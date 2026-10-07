@@ -9,7 +9,9 @@ const ROOT_OPTIONS = {
 export const COMMANDS = {
   version: { rootFree: true, load: async () => ({ options: {}, run: () => ({ name: "devctx", version: "0.0.0-local" }) }) },
   help: { rootFree: true, load: async () => ({ options: {}, run: () => ({ commands: listCommands() }) }) },
-  doctor: { load: async () => ({ options: {}, run: () => ({}) }) }
+  doctor: { load: async () => ({ options: {}, run: () => ({}) }) },
+  init: { load: async () => (await import("./config/commands.mjs")).initCommand },
+  "scope add": { load: async () => (await import("./config/commands.mjs")).scopeAddCommand }
 };
 export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;

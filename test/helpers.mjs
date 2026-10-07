@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import { main } from "../src/cli.mjs";
 import { loadPilot, rootsFromPilot } from "../src/config/pilot.mjs";
+import { applyInit } from "../src/config/store.mjs";
 export { sleep };
 export const now = () => new Date("2026-10-07T00:00:00.000Z");
 export async function sandbox(t) {
@@ -62,4 +63,9 @@ export async function treeSnapshot(dir) {
   }
   await walk(dir);
   return createHash("sha256").update(JSON.stringify(rows)).digest("hex");
+}
+export async function initPilot(t) {
+  const p = await makePilot(t);
+  await applyInit(p.roots, { actorRefs: ["email:owner@example.com"], preferences: {}, now });
+  return p;
 }

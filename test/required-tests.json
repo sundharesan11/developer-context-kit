@@ -21,5 +21,9 @@
   "parent dir swapped for symlink is refused; content mutation detected",
   "denied (including nested .env) and oversized files are skipped with reasons",
   "content mutated while the descriptor is held is SOURCE_CHANGED",
-  "parent directory replaced after the read (same bytes) is SOURCE_CHANGED; identity is persisted"
+  "parent directory replaced after the read (same bytes) is SOURCE_CHANGED; identity is persisted",
+  "init preview writes nothing; apply creates private layout; idempotent",
+  "registry publish requires the expected generation",
+  "mutating library calls refuse roots that are not pilot-bound",
+  "preferences are validated and stored separately; scope policies must name a listed hub"
 ]
