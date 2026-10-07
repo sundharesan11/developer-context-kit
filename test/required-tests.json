@@ -13,5 +13,8 @@
   "root-bound lock refuses escaped state root before touching outside",
   "concurrent writers serialize; a foreign lock is never broken",
   "fingerprint mismatch is refused",
-  "request hash ignores order and non-request fields; deterministic id is stable and payload-bound"
+  "request hash ignores order and non-request fields; deterministic id is stable and payload-bound",
+  "linked worktree, branch, head and dirty warning",
+  "repository fsmonitor never runs; inherited GIT_DIR ignored; probe writes nothing",
+  "git takes an argument array and strips credentials from remotes"
 ]
