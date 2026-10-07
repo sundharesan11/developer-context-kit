@@ -18,7 +18,10 @@ export const COMMANDS = {
   "record publish": { load: async () => (await import("./records/commands.mjs")).recordPublishCommand },
   "project onboard": { load: async () => (await import("./onboarding/commands.mjs")).projectOnboardCommand },
   "context resolve": { load: async () => (await import("./context/commands.mjs")).contextResolveCommand },
-  "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand }
+  "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand },
+  "agents install": { load: async () => (await import("./agents/commands.mjs")).agentsInstallCommand },
+  "agents uninstall": { load: async () => (await import("./agents/commands.mjs")).agentsUninstallCommand },
+  "agents status": { load: async () => (await import("./agents/commands.mjs")).agentsStatusCommand }
 };
 export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;

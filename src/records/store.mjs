@@ -133,6 +133,6 @@ export async function publishProposal(roots, { scope, project, proposalId, revie
   if (!controller) throw new DevctxError("APPROVAL_REQUIRED", "Controller required");
   const path = join(dirFor(roots, scope, project), "proposals", proposalId + ".json");
   const proposal = await readPrivateJson(path);
-  return addRecord(roots, { ...proposal.input, scope, project, draft: { ...proposal.input.draft, review: review ?? proposal.input.draft.review } }, { now });
+  return addRecord(roots, { ...proposal.input, scope, project, draft: { ...proposal.input.draft, status: "observed", review: review ?? proposal.input.draft.review } }, { now });
 }
 export { recordHash };

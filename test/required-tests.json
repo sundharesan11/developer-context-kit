@@ -48,5 +48,9 @@
   "symlinked cwd refused; subdirectory resolves; brief deterministic and bounded",
   "changed source marks needs-revalidation; dirty worktree warns",
   "required policy is loaded first or the brief fails; optional policy omission is counted",
-  "receipt separates preferences, scope policies and project records"
+  "receipt separates preferences, scope policies and project records",
+  "handoff: claude proposes, controller publishes, codex brief shows it with provenance",
+  "envelope rejects outputs outside worktree and publish operations; notice present",
+  "install: preview, apply, idempotent, conflict preserved, modified preserved on uninstall",
+  "installer status reports incomplete journal without repair"
 ]
