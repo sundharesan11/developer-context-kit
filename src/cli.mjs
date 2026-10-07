@@ -1,13 +1,15 @@
 import { parseArgs } from "node:util";
 import { homedir } from "node:os";
 import { DevctxError, toJson } from "./errors.mjs";
+import { loadPilot, rootsFromPilot } from "./config/pilot.mjs";
 const ROOT_OPTIONS = {
   "config-root": { type: "string" }, "data-root": { type: "string" },
   "state-root": { type: "string" }, pilot: { type: "string" }
 };
 export const COMMANDS = {
   version: { rootFree: true, load: async () => ({ options: {}, run: () => ({ name: "devctx", version: "0.0.0-local" }) }) },
-  help: { rootFree: true, load: async () => ({ options: {}, run: () => ({ commands: listCommands() }) }) }
+  help: { rootFree: true, load: async () => ({ options: {}, run: () => ({ commands: listCommands() }) }) },
+  doctor: { load: async () => ({ options: {}, run: () => ({}) }) }
 };
 export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;
@@ -24,6 +26,7 @@ export async function main(argv, options = {}) {
   try {
     const routed = routeFor(argv);
     command = routed.route;
+    if (!isRootFree(command) && !routed.args.includes("--pilot")) throw new DevctxError("GATE_REQUIRED", "v0 runs only inside a pilot fence");
     const impl = await COMMANDS[command].load();
     let values;
     try {
@@ -31,8 +34,15 @@ export async function main(argv, options = {}) {
     } catch {
       throw new DevctxError("USAGE", "Invalid command options");
     }
-    if (!isRootFree(command) && !values.pilot) throw new DevctxError("GATE_REQUIRED", "Pilot file required");
-    const result = await impl.run(values, { now, home, env });
+    let pilot, roots;
+    if (!isRootFree(command)) {
+      pilot = await loadPilot(values.pilot, { home, env });
+      roots = rootsFromPilot(pilot);
+      for (const [flag, key] of [["config-root", "configRoot"], ["data-root", "dataRoot"], ["state-root", "stateRoot"]]) {
+        if (values[flag] && values[flag] !== roots[key]) throw new DevctxError("GATE_REQUIRED", "Root does not match pilot");
+      }
+    }
+    const result = await impl.run(values, { roots, pilot, now, home, env });
     stdout.write(JSON.stringify({ ok: true, command, result }) + "\n");
     return 0;
   } catch (error) {

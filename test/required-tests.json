@@ -2,5 +2,11 @@
   "version prints JSON and exits 0",
   "unknown command or flag exits 2",
   "digest ignores key order; non-finite rejected",
-  "G1 gate rejects empty, comment-only, skipped and missing required tests"
+  "canonical JSON preserves own special keys and array order",
+  "G1 gate rejects empty, comment-only, skipped and missing required tests",
+  "writeNewFile is 0600 and never overwrites; readPrivateText refuses symlinks",
+  "safeJoin refuses traversal",
+  "pilot fence refuses real agent homes, configured homes, default roots and forbidden overlap",
+  "assertWritable rechecks the fence at write time; escaped member is refused",
+  "CLI: only version and help are root-free; every other route refuses without --pilot"
 ]
