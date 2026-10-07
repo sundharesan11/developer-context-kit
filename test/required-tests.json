@@ -1,0 +1,6 @@
+[
+  "version prints JSON and exits 0",
+  "unknown command or flag exits 2",
+  "digest ignores key order; non-finite rejected",
+  "G1 gate rejects empty, comment-only, skipped and missing required tests"
+]
