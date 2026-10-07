@@ -4,14 +4,14 @@ import { mkdir, writeFile, readFile, symlink, link, unlink } from "node:fs/promi
 import { join } from "node:path";
 import { makePilot, initPilot, runCli } from "./helpers.mjs";
 import { applyScopeAdd } from "../src/config/store.mjs";
-import { createWorkspace } from "../src/skill-builder/workspace.mjs";
+import { createWorkspace, recordRequirements, createDraft } from "../src/skill-builder/workspace.mjs";
 import { validatePackage } from "../src/skill-builder/validate.mjs";
 
 const sel = ["--audience", "personal", "--workspace", "ws_fixture01"];
 async function call(p, route, args = []) { return runCli(["skill", route, "--pilot", p.path, ...sel, ...args]); }
 async function input(p, name, value) { const path = join(p.inputsRoot, name); await writeFile(path, JSON.stringify(value)); return path; }
-const requirements = { goal: "Summarize a daily note", success: "Produces a dated summary", examples: ["Summarize today's note"], negativeExample: "Write a new note", inputs: ["note text"], permittedTools: [], forbiddenTools: ["network"], supportedAgents: ["codex"], output: "Markdown summary", failure: "Explain missing note", destination: "private", unknowns: [] };
-const design = { name: "summarize-note", description: "Summarize a daily note into a dated Markdown report.", workflow: ["Read note", "Summarize"], outputs: ["Markdown summary"], dependencies: [], tests: ["fixture note"], tree: ["SKILL.md"], reuse: "No bundled skill covers this fixture." };
+const requirements = { goal: "Summarize a daily note", success: "Produces a dated summary", examples: ["Summarize today's note"], negativeExample: "Write a new note", inputs: ["note text"], permittedTools: [], forbiddenTools: ["network"], permittedContext: [], forbiddenContext: [], supportedAgents: ["codex"], output: "Markdown summary", failure: "Explain missing note", destination: "private", unknowns: [] };
+const design = { name: "summarize-note", description: "Summarize a daily note into a dated Markdown report.", workflow: ["Read note", "Summarize"], outputs: ["Markdown summary"], dependencies: [], tests: ["fixture note"], tree: ["SKILL.md"], destinations: ["private"], reuse: "No bundled skill covers this fixture." };
 async function setup(p) {
   assert.equal((await call(p, "workspace-create")).code, 0);
   const rq = await input(p, "requirements.json", requirements);
@@ -40,7 +40,7 @@ test("draft creation rejects missing and mismatched explicit design approval", a
   assert.equal(missing.code, 1);
   const wrong = await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "approve sha256:wrong"]);
   assert.equal(wrong.code, 1);
-  const accepted = await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approve " + digest]);
+  const accepted = await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest]);
   assert.equal(accepted.code, 0, JSON.stringify(accepted.json));
   const created = await call(p, "draft-create", draft);
   assert.equal(created.code, 0, JSON.stringify(created.json));
@@ -55,7 +55,7 @@ test("draft creation rejects missing and mismatched explicit design approval", a
 
 test("design approval is stale after named requirements change", async (t) => {
   const p = await makePilot(t), digest = await setup(p);
-  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", digest])).code, 0);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
   const path = join(p.dataRoot, "personal", "skill-workspaces", "ws_fixture01", "requirements", "rq_fixture01.json");
   await writeFile(path, JSON.stringify({ ...requirements, goal: "Changed" }));
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate); await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a note.\n---\n# Summary\n");
@@ -65,7 +65,7 @@ test("design approval is stale after named requirements change", async (t) => {
 
 test("intake rejects symlinked package files without running helpers", async (t) => {
   const p = await makePilot(t), digest = await setup(p);
-  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", digest])).code, 0);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate);
   await symlink(join(p.inputsRoot, "design.json"), join(candidate, "SKILL.md"));
   const result = await call(p, "draft-create", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate]);
@@ -92,7 +92,7 @@ test("company and project workspaces require registered membership and keep scop
 
 test("validation records missing references as failure and leaves revision private", async (t) => {
   const p = await makePilot(t), digest = await setup(p);
-  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", digest])).code, 0);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate);
   await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a note.\n---\n# Summary\nSee [guide](references/guide.md).\n");
   const draft = await call(p, "draft-create", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate]);
@@ -105,11 +105,11 @@ test("validation records missing references as failure and leaves revision priva
 
 test("tampering with a revision prevents validation and is visible without leaking bodies", async (t) => {
   const p = await makePilot(t), digest = await setup(p);
-  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", digest])).code, 0);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate);
   await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a note.\n---\n# Summary\n");
   assert.equal((await call(p, "draft-create", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate])).code, 0);
-  const file = join(p.dataRoot, "personal", "skill-workspaces", "ws_fixture01", "drafts", "rv_fixture01", "package", "SKILL.md");
+  const file = join(p.dataRoot, "personal", "skill-workspaces", "ws_fixture01", "drafts", "rv_fixture01", "summarize-note", "SKILL.md");
   await writeFile(file, "changed");
   assert.equal((await call(p, "draft-validate", ["--revision", "rv_fixture01"])).code, 1);
   const shown = await call(p, "workspace-show");
@@ -119,7 +119,7 @@ test("tampering with a revision prevents validation and is visible without leaki
 
 test("unsupported frontmatter is a recorded validation failure", async (t) => {
   const p = await makePilot(t), digest = await setup(p);
-  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", digest])).code, 0);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate);
   await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: 'quoted unsupported'\n---\n# Summary\n");
   assert.equal((await call(p, "draft-create", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate])).code, 0);
@@ -136,7 +136,7 @@ test("relative links in reference files resolve beside that file", () => {
 
 test("changed design content invalidates its approval before draft publication", async (t) => {
   const p = await makePilot(t), digest = await setup(p);
-  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", digest])).code, 0);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
   const designPath = join(p.dataRoot, "personal", "skill-workspaces", "ws_fixture01", "designs", "ds_fixture01.json");
   const changed = JSON.parse(await readFile(designPath, "utf8"));
   changed.description = "Changed design"; await writeFile(designPath, JSON.stringify(changed));
@@ -146,7 +146,7 @@ test("changed design content invalidates its approval before draft publication",
 
 test("hardlinked and oversized package sources are refused", async (t) => {
   const p = await makePilot(t), digest = await setup(p);
-  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", digest])).code, 0);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate);
   const original = join(p.inputsRoot, "original.md"); await writeFile(original, "---\nname: summarize-note\ndescription: Summarize a note.\n---\n# Summary\n");
   await link(original, join(candidate, "SKILL.md"));
@@ -159,7 +159,7 @@ test("hardlinked and oversized package sources are refused", async (t) => {
 
 test("helper files stay inert and validation marks them unverified", async (t) => {
   const p = await makePilot(t), digest = await setup(p);
-  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", digest])).code, 0);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(join(candidate, "scripts"), { recursive: true });
   await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a note.\n---\n# Summary\n");
   await writeFile(join(candidate, "scripts", "helper.sh"), "#!/bin/sh\nexit 42\n");
@@ -167,4 +167,69 @@ test("helper files stay inert and validation marks them unverified", async (t) =
   const checked = await call(p, "draft-validate", ["--revision", "rv_fixture01"]);
   assert.equal(checked.code, 0);
   assert.equal(checked.json.result.helpers, "unverified");
+});
+
+test("direct requirements intake uses roots pilot and refuses outside files", async (t) => {
+  const p = await makePilot(t); await setup(p);
+  const outside = join(p.sandbox, "outside"); await mkdir(outside);
+  const file = join(outside, "rq.json"); await writeFile(file, JSON.stringify({ ...requirements, goal: "Outside marker" }));
+  await assert.rejects(recordRequirements(p.roots, { audience: "personal", workspace: "ws_fixture01" }, "rq_outside01", file), { code: "DEVCTX_GATE_REQUIRED" });
+});
+
+test("typed YAML plain scalars and a denial are refused", async (t) => {
+  const base = "---\nname: summarize-note\ndescription: VALUE\n---\n# Body\n";
+  for (const value of ["null", "true", "123", "yes", "off", "2026-10-08", "0x1f", "1e3"]) assert.throws(() => validatePackage({ "SKILL.md": base.replace("VALUE", value) }, "summarize-note"));
+  const p = await makePilot(t), digest = await setup(p);
+  const denied = await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "I do NOT approve " + digest]);
+  assert.equal(denied.code, 1);
+});
+
+test("crashed staging is retained, blocks revision reuse, and incomplete draft is distinct", async (t) => {
+  const p = await makePilot(t), digest = await setup(p);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
+  const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate); await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a note.\n---\n# Summary\n");
+  await assert.rejects(createDraft(p.roots, { audience: "personal", workspace: "ws_fixture01" }, { requirementsId: "rq_fixture01", designId: "ds_fixture01", decisionId: "dc_fixture01", revisionId: "rv_fixture01", candidate }, { faults: { afterFiles: () => { throw new Error("synthetic crash"); } } }));
+  const retry = await call(p, "draft-create", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate]);
+  assert.equal(retry.json.error.code, "DEVCTX_CONFLICT");
+  const draftDir = join(p.dataRoot, "personal", "skill-workspaces", "ws_fixture01", "drafts", "rv_missing01"); await mkdir(draftDir);
+  const shown = await call(p, "workspace-show");
+  assert.deepEqual(shown.json.result.staging, ["rv_fixture01"]);
+  assert.equal(shown.json.result.revisions.find((r) => r.id === "rv_missing01").status, "incomplete");
+});
+
+test("drafts use the named package directory and report validation status", async (t) => {
+  const p = await makePilot(t), digest = await setup(p);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
+  const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate); await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a note.\n---\n# Summary\n");
+  assert.equal((await call(p, "draft-create", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate])).code, 0);
+  assert.equal((await call(p, "draft-validate", ["--revision", "rv_fixture01"])).code, 0);
+  assert.equal((await readFile(join(p.dataRoot, "personal", "skill-workspaces", "ws_fixture01", "drafts", "rv_fixture01", "summarize-note", "SKILL.md"), "utf8")).includes("# Summary"), true);
+  assert.equal((await call(p, "workspace-show")).json.result.revisions[0].validation, "valid");
+});
+
+test("invalid UTF-8 and excessive empty directories are rejected at intake", async (t) => {
+  const p = await makePilot(t), digest = await setup(p);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
+  const candidate = join(p.inputsRoot, "candidate"); await mkdir(join(candidate, "assets"), { recursive: true }); await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a note.\n---\n# Summary\n");
+  const args = ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate];
+  await writeFile(join(candidate, "assets", "bad.txt"), Buffer.from([0xe9, 0x41]));
+  assert.equal((await call(p, "draft-create", args)).code, 1);
+  await unlink(join(candidate, "assets", "bad.txt"));
+  for (let i = 0; i < 33; i++) await mkdir(join(candidate, "assets", "d" + i));
+  assert.equal((await call(p, "draft-create", args)).code, 1);
+});
+
+test("quoted string metadata, thematic breaks and contained parent links validate", () => {
+  const files = {
+    "SKILL.md": "---\nname: \"summarize-note\"\ndescription: \"Summarize a note: safely.\"\n---\n# Summary\n---\nSee [guide](references/guide.md).\n",
+    "references/guide.md": "See [main](../SKILL.md).\n```md\n[example](missing.md)\n```\n"
+  };
+  const result = validatePackage(files, "summarize-note");
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.missing, []);
+});
+
+test("quoted description cannot decode to multiple lines", () => {
+  const files = { "SKILL.md": "---\nname: summarize-note\ndescription: \"first\\nsecond\"\n---\n# Body\n" };
+  assert.throws(() => validatePackage(files, "summarize-note"));
 });

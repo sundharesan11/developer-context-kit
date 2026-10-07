@@ -10,10 +10,10 @@ const common = { audience: { type: "string" }, scope: { type: "string" }, projec
 const requirements = { requirements: { type: "string" } }, design = { design: { type: "string" } }, decision = { decision: { type: "string" } }, revision = { revision: { type: "string" } };
 const selection = (v) => ({ audience: v.audience, scope: v.scope, project: v.project, workspace: v.workspace });
 export const workspaceCreateCommand = { options: common, run: (v, ctx) => createWorkspace(ctx.roots, selection(v)) };
-export const requirementsRecordCommand = { options: { ...common, ...requirements, input: { type: "string" } }, run: (v, ctx) => recordRequirements(ctx.roots, ctx.pilot, selection(v), v.requirements, v.input) };
-export const designRecordCommand = { options: { ...common, ...requirements, ...design, input: { type: "string" } }, run: (v, ctx) => recordDesign(ctx.roots, ctx.pilot, selection(v), v.requirements, v.design, v.input) };
+export const requirementsRecordCommand = { options: { ...common, ...requirements, input: { type: "string" } }, run: (v, ctx) => recordRequirements(ctx.roots, selection(v), v.requirements, v.input) };
+export const designRecordCommand = { options: { ...common, ...requirements, ...design, input: { type: "string" } }, run: (v, ctx) => recordDesign(ctx.roots, selection(v), v.requirements, v.design, v.input) };
 export const designApproveCommand = { options: { ...common, ...design, ...decision, "interaction-ref": { type: "string" }, response: { type: "string" } }, run: (v, ctx) => approveDesign(ctx.roots, selection(v), v.design, v.decision, v["interaction-ref"], v.response) };
-export const draftCreateCommand = { options: { ...common, ...requirements, ...design, ...decision, ...revision, candidate: { type: "string" } }, run: (v, ctx) => createDraft(ctx.roots, ctx.pilot, selection(v), { requirementsId: v.requirements, designId: v.design, decisionId: v.decision, revisionId: v.revision, candidate: v.candidate }) };
+export const draftCreateCommand = { options: { ...common, ...requirements, ...design, ...decision, ...revision, candidate: { type: "string" } }, run: (v, ctx) => createDraft(ctx.roots, selection(v), { requirementsId: v.requirements, designId: v.design, decisionId: v.decision, revisionId: v.revision, candidate: v.candidate }) };
 export const draftValidateCommand = { options: { ...common, ...revision }, run: (v, ctx) => validateDraft(ctx.roots, selection(v), v.revision) };
 export const workspaceShowCommand = { options: common, run: (v, ctx) => showWorkspace(ctx.roots, selection(v)) };
 
@@ -28,7 +28,7 @@ export const discoverCommand = { options: { fixture: { type: "string" } }, async
   if (v.fixture) {
     assertInPilot(ctx.pilot, v.fixture, "inputsRoot");
     const read = await readApprovedSource(ctx.pilot.inputsRoot, relative(ctx.pilot.inputsRoot, join(v.fixture, "SKILL.md")));
-    if (read.skipped) throw new DevctxError("INVALID_INPUT", "Fixture skill unavailable");
+    if (read.skipped || !read.utf8Valid) throw new DevctxError("INVALID_INPUT", "Fixture skill unavailable");
     const match = /^name: ([a-z0-9-]+)$/m.exec(read.text);
     if (!match) throw new DevctxError("INVALID_INPUT", "Fixture name unavailable");
     found.push({ name: match[1], description: /^description:\s*(.+)$/m.exec(read.text)?.[1] ?? "", origin: "fixture", path: relative(ctx.pilot.inputsRoot, v.fixture) + "/SKILL.md" });

@@ -20,12 +20,17 @@ function parseFrontmatter(text) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   if (lines[0] !== "---") throw new DevctxError("INVALID_INPUT", "Skill frontmatter required");
   const end = lines.indexOf("---", 1);
-  if (end < 2 || lines.slice(end + 1).some((line) => line === "---")) throw new DevctxError("INVALID_INPUT", "Invalid frontmatter delimiter");
+  if (end < 2) throw new DevctxError("INVALID_INPUT", "Invalid frontmatter delimiter");
   const meta = {};
   for (const line of lines.slice(1, end)) {
     const match = /^(name|description): ([^\s].*)$/.exec(line);
-    if (!match || Object.hasOwn(meta, match[1]) || !/^[A-Za-z0-9][A-Za-z0-9 .,!?'()/_-]*$/.test(match[2])) throw new DevctxError("INVALID_INPUT", "Unsupported frontmatter syntax");
-    meta[match[1]] = match[2].trim();
+    if (!match || Object.hasOwn(meta, match[1])) throw new DevctxError("INVALID_INPUT", "Unsupported frontmatter syntax");
+    let value = match[2];
+    if (value.startsWith('"')) {
+      try { value = JSON.parse(value); } catch { throw new DevctxError("INVALID_INPUT", "Unsupported quoted scalar"); }
+      if (typeof value !== "string" || /[\r\n\0]/.test(value)) throw new DevctxError("INVALID_INPUT", "Skill metadata must be one-line strings");
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9 .,!?'()/_-]*$/.test(value) || /^(?:null|true|false|yes|no|on|off|~)$/i.test(value) || /^(?:[+-]?\d|\d{4}-\d{2}-\d{2})/.test(value)) throw new DevctxError("INVALID_INPUT", "Ambiguous plain scalar");
+    meta[match[1]] = value;
   }
   if (Object.keys(meta).length !== 2 || !lines.slice(end + 1).join("\n").trim()) throw new DevctxError("INVALID_INPUT", "Incomplete skill");
   return { meta, body: lines.slice(end + 1).join("\n") };
@@ -47,14 +52,22 @@ export function validatePackage(files, expectedName) {
   const missing = [], unchecked = [];
   for (const rel of paths.filter((p) => p.endsWith(".md"))) {
     const content = rel === "SKILL.md" ? parseFrontmatter(files[rel]).body : files[rel];
-    for (const match of content.matchAll(/\[[^\]\n]+\]\(([^)]+)\)/g)) {
-      const target = match[1].split("#", 1)[0];
-      if (!target || /^[a-z][a-z0-9+.-]*:/i.test(target)) continue;
-      const resolved = posix.join(posix.dirname(rel), target);
-      try { assertSourceRel(target); assertPackageRel(resolved); if (!paths.includes(resolved)) missing.push(resolved); }
-      catch { missing.push(target); }
+    let fenced = false;
+    for (const line of content.split("\n")) {
+      if (/^\s*```/.test(line)) { fenced = !fenced; continue; }
+      if (fenced) continue;
+      for (const match of line.matchAll(/\[[^\]\n]+\]\(([^)]+)\)/g)) {
+        const target = match[1].split("#", 1)[0];
+        if (!target || /^[a-z][a-z0-9+.-]*:/i.test(target)) continue;
+        const resolved = posix.join(posix.dirname(rel), target);
+        try {
+          if (target.startsWith("/") || target.split("/").some((part) => !part || !/^[A-Za-z0-9._-]+$/.test(part))) throw new Error("unsafe");
+          assertPackageRel(resolved);
+          if (!paths.includes(resolved)) missing.push(resolved);
+        } catch { missing.push(target); }
+      }
+      if (/\[[^\]]+\]\[[^\]]*\]|<a\s/i.test(line)) unchecked.push(rel);
     }
-    if (/\[[^\]]+\]\[[^\]]*\]|<a\s/i.test(content)) unchecked.push(rel);
   }
   return { valid: missing.length === 0, name: meta.name, files: paths.length, missing, unchecked, helpers: paths.some((p) => p.startsWith("scripts/")) ? "unverified" : "none" };
 }

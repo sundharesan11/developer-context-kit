@@ -84,5 +84,12 @@
   "relative links in reference files resolve beside that file",
   "changed design content invalidates its approval before draft publication",
   "hardlinked and oversized package sources are refused",
-  "helper files stay inert and validation marks them unverified"
+  "helper files stay inert and validation marks them unverified",
+  "direct requirements intake uses roots pilot and refuses outside files",
+  "typed YAML plain scalars and a denial are refused",
+  "crashed staging is retained, blocks revision reuse, and incomplete draft is distinct",
+  "drafts use the named package directory and report validation status",
+  "invalid UTF-8 and excessive empty directories are rejected at intake",
+  "quoted string metadata, thematic breaks and contained parent links validate",
+  "quoted description cannot decode to multiple lines"
 ]

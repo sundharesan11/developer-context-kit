@@ -68,7 +68,8 @@ export async function readApprovedSource(root, rel, { faults = {} } = {}) {
     if (final.dev !== st1.dev || final.ino !== st1.ino || final.isSymbolicLink()) throw changed();
     if (realpathSync(dirname(path)) !== join(root, dirname(rel))) throw changed();
     const bytes = buf.subarray(0, off);
-    return { rel, dev: st1.dev, ino: st1.ino, size: st1.size, mtimeMs: st1.mtimeMs, sha256: "sha256:" + createHash("sha256").update(bytes).digest("hex"), ancestors: beforeAncestors.result, text: bytes.toString("utf8") };
+    const text = bytes.toString("utf8");
+    return { rel, dev: st1.dev, ino: st1.ino, size: st1.size, mtimeMs: st1.mtimeMs, sha256: "sha256:" + createHash("sha256").update(bytes).digest("hex"), ancestors: beforeAncestors.result, text, utf8Valid: Buffer.from(text, "utf8").equals(bytes) };
   } finally { await handle.close(); }
 }
 export function sourceIdentity(bound) {

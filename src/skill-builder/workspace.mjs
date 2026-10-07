@@ -44,7 +44,7 @@ async function inputJson(pilot, path) {
   if (typeof path !== "string") throw new DevctxError("INVALID_INPUT", "Input file required");
   assertInPilot(pilot, dirname(path), "inputsRoot");
   const read = await readApprovedSource(pilot.inputsRoot, relative(pilot.inputsRoot, path));
-  if (read.skipped || read.size > PACKAGE_LIMITS.fileBytes) throw new DevctxError("INVALID_INPUT", "Input file unavailable");
+  if (read.skipped || !read.utf8Valid || read.size > PACKAGE_LIMITS.fileBytes) throw new DevctxError("INVALID_INPUT", "Input file unavailable");
   if (lstatSync(path).nlink !== 1) throw new DevctxError("PATH_UNSAFE", "Linked input refused");
   let value; try { value = JSON.parse(read.text); } catch { throw new DevctxError("INVALID_INPUT", "Invalid JSON input"); }
   privateJson(value);
@@ -72,24 +72,24 @@ async function base(roots, selection) {
   return path;
 }
 function validateRequirements(value) {
-  exact(value, ["goal", "success", "examples", "negativeExample", "inputs", "permittedTools", "forbiddenTools", "supportedAgents", "output", "failure", "destination", "unknowns"]);
-  if (!["goal", "success", "negativeExample", "output", "failure", "destination"].every((k) => nonempty(value[k])) || !strings(value.examples) || value.examples.length === 0 || !["inputs", "permittedTools", "forbiddenTools", "supportedAgents", "unknowns"].every((k) => strings(value[k]))) throw new DevctxError("INVALID_INPUT", "Incomplete requirements");
+  exact(value, ["goal", "success", "examples", "negativeExample", "inputs", "permittedTools", "forbiddenTools", "permittedContext", "forbiddenContext", "supportedAgents", "output", "failure", "destination", "unknowns"]);
+  if (!["goal", "success", "negativeExample", "output", "failure", "destination"].every((k) => nonempty(value[k])) || !strings(value.examples) || value.examples.length === 0 || !["inputs", "permittedTools", "forbiddenTools", "permittedContext", "forbiddenContext", "supportedAgents", "unknowns"].every((k) => strings(value[k]))) throw new DevctxError("INVALID_INPUT", "Incomplete requirements");
 }
 function validateDesign(value) {
-  exact(value, ["name", "description", "workflow", "outputs", "dependencies", "tests", "tree", "reuse"]);
-  if (!SKILL_NAME.test(value.name ?? "") || value.name.length > 64 || !nonempty(value.description, 1024) || !nonempty(value.reuse) || !["workflow", "outputs", "dependencies", "tests", "tree"].every((k) => strings(value[k])) || !value.workflow.length || !value.outputs.length || !value.tree.includes("SKILL.md")) throw new DevctxError("INVALID_INPUT", "Incomplete skill design");
+  exact(value, ["name", "description", "workflow", "outputs", "dependencies", "tests", "tree", "destinations", "reuse"]);
+  if (!SKILL_NAME.test(value.name ?? "") || value.name.length > 64 || !nonempty(value.description, 1024) || !nonempty(value.reuse) || !["workflow", "outputs", "dependencies", "tests", "tree", "destinations"].every((k) => strings(value[k])) || !value.workflow.length || !value.outputs.length || !value.tree.includes("SKILL.md")) throw new DevctxError("INVALID_INPUT", "Incomplete skill design");
 }
-export async function recordRequirements(roots, pilot, selection, id, inputPath) {
+export async function recordRequirements(roots, selection, id, inputPath) {
   needId("requirements", id);
   assertWritable(roots, []);
-  const value = await inputJson(pilot, inputPath); validateRequirements(value);
+  const value = await inputJson(roots.pilot, inputPath); validateRequirements(value);
   const path = workspacePath(roots, selection), dest = jsonPath(path, "requirements", id);
   return locked(roots, [dest], async () => { await base(roots, selection); ensurePrivatePath(path, ["requirements"]); const record = { schemaVersion: 1, audience: selection.audience, scope: selection.scope ?? null, project: selection.project ?? null, workspace: selection.workspace, id, ...value }; await writeNewFile(dest, privateJson(record)); return { requirements: id, digest: digest(record) }; });
 }
-export async function recordDesign(roots, pilot, selection, requirementsId, designId, inputPath) {
+export async function recordDesign(roots, selection, requirementsId, designId, inputPath) {
   needId("requirements", requirementsId); needId("design", designId);
   assertWritable(roots, []);
-  const value = await inputJson(pilot, inputPath); validateDesign(value);
+  const value = await inputJson(roots.pilot, inputPath); validateDesign(value);
   const path = workspacePath(roots, selection), dest = jsonPath(path, "designs", designId);
   return locked(roots, [dest], async () => { await base(roots, selection); const req = await namedJson(jsonPath(path, "requirements", requirementsId)); ensurePrivatePath(path, ["designs"]); const record = { schemaVersion: 1, audience: selection.audience, scope: selection.scope ?? null, project: selection.project ?? null, workspace: selection.workspace, id: designId, requirements: requirementsId, requirementsDigest: digest(req), ...value }; await writeNewFile(dest, privateJson(record)); return { design: designId, digest: digest(record), requirementsDigest: record.requirementsDigest }; });
 }
@@ -102,7 +102,7 @@ export async function approveDesign(roots, selection, designId, decisionId, inte
     const req = await namedJson(jsonPath(path, "requirements", design.requirements));
     if (design.requirementsDigest !== digest(req)) throw new DevctxError("STALE_VERSION", "Design requirements changed");
     const designDigest = digest(design);
-    if (typeof interactionRef !== "string" || !/^user:[A-Za-z0-9._:-]{1,120}$/.test(interactionRef) || !nonempty(responseText, 2048) || !responseText.includes(designDigest)) throw new DevctxError("APPROVAL_REQUIRED", "Explicit design approval evidence required");
+    if (typeof interactionRef !== "string" || !/^user:[A-Za-z0-9._:-]{1,120}$/.test(interactionRef) || responseText !== "Approved " + designDigest) throw new DevctxError("APPROVAL_REQUIRED", "Canonical design approval evidence required");
     ensurePrivatePath(path, ["decisions"]);
     const record = { schemaVersion: 1, action: "approve-design", audience: selection.audience, scope: selection.scope ?? null, project: selection.project ?? null, workspace: selection.workspace, id: decisionId, design: designId, designDigest, interactionRef, responseText };
     await writeNewFile(dest, privateJson(record));
@@ -112,10 +112,14 @@ export async function approveDesign(roots, selection, designId, decisionId, inte
 
 function walk(root, { privateMode = false } = {}) {
   const files = [];
+  let directories = 0;
   function visit(path, rel, depth) {
     const st = lstatSync(path);
     if (st.isSymbolicLink() || st.nlink < 1 || (privateMode && st.uid !== process.getuid())) throw new DevctxError("PATH_UNSAFE", "Unsafe package path");
     if (st.isDirectory()) {
+      directories++;
+      if (directories > 32) throw new DevctxError("LIMIT", "Package directory limit exceeded");
+      if (rel) assertPackageRel(rel + "/placeholder.txt");
       if (depth >= PACKAGE_LIMITS.depth) throw new DevctxError("LIMIT", "Package depth exceeded");
       for (const name of readdirSync(path).sort()) visit(join(path, name), rel ? rel + "/" + name : name, depth + 1);
     } else if (st.isFile() && st.nlink === 1) {
@@ -133,7 +137,7 @@ async function intake(pilot, candidate) {
   let total = 0;
   for (const rel of paths) {
     const read = await readApprovedSource(pilot.inputsRoot, relative(pilot.inputsRoot, join(candidate, rel)));
-    if (read.skipped) throw new DevctxError("PATH_UNSAFE", "Package source unavailable");
+    if (read.skipped || !read.utf8Valid) throw new DevctxError("PATH_UNSAFE", "Package source unavailable or invalid UTF-8");
     total += read.size;
     if (total > PACKAGE_LIMITS.totalBytes || lstatSync(join(candidate, rel)).nlink !== 1) throw new DevctxError("LIMIT", "Package size or linked source refused");
     assertNoSensitive(read.text);
@@ -146,28 +150,34 @@ async function approved(path, requirementsId, designId, decisionId) {
   const design = await namedJson(jsonPath(path, "designs", designId));
   const req = await namedJson(jsonPath(path, "requirements", requirementsId));
   const decision = await namedJson(jsonPath(path, "decisions", decisionId));
-  if (design.requirements !== requirementsId || design.requirementsDigest !== digest(req) || decision.action !== "approve-design" || decision.design !== designId || decision.designDigest !== digest(design) || !decision.responseText?.includes(decision.designDigest) || [req, design, decision].some((item) => item.audience !== req.audience || item.scope !== req.scope || item.project !== req.project || item.workspace !== req.workspace)) throw new DevctxError("STALE_VERSION", "Design approval is stale");
+  if (design.requirements !== requirementsId || design.requirementsDigest !== digest(req) || decision.action !== "approve-design" || decision.design !== designId || decision.designDigest !== digest(design) || decision.responseText !== "Approved " + decision.designDigest || [req, design, decision].some((item) => item.audience !== req.audience || item.scope !== req.scope || item.project !== req.project || item.workspace !== req.workspace)) throw new DevctxError("STALE_VERSION", "Design approval is stale");
   return { design, decision };
 }
-export async function createDraft(roots, pilot, selection, { requirementsId, designId, decisionId, revisionId, candidate }) {
+export async function createDraft(roots, selection, { requirementsId, designId, decisionId, revisionId, candidate }, { faults = {} } = {}) {
   needId("requirements", requirementsId); needId("design", designId); needId("decision", decisionId); needId("revision", revisionId);
   assertWritable(roots, []);
-  const files = await intake(pilot, candidate);
+  const files = await intake(roots.pilot, candidate);
   const path = workspacePath(roots, selection), staging = safeJoin(path, "staging", revisionId), final = safeJoin(path, "drafts", revisionId);
-  const destinations = [staging, final, ...Object.keys(files).map((rel) => join(staging, "package", ...rel.split("/"))), join(staging, "manifest.json")];
+  const destinations = [staging, final, join(staging, "manifest.json")];
   return locked(roots, destinations, async () => {
     await base(roots, selection);
     const { design, decision } = await approved(path, requirementsId, designId, decisionId);
     if (existsSync(staging) || existsSync(final)) throw new DevctxError("CONFLICT", "Revision ID exists or has incomplete staging");
     if (design.name !== files["SKILL.md"].match(/^name: ([^\n\r]+)$/m)?.[1]) throw new DevctxError("INVALID_INPUT", "Package name differs from approved design");
-    ensurePrivatePath(path, ["staging", revisionId, "package"]);
+    ensurePrivatePath(path, ["staging", revisionId, design.name]);
     ensurePrivatePath(path, ["drafts"]);
     const entries = [];
     for (const rel of Object.keys(files).sort()) {
-      const parts = rel.split("/"); if (parts.length > 1) ensurePrivatePath(join(staging, "package"), parts.slice(0, -1));
-      const file = join(staging, "package", ...parts);
+      const parts = rel.split("/"); if (parts.length > 1) ensurePrivatePath(join(staging, design.name), parts.slice(0, -1));
+      const file = join(staging, design.name, ...parts);
+      assertWritable(roots, [file]);
       await writeNewFile(file, files[rel]); entries.push({ path: rel, sha256: sha256(files[rel]) });
     }
+    for (const entry of entries) {
+      const staged = join(staging, design.name, ...entry.path.split("/"));
+      if (sha256(await readPrivateText(staged, PACKAGE_LIMITS.fileBytes)) !== entry.sha256) throw new DevctxError("INTEGRITY", "Staged package changed");
+    }
+    if (faults.afterFiles) await faults.afterFiles();
     const manifest = { schemaVersion: 1, audience: selection.audience, scope: selection.scope ?? null, project: selection.project ?? null, workspace: selection.workspace, revision: revisionId, name: design.name, design: designId, designDigest: digest(design), decision: decisionId, decisionDigest: digest(decision), files: entries };
     manifest.packageDigest = digest(manifest);
     await writeNewFile(join(staging, "manifest.json"), privateJson(manifest));
@@ -184,11 +194,12 @@ async function revision(roots, selection, revisionId) {
   const { packageDigest, ...content } = manifest;
   if (packageDigest !== digest(content) || manifest.workspace !== selection.workspace || manifest.audience !== selection.audience || manifest.scope !== (selection.scope ?? null) || manifest.project !== (selection.project ?? null)) throw new DevctxError("INTEGRITY", "Revision manifest mismatch");
   if (!Array.isArray(manifest.files) || manifest.files.length > PACKAGE_LIMITS.files || manifest.files.some((f) => typeof f?.path !== "string" || typeof f?.sha256 !== "string")) throw new DevctxError("INTEGRITY", "Revision manifest inventory invalid");
-  const paths = walk(join(dir, "package"), { privateMode: true });
+  if (!SKILL_NAME.test(manifest.name ?? "") || manifest.name.length > 64) throw new DevctxError("INTEGRITY", "Revision package name invalid");
+  const paths = walk(join(dir, manifest.name), { privateMode: true });
   if (JSON.stringify(paths) !== JSON.stringify(manifest.files.map((f) => f.path).sort())) throw new DevctxError("INTEGRITY", "Revision file inventory changed");
   const files = {};
   for (const entry of manifest.files) {
-    const text = await readPrivateText(join(dir, "package", ...entry.path.split("/")), PACKAGE_LIMITS.fileBytes);
+    const text = await readPrivateText(join(dir, manifest.name, ...entry.path.split("/")), PACKAGE_LIMITS.fileBytes);
     if (sha256(text) !== entry.sha256) throw new DevctxError("INTEGRITY", "Revision package changed");
     files[entry.path] = text;
   }
@@ -214,8 +225,17 @@ export async function showWorkspace(roots, selection) {
   const requirements = cleanNames("requirements", /^rq_[a-z0-9_-]{8,64}\.json$/), designs = cleanNames("designs", /^ds_[a-z0-9_-]{8,64}\.json$/), decisions = cleanNames("decisions", /^dc_[a-z0-9_-]{8,64}\.json$/), staging = names(join(path, "staging"), IDS.revision);
   const revisions = [];
   for (const id of names(join(path, "drafts"), IDS.revision)) {
-    try { const { manifest } = await revision(roots, selection, id); revisions.push({ id, packageDigest: manifest.packageDigest, status: "intact" }); }
-    catch { revisions.push({ id, status: "tampered" }); }
+    if (!info(join(path, "drafts", id, "manifest.json"))) { revisions.push({ id, status: "incomplete", validation: "none" }); continue; }
+    try {
+      const { manifest } = await revision(roots, selection, id);
+      const validationPath = safeJoin(path, "validations", id, VALIDATOR_VERSION + ".json");
+      let validation = "none";
+      if (info(validationPath)) {
+        try { const receipt = await namedJson(validationPath); validation = receipt.packageDigest === manifest.packageDigest ? receipt.valid ? "valid" : "invalid" : "stale"; }
+        catch { validation = "stale"; }
+      }
+      revisions.push({ id, packageDigest: manifest.packageDigest, status: "intact", validation });
+    } catch { revisions.push({ id, status: "tampered", validation: "stale" }); }
   }
   return { audience: selection.audience, scope: selection.scope ?? null, project: selection.project ?? null, workspace: selection.workspace, requirements, designs, decisions, revisions, staging };
 }
