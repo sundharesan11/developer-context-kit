@@ -52,5 +52,9 @@
   "handoff: claude proposes, controller publishes, codex brief shows it with provenance",
   "envelope rejects outputs outside worktree and publish operations; notice present",
   "install: preview, apply, idempotent, conflict preserved, modified preserved on uninstall",
-  "installer status reports incomplete journal without repair"
+  "installer status reports incomplete journal without repair",
+  "wrong account, workspace or actor cannot execute even a read; no fallback; secret never leaks",
+  "unverifiable actor is AUTH_UNVERIFIED; every operation re-verifies; disabled policy makes no provider call",
+  "approval binding rejects any changed field or expiry",
+  "hub proposal writes only a private proposal file; hub dir untouched"
 ]

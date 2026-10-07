@@ -119,3 +119,6 @@ export function draftFor(scope, project, opts = {}) {
   return { scope, project, requestId: opts.requestId ?? "req_default01", recordedBy: { actor: "human", runId: "run_fixture01" }, draft: { kind: opts.kind ?? "fact", status: opts.status ?? "observed", title: "Fixture fact", body: opts.body ?? "Fixture body", sources: [{ ref: "user:email:owner@example.com" }], applicability: { level: "project" }, review: opts.review ?? null } };
 }
 export const draft = (opts = {}) => draftFor("acme", "acme.atlas", opts);
+export function account(overrides = {}) {
+  return { id: "acct1", provider: "fake", accountId: "acct-expected", workspaceId: "ws-1", actorRef: "email:dev@example.com", secretRef: "fake:a", ...overrides, policy: { read: false, draft: false, outbound: false, ...(overrides.policy ?? {}) } };
+}

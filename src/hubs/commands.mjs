@@ -1,0 +1,2 @@
+import { proposeHubLearning } from "./propose.mjs";
+export const hubProposeCommand = { options: { scope: { type: "string" }, project: { type: "string" }, record: { type: "string", multiple: true }, hub: { type: "string" }, apply: { type: "boolean" } }, run: (values, ctx) => proposeHubLearning(ctx.roots, { scope: values.scope, project: values.project, recordIds: values.record ?? [], hubId: values.hub }, { now: ctx.now, apply: values.apply ?? false }) };

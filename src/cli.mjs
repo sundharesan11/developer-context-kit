@@ -21,7 +21,8 @@ export const COMMANDS = {
   "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand },
   "agents install": { load: async () => (await import("./agents/commands.mjs")).agentsInstallCommand },
   "agents uninstall": { load: async () => (await import("./agents/commands.mjs")).agentsUninstallCommand },
-  "agents status": { load: async () => (await import("./agents/commands.mjs")).agentsStatusCommand }
+  "agents status": { load: async () => (await import("./agents/commands.mjs")).agentsStatusCommand },
+  "hub propose": { load: async () => (await import("./hubs/commands.mjs")).hubProposeCommand }
 };
 export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;
