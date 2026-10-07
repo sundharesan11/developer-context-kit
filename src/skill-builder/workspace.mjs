@@ -11,7 +11,7 @@ import { canonicalJson, digest, sha256 } from "../storage/canonical.mjs";
 import { readApprovedSource } from "../storage/source-read.mjs";
 import { validateRoot } from "../config/roots.mjs";
 import { assertNoSensitive, findForbiddenFields } from "../records/redact.mjs";
-import { assertPackageRel, validatePackage, VALIDATOR_VERSION, PACKAGE_LIMITS, SKILL_NAME } from "./validate.mjs";
+import { assertPackageRel, parseFrontmatter, validatePackage, VALIDATOR_VERSION, PACKAGE_LIMITS, SKILL_NAME } from "./validate.mjs";
 
 const IDS = { workspace: /^ws_[a-z0-9_-]{8,64}$/, requirements: /^rq_[a-z0-9_-]{8,64}$/, design: /^ds_[a-z0-9_-]{8,64}$/, decision: /^dc_[a-z0-9_-]{8,64}$/, revision: /^rv_[a-z0-9_-]{8,64}$/ };
 function needId(kind, id) { if (typeof id !== "string" || !IDS[kind].test(id)) throw new DevctxError("INVALID_ID", "Invalid skill-builder identifier"); return id; }
@@ -163,7 +163,7 @@ export async function createDraft(roots, selection, { requirementsId, designId, 
     await base(roots, selection);
     const { design, decision } = await approved(path, requirementsId, designId, decisionId);
     if (existsSync(staging) || existsSync(final)) throw new DevctxError("CONFLICT", "Revision ID exists or has incomplete staging");
-    if (design.name !== files["SKILL.md"].match(/^name: ([^\n\r]+)$/m)?.[1]) throw new DevctxError("INVALID_INPUT", "Package name differs from approved design");
+    if (design.name !== parseFrontmatter(files["SKILL.md"], { nameOnly: true }).meta.name) throw new DevctxError("INVALID_INPUT", "Package name differs from approved design");
     ensurePrivatePath(path, ["staging", revisionId, design.name]);
     ensurePrivatePath(path, ["drafts"]);
     const entries = [];

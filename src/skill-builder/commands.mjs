@@ -5,6 +5,7 @@ import { DevctxError } from "../errors.mjs";
 import { assertInPilot } from "../config/pilot.mjs";
 import { readApprovedSource } from "../storage/source-read.mjs";
 import { createWorkspace, recordRequirements, recordDesign, approveDesign, createDraft, validateDraft, showWorkspace } from "./workspace.mjs";
+import { parseFrontmatter, SKILL_NAME } from "./validate.mjs";
 
 const common = { audience: { type: "string" }, scope: { type: "string" }, project: { type: "string" }, workspace: { type: "string" } };
 const requirements = { requirements: { type: "string" } }, design = { design: { type: "string" } }, decision = { decision: { type: "string" } }, revision = { revision: { type: "string" } };
@@ -29,9 +30,9 @@ export const discoverCommand = { options: { fixture: { type: "string" } }, async
     assertInPilot(ctx.pilot, v.fixture, "inputsRoot");
     const read = await readApprovedSource(ctx.pilot.inputsRoot, relative(ctx.pilot.inputsRoot, join(v.fixture, "SKILL.md")));
     if (read.skipped || !read.utf8Valid) throw new DevctxError("INVALID_INPUT", "Fixture skill unavailable");
-    const match = /^name: ([a-z0-9-]+)$/m.exec(read.text);
-    if (!match) throw new DevctxError("INVALID_INPUT", "Fixture name unavailable");
-    found.push({ name: match[1], description: /^description:\s*(.+)$/m.exec(read.text)?.[1] ?? "", origin: "fixture", path: relative(ctx.pilot.inputsRoot, v.fixture) + "/SKILL.md" });
+    const name = parseFrontmatter(read.text, { nameOnly: true }).meta.name;
+    if (!SKILL_NAME.test(name) || name.length > 64) throw new DevctxError("INVALID_INPUT", "Fixture name unavailable");
+    found.push({ name, description: /^description:\s*(.+)$/m.exec(read.text)?.[1] ?? "", origin: "fixture", path: relative(ctx.pilot.inputsRoot, v.fixture) + "/SKILL.md" });
   }
   return { sources: found };
 } };

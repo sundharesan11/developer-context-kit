@@ -12,12 +12,12 @@ async function call(p, route, args = []) { return runCli(["skill", route, "--pil
 async function input(p, name, value) { const path = join(p.inputsRoot, name); await writeFile(path, JSON.stringify(value)); return path; }
 const requirements = { goal: "Summarize a daily note", success: "Produces a dated summary", examples: ["Summarize today's note"], negativeExample: "Write a new note", inputs: ["note text"], permittedTools: [], forbiddenTools: ["network"], permittedContext: [], forbiddenContext: [], supportedAgents: ["codex"], output: "Markdown summary", failure: "Explain missing note", destination: "private", unknowns: [] };
 const design = { name: "summarize-note", description: "Summarize a daily note into a dated Markdown report.", workflow: ["Read note", "Summarize"], outputs: ["Markdown summary"], dependencies: [], tests: ["fixture note"], tree: ["SKILL.md"], destinations: ["private"], reuse: "No bundled skill covers this fixture." };
-async function setup(p) {
+async function setup(p, chosenDesign = design) {
   assert.equal((await call(p, "workspace-create")).code, 0);
   const rq = await input(p, "requirements.json", requirements);
   const recorded = await call(p, "requirements-record", ["--requirements", "rq_fixture01", "--input", rq]);
   assert.equal(recorded.code, 0, JSON.stringify(recorded.json));
-  const ds = await input(p, "design.json", design);
+  const ds = await input(p, "design.json", chosenDesign);
   const made = await call(p, "design-record", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--input", ds]);
   assert.equal(made.code, 0, JSON.stringify(made.json));
   return made.json.result.digest;
@@ -232,4 +232,44 @@ test("quoted string metadata, thematic breaks and contained parent links validat
 test("quoted description cannot decode to multiple lines", () => {
   const files = { "SKILL.md": "---\nname: summarize-note\ndescription: \"first\\nsecond\"\n---\n# Body\n" };
   assert.throws(() => validatePackage(files, "summarize-note"));
+});
+
+for (const name of ["summarize-note", "3d-render", "yes"]) {
+  test(`draft-create accepts a quoted approved name ${name}`, async (t) => {
+    const p = await makePilot(t), digest = await setup(p, { ...design, name });
+    const approved = await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest]);
+    assert.equal(approved.code, 0, JSON.stringify(approved.json));
+    const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate);
+    await writeFile(join(candidate, "SKILL.md"), `---\nname: "${name}"\ndescription: "A synthetic skill."\n---\n# Skill\n`);
+    const created = await call(p, "draft-create", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate]);
+    assert.equal(created.code, 0, JSON.stringify(created.json));
+    const validated = await call(p, "draft-validate", ["--revision", "rv_fixture01"]);
+    assert.equal(validated.json.result.valid, true, JSON.stringify(validated.json));
+  });
+}
+
+test("draft-create still refuses a decoded name different from the approved design", async (t) => {
+  const p = await makePilot(t), digest = await setup(p);
+  assert.equal((await call(p, "design-approve", ["--design", "ds_fixture01", "--decision", "dc_fixture01", "--interaction-ref", "user:fixture-1", "--response", "Approved " + digest])).code, 0);
+  const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate);
+  await writeFile(join(candidate, "SKILL.md"), '---\nname: "other-skill"\ndescription: "A synthetic skill."\n---\n# Skill\n');
+  const created = await call(p, "draft-create", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate]);
+  assert.equal(created.json.error.code, "DEVCTX_INVALID_INPUT");
+});
+
+for (const name of ["summarize-note", "3d-render", "yes"]) {
+  test(`synthetic discovery decodes a quoted name ${name}`, async (t) => {
+    const p = await makePilot(t), fixture = join(p.inputsRoot, "fixture"); await mkdir(fixture);
+    await writeFile(join(fixture, "SKILL.md"), `---\nname: "${name}"\ndescription: "A synthetic skill."\n---\n# Skill\n`);
+    const discovered = await runCli(["skill", "discover", "--pilot", p.path, "--fixture", fixture]);
+    assert.equal(discovered.code, 0, JSON.stringify(discovered.json));
+    assert.equal(discovered.json.result.sources.find((source) => source.origin === "fixture").name, name);
+  });
+}
+
+test("single-letter YAML boolean aliases require quoting", () => {
+  for (const value of ["y", "n", "Y", "N"]) {
+    const files = { "SKILL.md": `---\nname: summarize-note\ndescription: ${value}\n---\n# Skill\n` };
+    assert.throws(() => validatePackage(files, "summarize-note"), { code: "DEVCTX_INVALID_INPUT" });
+  }
 });

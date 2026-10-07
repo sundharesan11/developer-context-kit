@@ -15,7 +15,7 @@ export function assertPackageRel(rel) {
   return rel;
 }
 
-function parseFrontmatter(text) {
+export function parseFrontmatter(text, { nameOnly = false } = {}) {
   if (text.charCodeAt(0) === 0xfeff || text.includes("\0")) throw new DevctxError("INVALID_INPUT", "Unsupported skill text");
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   if (lines[0] !== "---") throw new DevctxError("INVALID_INPUT", "Skill frontmatter required");
@@ -23,16 +23,17 @@ function parseFrontmatter(text) {
   if (end < 2) throw new DevctxError("INVALID_INPUT", "Invalid frontmatter delimiter");
   const meta = {};
   for (const line of lines.slice(1, end)) {
+    if (nameOnly && !line.startsWith("name:")) continue;
     const match = /^(name|description): ([^\s].*)$/.exec(line);
     if (!match || Object.hasOwn(meta, match[1])) throw new DevctxError("INVALID_INPUT", "Unsupported frontmatter syntax");
     let value = match[2];
     if (value.startsWith('"')) {
       try { value = JSON.parse(value); } catch { throw new DevctxError("INVALID_INPUT", "Unsupported quoted scalar"); }
       if (typeof value !== "string" || /[\r\n\0]/.test(value)) throw new DevctxError("INVALID_INPUT", "Skill metadata must be one-line strings");
-    } else if (!/^[A-Za-z0-9][A-Za-z0-9 .,!?'()/_-]*$/.test(value) || /^(?:null|true|false|yes|no|on|off|~)$/i.test(value) || /^(?:[+-]?\d|\d{4}-\d{2}-\d{2})/.test(value)) throw new DevctxError("INVALID_INPUT", "Ambiguous plain scalar");
+    } else if (!/^[A-Za-z0-9][A-Za-z0-9 .,!?'()/_-]*$/.test(value) || /^(?:null|true|false|yes|no|on|off|y|n|~)$/i.test(value) || /^(?:[+-]?\d|\d{4}-\d{2}-\d{2})/.test(value)) throw new DevctxError("INVALID_INPUT", "Ambiguous plain scalar");
     meta[match[1]] = value;
   }
-  if (Object.keys(meta).length !== 2 || !lines.slice(end + 1).join("\n").trim()) throw new DevctxError("INVALID_INPUT", "Incomplete skill");
+  if (nameOnly ? !Object.hasOwn(meta, "name") : Object.keys(meta).length !== 2 || !lines.slice(end + 1).join("\n").trim()) throw new DevctxError("INVALID_INPUT", "Incomplete skill");
   return { meta, body: lines.slice(end + 1).join("\n") };
 }
 
