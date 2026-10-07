@@ -19,7 +19,7 @@ export function checkPreconditions(entries) {
 }
 export function onboardRequest(input) {
   const sorted = (key) => [...(input[key] ?? [])].sort();
-  const accept = Array.isArray(input.accept) ? [...input.accept].sort() : input.accept ?? "none";
+  const accept = Array.isArray(input.accept) ? [...input.accept].sort() : typeof input.accept === "string" && /^c[0-9]{2}(,c[0-9]{2})*$/.test(input.accept) ? input.accept.split(",").sort() : input.accept ?? "none";
   if (!(accept === "none" || accept === "all" || Array.isArray(accept))) throw new DevctxError("INVALID_INPUT", "Invalid accept selection");
   return { kind: "onboard", scope: input.scope, project: input.project, repo: input.repo, approvedDocs: sorted("approvedDocs"), expectedRemotes: sorted("expectedRemotes"), environments: sorted("environments"), actorRefs: sorted("actorRefs"), accept };
 }

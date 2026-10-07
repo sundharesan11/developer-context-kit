@@ -33,5 +33,15 @@
   "sensitive content and forbidden field names are rejected",
   "record refs and body files cannot reach denied or out-of-fence paths",
   "direct record mutation without pilot leaves registry and locks unchanged",
-  "discovery is zero-footprint, never runs scripts, cites sources"
+  "discovery is zero-footprint, never runs scripts, cites sources",
+  "crash afterBundles: project invisible, identical retry commits once",
+  "crash afterBinding: project invisible, identical retry commits once",
+  "crash afterManifest: project invisible, identical retry commits once",
+  "crash after registry publish: retry reconstructs the same receipt without republishing",
+  "reused request id with a changed payload conflicts, before or after commit",
+  "orphan staging from a failed unapplied bundle is a recovery report, never deleted or published",
+  "missing bundle after commit yields RECOVERY_REQUIRED, never a short read",
+  "same worktree under another scope is BINDING_CONFLICT without naming it",
+  "source mutated between preview and apply is refused; nothing published; repo has only the edit",
+  "direct onboarding without pilot leaves registry and locks unchanged"
 ]

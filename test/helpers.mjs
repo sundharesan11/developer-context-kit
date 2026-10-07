@@ -11,6 +11,7 @@ import { applyScopeAdd, writeBindingVersion, writeManifest } from "../src/config
 import { readRegistry, publishRegistry } from "../src/config/registry.mjs";
 import { withPilotLock, registryLockPath } from "../src/storage/lock.mjs";
 import { operationIdFor } from "../src/identity/ids.mjs";
+import { planOnboard, applyOnboard } from "../src/onboarding/onboard.mjs";
 export { sleep };
 export const now = () => new Date("2026-10-07T00:00:00.000Z");
 export async function sandbox(t) {
@@ -88,7 +89,19 @@ export async function seedCommittedProject(t) {
   }, { destinations: [p.configRoot, p.dataRoot] });
   return { ...p, repo, scope: "acme", project: "acme.atlas" };
 }
-export const committedProject = seedCommittedProject;
+export async function onboardFixture(t, { scope = "acme", project = "acme.atlas", repoName = "atlas", requestId = "req_onboard01", accept = "all" } = {}) {
+  const p = await initPilot(t);
+  await applyScopeAdd(p.roots, { scope, hubs: [], policies: [], now });
+  const repo = await makeRepo(join(p.reposDir, repoName), { "README.md": "# Atlas\nBilling API.\n", "package.json": '{"name":"atlas","scripts":{"test":"node --test"}}' });
+  const input = { scope, project, repo, approvedDocs: [], expectedRemotes: [], environments: ["staging"], actorRefs: [], accept, requestId };
+  const plan = await planOnboard(p.roots, p.pilot, input);
+  return { ...p, repo, input, plan };
+}
+export async function committedProject(t) {
+  const s = await onboardFixture(t);
+  await applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now });
+  return { ...s, scope: s.input.scope, project: s.input.project };
+}
 export function draftFor(scope, project, opts = {}) {
   return { scope, project, requestId: opts.requestId ?? "req_default01", recordedBy: { actor: "human", runId: "run_fixture01" }, draft: { kind: opts.kind ?? "fact", status: opts.status ?? "observed", title: "Fixture fact", body: opts.body ?? "Fixture body", sources: [{ ref: "user:email:owner@example.com" }], applicability: { level: "project" }, review: opts.review ?? null } };
 }

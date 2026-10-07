@@ -55,7 +55,7 @@ export async function commitBundle(roots, input, { now = () => new Date(), fault
     if (record.requestHash !== requestHash) throw new DevctxError("CONFLICT", "Request ID reused");
     return { recordId: id, recordHash: recordHash(record), created: false };
   }
-  if (existsSync(stage)) throw recovery();
+  if (existsSync(stage)) throw new DevctxError("RECOVERY_REQUIRED", "Orphan staging retained", { staging: [id] });
   const record = buildRecord({ scope, project, requestId, requestHash, operationId, recordedBy, draft, supersedes }, { now });
   assertWritable(roots, [stage, dest]);
   ensurePrivatePath(roots.dataRoot, ["scopes", scope, "projects", project, "staging"]);
