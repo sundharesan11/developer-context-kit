@@ -32,5 +32,6 @@
   "tampered body is reported corrupt and excluded",
   "sensitive content and forbidden field names are rejected",
   "record refs and body files cannot reach denied or out-of-fence paths",
-  "direct record mutation without pilot leaves registry and locks unchanged"
+  "direct record mutation without pilot leaves registry and locks unchanged",
+  "discovery is zero-footprint, never runs scripts, cites sources"
 ]
