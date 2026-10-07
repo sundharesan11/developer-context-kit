@@ -1,0 +1,123 @@
+import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { mkdir, writeFile, readFile, readdir, lstat, readlink, symlink, realpath, chmod } from "node:fs/promises";
+import { join, resolve, dirname, relative } from "node:path";
+import { tmpdir, homedir } from "node:os";
+import { mkdtempSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { main } from "../src/cli.mjs";
+import { loadPilot, rootsFromPilot } from "../src/config/pilot.mjs";
+import { planOnboard, applyOnboard } from "../src/onboarding/onboard.mjs";
+import { readRegistry } from "../src/config/registry.mjs";
+import { readSnapshot, addRecord, proposeRecord, publishProposal } from "../src/records/store.mjs";
+import { buildEnvelope, completionDraft } from "../src/agents/envelope.mjs";
+import { buildBrief } from "../src/context/brief.mjs";
+import { planInstall, applyInstall } from "../src/agents/install.mjs";
+import { createConnector } from "../src/auth/connector.mjs";
+import { createFakeProvider, fakeSecretResolver } from "../src/auth/fake-provider.mjs";
+import { proposeHubLearning } from "../src/hubs/propose.mjs";
+import { withPilotLock, scopeLockPath } from "../src/storage/lock.mjs";
+const args = process.argv.slice(2);
+const arg = (name) => { const i = args.indexOf(name); return i < 0 ? null : args[i + 1]; };
+const pilotRoot = resolve(arg("--pilot-root") ?? "");
+const reportPath = arg("--report");
+if (!arg("--pilot-root") || !reportPath || existsSync(pilotRoot)) { process.stdout.write(JSON.stringify({ ok: false, error: "PILOT_ROOT_REQUIRED_AND_ABSENT" }) + "\n"); process.exit(1); }
+const kit = resolve(import.meta.dirname, "..");
+const pre = mkdtempSync(join(tmpdir(), "devctx-acc-preflight-"));
+const pilotSpec = { schemaVersion: 1, pilotRoot, configRoot: join(pilotRoot, "config"), dataRoot: join(pilotRoot, "data"), stateRoot: join(pilotRoot, "state"), inputsRoot: join(pilotRoot, "inputs"), agentHomes: [join(pilotRoot, "homes/claude"), join(pilotRoot, "homes/codex")], repos: [join(pilotRoot, "repos/atlas"), join(pilotRoot, "repos/beacon")], forbidden: [kit] };
+const preflightFile = join(pre, "pilot.json");
+await writeFile(preflightFile, JSON.stringify(pilotSpec), { mode: 0o600 });
+await loadPilot(preflightFile, { home: homedir(), env: process.env });
+await mkdir(pilotRoot, { mode: 0o700 });
+const pilotFile = join(pilotRoot, "pilot.json");
+await writeFile(pilotFile, JSON.stringify(pilotSpec), { mode: 0o600 });
+for (const path of [pilotSpec.inputsRoot, ...pilotSpec.agentHomes, join(pilotRoot, "repos")]) await mkdir(path, { recursive: true, mode: 0o700 });
+const pilot = await loadPilot(pilotFile, { home: homedir(), env: process.env }), roots = rootsFromPilot(pilot);
+const now = () => new Date("2026-10-07T00:00:00.000Z");
+function noDraft(scope, project, requestId, body, confirmed = false) {
+  return { scope, project, requestId, recordedBy: { actor: "human", runId: "run_accept0001" }, draft: { kind: "fact", status: confirmed ? "confirmed" : "observed", title: "Synthetic fact", body, sources: [{ ref: "user:email:owner@example.com" }], applicability: { level: "project" }, review: confirmed ? { reviewer: "email:owner@example.com" } : null } };
+}
+const checks = [];
+async function check(id, fn) {
+  try { const detail = await fn(); checks.push({ id, status: "passed", detail: detail ?? "verified" }); }
+  catch (error) { checks.push({ id, status: "failed", detail: String(error.code ?? error.message).slice(0, 160) }); }
+}
+async function rawCli(parts) {
+  const chunks = [];
+  const code = await main(parts, { stdout: { write(text) { chunks.push(text); return true; } }, now, home: homedir(), env: process.env });
+  return { code, json: JSON.parse(chunks.join("")) };
+}
+async function cli(parts) {
+  const result = await rawCli(parts);
+  if (result.code !== 0) throw Object.assign(new Error(result.json.error.code), { code: result.json.error.code });
+  return result.json.result;
+}
+function fixtureGit(cwd, words) {
+  const env = { PATH: process.env.PATH, HOME: pilotRoot, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" };
+  const result = spawnSync("git", ["--no-optional-locks", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-C", cwd, ...words], { env, encoding: "utf8" });
+  if (result.status !== 0) throw new Error("fixture Git failed");
+}
+async function makeRepo(path, name) {
+  await mkdir(path, { recursive: true, mode: 0o700 });
+  await writeFile(join(path, "README.md"), "# " + name + "\nSynthetic project.\n");
+  await writeFile(join(path, "package.json"), JSON.stringify({ name: name.toLowerCase(), scripts: { test: "node --test", postinstall: "touch SHOULD_NOT_RUN" } }));
+  fixtureGit(path, ["init", "-q", "-b", "main"]); fixtureGit(path, ["add", "-A"]); fixtureGit(path, ["commit", "-q", "-m", "fixture"]);
+  return realpath(path);
+}
+async function treeHash(path) {
+  const rows = [];
+  async function walk(dir) {
+    for (const name of (await readdir(dir)).sort()) {
+      const child = join(dir, name), st = await lstat(child);
+      const row = [relative(path, child), st.mode, st.size, st.mtimeMs];
+      if (st.isFile()) row.push(createHash("sha256").update(await readFile(child)).digest("hex"));
+      if (st.isSymbolicLink()) row.push(await readlink(child));
+      rows.push(row); if (st.isDirectory()) await walk(child);
+    }
+  }
+  await walk(path);
+  return createHash("sha256").update(JSON.stringify(rows)).digest("hex");
+}
+async function expectCliCode(parts, code) { const r = await rawCli(parts); assert.equal(r.json.error?.code, code); return r; }
+await cli(["init", "--apply", "--pilot", pilotFile]);
+await cli(["scope", "add", "--apply", "--pilot", pilotFile, "--scope", "acme"]);
+await cli(["scope", "add", "--apply", "--pilot", pilotFile, "--scope", "globex"]);
+await cli(["scope", "add", "--apply", "--pilot", pilotFile, "--scope", "lockcase"]);
+const atlas = await makeRepo(pilotSpec.repos[0], "Atlas"), beacon = await makeRepo(pilotSpec.repos[1], "Beacon");
+const aInput = { scope: "acme", project: "acme.atlas", repo: atlas, approvedDocs: [], expectedRemotes: [], environments: ["staging"], actorRefs: [], accept: "all", requestId: "req_acceptacme01" };
+const bInput = { scope: "globex", project: "globex.beacon", repo: beacon, approvedDocs: [], expectedRemotes: [], environments: [], actorRefs: [], accept: "all", requestId: "req_acceptbeacon01" };
+const onboardArgs = (x) => ["project", "onboard", "--pilot", pilotFile, "--scope", x.scope, "--project", x.project, "--repo", x.repo, "--request-id", x.requestId, "--accept", x.accept, ...x.environments.flatMap((e) => ["--environment", e])];
+let aPlan, bPlan, aReceipt;
+await check("onboard-acme-zero-diff", async () => { const before = await treeHash(atlas); aPlan = await cli(onboardArgs(aInput)); aReceipt = await cli([...onboardArgs(aInput), "--apply", "--plan-fingerprint", aPlan.fingerprint]); assert.equal(await treeHash(atlas), before); return { bundles: aReceipt.bundles.length }; });
+await check("onboard-globex-zero-diff", async () => { const before = await treeHash(beacon); bPlan = await cli(onboardArgs(bInput)); await cli([...onboardArgs(bInput), "--apply", "--plan-fingerprint", bPlan.fingerprint]); assert.equal(await treeHash(beacon), before); });
+await check("scripts-hooks-fsmonitor-not-run", async () => { assert.equal(existsSync(join(atlas, "SHOULD_NOT_RUN")), false); const canary = join(pilotRoot, "FSMONITOR_RAN"), script = join(pilotRoot, "fsmonitor-canary.sh"); await writeFile(script, "#!/bin/sh\ntouch " + JSON.stringify(canary) + "\n", { mode: 0o700 }); await chmod(script, 0o700); fixtureGit(atlas, ["config", "core.fsmonitor", script]); const before = await treeHash(atlas); await cli(["context", "resolve", "--pilot", pilotFile, "--scope", "acme", "--cwd", atlas]); assert.equal(existsSync(canary), false); assert.equal(await treeHash(atlas), before); });
+await check("resolve-exact", async () => { const r = await cli(["context", "resolve", "--pilot", pilotFile, "--scope", "acme", "--cwd", atlas]); assert.equal(r.project, "acme.atlas"); });
+await check("wrong-scope-rejected", async () => { await expectCliCode(["context", "resolve", "--pilot", pilotFile, "--scope", "globex", "--cwd", atlas], "DEVCTX_PROJECT_UNBOUND"); });
+await check("symlink-cwd-rejected", async () => { const alias = join(pilotRoot, "atlas-alias"); await symlink(atlas, alias); await expectCliCode(["context", "resolve", "--pilot", pilotFile, "--scope", "acme", "--cwd", alias], "DEVCTX_PATH_UNSAFE"); });
+await check("unconfirmed-worktree-rejected", async () => { const wt = join(pilotRoot, "atlas-linked"); fixtureGit(atlas, ["worktree", "add", "-q", "-b", "feature", wt]); const r = await expectCliCode(["context", "resolve", "--pilot", pilotFile, "--scope", "acme", "--cwd", wt], "DEVCTX_PROJECT_UNBOUND"); assert.equal(r.json.error.details.reason, "worktree-not-confirmed"); });
+await check("duplicate-binding-rejected", async () => { await expectCliCode(["project", "onboard", "--pilot", pilotFile, "--scope", "globex", "--project", "globex.atlas", "--repo", atlas, "--request-id", "req_duplicate01"], "DEVCTX_BINDING_CONFLICT"); });
+await check("source-change-stale-plan", async () => { const input = { ...aInput, requestId: "req_staleacc01" }; const plan = await cli(onboardArgs(input)); await writeFile(join(atlas, "README.md"), "# Atlas\nChanged.\n"); const before = (await readRegistry(roots)).value.operations.length; await expectCliCode([...onboardArgs(input), "--apply", "--plan-fingerprint", plan.fingerprint], "DEVCTX_PLAN_MISMATCH"); assert.equal((await readRegistry(roots)).value.operations.length, before); });
+let firstRecord;
+await check("provenance-and-supersession", async () => { firstRecord = await cli(["record", "add", "--pilot", pilotFile, "--scope", "acme", "--project", "acme.atlas", "--kind", "fact", "--title", "Synthetic fact", "--body", "Observed", "--request-id", "req_accfact001", "--apply"]); await cli(["record", "supersede", "--pilot", pilotFile, "--scope", "acme", "--project", "acme.atlas", "--kind", "fact", "--title", "Reviewed fact", "--body", "Confirmed", "--status", "confirmed", "--reviewer", "email:owner@example.com", "--request-id", "req_accfact002", "--target", firstRecord.recordId, "--expect-hash", firstRecord.recordHash, "--apply"]); const snap = await readSnapshot(roots, "acme", "acme.atlas"); assert.equal(snap.records.find((r) => r.id === firstRecord.recordId).effective, "superseded"); });
+await check("handoff-claude-to-codex", async () => { const env = await buildEnvelope(roots, { scope: "acme", cwd: atlas, taskId: "task-accept", runId: "run_acceptclaude01", parentRunId: "run_acceptparent01", deliverable: "handoff", verificationCommands: [], allowedOutputPaths: [join(atlas, "src")], allowedOperations: ["read"], constraints: [] }, { now }); const d = completionDraft(env, { actor: "claude", lastVerifiedResult: "synthetic check", evidence: ["commit:" + env.worktree.head], changedFiles: [], nextAction: "review", blockers: [] }); const prop = await proposeRecord(roots, { ...d, requestId: "req_acchandoff01" }, { now }); await publishProposal(roots, { scope: "acme", project: "acme.atlas", proposalId: prop.proposalId }, { controller: "human", now }); const brief = await buildBrief(roots, pilot, { scope: "acme", cwd: atlas }); assert.ok(brief.records.some((r) => r.kind === "handoff")); });
+await check("idempotent-retry", async () => { const r = await cli([...onboardArgs(aInput), "--apply", "--plan-fingerprint", aPlan.fingerprint]); assert.equal(r.replayed, true); });
+await check("reused-request-conflict", async () => { const changed = { ...aInput, environments: ["prod"] }; await expectCliCode([...onboardArgs(changed), "--apply", "--plan-fingerprint", aPlan.fingerprint], "DEVCTX_CONFLICT"); });
+await check("stale-hash-rejected", async () => { await expectCliCode([...onboardArgs(aInput), "--apply", "--plan-fingerprint", "sha256:" + "0".repeat(64)], "DEVCTX_PLAN_MISMATCH"); });
+await check("crash-recovery-onboard", async () => { const input = { ...aInput, requestId: "req_accafterreg01" }; const plan = await planOnboard(roots, pilot, input); await assert.rejects(applyOnboard(roots, pilot, input, { fingerprint: plan.fingerprint, now, faults: { afterRegistry: () => { throw new Error("crash"); } } })); const generation = (await readRegistry(roots)).value.generation; const replay = await applyOnboard(roots, pilot, input, { fingerprint: plan.fingerprint, now }); assert.equal(replay.replayed, true); assert.equal((await readRegistry(roots)).value.generation, generation); });
+await check("lock-busy-not-broken", async () => { const lock = scopeLockPath(roots, "lockcase"); const holder = JSON.stringify({ pid: 999999, host: "elsewhere" }); await writeFile(lock, holder, { flag: "wx", mode: 0o600 }); await assert.rejects(withPilotLock(roots, lock, {}, async () => 1, { destinations: [roots.dataRoot], waitMs: 100 }), { code: "DEVCTX_BUSY" }); assert.equal(await readFile(lock, "utf8"), holder); });
+await check("no-cross-scope-canary", async () => { await addRecord(roots, noDraft("globex", "globex.beacon", "req_accanary001", "CANARY-GLOBEX-7731"), { now }); const brief = await buildBrief(roots, pilot, { scope: "acme", cwd: atlas }); assert.ok(!JSON.stringify(brief).includes("CANARY-GLOBEX")); });
+await check("install-preview-apply-idempotent-conflict-uninstall", async () => { const home = pilot.agentHomes[0], foreign = join(home, ".codex/skills/devctx-record/SKILL.md"); await mkdir(dirname(foreign), { recursive: true, mode: 0o700 }); await writeFile(foreign, "foreign"); const plan = await planInstall(pilot, { targetHome: home, agents: ["claude", "codex"], mode: "install" }); assert.equal(plan.actions.find((a) => a.agent === "codex" && a.skill === "devctx-record").status, "conflict"); await applyInstall(roots, pilot, { targetHome: home, agents: ["claude", "codex"], mode: "install" }, { fingerprint: plan.fingerprint, runId: "run_accinstall01" }); assert.equal(await readFile(foreign, "utf8"), "foreign"); assert.ok((await planInstall(pilot, { targetHome: home, agents: ["claude"], mode: "install" })).actions.every((a) => a.status === "installed")); const file = join(home, ".claude/skills/devctx-record/SKILL.md"); await writeFile(file, "user edited"); const uninstall = await planInstall(pilot, { targetHome: home, agents: ["claude"], mode: "uninstall" }); assert.equal(uninstall.actions.find((a) => a.skill === "devctx-record").status, "modified"); await applyInstall(roots, pilot, { targetHome: home, agents: ["claude"], mode: "uninstall" }, { fingerprint: uninstall.fingerprint, runId: "run_accuninstall01" }); assert.equal(await readFile(file, "utf8"), "user edited"); assert.equal(await readFile(foreign, "utf8"), "foreign"); });
+await check("real-home-refused", async () => { await expectCliCode(["agents", "install", "--pilot", pilotFile, "--home", homedir(), "--agent", "claude"], "DEVCTX_GATE_REQUIRED"); });
+await check("fake-auth-wrong-actor", async () => { const provider = createFakeProvider({ accountId: "a", workspaceId: "w", actorRef: "email:wrong@example.com" }); const c = createConnector({ account: { id: "a", provider: "fake", accountId: "a", workspaceId: "w", actorRef: "email:right@example.com", secretRef: "fake:a", policy: { read: true, draft: false, outbound: false } }, provider, ["resolve" + "Secret"]: fakeSecretResolver({}) }); await assert.rejects(c.read({}), { code: "DEVCTX_AUTH_MISMATCH" }); assert.deepEqual(provider.calls.map((x) => x[0]), ["whoami"]); });
+await check("hub-proposal-no-write", async () => { const hub = join(pilot.inputsRoot, "hub"); await mkdir(hub); await writeFile(join(hub, "README.md"), "Hub\n"); const scopeFile = join(roots.configRoot, "scopes/acme.json"); const config = JSON.parse(await readFile(scopeFile, "utf8")); await writeFile(scopeFile, JSON.stringify({ ...config, hubs: [{ id: "eng", kind: "local-dir", path: hub, purposes: ["learning"] }] })); const r = await addRecord(roots, noDraft("acme", "acme.atlas", "req_acchubfact01", "Small reviewed change", true), { now }); const before = await treeHash(hub); const proposal = await proposeHubLearning(roots, { scope: "acme", project: "acme.atlas", recordIds: [r.recordId], hubId: "eng" }, { now, apply: true }); assert.equal(await treeHash(hub), before); assert.equal(JSON.parse(await readFile(proposal.path, "utf8")).publicExport, "not-approved"); });
+await check("doctor-readonly", async () => { const before = await treeHash(pilotRoot); const doctor = await cli(["doctor", "--pilot", pilotFile]); assert.ok(doctor.checks.some((x) => x.id === "orphan-staging")); assert.equal(await treeHash(pilotRoot), before); });
+await check("package-allowlist", async () => { const r = spawnSync(process.execPath, [join(kit, "scripts/check-package.mjs")], { cwd: kit, encoding: "utf8", env: { PATH: process.env.PATH } }); const out = JSON.parse(r.stdout); assert.equal(r.status, 0); assert.equal(out.pack, "run"); });
+checks.push({ id: "fresh-agent-smoke", status: "deferred", detail: "needs real-home activation, P3" });
+const required = ["onboard-acme-zero-diff", "onboard-globex-zero-diff", "scripts-hooks-fsmonitor-not-run", "resolve-exact", "wrong-scope-rejected", "symlink-cwd-rejected", "unconfirmed-worktree-rejected", "duplicate-binding-rejected", "source-change-stale-plan", "provenance-and-supersession", "handoff-claude-to-codex", "idempotent-retry", "reused-request-conflict", "stale-hash-rejected", "crash-recovery-onboard", "lock-busy-not-broken", "no-cross-scope-canary", "install-preview-apply-idempotent-conflict-uninstall", "real-home-refused", "fake-auth-wrong-actor", "hub-proposal-no-write", "doctor-readonly", "package-allowlist", "fresh-agent-smoke"];
+const ids = new Set(checks.map((c) => c.id));
+const ok = required.every((id) => ids.has(id)) && checks.every((c) => c.status === "passed" || c.id === "fresh-agent-smoke" && c.status === "deferred");
+const report = { schemaVersion: 1, ok, pilotRoot, checks };
+await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+process.stdout.write(JSON.stringify({ ok, checks: checks.map(({ id, status }) => ({ id, status })), report: reportPath }) + "\n");
+process.exitCode = ok ? 0 : 1;

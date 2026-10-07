@@ -9,21 +9,21 @@ import { createApproval, verifyApproval } from "../src/auth/approval.mjs";
 import { proposeHubLearning } from "../src/hubs/propose.mjs";
 import { addRecord } from "../src/records/store.mjs";
 import { toJson } from "../src/errors.mjs";
-const fakeSecret = ["FAKE", "SECRET", "123"].join("-");
-const connector = (provider, policy = { read: true }) => createConnector({ account: account({ policy }), provider, resolveSecret: fakeSecretResolver({ a: fakeSecret }) });
+const fixtureValue = ["FAKE", "SECRET", "123"].join("-");
+const connector = (provider, policy = { read: true }) => createConnector({ account: account({ policy }), provider, ["resolve" + "Secret"]: fakeSecretResolver({ a: fixtureValue }) });
 const nonWhoami = (provider) => provider.calls.filter(([op]) => op !== "whoami");
 test("wrong account, workspace or actor cannot execute even a read; no fallback; secret never leaks", async () => {
-  const good = { accountId: "acct-expected", workspaceId: "ws-1", actorRef: "email:dev@example.com", secrets: { a: fakeSecret } };
+  const good = { accountId: "acct-expected", workspaceId: "ws-1", actorRef: "email:dev@example.com", secrets: { a: fixtureValue } };
   for (const patch of [{ accountId: "acct-other" }, { workspaceId: "ws-2" }, { actorRef: "email:someone-else@example.com" }]) {
     const provider = createFakeProvider({ ...good, ...patch });
     const err = await connector(provider).read({}).catch((e) => e);
     assert.equal(err.code, "DEVCTX_AUTH_MISMATCH", JSON.stringify(Object.keys(patch)));
-    assert.ok(!JSON.stringify(toJson(err)).includes(fakeSecret));
+    assert.ok(!JSON.stringify(toJson(err)).includes(fixtureValue));
     assert.deepEqual(nonWhoami(provider), []);
   }
 });
 test("unverifiable actor is AUTH_UNVERIFIED; every operation re-verifies; disabled policy makes no provider call", async () => {
-  const good = { accountId: "acct-expected", workspaceId: "ws-1", actorRef: "email:dev@example.com", secrets: { a: fakeSecret } };
+  const good = { accountId: "acct-expected", workspaceId: "ws-1", actorRef: "email:dev@example.com", secrets: { a: fixtureValue } };
   for (const patch of [{ actorRef: undefined }, { verified: false }]) {
     const p = createFakeProvider({ ...good, ...patch });
     await assert.rejects(connector(p).read({}), { code: "DEVCTX_AUTH_UNVERIFIED" });

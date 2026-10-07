@@ -1,15 +1,18 @@
 import { constants, lstatSync, realpathSync, openSync, closeSync, fstatSync, readSync, writeSync, fsyncSync, mkdirSync, renameSync } from "node:fs";
-import { dirname, join, relative, isAbsolute } from "node:path";
+import { dirname, join, relative, isAbsolute, sep } from "node:path";
 import { randomBytes } from "node:crypto";
 import { DevctxError } from "../errors.mjs";
 export const SEGMENT = /^[a-z0-9][a-z0-9._-]{0,127}$/;
-export const isWithin = (child, parent) => child === parent || (!relative(parent, child).startsWith("..") && !isAbsolute(relative(parent, child)));
+export const isWithin = (child, parent) => {
+  const r = relative(parent, child);
+  return r === "" || (r !== ".." && !r.startsWith(".." + sep) && !isAbsolute(r));
+};
 export const overlaps = (a, b) => isWithin(a, b) || isWithin(b, a);
 export function safeJoin(root, ...segments) {
   if (!isAbsolute(root) || segments.some((s) => !SEGMENT.test(s) || s === "..")) throw new DevctxError("PATH_ESCAPE", "Unsafe path segment");
   return join(root, ...segments);
 }
-export function info(path) { try { return lstatSync(path); } catch (e) { if (e.code === "ENOENT") return null; throw e; } }
+export function info(path) { try { return lstatSync(path); } catch (e) { if (e.code === "ENOENT" || e.code === "ENOTDIR") return null; throw e; } }
 export function checkNode(node, path, { directory = false } = {}) {
   if (!node || node.isSymbolicLink() || (directory ? !node.isDirectory() : !node.isFile()) || node.uid !== process.getuid() || (!directory && node.nlink !== 1) || (node.mode & 0o077)) throw new DevctxError("PATH_UNSAFE", "Unsafe private path", { path });
   return node;
@@ -28,7 +31,7 @@ export function ensurePrivatePath(root, segments = []) {
 }
 export async function readPrivateText(path, limit = 131072) {
   let fd;
-  try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW); }
+  try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); }
   catch (e) { if (e.code === "ELOOP") throw new DevctxError("PATH_UNSAFE", "Unsafe private path"); throw e; }
   try {
     const before = checkNode(fstatSync(fd), path);

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devctx registry v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "generation",
+    "bindings",
+    "operations"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "generation": {
+      "type": "integer"
+    },
+    "bindings": {
+      "type": "array"
+    },
+    "operations": {
+      "type": "array"
+    }
+  }
+}

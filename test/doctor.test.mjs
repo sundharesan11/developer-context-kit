@@ -1,0 +1,21 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { join } from "node:path";
+import { access } from "node:fs/promises";
+import { makePilot, onboardFixture, now, treeSnapshot } from "./helpers.mjs";
+import { runDoctor } from "../src/config/doctor.mjs";
+import { applyOnboard } from "../src/onboarding/onboard.mjs";
+test("doctor is read-only on a fresh pilot and reports, never repairs, orphan staging", async (t) => {
+  const p = await makePilot(t);
+  const before = await treeSnapshot(p.pilot.pilotRoot);
+  const fresh = await runDoctor(p.roots);
+  assert.equal(await treeSnapshot(p.pilot.pilotRoot), before);
+  await assert.rejects(access(p.configRoot));
+  assert.ok(fresh.checks.some((c) => c.status === "unavailable"));
+  const s = await onboardFixture(t);
+  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now, faults: { beforeRename: () => { throw new Error("crash"); } } }));
+  const snap = await treeSnapshot(s.pilot.pilotRoot);
+  const report = await runDoctor(s.roots);
+  assert.equal(report.checks.find((c) => c.id === "orphan-staging").status, "warn");
+  assert.equal(await treeSnapshot(s.pilot.pilotRoot), snap);
+});

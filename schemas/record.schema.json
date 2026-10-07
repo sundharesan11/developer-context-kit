@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devctx record v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "scope",
+    "project",
+    "kind",
+    "status",
+    "title",
+    "bodyHash",
+    "bodyBytes",
+    "sources",
+    "verification",
+    "recordedBy",
+    "applicability",
+    "supersedes",
+    "review",
+    "revisitAfter",
+    "requestId",
+    "requestHash",
+    "operationId",
+    "createdAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string"
+    },
+    "project": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "bodyHash": {
+      "type": "string"
+    },
+    "bodyBytes": {
+      "type": "integer"
+    },
+    "sources": {
+      "type": "array"
+    },
+    "verification": {
+      "type": "array"
+    },
+    "recordedBy": {
+      "type": "object"
+    },
+    "applicability": {
+      "type": "object"
+    },
+    "supersedes": {
+      "type": "array"
+    },
+    "review": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "revisitAfter": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "requestHash": {
+      "type": "string"
+    },
+    "operationId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "createdAt": {
+      "type": "string"
+    }
+  }
+}

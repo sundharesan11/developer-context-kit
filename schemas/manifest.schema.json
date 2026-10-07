@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devctx manifest v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "operationId",
+    "kind",
+    "requestId",
+    "requestHash",
+    "scope",
+    "project",
+    "bindingHash",
+    "planFingerprint",
+    "bundles"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "operationId": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "requestHash": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string"
+    },
+    "project": {
+      "type": "string"
+    },
+    "bindingHash": {
+      "type": "string"
+    },
+    "planFingerprint": {
+      "type": "string"
+    },
+    "bundles": {
+      "type": "array"
+    }
+  }
+}

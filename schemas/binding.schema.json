@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devctx binding v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "scope",
+    "project",
+    "version",
+    "roots",
+    "remotes",
+    "approvedSources",
+    "expectedRemotes",
+    "actorRefs",
+    "environments",
+    "createdAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "scope": {
+      "type": "string"
+    },
+    "project": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "roots": {
+      "type": "array"
+    },
+    "remotes": {
+      "type": "array"
+    },
+    "approvedSources": {
+      "type": "array"
+    },
+    "expectedRemotes": {
+      "type": "array"
+    },
+    "actorRefs": {
+      "type": "array"
+    },
+    "environments": {
+      "type": "array"
+    },
+    "createdAt": {
+      "type": "string"
+    }
+  }
+}

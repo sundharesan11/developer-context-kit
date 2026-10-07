@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devctx envelope v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "envelopeId",
+    "runId",
+    "parentRunId",
+    "taskId",
+    "scope",
+    "project",
+    "cwd",
+    "worktree",
+    "sourceRevision",
+    "inputRefs",
+    "allowedOutputPaths",
+    "allowedOperations",
+    "constraints",
+    "deliverable",
+    "verificationCommands",
+    "freshness",
+    "notice"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "envelopeId": {
+      "type": "string"
+    },
+    "runId": {
+      "type": "string"
+    },
+    "parentRunId": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string"
+    },
+    "project": {
+      "type": "string"
+    },
+    "cwd": {
+      "type": "string"
+    },
+    "worktree": {
+      "type": "object"
+    },
+    "sourceRevision": {
+      "type": "string"
+    },
+    "inputRefs": {
+      "type": "array"
+    },
+    "allowedOutputPaths": {
+      "type": "array"
+    },
+    "allowedOperations": {
+      "type": "array"
+    },
+    "constraints": {
+      "type": "array"
+    },
+    "deliverable": {
+      "type": "string"
+    },
+    "verificationCommands": {
+      "type": "array"
+    },
+    "freshness": {
+      "type": "object"
+    },
+    "notice": {
+      "type": "string"
+    }
+  }
+}

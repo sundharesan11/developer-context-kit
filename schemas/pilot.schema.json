@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devctx pilot v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "pilotRoot",
+    "configRoot",
+    "dataRoot",
+    "stateRoot",
+    "inputsRoot",
+    "agentHomes",
+    "repos",
+    "forbidden"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "pilotRoot": {
+      "type": "string"
+    },
+    "configRoot": {
+      "type": "string"
+    },
+    "dataRoot": {
+      "type": "string"
+    },
+    "stateRoot": {
+      "type": "string"
+    },
+    "inputsRoot": {
+      "type": "string"
+    },
+    "agentHomes": {
+      "type": "array"
+    },
+    "repos": {
+      "type": "array"
+    },
+    "forbidden": {
+      "type": "array"
+    }
+  }
+}

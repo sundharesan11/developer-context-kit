@@ -56,5 +56,20 @@
   "wrong account, workspace or actor cannot execute even a read; no fallback; secret never leaks",
   "unverifiable actor is AUTH_UNVERIFIED; every operation re-verifies; disabled policy makes no provider call",
   "approval binding rejects any changed field or expiry",
-  "hub proposal writes only a private proposal file; hub dir untouched"
+  "hub proposal writes only a private proposal file; hub dir untouched",
+  "doctor is read-only on a fresh pilot and reports, never repairs, orphan staging",
+  "package audit fails on a planted secret, home path, private email or denylist term, without echoing it",
+  "package audit passes on the actual candidate set, including these tests and their fixtures",
+  "docs state the candidate's limits in pinned phrases",
+  "F1 pilot fence rejects dot-prefixed, symlink and case aliases of protected homes",
+  "F2 operation ids use canonical digest and reject missing inputs",
+  "F3 Git probe refuses configured clean filter without executing it",
+  "F4 and F11 pilot rejects unknown keys and malformed shapes at load",
+  "F5 canonical JSON rejects object classes and cycles",
+  "F6 malformed URL never retains remote userinfo",
+  "F7 and F8 bare Git is unsafe and linked subdirectories resolve the common directory",
+  "F9 onboarding rejects an enclosing repository root",
+  "F10 CLI accepts equals-form pilot flag",
+  "F12 ensureRoots requires pilot before creating roots",
+  "F13 request and fingerprint helpers reject malformed or changed content"
 ]

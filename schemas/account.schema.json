@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devctx account v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "provider",
+    "accountId",
+    "workspaceId",
+    "actorRef",
+    "secretRef",
+    "policy"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "accountId": {
+      "type": "string"
+    },
+    "workspaceId": {
+      "type": "string"
+    },
+    "actorRef": {
+      "type": "string"
+    },
+    "secretRef": {
+      "type": "string"
+    },
+    "policy": {
+      "type": "object"
+    }
+  }
+}

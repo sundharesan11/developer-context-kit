@@ -9,7 +9,7 @@ const ROOT_OPTIONS = {
 export const COMMANDS = {
   version: { rootFree: true, load: async () => ({ options: {}, run: () => ({ name: "devctx", version: "0.0.0-local" }) }) },
   help: { rootFree: true, load: async () => ({ options: {}, run: () => ({ commands: listCommands() }) }) },
-  doctor: { load: async () => ({ options: {}, run: () => ({}) }) },
+  doctor: { load: async () => ({ options: {}, run: ({}, ctx) => import("./config/doctor.mjs").then((m) => m.runDoctor(ctx.roots)) }) },
   init: { load: async () => (await import("./config/commands.mjs")).initCommand },
   "scope add": { load: async () => (await import("./config/commands.mjs")).scopeAddCommand },
   "record add": { load: async () => (await import("./records/commands.mjs")).recordAddCommand },
@@ -39,7 +39,7 @@ export async function main(argv, options = {}) {
   try {
     const routed = routeFor(argv);
     command = routed.route;
-    if (!isRootFree(command) && !routed.args.includes("--pilot")) throw new DevctxError("GATE_REQUIRED", "v0 runs only inside a pilot fence");
+    if (!isRootFree(command) && !routed.args.some((arg) => arg === "--pilot" || arg.startsWith("--pilot="))) throw new DevctxError("GATE_REQUIRED", "v0 runs only inside a pilot fence");
     const impl = await COMMANDS[command].load();
     let values;
     try {
