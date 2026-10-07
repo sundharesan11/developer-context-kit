@@ -25,5 +25,12 @@
   "init preview writes nothing; apply creates private layout; idempotent",
   "registry publish requires the expected generation",
   "mutating library calls refuse roots that are not pilot-bound",
-  "preferences are validated and stored separately; scope policies must name a listed hub"
+  "preferences are validated and stored separately; scope policies must name a listed hub",
+  "idempotent add; reused request id with different content conflicts",
+  "crash before rename leaves invisible staging that blocks, never deletes",
+  "supersession preserves history; double supersede is stale; confirm needs reviewer",
+  "tampered body is reported corrupt and excluded",
+  "sensitive content and forbidden field names are rejected",
+  "record refs and body files cannot reach denied or out-of-fence paths",
+  "direct record mutation without pilot leaves registry and locks unchanged"
 ]

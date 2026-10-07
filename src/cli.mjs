@@ -11,7 +11,11 @@ export const COMMANDS = {
   help: { rootFree: true, load: async () => ({ options: {}, run: () => ({ commands: listCommands() }) }) },
   doctor: { load: async () => ({ options: {}, run: () => ({}) }) },
   init: { load: async () => (await import("./config/commands.mjs")).initCommand },
-  "scope add": { load: async () => (await import("./config/commands.mjs")).scopeAddCommand }
+  "scope add": { load: async () => (await import("./config/commands.mjs")).scopeAddCommand },
+  "record add": { load: async () => (await import("./records/commands.mjs")).recordAddCommand },
+  "record supersede": { load: async () => (await import("./records/commands.mjs")).recordSupersedeCommand },
+  "record propose": { load: async () => (await import("./records/commands.mjs")).recordProposeCommand },
+  "record publish": { load: async () => (await import("./records/commands.mjs")).recordPublishCommand }
 };
 export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;

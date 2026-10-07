@@ -7,6 +7,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { main } from "../src/cli.mjs";
 import { loadPilot, rootsFromPilot } from "../src/config/pilot.mjs";
 import { applyInit } from "../src/config/store.mjs";
+import { applyScopeAdd, writeBindingVersion, writeManifest } from "../src/config/store.mjs";
+import { readRegistry, publishRegistry } from "../src/config/registry.mjs";
+import { withPilotLock, registryLockPath } from "../src/storage/lock.mjs";
+import { operationIdFor } from "../src/identity/ids.mjs";
 export { sleep };
 export const now = () => new Date("2026-10-07T00:00:00.000Z");
 export async function sandbox(t) {
@@ -69,3 +73,23 @@ export async function initPilot(t) {
   await applyInit(p.roots, { actorRefs: ["email:owner@example.com"], preferences: {}, now });
   return p;
 }
+export async function seedCommittedProject(t) {
+  const p = await initPilot(t);
+  await applyScopeAdd(p.roots, { scope: "acme", hubs: [], policies: [], now });
+  const repo = await makeRepo(join(p.reposDir, "atlas"), { "README.md": "# Atlas\n" });
+  const operationId = operationIdFor({ scope: "acme", project: "acme.atlas", requestId: "req_seed0001" });
+  await withPilotLock(p.roots, registryLockPath(p.roots), { kind: "fixture-seed" }, async () => {
+    const binding = { schemaVersion: 1, scope: "acme", project: "acme.atlas", version: 1, roots: [{ path: repo, commonDir: join(repo, ".git"), kind: "main" }], remotes: [], approvedSources: [], expectedRemotes: [], actorRefs: [], environments: [], createdAt: now().toISOString() };
+    const bindingHash = await writeBindingVersion(p.roots, binding);
+    const manifest = { schemaVersion: 1, operationId, kind: "onboard", requestId: "req_seed0001", requestHash: "sha256:" + "0".repeat(64), scope: "acme", project: "acme.atlas", bindingHash, planFingerprint: "sha256:" + "0".repeat(64), bundles: [] };
+    const manifestHash = await writeManifest(p.roots, manifest);
+    const { value } = await readRegistry(p.roots);
+    await publishRegistry(p.roots, { ...value, generation: 1, bindings: [{ path: repo, commonDir: join(repo, ".git"), scope: "acme", project: "acme.atlas", bindingVersion: 1, bindingHash, operationId, manifestHash }], operations: [{ operationId, requestId: "req_seed0001", requestHash: manifest.requestHash, scope: "acme", project: "acme.atlas", manifestHash, planFingerprint: manifest.planFingerprint, generation: 1 }] }, { expectGeneration: 0 });
+  }, { destinations: [p.configRoot, p.dataRoot] });
+  return { ...p, repo, scope: "acme", project: "acme.atlas" };
+}
+export const committedProject = seedCommittedProject;
+export function draftFor(scope, project, opts = {}) {
+  return { scope, project, requestId: opts.requestId ?? "req_default01", recordedBy: { actor: "human", runId: "run_fixture01" }, draft: { kind: opts.kind ?? "fact", status: opts.status ?? "observed", title: "Fixture fact", body: opts.body ?? "Fixture body", sources: [{ ref: "user:email:owner@example.com" }], applicability: { level: "project" }, review: opts.review ?? null } };
+}
+export const draft = (opts = {}) => draftFor("acme", "acme.atlas", opts);
