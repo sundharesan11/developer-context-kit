@@ -102,6 +102,19 @@ export async function committedProject(t) {
   await applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now });
   return { ...s, scope: s.input.scope, project: s.input.project };
 }
+export async function twoScopes(t) {
+  const p = await initPilot(t);
+  const result = { roots: p.roots, pilot: p.pilot, base: p.reposDir };
+  for (const [scope, project, repoName] of [["acme", "acme.atlas", "atlas"], ["globex", "globex.beacon", "beacon"]]) {
+    await applyScopeAdd(p.roots, { scope, hubs: [], policies: [], now });
+    const repo = await makeRepo(join(p.reposDir, repoName), { "README.md": "# Atlas\nBilling API.\n", "package.json": '{"name":"atlas","scripts":{"test":"node --test"}}' });
+    const input = { scope, project, repo, approvedDocs: [], expectedRemotes: [], environments: ["staging"], actorRefs: [], accept: "all", requestId: "req_" + repoName + "0001" };
+    const plan = await planOnboard(p.roots, p.pilot, input);
+    await applyOnboard(p.roots, p.pilot, input, { fingerprint: plan.fingerprint, now });
+    result[repoName] = repo;
+  }
+  return result;
+}
 export function draftFor(scope, project, opts = {}) {
   return { scope, project, requestId: opts.requestId ?? "req_default01", recordedBy: { actor: "human", runId: "run_fixture01" }, draft: { kind: opts.kind ?? "fact", status: opts.status ?? "observed", title: "Fixture fact", body: opts.body ?? "Fixture body", sources: [{ ref: "user:email:owner@example.com" }], applicability: { level: "project" }, review: opts.review ?? null } };
 }

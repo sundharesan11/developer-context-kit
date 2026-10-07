@@ -16,7 +16,9 @@ export const COMMANDS = {
   "record supersede": { load: async () => (await import("./records/commands.mjs")).recordSupersedeCommand },
   "record propose": { load: async () => (await import("./records/commands.mjs")).recordProposeCommand },
   "record publish": { load: async () => (await import("./records/commands.mjs")).recordPublishCommand },
-  "project onboard": { load: async () => (await import("./onboarding/commands.mjs")).projectOnboardCommand }
+  "project onboard": { load: async () => (await import("./onboarding/commands.mjs")).projectOnboardCommand },
+  "context resolve": { load: async () => (await import("./context/commands.mjs")).contextResolveCommand },
+  "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand }
 };
 export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;

@@ -43,5 +43,10 @@
   "missing bundle after commit yields RECOVERY_REQUIRED, never a short read",
   "same worktree under another scope is BINDING_CONFLICT without naming it",
   "source mutated between preview and apply is refused; nothing published; repo has only the edit",
-  "direct onboarding without pilot leaves registry and locks unchanged"
+  "direct onboarding without pilot leaves registry and locks unchanged",
+  "cross-scope canary never appears in another scope's brief",
+  "symlinked cwd refused; subdirectory resolves; brief deterministic and bounded",
+  "changed source marks needs-revalidation; dirty worktree warns",
+  "required policy is loaded first or the brief fails; optional policy omission is counted",
+  "receipt separates preferences, scope policies and project records"
 ]

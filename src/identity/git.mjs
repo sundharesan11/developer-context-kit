@@ -28,7 +28,7 @@ export async function locateWorktree(cwd) {
   if (!top.ok) return { git: false, cwd: canonical };
   if (git(canonical, ["rev-parse", "--is-bare-repository"]).stdout.trim() === "true") throw new DevctxError("PATH_UNSAFE", "Bare repository unsupported");
   const root = realpathSync(top.stdout.trim());
-  const absolute = (value) => isAbsolute(value) ? realpathSync(value) : realpathSync(resolve(root, value));
+  const absolute = (value) => isAbsolute(value) ? realpathSync(value) : realpathSync(resolve(canonical, value));
   const commonDir = absolute(git(canonical, ["rev-parse", "--git-common-dir"]).stdout.trim());
   const gitDir = absolute(git(canonical, ["rev-parse", "--git-dir"]).stdout.trim());
   const b = git(canonical, ["symbolic-ref", "--quiet", "--short", "HEAD"]);

@@ -42,7 +42,7 @@ function selectedCandidates(plan) {
   return accept === "all" ? plan.candidates : accept === "none" ? [] : plan.candidates.filter((c) => accept.includes(c.cid));
 }
 function draftsFor(plan) {
-  const brief = { kind: "brief", status: "observed", title: "Client profile", body: briefBody(plan), sources: [], applicability: { level: "project" }, review: null };
+  const brief = { kind: "brief", status: "observed", title: "Client profile", body: briefBody(plan), sources: plan.candidates.find((c) => c.kind === "brief")?.sources ?? [], applicability: { level: "project" }, review: null };
   return [{ id: recordIdFor({ scope: plan.scope, project: plan.project, requestId: plan.requestId }), requestId: plan.requestId, draft: brief }, ...selectedCandidates(plan).map((c) => {
     const requestId = "req_" + digest({ requestId: plan.requestId, cid: c.cid }).slice(7, 31);
     return { id: recordIdFor({ scope: plan.scope, project: plan.project, requestId }), requestId, draft: { kind: c.kind, status: "observed", title: c.title, body: c.body, sources: c.sources, applicability: { level: "project" }, review: null } };
