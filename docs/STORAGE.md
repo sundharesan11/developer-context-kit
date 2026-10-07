@@ -1,3 +1,5 @@
 # Storage
 
 Configuration, data and state are separate private roots inside a pilot. A registry snapshot is the only project visibility switch. Records and manifests are immutable; successors supersede earlier records. Locks are never broken automatically, and orphan staging remains for explicit repair. New private files use mode 0600 and private directories use 0700.
+
+Private skill workspaces live under `dataRoot/personal/skill-workspaces/<workspace-id>`, `dataRoot/scopes/<scope>/skill-workspaces/<workspace-id>`, or `dataRoot/scopes/<scope>/projects/<project>/skill-workspaces/<workspace-id>`. Each scope is checked before use. Requirements, designs, approval decisions, draft revisions and validation receipts are immutable files. Drafts are staged before directory publication; incomplete staging is reported and kept for manual repair. The builder uses `stateRoot/locks/skill-builder.lock` and does not place generated packages in agent homes.

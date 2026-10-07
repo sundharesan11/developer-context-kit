@@ -71,5 +71,18 @@
   "F9 onboarding rejects an enclosing repository root",
   "F10 CLI accepts equals-form pilot flag",
   "F12 ensureRoots requires pilot before creating roots",
-  "F13 request and fingerprint helpers reject malformed or changed content"
+  "F13 request and fingerprint helpers reject malformed or changed content",
+  "skill workspace create makes a private personal workspace inside the pilot",
+  "draft creation rejects missing and mismatched explicit design approval",
+  "design approval is stale after named requirements change",
+  "intake rejects symlinked package files without running helpers",
+  "direct mutation without a pilot fence cannot create a workspace",
+  "company and project workspaces require registered membership and keep scope separate",
+  "validation records missing references as failure and leaves revision private",
+  "tampering with a revision prevents validation and is visible without leaking bodies",
+  "unsupported frontmatter is a recorded validation failure",
+  "relative links in reference files resolve beside that file",
+  "changed design content invalidates its approval before draft publication",
+  "hardlinked and oversized package sources are refused",
+  "helper files stay inert and validation marks them unverified"
 ]

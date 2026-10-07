@@ -22,7 +22,15 @@ export const COMMANDS = {
   "agents install": { load: async () => (await import("./agents/commands.mjs")).agentsInstallCommand },
   "agents uninstall": { load: async () => (await import("./agents/commands.mjs")).agentsUninstallCommand },
   "agents status": { load: async () => (await import("./agents/commands.mjs")).agentsStatusCommand },
-  "hub propose": { load: async () => (await import("./hubs/commands.mjs")).hubProposeCommand }
+  "hub propose": { load: async () => (await import("./hubs/commands.mjs")).hubProposeCommand },
+  "skill workspace-create": { load: async () => (await import("./skill-builder/commands.mjs")).workspaceCreateCommand },
+  "skill requirements-record": { load: async () => (await import("./skill-builder/commands.mjs")).requirementsRecordCommand },
+  "skill design-record": { load: async () => (await import("./skill-builder/commands.mjs")).designRecordCommand },
+  "skill design-approve": { load: async () => (await import("./skill-builder/commands.mjs")).designApproveCommand },
+  "skill draft-create": { load: async () => (await import("./skill-builder/commands.mjs")).draftCreateCommand },
+  "skill draft-validate": { load: async () => (await import("./skill-builder/commands.mjs")).draftValidateCommand },
+  "skill workspace-show": { load: async () => (await import("./skill-builder/commands.mjs")).workspaceShowCommand },
+  "skill discover": { load: async () => (await import("./skill-builder/commands.mjs")).discoverCommand }
 };
 export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;

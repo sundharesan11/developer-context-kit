@@ -1,6 +1,6 @@
 # Skill builder: proposed follow-on capability
 
-Status: draft design for user review, 2026-10-08. Not implemented, installed or published. This is an addition to the toolkit roadmap, not a change to the current synthetic pilot's execution contract.
+Status: design approved 2026-10-08. Milestone A deterministic tooling is implemented; its conversational skill and live-model behavior evaluation remain deferred. No generated skill has been installed or published. This is an addition to the toolkit roadmap, not a change to the current synthetic pilot's execution contract.
 
 ## Outcome
 
@@ -208,4 +208,4 @@ Deterministic tests prove file format, path, scope, approval, installer and expo
 
 The recommended architecture is awaiting user confirmation, including generic/personal-only installation and export-only initial publishing support. Actual publisher choice, public repository destination, license and real-agent activation are deliberately not selected here. They are decisions for the specific generated skill and deployment, not defaults inherited from this toolkit.
 
-The current build continues under its reviewed synthetic-pilot plan. This document adds a follow-on design only. No new builder skill, generated personal skill, local activation or public release has been completed by writing it.
+The current build continues under its reviewed synthetic-pilot plan. Milestone A tooling provides private requirements, design approval, drafts and validation. The conversational builder skill, behavioral evaluation, disposable installation and clean export remain pending; no generated personal skill, local activation or public release has been completed.
