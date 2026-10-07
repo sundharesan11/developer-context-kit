@@ -16,5 +16,10 @@
   "request hash ignores order and non-request fields; deterministic id is stable and payload-bound",
   "linked worktree, branch, head and dirty warning",
   "repository fsmonitor never runs; inherited GIT_DIR ignored; probe writes nothing",
-  "git takes an argument array and strips credentials from remotes"
+  "git takes an argument array and strips credentials from remotes",
+  "final file replaced by symlink between plan and apply is SOURCE_CHANGED",
+  "parent dir swapped for symlink is refused; content mutation detected",
+  "denied (including nested .env) and oversized files are skipped with reasons",
+  "content mutated while the descriptor is held is SOURCE_CHANGED",
+  "parent directory replaced after the read (same bytes) is SOURCE_CHANGED; identity is persisted"
 ]
