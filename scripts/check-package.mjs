@@ -1,8 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve, relative, isAbsolute } from "node:path";
+import { join, resolve } from "node:path";
 import { scanSensitive } from "../src/records/redact.mjs";
+import { isWithin } from "../src/storage/fsx.mjs";
 const args = process.argv.slice(2);
 const value = (flag, fallback) => { const i = args.indexOf(flag); return i < 0 ? fallback : args[i + 1]; };
 const root = resolve(value("--root", "."));
@@ -21,7 +22,7 @@ for (const file of files) if (!allow.has(file)) findings.push({ file, type: "ext
 for (const file of allowed) if (!files.includes(file)) findings.push({ file, type: "missing" });
 let terms = [];
 if (denylist) {
-  if (relative(root, denylist) === "" || (!relative(root, denylist).startsWith("..") && !isAbsolute(relative(root, denylist)))) findings.push({ file: ".", type: "denylist-inside-root" });
+  if (isWithin(denylist, root)) findings.push({ file: ".", type: "denylist-inside-root" });
   else try { terms = readFileSync(denylist, "utf8").split(/\r?\n/).filter(Boolean); } catch { findings.push({ file: ".", type: "denylist-unreadable" }); }
 }
 for (const file of files) {

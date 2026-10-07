@@ -35,7 +35,7 @@ export async function locateWorktree(cwd) {
   const b = git(canonical, ["symbolic-ref", "--quiet", "--short", "HEAD"]);
   const h = git(canonical, ["rev-parse", "--verify", "HEAD"]);
   const branch = b.ok ? b.stdout.trim() : null, head = h.ok ? h.stdout.trim() : null;
-  const filters = git(canonical, ["config", "--local", "--name-only", "--get-regexp", "^(filter|diff)\\."]);
+  const filters = git(canonical, ["config", "--includes", "--name-only", "--get-regexp", "^(filter|diff)\\."]);
   if (filters.ok && filters.stdout.trim()) throw new DevctxError("PATH_UNSAFE", "Repository filters require manual review");
   const dirty = Boolean(git(canonical, ["status", "--porcelain=v1", "-z", "--untracked-files=normal", "--ignore-submodules=all"]).stdout);
   const remotes = [];

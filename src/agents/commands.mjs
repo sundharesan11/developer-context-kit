@@ -6,7 +6,7 @@ const command = (mode) => ({ options, async run(values, ctx) {
   const input = { targetHome: values.home, agents: agents(values.agent), mode };
   if (!values.apply) return planInstall(ctx.pilot, input);
   if (!values["plan-fingerprint"]) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
-  return applyInstall(ctx.roots, ctx.pilot, input, { fingerprint: values["plan-fingerprint"], runId: values["run-id"] ?? "run_install0001" });
+  return applyInstall(ctx.roots, ctx.pilot, input, { fingerprint: values["plan-fingerprint"], runId: values["run-id"] ?? "run_install_" + values["plan-fingerprint"].slice(7, 31) });
 } });
 export const agentsInstallCommand = command("install");
 export const agentsUninstallCommand = command("uninstall");

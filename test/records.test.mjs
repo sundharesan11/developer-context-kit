@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { readdir, chmod, writeFile, readFile, access } from "node:fs/promises";
 import { committedProject, draft, now, runCli } from "./helpers.mjs";
 import { addRecord, supersedeRecord, readSnapshot } from "../src/records/store.mjs";
+import { recordIdFor } from "../src/identity/ids.mjs";
 test("idempotent add; reused request id with different content conflicts", async (t) => {
   const { roots } = await committedProject(t);
   const input = draft({ requestId: "req_test0001", body: "Uses PostgreSQL 16" });
@@ -55,5 +56,5 @@ test("direct record mutation without pilot leaves registry and locks unchanged",
   await assert.rejects(addRecord(bare, draft({ requestId: "req_nopilot01" }), { now }), { code: "DEVCTX_GATE_REQUIRED" });
   assert.deepEqual(await readFile(join(roots.configRoot, "registry.json")), before);
   await assert.rejects(access(join(roots.stateRoot, "locks", "acme.lock")));
-  await assert.rejects(access(join(roots.dataRoot, "scopes/acme/projects/acme.atlas/records", "req_nopilot01")));
+  await assert.rejects(access(join(roots.dataRoot, "scopes/acme/projects/acme.atlas/records", recordIdFor(draft({ requestId: "req_nopilot01" })))));
 });

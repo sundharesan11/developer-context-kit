@@ -3,7 +3,8 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { readRegistry } from "./registry.mjs";
-import { requireCommittedProject, readSnapshot } from "../records/store.mjs";
+import { readSnapshot, verifyManifestBundles } from "../records/store.mjs";
+import { readBindingVersion, readManifest } from "./store.mjs";
 import { describeLock } from "../storage/lock.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
 import { locateWorktree } from "../identity/git.mjs";
@@ -34,15 +35,24 @@ export async function runDoctor(roots) {
   }
   checks.push(check("orphan-staging", orphans.length ? "warn" : "ok", orphans));
   let registry;
-  try { registry = (await readRegistry(roots)).value; checks.push(check("registry", "ok", { generation: registry.generation })); }
+  try { registry = (await readRegistry(roots)).value; }
   catch (error) { checks.push(check("registry", existsSync(join(roots.configRoot, "registry.json")) ? "fail" : "unavailable", error.code ?? "unavailable")); }
-  let bundleProblems = 0, boundProblems = 0;
+  let bundleProblems = 0, boundProblems = 0, registryProblems = 0;
   if (registry) for (const entry of registry.bindings) {
-    try { await requireCommittedProject(roots, entry.scope, entry.project); const snap = await readSnapshot(roots, entry.scope, entry.project); bundleProblems += snap.corrupt.length; }
+    try {
+      const op = registry.operations.find((x) => x.operationId === entry.operationId);
+      if (!op || op.manifestHash !== entry.manifestHash) throw new Error("operation mismatch");
+      await readBindingVersion(roots, entry);
+      const manifest = await readManifest(roots, entry.scope, entry.project, entry.operationId, entry.manifestHash);
+      if (manifest.bindingHash !== entry.bindingHash) throw new Error("binding mismatch");
+      await verifyManifestBundles(roots, entry.scope, entry.project, manifest);
+    } catch { registryProblems++; }
+    try { const snap = await readSnapshot(roots, entry.scope, entry.project); bundleProblems += snap.corrupt.length; }
     catch { bundleProblems++; }
     try { const loc = await locateWorktree(entry.path); if (!loc.git || loc.commonDir !== entry.commonDir) boundProblems++; }
     catch { boundProblems++; }
   }
+  if (registry) checks.push(check("registry", registryProblems ? "fail" : "ok", registryProblems ? { code: "DEVCTX_RECOVERY_REQUIRED", invalidEntries: registryProblems } : { generation: registry.generation }));
   checks.push(check("bundles", bundleProblems ? "fail" : registry ? "ok" : "unavailable", { corrupt: bundleProblems }));
   const incomplete = [];
   for (const run of await names(join(roots.stateRoot, "runs"))) {

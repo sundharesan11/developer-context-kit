@@ -1,20 +1,20 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DevctxError } from "../errors.mjs";
 import { assertInPilot, assertWritable } from "../config/pilot.mjs";
 import { readRegistry, findByPath, publishRegistry } from "../config/registry.mjs";
-import { loadScope, bindingPath, writeBindingVersion, readBindingVersion, manifestPath, writeManifest, readManifest } from "../config/store.mjs";
+import { loadScope, bindingPath, writeBindingVersion, readBindingVersion, readBindingByHash, manifestPath, writeManifest, readManifest } from "../config/store.mjs";
 import { withPilotLock, registryLockPath, scopeLockPath } from "../storage/lock.mjs";
 import { onboardRequest, requestHashFor, deterministicRequestId, finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { sourceIdentity } from "../storage/source-read.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
-import { digest, sha256 } from "../storage/canonical.mjs";
+import { digest, sha256, canonicalJson } from "../storage/canonical.mjs";
 import { recordIdFor, operationIdFor, assertScopeId, assertProjectId } from "../identity/ids.mjs";
 import { scanRepository } from "./scan.mjs";
 import { deriveCandidates } from "./candidates.mjs";
 import { renderProfile } from "./profile.mjs";
-import { commitBundle, requireCommittedProject } from "../records/store.mjs";
+import { commitBundle, verifyManifestBundles } from "../records/store.mjs";
 import { writeRunReceipt } from "../storage/runs.mjs";
 const template = readFileSync(fileURLToPath(new URL("../../templates/client-profile.md", import.meta.url)), "utf8");
 const conflict = () => new DevctxError("BINDING_CONFLICT", "Worktree bound elsewhere", { reason: "bound elsewhere" });
@@ -58,8 +58,25 @@ export async function planOnboard(roots, pilot, input) {
   const scan = await scanRepository({ repo: input.repo, approvedDocs: input.approvedDocs ?? [] });
   const derived = deriveCandidates(scan, { expectedRemotes: input.expectedRemotes ?? [], environments: input.environments ?? [] });
   const approvedSources = scan.sources.filter((s) => !s.skipped).map(sourceIdentity);
-  const version = existing ? existing.bindingVersion + 1 : 1;
-  const binding = { schemaVersion: 1, scope: input.scope, project: input.project, version, roots: [{ path: scan.location.root, commonDir: scan.location.commonDir, kind: scan.location.kind }], remotes: scan.location.remotes.map((r) => ({ ...r, role: "evidence" })), approvedSources, expectedRemotes: input.expectedRemotes ?? [], actorRefs: input.actorRefs ?? [], environments: input.environments ?? [] };
+  const projectEntries = registry.bindings.filter((b) => b.scope === input.scope && b.project === input.project);
+  if (projectEntries.some((b) => b.commonDir !== scan.location.commonDir)) throw new DevctxError("BINDING_CONFLICT", "Project belongs to another repository");
+  const latest = projectEntries.reduce((a, b) => !a || b.bindingVersion > a.bindingVersion ? b : a, null);
+  const previous = latest ? await readBindingVersion(roots, latest) : null;
+  const versionDir = join(roots.configRoot, "projects", input.scope, input.project);
+  const diskVersions = existsSync(versionDir) ? readdirSync(versionDir).map((name) => /^v([1-9][0-9]*)\.json$/.exec(name)).filter(Boolean).map((match) => Number(match[1])) : [];
+  const newRoot = { path: scan.location.root, commonDir: scan.location.commonDir, kind: scan.location.kind };
+  const rootsList = [...(previous?.roots ?? []).filter((r) => r.path !== newRoot.path), newRoot];
+  const bindingBase = { schemaVersion: 1, scope: input.scope, project: input.project, roots: rootsList, remotes: scan.location.remotes.map((r) => ({ ...r, role: "evidence" })), approvedSources, expectedRemotes: input.expectedRemotes ?? [], actorRefs: input.actorRefs ?? [], environments: input.environments ?? [] };
+  let version = Math.max(0, ...diskVersions, ...projectEntries.map((b) => b.bindingVersion)) + 1;
+  if (diskVersions.length && Math.max(...diskVersions) > Math.max(0, ...projectEntries.map((b) => b.bindingVersion))) {
+    const candidateVersion = Math.max(...diskVersions);
+    try {
+      const orphan = await readPrivateJson(bindingPath(roots, input.scope, input.project, candidateVersion));
+      const { createdAt, version: ignored, ...orphanBase } = orphan;
+      if (canonicalJson(orphanBase) === canonicalJson(bindingBase)) version = candidateVersion;
+    } catch { /* A damaged orphan cannot be reused. */ }
+  }
+  const binding = { ...bindingBase, version };
   const plan = { kind: "onboard", pilotDigest: pilot.digest, scope: input.scope, project: input.project, requestId, requestHash, root: scan.location.root, binding, sourceBindings: approvedSources, head: scan.location.head, bundles: [], candidates: derived.candidates, unknowns: derived.unknowns, conflicts: derived.conflicts, registryGeneration: registry.generation, repoWrites: [], accept: input.accept ?? "none" };
   plan.bundles = draftsFor(plan).map((x) => ({ id: x.id, kind: x.draft.kind, title: x.draft.title, bodyHash: sha256(x.draft.body) }));
   return finalizePlan(plan);
@@ -77,12 +94,10 @@ export async function applyOnboard(roots, pilot, input, { fingerprint, now = () 
     if (published) {
       if (published.scope !== input.scope || published.project !== input.project || published.requestHash !== requestHash) throw new DevctxError("CONFLICT", "Request ID reused");
       if (fingerprint !== published.planFingerprint) throw new DevctxError("PLAN_MISMATCH", "Published plan differs");
-      const bindingEntry = registry.bindings.find((x) => x.operationId === published.operationId);
-      if (!bindingEntry) throw new DevctxError("RECOVERY_REQUIRED", "Published binding missing");
       const manifest = await readManifest(roots, input.scope, input.project, published.operationId, published.manifestHash);
-      if (manifest.requestHash !== requestHash || manifest.planFingerprint !== published.planFingerprint || manifest.bindingHash !== bindingEntry.bindingHash) throw new DevctxError("RECOVERY_REQUIRED", "Published operation mismatch");
-      await readBindingVersion(roots, bindingEntry);
-      await requireCommittedProject(roots, input.scope, input.project);
+      if (manifest.requestHash !== requestHash || manifest.planFingerprint !== published.planFingerprint || manifest.operationId !== published.operationId) throw new DevctxError("RECOVERY_REQUIRED", "Published operation mismatch");
+      await readBindingByHash(roots, input.scope, input.project, manifest.bindingHash);
+      await verifyManifestBundles(roots, input.scope, input.project, manifest);
       return { ...onboardReceipt(published, manifest), replayed: true };
     }
     const plan = await planOnboard(roots, pilot, { ...input, requestId });
@@ -110,7 +125,7 @@ export async function applyOnboard(roots, pilot, input, { fingerprint, now = () 
     if (faults.afterManifest) await faults.afterManifest();
     const generation = registry.generation + 1;
     const entry = { operationId, requestId, requestHash, scope: input.scope, project: input.project, manifestHash, planFingerprint: fingerprint, generation };
-    const bindingEntry = { path: input.repo, commonDir: plan.binding.roots[0].commonDir, scope: input.scope, project: input.project, bindingVersion: plan.binding.version, bindingHash, operationId, manifestHash };
+    const bindingEntry = { path: input.repo, commonDir: plan.binding.roots.find((r) => r.path === input.repo).commonDir, scope: input.scope, project: input.project, bindingVersion: plan.binding.version, bindingHash, operationId, manifestHash };
     await publishRegistry(roots, { ...registry, generation, bindings: [...registry.bindings.filter((b) => b.path !== input.repo), bindingEntry], operations: [...registry.operations, entry] }, { expectGeneration: registry.generation });
     if (faults.afterRegistry) await faults.afterRegistry();
     await writeRunReceipt(roots, "run_" + operationId.slice(3), onboardReceipt(entry, manifest));

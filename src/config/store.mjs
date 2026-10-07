@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import { readdir } from "node:fs/promises";
 import { DevctxError } from "../errors.mjs";
 import { assertWritable, assertInPilot } from "./pilot.mjs";
 import { assertScopeId, assertProjectId, assertActorRef } from "../identity/ids.mjs";
@@ -7,6 +8,9 @@ import { assertSourceRel, isDeniedRel } from "../storage/source-read.mjs";
 import { canonicalJson, sha256 } from "../storage/canonical.mjs";
 import { readPrivateJson, readPrivateText, writeNewFile, ensurePrivateDir, ensurePrivatePath, fsyncDir } from "../storage/fsx.mjs";
 import { withPilotLock, registryLockPath, scopeLockPath } from "../storage/lock.mjs";
+import { assertNoSensitive } from "../records/redact.mjs";
+import { git } from "../identity/git.mjs";
+import { deepestExisting } from "./roots.mjs";
 const invalid = () => { throw new DevctxError("INVALID_INPUT", "Invalid configuration"); };
 export function validatePreferences(value = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) invalid();
@@ -15,6 +19,7 @@ export function validatePreferences(value = {}) {
   if (value.diagrams !== undefined && !["prefer", "avoid", "neutral"].includes(value.diagrams)) invalid();
   if (value.notes !== undefined) {
     if (!Array.isArray(value.notes) || value.notes.length > 10 || value.notes.some((n) => typeof n !== "string" || n.length > 200 || /[\r\n]/.test(n))) invalid();
+    for (const note of value.notes) assertNoSensitive(note);
   }
   if (Buffer.byteLength(canonicalJson(value)) > 2048) invalid();
   return value;
@@ -27,10 +32,14 @@ export async function applyInit(roots, { actorRefs = [], preferences = {}, now =
   validatePreferences(preferences);
   actorRefs.forEach(assertActorRef);
   const userPath = join(roots.configRoot, "user.json"), registryPath = join(roots.configRoot, "registry.json");
+  for (const root of [roots.configRoot, roots.dataRoot, roots.stateRoot]) {
+    if (git(deepestExisting(root), ["rev-parse", "--is-inside-work-tree"]).stdout.trim() === "true") throw new DevctxError("PATH_UNSAFE", "Private roots inside Git worktree");
+  }
   assertWritable(roots, [roots.configRoot, roots.dataRoot, roots.stateRoot, userPath, registryPath]);
   return withPilotLock(roots, registryLockPath(roots), { kind: "init" }, async () => {
     assertWritable(roots, [roots.configRoot, roots.dataRoot, roots.stateRoot, userPath, registryPath]);
     for (const path of [roots.configRoot, roots.dataRoot, roots.stateRoot]) ensurePrivateDir(path);
+    if (existsSync(userPath) !== existsSync(registryPath)) throw new DevctxError("RECOVERY_REQUIRED", "Partial initialization");
     if (existsSync(userPath)) {
       const old = await readPrivateJson(userPath);
       if (canonicalJson({ actorRefs: old.actorRefs, preferences: old.preferences }) !== canonicalJson({ actorRefs, preferences })) throw new DevctxError("CONFLICT", "Initialization differs");
@@ -102,6 +111,23 @@ export async function readBindingVersion(roots, entry) {
   try { text = await readPrivateText(path); } catch { throw new DevctxError("RECOVERY_REQUIRED", "Binding unavailable"); }
   if (sha256(text) !== entry.bindingHash) throw new DevctxError("RECOVERY_REQUIRED", "Binding hash mismatch");
   return JSON.parse(text);
+}
+export async function readBindingByHash(roots, scope, project, expectedHash) {
+  const dir = join(roots.configRoot, "projects", scope, project);
+  let names;
+  try { names = await readdir(dir); } catch { throw new DevctxError("RECOVERY_REQUIRED", "Historical binding unavailable"); }
+  for (const name of names) {
+    const match = /^v([1-9][0-9]*)\.json$/.exec(name);
+    if (!match) continue;
+    let text;
+    try { text = await readPrivateText(join(dir, name)); } catch { continue; }
+    if (sha256(text) !== expectedHash) continue;
+    try {
+      const binding = JSON.parse(text);
+      if (binding.scope === scope && binding.project === project && binding.version === Number(match[1])) return binding;
+    } catch { /* A matching hash still needs a valid binding. */ }
+  }
+  throw new DevctxError("RECOVERY_REQUIRED", "Historical binding unavailable");
 }
 export function manifestPath(roots, scope, project, operationId) { assertProjectId(project, scope); return join(roots.dataRoot, "scopes", scope, "projects", project, "operations", operationId + ".json"); }
 export async function writeManifest(roots, manifest) {

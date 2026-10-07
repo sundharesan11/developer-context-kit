@@ -5,12 +5,13 @@ import { DevctxError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
 import { readRegistry } from "../config/registry.mjs";
 import { readBindingVersion, readManifest } from "../config/store.mjs";
-import { readPrivateJson, readPrivateText, writeNewFile, ensurePrivatePath, fsyncDir } from "../storage/fsx.mjs";
+import { readPrivateJson, readPrivateText, writeNewFile, ensurePrivatePath, fsyncDir, safeJoin } from "../storage/fsx.mjs";
 import { withPilotLock, scopeLockPath } from "../storage/lock.mjs";
 import { canonicalJson, digest, sha256 } from "../storage/canonical.mjs";
 import { REQUEST_ID } from "../storage/plan.mjs";
 import { recordIdFor, assertScopeId, assertProjectId } from "../identity/ids.mjs";
-import { buildRecord, validateRecord, recordHash } from "./schema.mjs";
+import { buildRecord, validateRecord, validateDraft, recordHash } from "./schema.mjs";
+import { assertNoSensitive, findForbiddenFields } from "./redact.mjs";
 const dirFor = (roots, scope, project) => join(roots.dataRoot, "scopes", scope, "projects", project);
 const recDir = (roots, scope, project, id) => join(dirFor(roots, scope, project), "records", id);
 const recovery = () => new DevctxError("RECOVERY_REQUIRED", "Incomplete committed project");
@@ -26,7 +27,7 @@ async function readBundle(roots, scope, project, id) {
 export async function requireCommittedProject(roots, scope, project) {
   assertScopeId(scope); assertProjectId(project, scope);
   const { value } = await readRegistry(roots);
-  const entry = value.bindings.find((x) => x.scope === scope && x.project === project);
+  const entry = value.bindings.filter((x) => x.scope === scope && x.project === project).reduce((latest, x) => !latest || x.bindingVersion > latest.bindingVersion ? x : latest, null);
   if (!entry) throw new DevctxError("PROJECT_UNBOUND", "Project unbound");
   const op = value.operations.find((x) => x.operationId === entry.operationId);
   if (!op || op.manifestHash !== entry.manifestHash) throw recovery();
@@ -35,15 +36,28 @@ export async function requireCommittedProject(roots, scope, project) {
     binding = await readBindingVersion(roots, entry);
     manifest = await readManifest(roots, scope, project, entry.operationId, entry.manifestHash);
     if (manifest.bindingHash !== entry.bindingHash || manifest.operationId !== op.operationId) throw recovery();
-    for (const bundle of manifest.bundles) {
-      const { record, body } = await readBundle(roots, scope, project, bundle.id);
-      if (recordHash(record) !== bundle.recordHash || sha256(body) !== bundle.bodyHash) throw recovery();
-    }
+    await verifyManifestBundles(roots, scope, project, manifest);
   } catch { throw recovery(); }
   return { binding, manifest, entry, registry: value };
 }
-export async function commitBundle(roots, input, { now = () => new Date(), faults = {} } = {}) {
-  const { scope, project, requestId, recordedBy, draft, operationId = null, supersedes = [] } = input;
+export async function verifyManifestBundles(roots, scope, project, manifest) {
+  try {
+    for (const bundle of manifest.bundles) {
+      const { record, body } = await readBundle(roots, scope, project, bundle.id);
+      if (recordHash(record) !== bundle.recordHash || sha256(body) !== bundle.bodyHash || record.operationId !== manifest.operationId) throw recovery();
+    }
+  } catch { throw recovery(); }
+}
+function assertPublicInput(input) {
+  if (!input || Object.keys(input).some((key) => !["scope", "project", "requestId", "recordedBy", "draft", "operationId"].includes(key))) throw new DevctxError("INVALID_INPUT", "Unexpected record field");
+}
+export async function commitBundle(roots, input, options = {}) {
+  assertPublicInput(input);
+  if (Object.keys(options).some((key) => !["now", "faults"].includes(key))) throw new DevctxError("INVALID_INPUT", "Unexpected bundle option");
+  return commitBundleInternal(roots, input, options);
+}
+async function commitBundleInternal(roots, input, { now = () => new Date(), faults = {}, supersedes = [] } = {}) {
+  const { scope, project, requestId, recordedBy, draft, operationId = null } = input;
   if (!REQUEST_ID.test(requestId)) throw new DevctxError("INVALID_ID", "Invalid request ID");
   const id = recordIdFor({ scope, project, requestId });
   const base = dirFor(roots, scope, project);
@@ -93,6 +107,7 @@ export async function readSnapshot(roots, scope, project) {
   return { records, corrupt, hiddenUncommitted };
 }
 export async function addRecord(roots, input, options = {}) {
+  assertPublicInput(input);
   const path = recDir(roots, input.scope, input.project, recordIdFor(input));
   assertWritable(roots, [path, scopeLockPath(roots, input.scope)]);
   return withPilotLock(roots, scopeLockPath(roots, input.scope), { kind: "record-add" }, async () => {
@@ -101,6 +116,7 @@ export async function addRecord(roots, input, options = {}) {
   }, { destinations: [path] });
 }
 export async function supersedeRecord(roots, input, options = {}) {
+  if (!input || Object.keys(input).some((key) => !["scope", "project", "requestId", "recordedBy", "draft", "targets", "expectHashes"].includes(key))) throw new DevctxError("INVALID_INPUT", "Unexpected supersession field");
   const path = recDir(roots, input.scope, input.project, recordIdFor(input));
   assertWritable(roots, [path, scopeLockPath(roots, input.scope)]);
   return withPilotLock(roots, scopeLockPath(roots, input.scope), { kind: "record-supersede" }, async () => {
@@ -110,7 +126,7 @@ export async function supersedeRecord(roots, input, options = {}) {
       const target = snap.records.find((r) => r.id === input.targets[i]);
       if (!target || target.effective === "superseded" || target.recordHash !== input.expectHashes[i]) throw new DevctxError("STALE_VERSION", "Target changed");
     }
-    return commitBundle(roots, { ...input, supersedes: input.targets }, options);
+    return commitBundleInternal(roots, input, { ...options, supersedes: input.targets });
   }, { destinations: [path] });
 }
 export async function previewRecord(roots, input) {
@@ -118,21 +134,34 @@ export async function previewRecord(roots, input) {
   return { preview: true, recordId: recordIdFor(input), scope: input.scope, project: input.project };
 }
 export async function proposeRecord(roots, input, { now = () => new Date() } = {}) {
-  const proposalId = "prop_" + digest(input).slice(7, 31);
+  assertPublicInput(input);
+  if (input.operationId !== undefined) throw new DevctxError("INVALID_INPUT", "Proposal cannot name operation");
+  assertScopeId(input.scope); assertProjectId(input.project, input.scope);
+  if (!REQUEST_ID.test(input.requestId)) throw new DevctxError("INVALID_ID", "Invalid request ID");
+  validateDraft(input.draft, { recordedBy: input.recordedBy });
+  if (Object.keys(input.recordedBy).some((key) => !["actor", "runId"].includes(key))) throw new DevctxError("INVALID_INPUT", "Unexpected recorder field");
+  const clean = { scope: input.scope, project: input.project, requestId: input.requestId, recordedBy: input.recordedBy, draft: input.draft };
+  if (findForbiddenFields(clean).length) throw new DevctxError("INVALID_INPUT", "Forbidden proposal field");
+  assertNoSensitive(canonicalJson(clean));
+  const proposalId = "prop_" + digest(clean).slice(7, 31);
   const path = join(dirFor(roots, input.scope, input.project), "proposals", proposalId + ".json");
   assertWritable(roots, [path]);
   return withPilotLock(roots, scopeLockPath(roots, input.scope), { kind: "record-propose" }, async () => {
     await requireCommittedProject(roots, input.scope, input.project);
     assertWritable(roots, [path]);
     ensurePrivatePath(roots.dataRoot, ["scopes", input.scope, "projects", input.project, "proposals"]);
-    if (!existsSync(path)) await writeNewFile(path, canonicalJson({ schemaVersion: 1, proposalId, input, createdAt: now().toISOString(), review: "unreviewed" }) + "\n");
+    if (!existsSync(path)) await writeNewFile(path, canonicalJson({ schemaVersion: 1, proposalId, input: clean, createdAt: now().toISOString(), review: "unreviewed" }) + "\n");
     return { proposalId, path };
   }, { destinations: [path] });
 }
 export async function publishProposal(roots, { scope, project, proposalId, review }, { controller, now = () => new Date() } = {}) {
   if (!controller) throw new DevctxError("APPROVAL_REQUIRED", "Controller required");
-  const path = join(dirFor(roots, scope, project), "proposals", proposalId + ".json");
+  assertScopeId(scope); assertProjectId(project, scope);
+  if (!/^prop_[a-f0-9]{24}$/.test(proposalId ?? "")) throw new DevctxError("INVALID_ID", "Invalid proposal ID");
+  const path = safeJoin(dirFor(roots, scope, project), "proposals", proposalId + ".json");
   const proposal = await readPrivateJson(path);
+  if (proposal.input?.scope !== scope || proposal.input?.project !== project) throw new DevctxError("CONFLICT", "Proposal belongs to another project");
+  assertPublicInput(proposal.input);
   return addRecord(roots, { ...proposal.input, scope, project, draft: { ...proposal.input.draft, status: "observed", review: review ?? proposal.input.draft.review } }, { now });
 }
 export { recordHash };

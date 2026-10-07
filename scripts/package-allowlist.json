@@ -82,6 +82,7 @@
   "test/pilot.test.mjs",
   "test/records.test.mjs",
   "test/redact.test.mjs",
+  "test/repair-regressions.test.mjs",
   "test/required-tests.json",
   "test/run-tests.test.mjs",
   "test/source-read.test.mjs"

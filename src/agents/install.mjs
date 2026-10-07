@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, lstatSync } from "node:fs";
+import { readFileSync, existsSync, lstatSync, readdirSync } from "node:fs";
 import { mkdir, readFile, unlink, rmdir, readdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +24,7 @@ function statusFor(dir, skill, mode) {
     if (lstatSync(ownerFile).isSymbolicLink() || lstatSync(skillFile).isSymbolicLink()) return "conflict";
     const owned = JSON.parse(readFileSync(ownerFile, "utf8"));
     if (owned.skill !== skill || owned.files?.["SKILL.md"] !== sha256(readFileSync(skillFile))) return "modified";
+    if (readdirSync(dir).some((name) => name !== "SKILL.md" && name !== ".devctx-owned.json")) return "modified";
     if (mode === "uninstall") return "remove";
     return owned.version === "0.0.0-local" && readFileSync(skillFile, "utf8") === source(skill) ? "installed" : "update";
   } catch { return "conflict"; }
@@ -64,6 +65,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }) 
         await atomicReplace(join(action.path, "SKILL.md"), source(action.skill));
         await atomicReplace(join(action.path, ".devctx-owned.json"), canonicalJson({ schemaVersion: 1, skill: action.skill, version: "0.0.0-local", files: { "SKILL.md": sha256(source(action.skill)) }, runId }) + "\n");
       } else {
+        if (statusFor(action.path, action.skill, "uninstall") !== "remove") throw new DevctxError("CONFLICT", "Installed skill changed before removal");
         await unlink(join(action.path, "SKILL.md"));
         await unlink(join(action.path, ".devctx-owned.json"));
         await rmdir(action.path);
