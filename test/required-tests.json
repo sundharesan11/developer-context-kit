@@ -8,5 +8,10 @@
   "safeJoin refuses traversal",
   "pilot fence refuses real agent homes, configured homes, default roots and forbidden overlap",
   "assertWritable rechecks the fence at write time; escaped member is refused",
-  "CLI: only version and help are root-free; every other route refuses without --pilot"
+  "CLI: only version and help are root-free; every other route refuses without --pilot",
+  "root-bound lock rejects missing pilot before creating lock parent",
+  "root-bound lock refuses escaped state root before touching outside",
+  "concurrent writers serialize; a foreign lock is never broken",
+  "fingerprint mismatch is refused",
+  "request hash ignores order and non-request fields; deterministic id is stable and payload-bound"
 ]

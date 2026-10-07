@@ -30,3 +30,4 @@ export async function makePilot(t, { env = {} } = {}) {
   let n = 0;
   return { path, pilot, roots: rootsFromPilot(pilot), configRoot: obj.configRoot, dataRoot: obj.dataRoot, stateRoot: obj.stateRoot, inputsRoot: obj.inputsRoot, agentHomes: obj.agentHomes, reposDir: join(root, "repos"), fakeHome, forbidden, sandbox: sb, async with(patch) { const p = join(sb, "pilot-" + ++n + ".json"); await writeFile(p, JSON.stringify({ ...obj, ...patch })); return p; } };
 }
+export async function lockFile(t) { return join(await sandbox(t), "x.lock"); }
