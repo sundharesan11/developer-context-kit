@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "preset": "requested-twelve",
+  "sources": [
+    { "id": "pm-skills", "repository": { "owner": "phuryn", "name": "pm-skills" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "Nested plugin skills and references; selection unverified." } },
+    { "id": "openspec", "repository": { "owner": "Fission-AI", "name": "OpenSpec" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "CLI and project integration are separate; selection unverified." } },
+    { "id": "last30days", "repository": { "owner": "mvanhorn", "name": "last30days-skill" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "Research engine and optional providers; selection unverified." } },
+    { "id": "ui-ux-pro-max", "repository": { "owner": "nextlevelbuilder", "name": "ui-ux-pro-max-skill" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "Host builds and CLI differ; selection unverified." } },
+    { "id": "taste-skill", "repository": { "owner": "Leonxlnx", "name": "taste-skill" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "No branch fallback; check reports no_release while no stable release exists." } },
+    { "id": "impeccable", "repository": { "owner": "pbakaus", "name": "impeccable" }, "license": "Apache-2.0", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "Host builds, engine and hooks need separate review." } },
+    { "id": "superpowers", "repository": { "owner": "obra", "name": "superpowers" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "Native plugin and portable copy can conflict; selection unverified." } },
+    { "id": "mattpocock-skills", "repository": { "owner": "mattpocock", "name": "skills" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "Nested names and references need mapping." } },
+    { "id": "understand-anything", "repository": { "owner": "Egonex-AI", "name": "Understand-Anything" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "Runtime/dashboard and hooks need separate review." } },
+    { "id": "marketing-skills", "repository": { "owner": "coreyhaines31", "name": "marketingskills" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "Skill names can collide; selection unverified." } },
+    { "id": "humanizer", "repository": { "owner": "blader", "name": "humanizer" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "Root-level SKILL.md needs explicit selection." } },
+    { "id": "claude-seo", "repository": { "owner": "AgriciDaniel", "name": "claude-seo" }, "license": "MIT", "source": { "channel": "stable-release" }, "installation": { "status": "unverified", "note": "Claude plugin and optional dependencies; other hosts unverified." } }
+  ]
+}

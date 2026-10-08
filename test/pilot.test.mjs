@@ -32,9 +32,9 @@ test("assertWritable rechecks the fence at write time; escaped member is refused
   await assert.rejects(Promise.resolve().then(() => assertWritable(p.roots, [join(p.dataRoot, "scopes")])), (e) => ["DEVCTX_GATE_REQUIRED", "DEVCTX_PATH_UNSAFE"].includes(e.code));
   assert.deepEqual(await readdir(outside), []);
 });
-test("CLI: only version and help are root-free; every other route refuses without --pilot", async () => {
+test("CLI: only version, help, and skill source reads are root-free; every other route requires --pilot", async () => {
   const routes = listCommands();
-  assert.deepEqual(routes.filter((r) => isRootFree(r)).sort(), ["help", "version"]);
+  assert.deepEqual(routes.filter((r) => isRootFree(r)).sort(), ["help", "skill-sources catalog", "skill-sources check", "version"]);
   for (const route of routes.filter((r) => !isRootFree(r))) {
     const { code, json } = await runCli(route.split(" "));
     assert.equal(code, 1, route);

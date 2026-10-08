@@ -9,6 +9,8 @@ const ROOT_OPTIONS = {
 export const COMMANDS = {
   version: { rootFree: true, load: async () => ({ options: {}, run: () => ({ name: "devctx", version: "0.0.0-local" }) }) },
   help: { rootFree: true, load: async () => ({ options: {}, run: () => ({ commands: listCommands() }) }) },
+  "skill-sources catalog": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/commands.mjs")).catalogCommand },
+  "skill-sources check": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/commands.mjs")).checkCommand },
   doctor: { load: async () => ({ options: {}, run: ({}, ctx) => import("./config/doctor.mjs").then((m) => m.runDoctor(ctx.roots)) }) },
   init: { load: async () => (await import("./config/commands.mjs")).initCommand },
   "scope add": { load: async () => (await import("./config/commands.mjs")).scopeAddCommand },
@@ -56,7 +58,21 @@ export async function main(argv, options = {}) {
     const impl = await COMMANDS[command].load();
     let values;
     try {
-      ({ values } = parseArgs({ args: routed.args, options: { ...ROOT_OPTIONS, ...impl.options }, strict: true, allowPositionals: false }));
+      const parsed = parseArgs({
+        args: routed.args,
+        options: { ...(COMMANDS[command].rootOptions === false ? {} : ROOT_OPTIONS), ...impl.options },
+        strict: true, allowPositionals: false,
+        tokens: COMMANDS[command].rootOptions === false
+      });
+      values = parsed.values;
+      if (COMMANDS[command].rootOptions === false) {
+        const seen = new Set();
+        for (const token of parsed.tokens) {
+          if (token.kind !== "option") continue;
+          if (seen.has(token.name)) throw new DevctxError("USAGE", "Duplicate command option");
+          seen.add(token.name);
+        }
+      }
     } catch {
       throw new DevctxError("USAGE", "Invalid command options");
     }
@@ -68,7 +84,9 @@ export async function main(argv, options = {}) {
         if (values[flag] && values[flag] !== roots[key]) throw new DevctxError("GATE_REQUIRED", "Root does not match pilot");
       }
     }
-    const result = await impl.run(values, { roots, pilot, now, home, env });
+    const context = { roots, pilot, now, home, env };
+    if (command === "skill-sources check") context.request = options.request;
+    const result = await impl.run(values, context);
     stdout.write(JSON.stringify({ ok: true, command, result }) + "\n");
     return 0;
   } catch (error) {

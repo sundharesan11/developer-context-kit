@@ -3,6 +3,7 @@
   "README.md",
   "SECURITY.md",
   "bin/devctx.mjs",
+  "catalog/skill-sources.json",
   "docs/AGENT-PROTOCOL.md",
   "docs/AUTH.md",
   "docs/LIMITATIONS.md",
@@ -11,6 +12,7 @@
   "docs/SKILL-BUILDER.md",
   "docs/STORAGE.md",
   "docs/plans/skill-builder.md",
+  "docs/plans/skill-source-catalog.md",
   "docs/research/skill-collections.md",
   "package.json",
   "schemas/account.schema.json",
@@ -70,6 +72,9 @@
   "src/skill-builder/commands.mjs",
   "src/skill-builder/validate.mjs",
   "src/skill-builder/workspace.mjs",
+  "src/skill-sources/catalog.mjs",
+  "src/skill-sources/commands.mjs",
+  "src/skill-sources/github.mjs",
   "templates/client-profile.md",
   "test/agents.test.mjs",
   "test/auth-hubs.test.mjs",
@@ -95,5 +100,6 @@
   "test/run-tests.test.mjs",
   "test/skill-builder.test.mjs",
   "test/skill-install.test.mjs",
+  "test/skill-sources.test.mjs",
   "test/source-read.test.mjs"
 ]
