@@ -88,7 +88,10 @@ async function observed(dir, manifest, workspace, mode) {
 }
 function fileHashes(files) { return Object.fromEntries(Object.keys(files).sort().map((rel) => [rel, sha256(files[rel])])); }
 function roleConflict(oldFiles, newFiles) {
-  return Object.keys(oldFiles).some((oldRel) => Object.keys(newFiles).some((newRel) => oldRel.startsWith(newRel + "/") || newRel.startsWith(oldRel + "/")));
+  return Object.keys(oldFiles).some((oldRel) => Object.keys(newFiles).some((newRel) => {
+    const oldFolded = oldRel.toLowerCase(), newFolded = newRel.toLowerCase();
+    return (oldFolded === newFolded && oldRel !== newRel) || oldFolded.startsWith(newFolded + "/") || newFolded.startsWith(oldFolded + "/");
+  }));
 }
 export async function planPackageInstall(roots, selection, { revisionId, contentDecisionId, targetHome, agents, mode }) {
   selectionCheck(selection); const pilot = safeHome(roots, targetHome);

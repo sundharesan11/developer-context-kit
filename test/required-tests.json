@@ -123,5 +123,7 @@
   "revision changes after journal creation cannot change installed bytes",
   "package plan refuses the real home and scoped audiences",
   "extra, symlinked and hardlinked installed entries are preserved",
-  "v1 and another workspace ownership receipts are conflicts"
+  "v1 and another workspace ownership receipts are conflicts",
+  "case-only owned file rename is refused before approval and consumption",
+  "case-folded file-to-directory update is refused before approval"
 ]

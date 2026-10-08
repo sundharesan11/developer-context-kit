@@ -12,7 +12,7 @@ const selection = { audience: "personal", workspace: "ws_install01" };
 const args = ["--audience", "personal", "--workspace", "ws_install01"];
 const response = (kind, hash) => `Approved ${kind} ${hash}`;
 async function cli(p, route, more = []) { return runCli(["skill", route, "--pilot", p.path, ...args, ...more]); }
-async function fixture(t, { oldReference = false, oldNestedReference = false, name = "summarize-note", title = "Summary" } = {}) {
+async function fixture(t, { oldReference = false, oldReferenceName = "old.md", oldNestedReference = false, name = "summarize-note", title = "Summary" } = {}) {
   const p = await makePilot(t);
   await createWorkspace(p.roots, selection);
   const req = { goal: "Summarize a synthetic note", success: "A short summary", examples: ["Summarize note"], negativeExample: "Write note", inputs: [], permittedTools: [], forbiddenTools: [], permittedContext: [], forbiddenContext: [], supportedAgents: ["codex", "claude"], output: "Markdown", failure: "Explain", destination: "private", unknowns: [] };
@@ -24,7 +24,7 @@ async function fixture(t, { oldReference = false, oldNestedReference = false, na
   await approveDesign(p.roots, selection, "ds_install01", "dc_design01", "user:synthetic", response("", recorded.digest).replace("  ", " "));
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate);
   await writeFile(join(candidate, "SKILL.md"), `---\nname: ${name}\ndescription: Summarize a synthetic note.\n---\n# ${title}\n`);
-  if (oldReference) { await mkdir(join(candidate, "references")); await writeFile(join(candidate, "references/old.md"), "Old synthetic reference.\n"); }
+  if (oldReference) { await mkdir(join(candidate, "references")); await writeFile(join(candidate, "references", oldReferenceName), "Old synthetic reference.\n"); }
   if (oldNestedReference) { await mkdir(join(candidate, "references/old.md"), { recursive: true }); await writeFile(join(candidate, "references/old.md/child.md"), "Nested synthetic reference.\n"); }
   const draft = await createDraft(p.roots, selection, { requirementsId: "rq_install01", designId: "ds_install01", decisionId: "dc_design01", revisionId: "rv_install01", candidate });
   const validation = await validateDraft(p.roots, selection, "rv_install01");
@@ -400,4 +400,34 @@ test("v1 and another workspace ownership receipts are conflicts", async (t) => {
   const receiptPath = join(dir, ".devctx-owned.json"), receipt = JSON.parse(await readFile(receiptPath, "utf8"));
   await writeFile(receiptPath, JSON.stringify({ ...receipt, workspace: "ws_foreign01" }));
   assert.equal((await cli(x.p, "local-plan", x.install)).json.result.actions[0].status, "conflict");
+});
+
+test("case-only owned file rename is refused before approval and consumption", async (t) => {
+  const x = await approvedInstall(t, { oldReference: true, oldReferenceName: "Old.md" }); await applyApproved(x);
+  const candidate = join(x.p.inputsRoot, "case-rename"); await mkdir(join(candidate, "references"), { recursive: true });
+  await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a synthetic note.\n---\n# Two\n");
+  await writeFile(join(candidate, "references/old.md"), "New synthetic reference.\n");
+  const draft = await createDraft(x.p.roots, selection, { requirementsId: "rq_install01", designId: "ds_install01", decisionId: "dc_design01", revisionId: "rv_install02", candidate });
+  await validateDraft(x.p.roots, selection, "rv_install02");
+  assert.equal((await cli(x.p, "content-approve", ["--revision", "rv_install02", "--decision", "dc_content02", "--interaction-ref", "user:synthetic", "--response", `Approved content ${draft.packageDigest} as personal generic non-confidential`])).code, 0);
+  const update = ["--mode", "install", "--revision", "rv_install02", "--content-decision", "dc_content02", "--home", x.home, "--agent", "claude"];
+  const plan = await cli(x.p, "local-plan", update);
+  assert.equal(plan.json.result.actions[0].status, "conflict");
+  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVCTX_CONFLICT");
+  await assert.rejects(stat(join(x.p.stateRoot, "skill-installs/consumed/ws_install01/dc_update001.json")), { code: "ENOENT" });
+});
+
+test("case-folded file-to-directory update is refused before approval", async (t) => {
+  const x = await approvedInstall(t, { oldReference: true, oldReferenceName: "Notes.md" }); await applyApproved(x);
+  const candidate = join(x.p.inputsRoot, "case-prefix"); await mkdir(join(candidate, "references/notes.md"), { recursive: true });
+  await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a synthetic note.\n---\n# Two\n");
+  await writeFile(join(candidate, "references/notes.md/child.md"), "New nested reference.\n");
+  const draft = await createDraft(x.p.roots, selection, { requirementsId: "rq_install01", designId: "ds_install01", decisionId: "dc_design01", revisionId: "rv_install02", candidate });
+  await validateDraft(x.p.roots, selection, "rv_install02");
+  assert.equal((await cli(x.p, "content-approve", ["--revision", "rv_install02", "--decision", "dc_content02", "--interaction-ref", "user:synthetic", "--response", `Approved content ${draft.packageDigest} as personal generic non-confidential`])).code, 0);
+  const update = ["--mode", "install", "--revision", "rv_install02", "--content-decision", "dc_content02", "--home", x.home, "--agent", "claude"];
+  const plan = await cli(x.p, "local-plan", update);
+  assert.equal(plan.json.result.actions[0].status, "conflict");
+  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVCTX_CONFLICT");
+  await assert.rejects(stat(join(x.p.stateRoot, "skill-installs/consumed/ws_install01/dc_update001.json")), { code: "ENOENT" });
 });
