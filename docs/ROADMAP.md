@@ -1,10 +1,10 @@
 # Readiness and remaining work
 
-Status snapshot: 2026-10-08. The core at `a446760` is a reviewed synthetic local pilot, not a production-ready or publicly released package. This file tracks product capabilities, not private projects, accounts or tasks.
+Status snapshot: 2026-10-09. The core at `a446760` is a reviewed synthetic local pilot, not a production-ready or publicly released package. Skill-builder A and B tooling is implemented. B at `1a850d9` has passed independent implementation review after repairs; the current 23-file suite has 150 passing tests. This file tracks product capabilities, not private projects, accounts or tasks.
 
 ## What works in the pilot
 
-The verified baseline has 88 passing tests, 23 passing synthetic acceptance checks, and a passing package audit. It provides scoped project onboarding, immutable context records, decisions and supersession, bounded context briefs, advisory agent handoffs, disposable skill installation, fake-provider identity checks, private learning proposals, and a read-only doctor. These are tool-level checks, not proof of real-agent behavior.
+The historical core baseline had 88 passing tests, 23 passing synthetic acceptance checks, and a passing package audit. It provides scoped project onboarding, immutable context records, decisions and supersession, bounded context briefs, advisory agent handoffs, disposable skill installation, fake-provider identity checks, private learning proposals, and a read-only doctor. These are tool-level checks, not proof of real-agent behavior. The current branch also passes its package audit; the core acceptance count is not a new B-specific behavior test.
 
 The package remains private and unlicensed for redistribution. There is no live connector or send operation, no automatic migration, and no public release. Installation files alone do not prove discovery by an agent.
 
@@ -27,17 +27,25 @@ Priorities 5–7 need not block an offline daily-use pilot. Do not build every c
 
 The approved design is [skill-builder.md](plans/skill-builder.md).
 
-1. **A: private creation.** Requirements → approved design → immutable draft → validation. No installation.
-2. **B: disposable installation.** Approved generic/personal packages only, using owned copies and conflict-preserving removal. Real homes remain gated.
-3. **C: clean export.** Explicit file selection and privacy/rights review. Export preparation is not publication.
+1. **A: private creation tooling implemented.** Requirements → approved design → immutable draft → validation. The conversational skill and live behavior evaluation remain deferred.
+2. **B: disposable installation implemented and reviewed.** Approved generic/personal packages only, using owned copies and conflict-preserving removal. Plans bind content, validation and prior installed state. Byte edits, path-role changes and case-only renames are preserved/refused. Real homes remain gated.
+3. **C: clean export, not implemented.** Explicit file selection and privacy/rights review. Export preparation is not publication.
 
 Live-model behavior evaluation needs an approved provider/account and synthetic fixture scope. Report it deferred when not run. Static format checks and scripted approval tests cannot demonstrate useful clarification, routing or writing quality. Fresh-session discovery is a separate activation check.
+
+## Requested addition: third-party catalog and weekly updates
+
+The twelve-source catalog request is now in planning. See [source audit and proposed delivery](research/skill-collections.md) for verified repository names, observed releases, installation differences, candidate architecture and exit evidence.
+
+This is not part of skill-builder B's disposable package installation contract. It needs source acquisition/provenance, per-host adapters, collision/adoption policy, a guarded updater and a reusable automation-setup skill. Add the reviewed preset to initial onboarding after these components pass their own gates. Keep source recipes public and each user's installations, locks, schedules and reports private.
+
+The intended sequence is catalog/design approval → disposable adapter/updater tests → reviewed local activation → fresh-host discovery checks → disabled schedule and harmless run → weekly enablement. Claude, Codex, Gemini CLI, Cursor and Command Code require explicit compatibility evidence; a common folder is not universal support. No weekly updater or twelve-source activation is claimed yet.
 
 ## Known core follow-ups
 
 These are recorded residuals from the bounded pilot review, not claims that each is exploitable:
 
-- The CLI install → uninstall → reinstall sequence can collide with its default journal ID. An explicit fresh `--run-id` is the current workaround; fix and test the full cycle before routine installation.
+- The CLI install → uninstall → reinstall journal-ID collision is fixed and reviewed in B, with fresh generated IDs, exclusive run directories and regression tests.
 - Tighten which mutators can write agent-home paths, and allow the acceptance harness to receive the run's additional forbidden paths.
 - Fail closed on unexpected Git configuration-query errors; retain the tests that prove filters and hooks do not execute during discovery.
 - Review low-level interrupted-file writes, lock-handle cleanup, Git output bounds and file-identity precision.

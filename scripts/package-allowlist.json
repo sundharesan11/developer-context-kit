@@ -11,6 +11,7 @@
   "docs/SKILL-BUILDER.md",
   "docs/STORAGE.md",
   "docs/plans/skill-builder.md",
+  "docs/research/skill-collections.md",
   "package.json",
   "schemas/account.schema.json",
   "schemas/binding.schema.json",
