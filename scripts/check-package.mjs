@@ -26,6 +26,7 @@ if (denylist) {
   else try { terms = readFileSync(denylist, "utf8").split(/\r?\n/).filter(Boolean); } catch { findings.push({ file: ".", type: "denylist-unreadable" }); }
 }
 for (const file of files) {
+  if (/\.handoff\.md$/i.test(file)) findings.push({ file, type: "generated-handoff-packet" });
   let body;
   try { body = readFileSync(join(root, file), "utf8"); } catch { findings.push({ file, type: "unreadable" }); continue; }
   for (const hit of scanSensitive(body)) findings.push({ file, type: "sensitive:" + hit.type });
@@ -43,6 +44,7 @@ if (!noPack && listed.status === 0) {
     try {
       const entries = JSON.parse(result.stdout)[0].files.map((x) => x.path);
       for (const file of entries) {
+        if (/\.handoff\.md$/i.test(file)) findings.push({ file, type: "generated-handoff-packet-in-pack" });
         if (!allow.has(file)) findings.push({ file, type: "pack-extra" });
         if (/^(?:(?:data|state|config|\.local|private)\/)?(?:records|operations|proposals|staging|runs|locks)(\/|$)|(^|\/)registry\.json$|\.lock$/.test(file)) findings.push({ file, type: "private-state-in-pack" });
       }

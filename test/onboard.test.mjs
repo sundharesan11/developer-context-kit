@@ -1,13 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { writeFile, readdir, rename } from "node:fs/promises";
-import { onboardFixture, now, treeSnapshot } from "./helpers.mjs";
+import { writeFile, readdir, rename, readFile } from "node:fs/promises";
+import { onboardFixture, now, treeSnapshot, committedProject, draftFor } from "./helpers.mjs";
 import { planOnboard, applyOnboard } from "../src/onboarding/onboard.mjs";
-import { requireCommittedProject } from "../src/records/store.mjs";
+import { requireCommittedProject, readSnapshot, addRecord } from "../src/records/store.mjs";
+import { buildPortableHandoff } from "../src/handoff/portable.mjs";
 import { readRegistry } from "../src/config/registry.mjs";
 import { applyScopeAdd } from "../src/config/store.mjs";
 import { toJson } from "../src/errors.mjs";
+test("new onboarding profiles use project identity and preserve historical records", async (t) => {
+  const s = await committedProject(t);
+  const profile = (await readSnapshot(s.roots, "acme", "acme.atlas")).records.find((r) => r.title === "Client profile");
+  assert.ok(profile.body.includes("acme.atlas"));
+  assert.ok(!profile.body.includes(s.repo));
+  const historical = await addRecord(s.roots, draftFor("acme", "acme.atlas", { requestId: "req_historical001", body: s.repo }), { now });
+  const path = join(s.dataRoot, "scopes/acme/projects/acme.atlas/records", historical.recordId);
+  const before = await Promise.all([readFile(join(path, "body.md")), readFile(join(path, "record.json"))]);
+  const request = { ...s.input, requestId: "req_laterprofile01" };
+  const plan = await planOnboard(s.roots, s.pilot, request);
+  await applyOnboard(s.roots, s.pilot, request, { fingerprint: plan.fingerprint, now });
+  assert.deepEqual(await Promise.all([readFile(join(path, "body.md")), readFile(join(path, "record.json"))]), before);
+  await assert.rejects(buildPortableHandoff(s.roots, s.pilot, { scope: "acme", cwd: s.repo, recordIds: [historical.recordId], asOf: "2026-10-09T00:00:00.000Z" }), { code: "DEVCTX_HANDOFF_UNSAFE" });
+});
 for (const point of ["afterBundles", "afterBinding", "afterManifest"]) {
   test(`crash ${point}: project invisible, identical retry commits once`, async (t) => {
     const s = await onboardFixture(t);

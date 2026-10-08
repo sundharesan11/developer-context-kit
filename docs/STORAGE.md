@@ -32,3 +32,7 @@ Source `.devctx-owned.json` uses schema 3 and kind `skill-source-package`, with 
 Apply consumes approval before journal creation. A failure in between leaves a consumed decision with no target writes; status shows consumption. Failures after journal creation retain recovery evidence and block later package applies to that home. Before ownership publication, the shared executor verifies output hashes and the exact file/directory inventory. Multi-host completion is journaled incrementally; success on one host does not hide a failed second host.
 
 Clean-version restoration uses retained staging/content evidence and a new action approval. Interrupted writes require manual review, not automatic rollback. Removal needs the intact current decision and installed receipt/hashes but can proceed after staging loss. Source homes must be canonical paths; existing personal journal matching remains raw-string based, with broader personal canonicalization left separate.
+
+## Portable handoff files
+
+Private handoff exports live only at `dataRoot/exports/handoffs/<scope>/<project>/<name>.handoff.md`, in 0700 directories with exclusive 0600 files. They are not record mutations or publication receipts. Preflight holds leave no packet; interrupted writes may retain incomplete files, never overwritten or automatically deleted. Discard invalid-footer artifacts from use and preserve evidence for manual inspection. See [HANDOFF.md](HANDOFF.md) for the selected-record and digest contracts.

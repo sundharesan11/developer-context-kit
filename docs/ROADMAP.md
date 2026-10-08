@@ -49,11 +49,11 @@ Native host adapters/discovery, reviewed adoption, automatic update policies and
 
 The delivery sequence is read-only catalog/checker → package acquisition and explicit selections → disposable adapter/updater tests → reviewed local activation → fresh-host discovery checks → disabled schedule and harmless run → weekly enablement. Claude, Codex, Gemini CLI, Cursor and Command Code require explicit compatibility evidence; a common folder is not universal support. The weekly schedule has user approval, but no weekly updater, enabled schedule or twelve-source activation is claimed yet. Scheduler recipes remain generic; each user's schedule and execution receipts stay local.
 
-## Proposed next: portable team handoff
+## Portable selected-record handoff
 
-A separately scoped design could turn explicitly selected records into portable local Markdown that a recipient can read without this toolkit. The packet should retain evidence references, freshness and unknowns. Resolve duplicate-profile behavior on re-onboarding and stale-source handling before automating export.
+The [H1 plan](plans/portable-handoff.md) implements explicit selected-record Markdown export under the existing pilot fence. [Handoff documentation](HANDOFF.md) defines the required evaluation clock, exporting-worktree observations, hashes, strict bounds, identity exclusions and unsafe-content holds. New profiles use project identity; historical records and shared briefs remain unchanged.
 
-The proposed first evaluation is a manually prepared synthetic packet and a fresh Codex reader test. Scope and source-selection choices still need an approved design. Automated export/import, real-project trials and live discovery are not implemented or validated by the installation milestone.
+Synthetic tests cover CLI packets, deterministic bytes, scope isolation, disclosure/freshness, output refusal and overflow. The packet is a private preview, not sharing permission or proof of application execution. Import, distribution, real-project evaluation and live discovery remain separate milestones; source-installation evidence does not prove them.
 
 ## Known core follow-ups
 

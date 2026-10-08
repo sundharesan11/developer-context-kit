@@ -6,6 +6,8 @@ All root-bound commands require an explicit disposable `--pilot <pilot.json>` fe
 
 No real-home activation, live account connection, client migration, outbound send, or public release is included. The package is private, and rights and license decisions remain with the owner.
 
+[Portable handoff export](docs/HANDOFF.md) writes explicitly selected project records as private Markdown beneath pilot dataRoot. It retains status, hashes, freshness and exclusions, with strict 12-record/32-KiB bounds and unsafe-content holds. Commands are documented, not executed; packets are not approved for publication and require recipient verification. No toolkit installation is needed to read one.
+
 The [reviewed source installation bridge](docs/SKILL-BUILDER.md#third-party-source-packages) adds offline `skill-sources package-review`, `content-approve`, `local-plan`, `local-approve`, `local-apply`, and `local-status`. All require a disposable pilot. Explicit mappings name every selected/required file and license/notice; content and action approvals separately bind bytes, declarations, provenance and target effects. Missing dependencies and unreviewed compatibility block installation. Acquired scripts are never executed.
 
 Fixture tests cover installation, update, restoration of an older approved version and removal, with collision/edit protection and interrupted-write holds. Source targets are `.claude/skills` and `.agents/skills` below a pilot home. Personal B retains `.codex/skills` with an added competing-root check. These are sandbox filesystem layouts, not evidence of live discovery, real-source compatibility, twelve-source installation or an automatic updater. Source installation accepts at most 256 KiB total, below acquisition's 1 MiB cap.

@@ -33,3 +33,15 @@ test("package audit passes on the actual candidate set, including these tests an
   assert.equal(out.pack, "run");
   assert.ok(out.files.includes("test/package.test.mjs"));
 });
+
+test("package audit refuses generated handoff packets even when allowlisted", async (t) => {
+  const fixture = await pkgFixture(t, { "packet.handoff.md": "PRIVATE-PACKET-CANARY\n", "package.json": JSON.stringify({ name: "synthetic-package", version: "0.0.0", private: true }) });
+  for (const suffix of [["--no-pack"], []]) {
+    const result = checkPkg(["--root", fixture.dir, "--allowlist", fixture.allow, ...suffix]);
+    assert.equal(result.status, 1);
+    const parsed = JSON.parse(result.stdout);
+    assert.ok(parsed.findings.some((item) => item.type === "generated-handoff-packet"));
+    if (!suffix.length) assert.ok(parsed.findings.some((item) => item.type === "generated-handoff-packet-in-pack"));
+    assert.ok(!result.stdout.includes("PRIVATE-PACKET-CANARY"));
+  }
+});

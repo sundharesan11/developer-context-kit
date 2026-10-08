@@ -28,7 +28,7 @@ function briefBody(plan) {
     brief: plan.candidates.find((c) => c.kind === "brief")?.body ?? "Unknown",
     objectives: "Unknown until recorded",
     hubs: "None selected",
-    repository: plan.root,
+    repository: plan.project,
     commands: plan.candidates.filter((c) => c.kind === "command").map((c) => c.body).join("\n") || "Unknown",
     environments: plan.candidates.filter((c) => c.kind === "environment").map((c) => c.title).join(", ") || "Unknown",
     contacts: "Unknown until recorded",

@@ -30,6 +30,7 @@ export const COMMANDS = {
   "project onboard": { load: async () => (await import("./onboarding/commands.mjs")).projectOnboardCommand },
   "context resolve": { load: async () => (await import("./context/commands.mjs")).contextResolveCommand },
   "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand },
+  "handoff export": { rootOptions: false, load: async () => (await import("./handoff/commands.mjs")).handoffExportCommand },
   "agents install": { load: async () => (await import("./agents/commands.mjs")).agentsInstallCommand },
   "agents uninstall": { load: async () => (await import("./agents/commands.mjs")).agentsUninstallCommand },
   "agents status": { load: async () => (await import("./agents/commands.mjs")).agentsStatusCommand },
@@ -78,7 +79,7 @@ export async function main(argv, options = {}) {
         const seen = new Set();
         for (const token of parsed.tokens) {
           if (token.kind !== "option") continue;
-          if (seen.has(token.name)) throw new DevctxError("USAGE", "Duplicate command option");
+          if (seen.has(token.name) && impl.options[token.name]?.multiple !== true) throw new DevctxError("USAGE", "Duplicate command option");
           seen.add(token.name);
         }
       }
@@ -91,6 +92,7 @@ export async function main(argv, options = {}) {
         pilot = await loadPilot(values.pilot, { home, env });
         roots = rootsFromPilot(pilot);
       } catch (error) {
+        if (command === "handoff export") throw (await import("./handoff/privacy.mjs")).handoffError(error);
         if (!command.startsWith("skill-sources ")) throw error;
         throw new DevctxError(error instanceof DevctxError ? error.code : "STORAGE_ERROR", "Acquisition pilot could not be loaded", {field: "pilot"});
       }
