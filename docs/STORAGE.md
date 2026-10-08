@@ -10,6 +10,8 @@ Third-party acquisition is separate. It writes exclusively beneath `dataRoot/ski
 
 All downloads verify before directory creation. Run directories and files are exclusive and never adopted or overwritten. The complete receipt is written/fsynced as `.receipt-pending`, exclusively linked to `receipt.json`, then the temporary link is removed and directories are fsynced. No final receipt is ever deleted on failure. `STAGE_UNCONFIRMED` includes a run ID and `next:"inspect"`; inspect may establish a completed stage after an interrupted success response.
 
+The dataRoot filesystem must support hard links. Unsupported link creation fails safely with `STORAGE_ERROR`, preserves the pending receipt, and inspection reports `STAGE_INCOMPLETE`; there is no replacement or copy fallback. Failures before publication currently omit the run ID, so incomplete directories may need to be found by listing the private staging parent manually.
+
 | Inspection state | Result |
 | --- | --- |
 | No container/run | `STAGE_NOT_FOUND` |

@@ -268,6 +268,6 @@ const inspectOptions = {pilot: {type: "string"}, run: {type: "string"}};
 - [x] Independent Claude plan review completed; conditional findings resolved and focused coordinator paragraph re-check passed.
 - [x] Coordinator authorizes the implementation file ownership above.
 - [x] Implementation and fixture verification completed: 185 tests across 26 files, 23 synthetic acceptance checks, package audit and whitespace checks passed. Acceptance requires `--pilot-root` naming a new disposable directory and `--report` outside the checkout.
-- [ ] Independent Claude actual-diff review completed and material findings resolved.
+- [x] Independent Claude actual-diff review completed with no material findings. Independent full verification and a separate two-file public-source preview/stage/offline-inspect smoke passed; source content was not executed.
 
-Review provenance and actual test evidence belong in the coordinator's private artifact, with only public-safe status recorded here. Until both implementation checkboxes pass, this document describes a plan and makes no capability claim.
+Review provenance and actual test evidence remain in the coordinator's private artifact. The bounded acquisition milestone is implemented and reviewed; dependency completeness, source trust, compatibility, installation and scheduling remain outside its claims. Optional follow-ups are pre-publication failure run IDs, allowlisted field hints and measuring repeated filesystem checks before any cap increase. Receipt publication requires a hardlink-capable filesystem and safely leaves incomplete staging if that primitive is unavailable.
