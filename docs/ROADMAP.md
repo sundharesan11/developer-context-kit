@@ -1,6 +1,6 @@
 # Readiness and remaining work
 
-Status snapshot: 2026-10-09. The core at `a446760` is a reviewed synthetic local pilot, not a production-ready or publicly released package. Skill-builder A and B tooling is implemented. B at `1a850d9` passed independent implementation review after repairs. The read-only skill-source foundation is implemented at `5fcf53e`; pinned acquisition adds private staging and offline inspection. The installation bridge adds reviewed mappings and disposable source install/update/restoration/removal. Its post-fix full suite passes 208 tests across 28 files; focused independent re-review is pending. This file tracks product capabilities, not private projects, accounts or tasks.
+Status snapshot: 2026-10-09. The core at `a446760` is a reviewed synthetic local pilot, not a production-ready or publicly released package. Skill-builder A and B tooling is implemented. B at `1a850d9` passed independent implementation review after repairs. The read-only skill-source foundation is implemented at `5fcf53e`; pinned acquisition adds private staging and offline inspection. The installation bridge adds reviewed mappings and disposable source install/update/restoration/removal. Its post-fix full suite passes 208 tests across 28 files; independent Claude actual-diff review passed after focused repair review of `9baab2d`. This file tracks product capabilities, not private projects, accounts or tasks.
 
 ## What works in the pilot
 
@@ -48,6 +48,12 @@ The [source installation bridge](plans/skill-source-installation.md) maps one ex
 Native host adapters/discovery, reviewed adoption, automatic update policies and a reusable automation-setup skill remain. Add the preset to initial onboarding only after those components pass their own gates. Keep recipes public and each user's installations, decisions, schedules and reports private.
 
 The delivery sequence is read-only catalog/checker → package acquisition and explicit selections → disposable adapter/updater tests → reviewed local activation → fresh-host discovery checks → disabled schedule and harmless run → weekly enablement. Claude, Codex, Gemini CLI, Cursor and Command Code require explicit compatibility evidence; a common folder is not universal support. The weekly schedule has user approval, but no weekly updater, enabled schedule or twelve-source activation is claimed yet. Scheduler recipes remain generic; each user's schedule and execution receipts stay local.
+
+## Proposed next: portable team handoff
+
+A separately scoped design could turn explicitly selected records into portable local Markdown that a recipient can read without this toolkit. The packet should retain evidence references, freshness and unknowns. Resolve duplicate-profile behavior on re-onboarding and stale-source handling before automating export.
+
+The proposed first evaluation is a manually prepared synthetic packet and a fresh Codex reader test. Scope and source-selection choices still need an approved design. Automated export/import, real-project trials and live discovery are not implemented or validated by the installation milestone.
 
 ## Known core follow-ups
 
