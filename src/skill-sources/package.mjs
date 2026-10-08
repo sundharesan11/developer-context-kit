@@ -64,13 +64,17 @@ function sourceFrontmatter(text) {
   const end = lines.indexOf("---", 1);
   if (end < 2) fail();
   const keys = new Set();
+  let governingKey;
   for (const line of lines.slice(1, end)) {
+    // YAML folds indented continuations into a plain scalar, including across blank lines.
+    if (governingKey === "name" && /^\s+\S/.test(line)) fail();
     if (!line.trim() || /^\s*#/.test(line)) continue;
     if (line.includes("\t") || /^\s*(?:["'?&*!{\[%]|<<:|---|\.\.\.)/.test(line) || /:\s*[{\[]/.test(line) || /(?:^|:\s*|\s)[&*!][A-Za-z0-9_-]+/.test(line)) fail();
     if (!line.startsWith(" ")) {
       const match = /^([A-Za-z0-9_-]+):(?:\s|$)/.exec(line);
       if (!match || keys.has(match[1])) fail();
       keys.add(match[1]);
+      governingKey = match[1];
     }
   }
   if (!keys.has("name")) fail();

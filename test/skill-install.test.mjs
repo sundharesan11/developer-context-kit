@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile, readFile, stat, readdir, unlink, rename, symlink, link, chmod, rmdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { makePilot, runCli } from "./helpers.mjs";
+import { makePilot, runCli, stageSourceFixture } from "./helpers.mjs";
 import { createWorkspace, recordRequirements, recordDesign, approveDesign, createDraft, validateDraft } from "../src/skill-builder/workspace.mjs";
 import { planPackageInstall, applyPackageInstall } from "../src/agents/package-install.mjs";
 import { digest, sha256 } from "../src/storage/canonical.mjs";
+import {reviewSourcePackage} from "../src/skill-sources/package.mjs";
+import {approveSourceContent, planSourceInstall, approveSourceAction, applySourceInstall} from "../src/skill-sources/installation.mjs";
 
 const selection = { audience: "personal", workspace: "ws_install01" };
 const args = ["--audience", "personal", "--workspace", "ws_install01"];
@@ -39,6 +41,28 @@ test("package receipt refuses unexpected empty directories at publication", asyn
     {fingerprint: x.plan.fingerprint, decisionId: "dc_local001", runId: "run_emptydir01"},
     {faults: {beforeReceipt: async (action) => mkdir(join(action.path, "extra"), {mode: 0o700})}}
   ), {code: "DEVCTX_INTEGRITY"});
+});
+
+test("personal and source packages refuse each others valid ownership markers", async (t) => {
+  for (const first of ["personal", "source"]) {
+    const x = await approvedInstall(t);
+    const staged = await stageSourceFixture(t, {p: x.p, skillRoot: "", contents: {LICENSE: "Synthetic license", "SKILL.md": "---\nname: summarize-note\ndescription: Source fixture.\n---\nSource fixture body.\n"}});
+    staged.mapping.name = "summarize-note";
+    const review = await reviewSourcePackage(x.p.roots, staged);
+    await approveSourceContent(x.p.roots, {...staged, packageDigest: review.packageDigest}, {decisionId: "dc_crosscontent01", interactionRef: "user:fixture", responseText: `Approved source content ${review.packageDigest} with caller-supplied-unverified pin`});
+    const sourceInput = {contentDecisionId: "dc_crosscontent01", targetHome: x.home, agents: ["claude"], mode: "install"};
+    const personalInput = {revisionId: "rv_install01", contentDecisionId: "dc_content01", targetHome: x.home, agents: ["claude"], mode: "install"};
+    if (first === "personal") {
+      await applyApproved(x);
+      assert.equal((await planSourceInstall(x.p.roots, sourceInput)).actions[0].status, "conflict");
+    } else {
+      const plan = await planSourceInstall(x.p.roots, sourceInput);
+      const approval = {decisionId: "dc_crossaction01", fingerprint: plan.fingerprint, interactionRef: "user:fixture", responseText: `Approved source install ${plan.fingerprint}`};
+      await approveSourceAction(x.p.roots, sourceInput, approval);
+      await applySourceInstall(x.p.roots, sourceInput, approval);
+      assert.equal((await planPackageInstall(x.p.roots, selection, personalInput)).actions[0].status, "conflict");
+    }
+  }
 });
 async function cli(p, route, more = []) { return runCli(["skill", route, "--pilot", p.path, ...args, ...more]); }
 async function fixture(t, { oldReference = false, oldReferenceName = "old.md", oldNestedReference = false, name = "summarize-note", title = "Summary" } = {}) {

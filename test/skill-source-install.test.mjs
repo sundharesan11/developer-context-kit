@@ -8,6 +8,7 @@ import {reviewSourcePackage} from "../src/skill-sources/package.mjs";
 import {approveSourceContent, planSourceInstall, approveSourceAction, applySourceInstall, sourceInstallStatus} from "../src/skill-sources/installation.mjs";
 import {withPilotLock} from "../src/storage/lock.mjs";
 import {journals} from "../src/agents/package-files.mjs";
+import {applyPackageInstall} from "../src/agents/package-install.mjs";
 
 let sequence = 0;
 const id = () => "dc_source" + String(++sequence).padStart(8, "0");
@@ -115,6 +116,7 @@ test("source partial writes retain recovery evidence and consume only one action
     await assert.rejects(apply(x, a, {faults: {[hook]: async () => { throw new Error("PRIVATE_FAULT_CANARY"); }}}), (e) => !JSON.stringify(e).includes("PRIVATE_FAULT_CANARY"));
     const status = await sourceInstallStatus(x.p.roots, x.input);
     assert.ok(status.consumed.includes(a.approval.decisionId));
+    if (hook === "afterAction") assert.deepEqual(status.actions.map(({agent, status}) => ({agent, status})), [{agent: "claude", status: "installed"}, {agent: "codex", status: "create"}]);
     if (hook !== "afterConsume") {
       assert.equal(status.status, "RECOVERY_REQUIRED");
       assert.ok((await journals(x.p.roots, x.input.targetHome)).incomplete.length);
@@ -152,6 +154,10 @@ test("malformed completed source journals block both package adapters", async (t
   assert.deepEqual((await journals(x.p.roots, x.input.targetHome)).incomplete, ["run_malformed01"]);
   const a = await action(x);
   await assert.rejects(apply(x, a), {code: "DEVCTX_RECOVERY_REQUIRED"});
+  await assert.rejects(applyPackageInstall(x.p.roots, {audience: "personal", workspace: "ws_recovery1"},
+    {targetHome: x.input.targetHome, agents: ["claude"], mode: "install", revisionId: "rv_unknown01", contentDecisionId: "dc_unknown01"},
+    {decisionId: "dc_unknown02", fingerprint: "sha256:" + "0".repeat(64)}
+  ), {code: "DEVCTX_RECOVERY_REQUIRED"});
 });
 
 test("source installation keeps unreviewed host compatibility and pilot gates visible", async (t) => {

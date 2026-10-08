@@ -50,6 +50,19 @@ test("source package frontmatter rejects ambiguous semantic name forms", async (
   }
 });
 
+test("source name cannot continue through indented text comments or blank lines", async (t) => {
+  for (const metadata of [
+    "name: example-skill\n  continued-name",
+    "name: example-skill\n  # c\n  more",
+    "description: x\nname: example-skill\n\n  tail",
+    "name: example-skill\n  # comment only",
+    "name: example-skill\n\n  # separated comment"
+  ]) {
+    const x = await stageSourceFixture(t, {skillRoot: "", contents: {LICENSE: "License", "SKILL.md": `---\n${metadata}\n---\nBody\n`}});
+    assert.ok((await reviewSourcePackage(x.p.roots, x)).holds.some((h) => h.code === "UNSUPPORTED_NAME"), metadata);
+  }
+});
+
 test("source package reports unsupported bytes links limits and legal collisions", async (t) => {
   for (const [body, expected] of [
     ["---\nname: example-skill\n---\n[Missing](references/missing.md)", "MISSING_LINK"],

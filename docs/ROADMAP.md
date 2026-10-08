@@ -1,6 +1,6 @@
 # Readiness and remaining work
 
-Status snapshot: 2026-10-09. The core at `a446760` is a reviewed synthetic local pilot, not a production-ready or publicly released package. Skill-builder A and B tooling is implemented. B at `1a850d9` passed independent implementation review after repairs. The read-only skill-source foundation is implemented at `5fcf53e`; pinned acquisition adds private staging and offline inspection. The installation bridge adds reviewed mappings and disposable source install/update/restoration/removal. Its full suite passes 206 tests across 28 files; independent actual-diff review is pending. This file tracks product capabilities, not private projects, accounts or tasks.
+Status snapshot: 2026-10-09. The core at `a446760` is a reviewed synthetic local pilot, not a production-ready or publicly released package. Skill-builder A and B tooling is implemented. B at `1a850d9` passed independent implementation review after repairs. The read-only skill-source foundation is implemented at `5fcf53e`; pinned acquisition adds private staging and offline inspection. The installation bridge adds reviewed mappings and disposable source install/update/restoration/removal. Its post-fix full suite passes 208 tests across 28 files; focused independent re-review is pending. This file tracks product capabilities, not private projects, accounts or tasks.
 
 ## What works in the pilot
 
