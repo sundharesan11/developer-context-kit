@@ -1,6 +1,6 @@
 # Readiness and remaining work
 
-Status snapshot: 2026-10-09. The core at `a446760` is a reviewed synthetic local pilot, not a production-ready or publicly released package. Skill-builder A and B tooling is implemented. B at `1a850d9` has passed independent implementation review after repairs; the current 23-file suite has 150 passing tests. This file tracks product capabilities, not private projects, accounts or tasks.
+Status snapshot: 2026-10-09. The core at `a446760` is a reviewed synthetic local pilot, not a production-ready or publicly released package. Skill-builder A and B tooling is implemented. B at `1a850d9` passed independent implementation review after repairs. The read-only skill-source foundation is implemented at `5fcf53e`; the current 24-file suite has 168 passing tests. This file tracks product capabilities, not private projects, accounts or tasks.
 
 ## What works in the pilot
 
@@ -35,11 +35,13 @@ Live-model behavior evaluation needs an approved provider/account and synthetic 
 
 ## Requested addition: third-party catalog and weekly updates
 
-The twelve-source catalog request is now in planning. See [source audit and proposed delivery](research/skill-collections.md) for verified repository names, observed releases, installation differences, candidate architecture and exit evidence.
+The twelve-source managed design is approved. See [source audit and delivery design](research/skill-collections.md) for verified repository names, observed releases, installation differences and exit evidence. The first bounded slice, the [read-only catalog and release checker](plans/skill-source-catalog.md), is implemented. It validates the twelve public recipes, resolves stable releases to commit IDs, compares a supplied prior lock, and reports absent releases or typed failures. It does not save locks, download packages, install skills or schedule jobs.
+
+From the checkout, `node bin/devctx.mjs skill-sources catalog` lists the preset without network access. `node bin/devctx.mjs skill-sources check --source <id>` makes bounded public GitHub requests; read the README rate-limit note before sweeping all sources. Every source remains installation-unverified. Current verification: 168 tests across 24 files, package audit including dry-run packing, and whitespace checks pass. Independent Claude implementation review and focused repair review passed.
 
 This is not part of skill-builder B's disposable package installation contract. It needs source acquisition/provenance, per-host adapters, collision/adoption policy, a guarded updater and a reusable automation-setup skill. Add the reviewed preset to initial onboarding after these components pass their own gates. Keep source recipes public and each user's installations, locks, schedules and reports private.
 
-The intended sequence is catalog/design approval → disposable adapter/updater tests → reviewed local activation → fresh-host discovery checks → disabled schedule and harmless run → weekly enablement. Claude, Codex, Gemini CLI, Cursor and Command Code require explicit compatibility evidence; a common folder is not universal support. No weekly updater or twelve-source activation is claimed yet.
+The delivery sequence is read-only catalog/checker → package acquisition and explicit selections → disposable adapter/updater tests → reviewed local activation → fresh-host discovery checks → disabled schedule and harmless run → weekly enablement. Claude, Codex, Gemini CLI, Cursor and Command Code require explicit compatibility evidence; a common folder is not universal support. The weekly schedule has user approval, but no weekly updater, enabled schedule or twelve-source activation is claimed yet. Scheduler recipes remain generic; each user's schedule and execution receipts stay local.
 
 ## Known core follow-ups
 

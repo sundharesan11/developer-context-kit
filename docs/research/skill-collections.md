@@ -1,6 +1,6 @@
-# Third-party skill collections: source audit and proposed delivery
+# Third-party skill collections: source audit and approved delivery
 
-Research snapshot: 2026-10-09. Status: **proposal, not an installation manifest**. The repository URLs, default-branch trees and latest published release metadata below were retrieved from GitHub. No source was installed or executed during this audit. Release availability does not prove compatibility or safety.
+Research snapshot: 2026-10-09. Status: **managed design approved; not an installation manifest**. The repository URLs, default-branch trees and latest published release metadata below were retrieved from GitHub. No source was installed or executed during this audit. Release availability does not prove compatibility or safety. The [read-only catalog foundation](../plans/skill-source-catalog.md) is implemented; package acquisition, installation and scheduling remain planned.
 
 ## Verified sources
 
@@ -23,6 +23,8 @@ The requested preset contains these twelve sources. It is not twelve individual 
 
 GitHub repository metadata reports MIT for eleven sources and Apache-2.0 for Impeccable. This is a discovery result, not a complete redistribution review. Preserve source licenses and notices and inspect bundled dependencies before redistribution. Prefer source recipes over vendoring upstream code into this toolkit.
 
+These release labels preserve the initial research snapshot, not a live version inventory. A later check observed Marketing Skills `v2.11.25`; rate limiting prevented completion of that recheck. The catalog stores source identities rather than these version labels. A failed or incomplete check is not evidence that a source is up to date.
+
 ### Snapshot identity
 
 These are observed **default-branch commit IDs**, not resolved release commits and not approved installation pins. Release tags and distributed assets must be resolved and verified separately before installation.
@@ -42,7 +44,7 @@ These are observed **default-branch commit IDs**, not resolved release commits a
 | `blader/humanizer` | `225a6f39ac85f76ee48dbad772ea4abe4ed6c9d8` |
 | `AgriciDaniel/claude-seo` | `4b99de2f7de7e7d5247042e5fb5b4ea9368ef734` |
 
-## Design choice awaiting approval
+## Approved design direction
 
 ### Host discovery evidence
 
@@ -66,18 +68,19 @@ Host probes also need a side-effect policy: a CLI may self-update even when aske
 2. **Native installers only.** Less custom installation code, but fragmented version state, auto-update behavior and rollback. Some installers modify project files or trust settings.
 3. **Copy all discovered skills everywhere.** Simple initial operation, but not a valid compatibility guarantee. It can include maintainer skills, omit runtime dependencies and introduce name collisions. Not recommended.
 
-The proposed managed approach has three separately verifiable slices:
+The approved managed approach has three separately verifiable slices:
 
-Proposed repository placement (none of these new runtime files exists yet):
+Repository placement (the catalog and read-only source checker exist; the other runtime components and conversational skills below remain planned):
 
 ```text
-catalog/skill-sources.json                # reviewed source recipes and preset
-src/skill-sources/                        # inventory, fetch, policy, update receipts
-src/agents/catalog-adapters/              # versioned host-specific render/discovery
-src/automations/orca.mjs                  # first scheduler adapter
-skills/devctx-manage-skill-sources/        # setup, inspect and update workflow
-skills/devctx-setup-automation/            # approved schedule creation and testing
-test/                                    # synthetic source/host/scheduler fixtures
+catalog/skill-sources.json                # implemented: public identities and preset
+src/skill-sources/                        # implemented: validation and release checks
+                                         # planned: acquisition, policy, update receipts
+src/agents/catalog-adapters/              # planned: host-specific render/discovery
+src/automations/orca.mjs                  # planned: first scheduler adapter
+skills/devctx-manage-skill-sources/        # planned: setup, inspect and update workflow
+skills/devctx-setup-automation/            # planned: schedule creation and testing
+test/skill-sources.test.mjs               # implemented: catalog and HTTP fixtures
 ```
 
 Each skill would use the standard `SKILL.md` plus only needed references/scripts. The automation skill should orchestrate tested CLI operations, not embed a second updater implementation. Existing skill-builder A/B tools remain about private user-authored packages; do not loosen their disposable-home fence to add third-party installation.
@@ -122,4 +125,4 @@ Each skill would use the standard `SKILL.md` plus only needed references/scripts
 5. Workflow selection tests catch competing always-on instructions and cross-collection references. Availability does not mean every skill is activated for every task.
 6. The weekly schedule has a verified timezone/next-run record and a completed harmless local test. A created schedule alone is not execution proof.
 
-Unresolved: final design approval; per-source package selections and update policies; supported installed-host versions; Command Code identity/contract; weekly day/time; live behavior-test provider approval; how to adopt existing copies without taking ownership implicitly. This document updates planning only. It does not authorize or claim installation, live activation, scheduling or publication.
+The managed design and a private weekly schedule have been approved. Each user's schedule belongs in local state, not the public preset. Still unresolved: per-source package selections and update policies; supported installed-host versions; Command Code compatibility; no-release tracking choices; and reviewed adoption of existing copies. Approval is not execution evidence: no installation, live activation, scheduling or publication is claimed by this document.
