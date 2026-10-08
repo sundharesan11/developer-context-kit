@@ -1,30 +1,41 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "devctx install-owned v1",
-  "type": "object",
-  "required": [
-    "schemaVersion",
-    "skill",
-    "version",
-    "files",
-    "runId"
-  ],
-  "additionalProperties": false,
-  "properties": {
-    "schemaVersion": {
-      "const": 1
+  "title": "devctx install-owned v1 or v2",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["schemaVersion", "skill", "version", "files", "runId"],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "skill": { "type": "string" },
+        "version": { "type": "string" },
+        "files": { "type": "object" },
+        "runId": { "type": "string" }
+      }
     },
-    "skill": {
-      "type": "string"
-    },
-    "version": {
-      "type": "string"
-    },
-    "files": {
-      "type": "object"
-    },
-    "runId": {
-      "type": "string"
+    {
+      "type": "object",
+      "required": ["schemaVersion", "kind", "skill", "version", "audience", "workspace", "revision", "packageDigest", "files", "runId"],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": { "const": 2 },
+        "kind": { "const": "skill-package" },
+        "skill": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 64 },
+        "version": { "const": "0.0.0-local" },
+        "audience": { "const": "personal" },
+        "workspace": { "type": "string", "pattern": "^ws_[a-z0-9_-]{8,64}$" },
+        "revision": { "type": "string", "pattern": "^rv_[a-z0-9_-]{8,64}$" },
+        "packageDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "files": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 24,
+          "propertyNames": { "type": "string", "maxLength": 512 },
+          "additionalProperties": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+        },
+        "runId": { "type": "string", "pattern": "^run_[a-z0-9_-]{6,64}$" }
+      }
     }
-  }
+  ]
 }

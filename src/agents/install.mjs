@@ -32,7 +32,7 @@ function statusFor(dir, skill, mode) {
 export async function planInstall(pilot, { targetHome, agents, mode = "install" }) {
   assertInPilot(pilot, targetHome, "agentHomes");
   if (targetHome === homedir()) throw new DevctxError("GATE_REQUIRED", "Real home refused");
-  if (!["install", "uninstall"].includes(mode) || !Array.isArray(agents) || agents.some((a) => !AGENT_HOMES[a])) throw new DevctxError("INVALID_INPUT", "Invalid installer selection");
+  if (!["install", "uninstall"].includes(mode) || !Array.isArray(agents) || agents.some((a) => typeof a !== "string" || !Object.hasOwn(AGENT_HOMES, a))) throw new DevctxError("INVALID_INPUT", "Invalid installer selection");
   const actions = [];
   for (const agent of [...new Set(agents)].sort()) for (const skill of SKILL_NAMES) {
     const path = join(targetHome, AGENT_HOMES[agent], skill);

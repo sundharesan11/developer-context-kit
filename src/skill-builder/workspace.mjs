@@ -218,6 +218,52 @@ export async function validateDraft(roots, selection, revisionId) {
     return record;
   });
 }
+function localSelection(selection) {
+  if (selection.audience !== "personal" || selection.scope || selection.project) throw new DevctxError("GATE_REQUIRED", "Only personal generic packages can be installed");
+}
+export async function loadLocalRevision(roots, selection, revisionId, { requireValidation = true } = {}) {
+  assertWritable(roots, []);
+  localSelection(selection);
+  const { path, manifest, files } = await revision(roots, selection, revisionId);
+  let validation = null;
+  if (requireValidation) {
+    validation = await namedJson(safeJoin(path, "validations", revisionId, VALIDATOR_VERSION + ".json"));
+    const current = validatePackage(files, manifest.name);
+    if (validation.revision !== revisionId || validation.packageDigest !== manifest.packageDigest || validation.validatorVersion !== VALIDATOR_VERSION || validation.valid !== true || current.valid !== true || current.helpers !== validation.helpers || JSON.stringify(current.unchecked) !== JSON.stringify(validation.unchecked)) throw new DevctxError("STALE_VERSION", "Validation receipt is stale");
+  }
+  return { manifest, files, validation };
+}
+export async function loadLocalDecision(roots, selection, decisionId, expectedAction) {
+  assertWritable(roots, []); localSelection(selection); needId("decision", decisionId);
+  const path = await base(roots, selection);
+  const value = await namedJson(jsonPath(path, "decisions", decisionId));
+  if (value.id !== decisionId || value.workspace !== selection.workspace || value.audience !== "personal" || value.scope !== null || value.project !== null || value.action !== expectedAction) throw new DevctxError("INTEGRITY", "Local decision mismatch");
+  return value;
+}
+export async function approveContent(roots, selection, revisionId, decisionId, interactionRef, responseText) {
+  assertWritable(roots, []); localSelection(selection); needId("decision", decisionId);
+  const path = workspacePath(roots, selection), dest = jsonPath(path, "decisions", decisionId);
+  return locked(roots, [dest], async () => {
+    const { manifest } = await loadLocalRevision(roots, selection, revisionId);
+    if (!/^user:[A-Za-z0-9._:-]{1,120}$/.test(interactionRef ?? "") || responseText !== `Approved content ${manifest.packageDigest} as personal generic non-confidential`) throw new DevctxError("APPROVAL_REQUIRED", "Canonical content approval evidence required");
+    ensurePrivatePath(path, ["decisions"]);
+    const record = { schemaVersion: 1, action: "approve-content", audience: "personal", scope: null, project: null, workspace: selection.workspace, id: decisionId, revision: revisionId, packageDigest: manifest.packageDigest, personalGenericNonConfidential: true, interactionRef, responseText };
+    await writeNewFile(dest, privateJson(record));
+    return { decision: decisionId, revision: revisionId, packageDigest: manifest.packageDigest };
+  });
+}
+export async function approveLocalAction(roots, selection, plan, decisionId, interactionRef, responseText) {
+  assertWritable(roots, []); localSelection(selection); needId("decision", decisionId);
+  const path = workspacePath(roots, selection), dest = jsonPath(path, "decisions", decisionId);
+  return locked(roots, [dest], async () => {
+    if (plan.kind !== "skill-package-local" || plan.workspace !== selection.workspace || !["install", "uninstall"].includes(plan.mode) || !/^user:[A-Za-z0-9._:-]{1,120}$/.test(interactionRef ?? "") || responseText !== `Approved ${plan.mode} ${plan.fingerprint}`) throw new DevctxError("APPROVAL_REQUIRED", "Canonical local approval evidence required");
+    if (plan.actions.some((a) => !["create", "update", "remove", "installed", "absent"].includes(a.status)) || !plan.actions.some((a) => ["create", "update", "remove"].includes(a.status))) throw new DevctxError("CONFLICT", "No safe local action to approve");
+    ensurePrivatePath(path, ["decisions"]);
+    const record = { schemaVersion: 1, action: `approve-local-${plan.mode}`, audience: "personal", scope: null, project: null, workspace: selection.workspace, id: decisionId, revision: plan.revision, packageDigest: plan.packageDigest, contentDecision: plan.contentDecision, targetHome: plan.targetHome, agents: plan.agents, planFingerprint: plan.fingerprint, interactionRef, responseText };
+    await writeNewFile(dest, privateJson(record));
+    return { decision: decisionId, planFingerprint: plan.fingerprint };
+  });
+}
 function names(path, expression) { if (!existsSync(path)) return []; checkNode(info(path), path, { directory: true }); return readdirSync(path).filter((name) => expression.test(name)).sort(); }
 export async function showWorkspace(roots, selection) {
   const path = await base(roots, selection);

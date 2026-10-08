@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
-import { twoScopes, makePilot, now } from "./helpers.mjs";
+import { twoScopes, makePilot, now, runCli } from "./helpers.mjs";
 import { buildEnvelope, checkEnvelopeFresh, completionDraft } from "../src/agents/envelope.mjs";
 import { planInstall, applyInstall, installStatus } from "../src/agents/install.mjs";
 import { proposeRecord, publishProposal, readSnapshot } from "../src/records/store.mjs";
@@ -61,4 +61,14 @@ test("installer status reports incomplete journal without repair", async (t) => 
   const status = await installStatus(p.roots, p.pilot, { targetHome: p.agentHomes[0] });
   assert.equal(status.status, "RECOVERY_REQUIRED");
   assert.equal((await readFile(join(run, "journal.json"), "utf8")).includes("completed"), true);
+});
+test("bundled CLI can install, uninstall, and reinstall with unique default journal IDs", async (t) => {
+  const p = await makePilot(t), home = p.agentHomes[0];
+  for (const mode of ["install", "uninstall", "install"]) {
+    const args = ["agents", mode, "--pilot", p.path, "--home", home, "--agent", "claude"];
+    const planned = await runCli(args);
+    assert.equal(planned.code, 0, JSON.stringify(planned.json));
+    const result = await runCli([...args, "--apply", "--plan-fingerprint", planned.json.result.fingerprint]);
+    assert.equal(result.code, 0, JSON.stringify(result.json));
+  }
 });

@@ -29,6 +29,11 @@ export const COMMANDS = {
   "skill design-approve": { load: async () => (await import("./skill-builder/commands.mjs")).designApproveCommand },
   "skill draft-create": { load: async () => (await import("./skill-builder/commands.mjs")).draftCreateCommand },
   "skill draft-validate": { load: async () => (await import("./skill-builder/commands.mjs")).draftValidateCommand },
+  "skill content-approve": { load: async () => (await import("./skill-builder/commands.mjs")).contentApproveCommand },
+  "skill local-plan": { load: async () => (await import("./skill-builder/commands.mjs")).localPlanCommand },
+  "skill local-approve": { load: async () => (await import("./skill-builder/commands.mjs")).localApproveCommand },
+  "skill local-apply": { load: async () => (await import("./skill-builder/commands.mjs")).localApplyCommand },
+  "skill local-status": { load: async () => (await import("./skill-builder/commands.mjs")).localStatusCommand },
   "skill workspace-show": { load: async () => (await import("./skill-builder/commands.mjs")).workspaceShowCommand },
   "skill discover": { load: async () => (await import("./skill-builder/commands.mjs")).discoverCommand }
 };
