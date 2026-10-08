@@ -26,7 +26,14 @@ async function fixture(t, routes) {
     if (entry.hang) return;
     const body = entry.encodedBody ?? (typeof entry.body === "string" ? entry.body : JSON.stringify(entry.body ?? entry));
     res.writeHead(entry.status ?? 200, { "content-type": entry.contentType ?? "application/json; charset=utf-8", ...entry.headers });
-    res.end(body);
+    if (entry.chunks) {
+      for (const chunk of entry.chunks) res.write(chunk);
+      res.end();
+    } else if (entry.delay) {
+      setTimeout(() => res.end(body), entry.delay);
+    } else {
+      res.end(body);
+    }
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
@@ -108,7 +115,7 @@ test("skill source moved tag is compared with supplied prior lock", async (t) =>
 test("skill source resolves slash tags and annotated tags without branch fallback", async (t) => {
   const slash = routesFor("release/v1", shaA);
   slash[`${base}/git/ref/tags/release/v1`] = { ref: "refs/tags/release/v1", object: { type: "tag", sha: shaB } };
-  slash[`${base}/git/tags/${shaB}`] = { tag: "release/v1", object: { type: "commit", sha: shaA } };
+  slash[`${base}/git/tags/${shaB}`] = { sha: shaB, tag: "release/v1", object: { type: "commit", sha: shaA } };
   const { request, seen } = await fixture(t, slash);
   assert.equal((await checkSource(source(), { request })).status, "untracked");
   assert.ok(seen.some((item) => item.path === `${base}/git/ref/tags/release/v1`));
@@ -130,15 +137,15 @@ test("skill source annotated tags stop at four objects and reject cycles", async
   routes[`${base}/git/ref/tags/v1`] = { ref: "refs/tags/v1", object: { type: "tag", sha: tagShas[0] } };
   for (let index = 0; index < 4; index++) {
     routes[`${base}/git/tags/${tagShas[index]}`] = {
-      tag: "v1", object: { type: index === 3 ? "commit" : "tag", sha: index === 3 ? shaA : tagShas[index + 1] }
+      sha: tagShas[index], tag: "v1", object: { type: index === 3 ? "commit" : "tag", sha: index === 3 ? shaA : tagShas[index + 1] }
     };
   }
   const accepted = await fixture(t, routes);
   assert.equal((await checkSource(source(), { request: accepted.request })).commit, shaA);
-  routes[`${base}/git/tags/${tagShas[3]}`] = { tag: "v1", object: { type: "tag", sha: tagShas[4] } };
+  routes[`${base}/git/tags/${tagShas[3]}`] = { sha: tagShas[3], tag: "v1", object: { type: "tag", sha: tagShas[4] } };
   const excessive = await fixture(t, routes);
   await assert.rejects(checkSource(source(), { request: excessive.request }), { code: "DEVCTX_UPSTREAM_INVALID" });
-  routes[`${base}/git/tags/${tagShas[1]}`] = { tag: "v1", object: { type: "tag", sha: tagShas[0] } };
+  routes[`${base}/git/tags/${tagShas[1]}`] = { sha: tagShas[1], tag: "v1", object: { type: "tag", sha: tagShas[0] } };
   const cycle = await fixture(t, routes);
   await assert.rejects(checkSource(source(), { request: cycle.request }), { code: "DEVCTX_UPSTREAM_INVALID" });
 });
@@ -148,7 +155,7 @@ test("skill source HTTP fixture refuses redirects and oversized bodies", async (
     [base, { status: 301, headers: { location: "https://elsewhere.invalid" }, body: {} }, "DEVCTX_SOURCE_MOVED"],
     [`${base}/releases/latest`, { status: 302, body: {} }, "DEVCTX_REDIRECT_REFUSED"],
     [`${base}/releases/latest`, { headers: { "content-length": "262145" }, body: {} }, "DEVCTX_UPSTREAM_INVALID"],
-    [`${base}/releases/latest`, { body: "x".repeat(262145) }, "DEVCTX_UPSTREAM_INVALID"]
+    [`${base}/releases/latest`, { chunks: ["x".repeat(130000), "x".repeat(132145)] }, "DEVCTX_UPSTREAM_INVALID"]
   ]) {
     const routes = { ...routesFor(), [route]: entry };
     const { request } = await fixture(t, routes);
@@ -200,6 +207,74 @@ test("skill source refuses malformed direct recipes before transport", async () 
     await assert.rejects(checkSource({ ...source(), repository }, { request }), { code: "DEVCTX_INVALID_INPUT" });
   }
   assert.equal(calls, 0);
+});
+
+test("skill source rejects mismatched identity length and annotated SHA", async (t) => {
+  const local = await fixture(t, routesFor());
+  const request = (url, options) => new URL(url).pathname === base
+    ? Promise.resolve(new Response(JSON.stringify({ full_name: "phuryn/pm-skills" }), { headers: { "content-type": "application/json", "content-length": "9999" } }))
+    : local.request(url, options);
+  await assert.rejects(checkSource(source(), { request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+  const routes = routesFor();
+  routes[`${base}/git/ref/tags/v1`] = { ref: "refs/tags/v1", object: { type: "tag", sha: shaB } };
+  routes[`${base}/git/tags/${shaB}`] = { sha: shaA, tag: "v1", object: { type: "commit", sha: shaA } };
+  const mismatch = await fixture(t, routes);
+  await assert.rejects(checkSource(source(), { request: mismatch.request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+  routes[`${base}/git/tags/${shaB}`] = { sha: shaB, tag: "other", object: { type: "commit", sha: shaA } };
+  const name = await fixture(t, routes);
+  await assert.rejects(checkSource(source(), { request: name.request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+});
+
+test("skill source bounds rate-limit details and prior-lock fields", async (t) => {
+  const limited = await fixture(t, { [base]: { status: 403, headers: { "retry-after": "12", "x-ratelimit-reset": "1700000000" }, body: {} } });
+  await assert.rejects(checkSource(source(), { request: limited.request }), (error) => {
+    assert.equal(error.code, "DEVCTX_RATE_LIMITED");
+    assert.deepEqual(error.details, { retryAfterSeconds: 12, resetAt: "2023-11-14T22:13:20.000Z" });
+    return true;
+  });
+  const malformed = await fixture(t, { [base]: { status: 429, headers: { "retry-after": "bad", "x-ratelimit-reset": "9999999999999999" }, body: {} } });
+  await assert.rejects(checkSource(source(), { request: malformed.request }), (error) => error.code === "DEVCTX_RATE_LIMITED" && Object.keys(error.details).length === 0);
+  for (const priorLock of [
+    { sourceId: "other", channel: "stable-release", tag: "v1", commit: shaA },
+    { sourceId: "pm-skills", channel: "stable-release", tag: "v1..bad", commit: shaA },
+    []
+  ]) await assert.rejects(checkSource(source(), { request: () => { throw new Error("unexpected request"); }, priorLock }), { code: "DEVCTX_INVALID_INPUT" });
+});
+
+test("skill source rejects deceptive public text", async () => {
+  const candidate = structuredClone(loadBundledCatalog());
+  candidate.sources[0].installation.note = `safe\u202Ehidden`;
+  assert.throws(() => validateCatalog(candidate), { code: "DEVCTX_INVALID_INPUT" });
+  for (const tag of [".hidden/v1", "release/.lock", "v1.", "v\u202E1"]) {
+    const priorLock = { sourceId: "pm-skills", channel: "stable-release", tag, commit: shaA };
+    await assert.rejects(checkSource(source(), { priorLock, request: () => { throw new Error("unexpected request"); } }), { code: "DEVCTX_INVALID_INPUT" });
+  }
+});
+
+test("skill source whole check stops at the fifteen-second deadline", async (t) => {
+  const routes = Object.fromEntries(Object.entries(routesFor()).map(([path, body]) => [path, { body, delay: 3900 }]));
+  const { request } = await fixture(t, routes);
+  const started = Date.now();
+  await assert.rejects(checkSource(source(), { request }), { code: "DEVCTX_NETWORK_TIMEOUT" });
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed >= 14500 && elapsed < 17000, `deadline elapsed ${elapsed} ms`);
+});
+
+test("skill source enforces aggregate one-megabyte body limit", async (t) => {
+  const routes = routesFor();
+  routes[`${base}/git/ref/tags/v1`] = { ref: "refs/tags/v1", object: { type: "tag", sha: shaB } };
+  const tagShas = [shaB, "1".repeat(40), "2".repeat(40), "3".repeat(40)];
+  for (let index = 0; index < tagShas.length; index++) {
+    routes[`${base}/git/tags/${tagShas[index]}`] = {
+      sha: tagShas[index], tag: "v1", object: { type: index === tagShas.length - 1 ? "commit" : "tag", sha: index === tagShas.length - 1 ? shaA : tagShas[index + 1] }
+    };
+  }
+  for (const path of [base, `${base}/releases/latest`, `${base}/git/ref/tags/v1`, ...tagShas.map((sha) => `${base}/git/tags/${sha}`)]) {
+    routes[path] = { ...routes[path], pad: "x".repeat(190000) };
+  }
+  const { request, seen } = await fixture(t, routes);
+  await assert.rejects(checkSource(source(), { request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+  assert.ok(seen.length >= 6);
 });
 
 async function cli(args, options = {}) {

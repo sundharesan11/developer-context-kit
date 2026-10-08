@@ -35,7 +35,7 @@ export function validateSourceRecipe(entry, field = "source") {
     record(entry.installation, ["status", "note"], `${field}.installation`);
     if (entry.installation.status !== "unverified") bad(`${field}.installation.status`);
     const note = entry.installation.note;
-    if (typeof note !== "string" || note.length < 1 || note.length > 200 || /[\x00-\x1f\x7f]/.test(note)) bad(`${field}.installation.note`);
+    if (typeof note !== "string" || note.length < 1 || note.length > 200 || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(note)) bad(`${field}.installation.note`);
     return freeze({ id, repository: { owner, name }, license: entry.license, source: { channel: "stable-release" }, installation: { status: "unverified", note } });
 }
 

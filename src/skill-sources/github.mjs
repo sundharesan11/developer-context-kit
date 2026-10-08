@@ -9,8 +9,8 @@ const CHECK_MS = 15000;
 const NO_RELEASE = Symbol("no release");
 const fail = (code, message, details = {}) => { throw new DevctxError(code, message, details); };
 const validTag = (tag) => typeof tag === "string" && tag.length >= 1 && tag.length <= 128 &&
-  !/[\x00-\x20\x7f~^:?*\[\\]/.test(tag) && !tag.includes("..") && !tag.includes("@{") &&
-  !tag.endsWith(".lock") && tag.split("/").every((part) => part && part !== "." && part !== "..");
+  !/[~^:?*\[\\\p{Cc}\p{Cf}\p{Zs}\p{Zl}\p{Zp}]/u.test(tag) && !tag.includes("..") && !tag.includes("@{") &&
+  tag.split("/").every((part) => part && !part.startsWith(".") && !part.endsWith(".") && !part.endsWith(".lock"));
 const tagPath = (tag) => tag.split("/").map(encodeURIComponent).join("/");
 const validSha = (sha) => typeof sha === "string" && SHA.test(sha);
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -63,6 +63,7 @@ export async function checkSource(source, { request = fetch, priorLock, timeoutM
   let transferred = 0;
 
   async function getJson(path, kind) {
+    // Maximum chain: repository + release + ref + four tag objects + commit = eight requests.
     if (++calls > 8 || Date.now() - started >= CHECK_MS) fail("NETWORK_TIMEOUT", "GitHub check deadline exceeded");
     const controller = new AbortController();
     const remaining = Math.min(timeoutMs, CHECK_MS - (Date.now() - started));
@@ -101,8 +102,8 @@ export async function checkSource(source, { request = fetch, priorLock, timeoutM
         if (size > BODY_LIMIT || transferred > TOTAL_LIMIT) fail("UPSTREAM_INVALID", "GitHub response too large");
         chunks.push(item.value);
       }
-      const encoding = response.headers.get("content-encoding")?.toLowerCase();
-      if ((encoding === null || encoding === "identity") && declared !== null && /^\d+$/.test(declared) && size !== Number(declared)) fail("UPSTREAM_INVALID", "Truncated GitHub response");
+      const encoding = (response.headers.get("content-encoding") ?? "identity").toLowerCase();
+      if (encoding === "identity" && declared !== null && /^\d+$/.test(declared) && size !== Number(declared)) fail("UPSTREAM_INVALID", "Truncated GitHub response");
       const bytes = Buffer.concat(chunks, size);
       try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
       catch { fail("UPSTREAM_INVALID", "Invalid GitHub JSON"); }
@@ -131,7 +132,7 @@ export async function checkSource(source, { request = fetch, priorLock, timeoutM
     if (depth >= 4 || visited.has(target.sha)) fail("UPSTREAM_INVALID", "Invalid GitHub tag chain");
     visited.add(target.sha);
     const annotated = await getJson(`/git/tags/${target.sha}`, "tag");
-    if (!object(annotated) || (depth === 0 && annotated.tag !== tag) || !object(annotated.object) ||
+    if (!object(annotated) || annotated.sha !== target.sha || (depth === 0 && annotated.tag !== tag) || !object(annotated.object) ||
         !["commit", "tag"].includes(annotated.object.type) || !validSha(annotated.object.sha)) fail("UPSTREAM_INVALID", "Invalid GitHub tag object");
     target = annotated.object;
   }
