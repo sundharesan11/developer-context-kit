@@ -11,7 +11,7 @@ test("pilot fence refuses real agent homes, configured homes, default roots and 
   const opts = { home: p.fakeHome, kitRoot: "/nonexistent-kit", env: {} };
   const codexHome = join(p.sandbox, "configured-codex");
   await mkdir(codexHome);
-  for (const bad of [join(p.fakeHome, ".claude"), join(p.fakeHome, ".local/share/devctx"), p.forbidden[0], p.fakeHome, "/"]) {
+  for (const bad of [join(p.fakeHome, ".claude"), join(p.fakeHome, ".gemini"), join(p.fakeHome, ".cursor"), join(p.fakeHome, ".commandcode"), join(p.fakeHome, ".local/share/devctx"), p.forbidden[0], p.fakeHome, "/"]) {
     await assert.rejects(loadPilot(await p.with({ pilotRoot: bad }), opts), (e) => e.code === "DEVCTX_GATE_REQUIRED" && e.details.field === "pilotRoot");
   }
   const err = await loadPilot(await p.with({ pilotRoot: codexHome }), { ...opts, env: { CODEX_HOME: codexHome } }).catch((e) => e);
@@ -34,7 +34,7 @@ test("assertWritable rechecks the fence at write time; escaped member is refused
 });
 test("CLI: only version, help, and skill source reads are root-free; every other route requires --pilot", async () => {
   const routes = listCommands();
-  assert.deepEqual(routes.filter((r) => isRootFree(r)).sort(), ["help", "skill-sources catalog", "skill-sources check", "version"]);
+  assert.deepEqual(routes.filter((r) => isRootFree(r)).sort(), ["help", "skill-sources catalog", "skill-sources check", "skill-sources preview", "version"]);
   for (const route of routes.filter((r) => !isRootFree(r))) {
     const { code, json } = await runCli(route.split(" "));
     assert.equal(code, 1, route);

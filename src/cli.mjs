@@ -11,6 +11,9 @@ export const COMMANDS = {
   help: { rootFree: true, load: async () => ({ options: {}, run: () => ({ commands: listCommands() }) }) },
   "skill-sources catalog": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/commands.mjs")).catalogCommand },
   "skill-sources check": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/commands.mjs")).checkCommand },
+  "skill-sources preview": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/acquisition-commands.mjs")).previewCommand },
+  "skill-sources stage": { rootOptions: false, load: async () => (await import("./skill-sources/acquisition-commands.mjs")).stageCommand },
+  "skill-sources inspect": { rootOptions: false, load: async () => (await import("./skill-sources/acquisition-commands.mjs")).inspectCommand },
   doctor: { load: async () => ({ options: {}, run: ({}, ctx) => import("./config/doctor.mjs").then((m) => m.runDoctor(ctx.roots)) }) },
   init: { load: async () => (await import("./config/commands.mjs")).initCommand },
   "scope add": { load: async () => (await import("./config/commands.mjs")).scopeAddCommand },
@@ -78,14 +81,19 @@ export async function main(argv, options = {}) {
     }
     let pilot, roots;
     if (!isRootFree(command)) {
-      pilot = await loadPilot(values.pilot, { home, env });
-      roots = rootsFromPilot(pilot);
+      try {
+        pilot = await loadPilot(values.pilot, { home, env });
+        roots = rootsFromPilot(pilot);
+      } catch (error) {
+        if (!["skill-sources stage", "skill-sources inspect"].includes(command)) throw error;
+        throw new DevctxError(error instanceof DevctxError ? error.code : "STORAGE_ERROR", "Acquisition pilot could not be loaded", {field: "pilot"});
+      }
       for (const [flag, key] of [["config-root", "configRoot"], ["data-root", "dataRoot"], ["state-root", "stateRoot"]]) {
         if (values[flag] && values[flag] !== roots[key]) throw new DevctxError("GATE_REQUIRED", "Root does not match pilot");
       }
     }
     const context = { roots, pilot, now, home, env };
-    if (command === "skill-sources check") context.request = options.request;
+    if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
     const result = await impl.run(values, context);
     stdout.write(JSON.stringify({ ok: true, command, result }) + "\n");
     return 0;
