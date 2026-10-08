@@ -1,6 +1,6 @@
 # Third-party skill collections: source audit and approved delivery
 
-Research snapshot: 2026-10-09. Status: **managed design approved; not an installation manifest**. The repository URLs, default-branch trees and latest published release metadata below were retrieved from GitHub. No source was installed or executed during this audit. Release availability does not prove compatibility or safety. The [read-only catalog foundation](../plans/skill-source-catalog.md) is implemented; package acquisition, installation and scheduling remain planned.
+Research snapshot: 2026-10-09. Status: **managed design approved; not an installation manifest**. The repository URLs, default-branch trees and latest published release metadata below were retrieved from GitHub. No source was installed or executed during this audit. Release availability does not prove compatibility or safety. The [read-only catalog foundation](../plans/skill-source-catalog.md) and [pinned acquisition](../plans/skill-source-acquisition.md) are implemented. The [reviewed installation bridge](../plans/skill-source-installation.md) adds fixture-tested disposable Claude/Codex layouts. Actual source/host compatibility, live activation and scheduling remain separate work.
 
 ## Verified sources
 
@@ -70,12 +70,12 @@ Host probes also need a side-effect policy: a CLI may self-update even when aske
 
 The approved managed approach has three separately verifiable slices:
 
-Repository placement (the catalog and read-only source checker exist; the other runtime components and conversational skills below remain planned):
+Repository placement (catalog, acquisition and bounded source installation exist; native host discovery, automatic updating and conversational setup remain planned):
 
 ```text
 catalog/skill-sources.json                # implemented: public identities and preset
-src/skill-sources/                        # implemented: validation and release checks
-                                         # planned: acquisition, policy, update receipts
+src/skill-sources/                        # catalog, checks, acquisition and reviewed sandbox bridge
+                                         # planned: unattended update policy and native routes
 src/agents/catalog-adapters/              # planned: host-specific render/discovery
 src/automations/orca.mjs                  # planned: first scheduler adapter
 skills/devctx-manage-skill-sources/        # planned: setup, inspect and update workflow

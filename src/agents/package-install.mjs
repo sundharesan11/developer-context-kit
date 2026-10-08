@@ -1,60 +1,24 @@
-import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
-import { mkdir, readdir, rmdir, unlink } from "node:fs/promises";
-import { homedir } from "node:os";
+import { safeHome, agentsCheck, checkAgentParents, entries, fileHashes, roleConflict, journals, performPackageAction } from "./package-files.mjs";
+import { lstatSync } from "node:fs";
+import { mkdir, readdir } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
-import { dirname, join, relative } from "node:path";
+import { join } from "node:path";
 import { DevctxError } from "../errors.mjs";
-import { assertInPilot, assertWritable } from "../config/pilot.mjs";
+import { assertWritable } from "../config/pilot.mjs";
 import { validateRoot } from "../config/roots.mjs";
 import { canonicalJson, digest, sha256 } from "../storage/canonical.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
-import { ensurePrivatePath, readPrivateJson, readPrivateBytes, writeNewFile, atomicReplace, fsyncDir, info, isWithin } from "../storage/fsx.mjs";
+import { ensurePrivatePath, readPrivateJson, readPrivateBytes, writeNewFile, atomicReplace, info } from "../storage/fsx.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { RUN_ID } from "../storage/runs.mjs";
-import { assertPackageRel, PACKAGE_LIMITS, VALIDATOR_VERSION } from "../skill-builder/validate.mjs";
+import { assertPackageRel, PACKAGE_LIMITS } from "../skill-builder/validate.mjs";
 import { loadLocalRevision, loadLocalDecision } from "../skill-builder/workspace.mjs";
 import { AGENT_HOMES, SKILL_NAMES } from "./install.mjs";
 
 const marker = ".devctx-owned.json";
 const receiptKeys = ["schemaVersion", "kind", "skill", "version", "audience", "workspace", "revision", "packageDigest", "files", "runId"].sort();
-function safeHome(roots, targetHome) {
-  assertWritable(roots, []);
-  if (typeof targetHome !== "string") throw new DevctxError("INVALID_INPUT", "Target home required");
-  const pilot = roots.pilot;
-  assertInPilot(pilot, targetHome, "agentHomes");
-  let real;
-  try { real = realpathSync.native(targetHome); }
-  catch (error) { if (error.code === "ENOENT") throw new DevctxError("GATE_REQUIRED", "Pilot agent home unavailable"); throw error; }
-  const home = realpathSync.native(homedir());
-  if (isWithin(real, home) || isWithin(home, real)) throw new DevctxError("GATE_REQUIRED", "Real home refused");
-  return pilot;
-}
 function selectionCheck(selection) {
   if (selection?.audience !== "personal" || selection.scope || selection.project || !/^ws_[a-z0-9_-]{8,64}$/.test(selection.workspace ?? "")) throw new DevctxError("GATE_REQUIRED", "Only personal workspaces can be installed");
-}
-function agentsCheck(agents) {
-  if (!Array.isArray(agents) || !agents.length || agents.some((a) => typeof a !== "string" || !Object.hasOwn(AGENT_HOMES, a))) throw new DevctxError("INVALID_INPUT", "Invalid agent selection");
-  return [...new Set(agents)].sort();
-}
-function checkAgentParents(targetHome, agent) {
-  const parts = AGENT_HOMES[agent].split("/");
-  let at = targetHome;
-  for (const part of parts) {
-    at = join(at, part);
-    const st = info(at);
-    if (st && (!st.isDirectory() || st.isSymbolicLink() || st.uid !== process.getuid() || (st.mode & 0o077))) throw new DevctxError("PATH_UNSAFE", "Unsafe agent skill directory");
-  }
-}
-function entries(dir, prefix = "") {
-  const result = [];
-  for (const name of readdirSync(dir).sort()) {
-    const rel = prefix ? prefix + "/" + name : name, path = join(dir, name), st = lstatSync(path);
-    if (st.isSymbolicLink() || st.uid !== process.getuid() || (st.mode & 0o077) || (st.isFile() && st.nlink !== 1)) throw new DevctxError("PATH_UNSAFE", "Unsafe installed entry");
-    if (st.isDirectory()) { result.push({ rel, directory: true }); result.push(...entries(path, rel)); }
-    else if (st.isFile()) result.push({ rel, directory: false });
-    else throw new DevctxError("PATH_UNSAFE", "Unsafe installed entry");
-  }
-  return result;
 }
 async function observed(dir, manifest, workspace, mode) {
   if (!info(dir)) return { status: mode === "install" ? "create" : "absent" };
@@ -86,13 +50,6 @@ async function observed(dir, manifest, workspace, mode) {
   if (mode === "uninstall") return { status: receipt.revision === manifest.revision && receipt.packageDigest === manifest.packageDigest ? "remove" : "conflict", receipt };
   return { status: receipt.revision === manifest.revision && receipt.packageDigest === manifest.packageDigest ? "installed" : "update", receipt };
 }
-function fileHashes(files) { return Object.fromEntries(Object.keys(files).sort().map((rel) => [rel, sha256(files[rel])])); }
-function roleConflict(oldFiles, newFiles) {
-  return Object.keys(oldFiles).some((oldRel) => Object.keys(newFiles).some((newRel) => {
-    const oldFolded = oldRel.toLowerCase(), newFolded = newRel.toLowerCase();
-    return (oldFolded === newFolded && oldRel !== newRel) || oldFolded.startsWith(newFolded + "/") || newFolded.startsWith(oldFolded + "/");
-  }));
-}
 export async function planPackageInstall(roots, selection, { revisionId, contentDecisionId, targetHome, agents, mode }) {
   selectionCheck(selection); const pilot = safeHome(roots, targetHome);
   if (!["install", "uninstall"].includes(mode) || (mode === "install" ? !contentDecisionId : !!contentDecisionId)) throw new DevctxError("INVALID_INPUT", "Invalid local action");
@@ -110,50 +67,12 @@ export async function planPackageInstall(roots, selection, { revisionId, content
     validateRoot(path, "target");
     const prior = await observed(path, manifest, selection.workspace, mode);
     const { receipt } = prior;
-    const status = prior.status === "update" && roleConflict(receipt.files, hashes) ? "conflict" : prior.status;
+    if (agent === "codex") checkAgentParents(targetHome, agent, {codex: ".agents/skills"});
+    const competing = agent === "codex" && info(join(targetHome, ".agents/skills", manifest.name));
+    const status = competing || prior.status === "update" && roleConflict(receipt.files, hashes) ? "conflict" : prior.status;
     actions.push({ agent, skill: manifest.name, path, status, priorReceiptDigest: receipt ? digest(receipt) : null, files: hashes });
   }
   return finalizePlan({ kind: "skill-package-local", mode, audience: "personal", workspace: selection.workspace, revision: revisionId, packageDigest: manifest.packageDigest, contentDecision: contentDecisionId ?? null, validatorVersion: validation?.validatorVersion ?? null, validationDigest: validation ? digest(validation) : null, helpers: validation?.helpers ?? null, targetHome, agents: chosen, actions });
-}
-async function journals(roots, targetHome) {
-  const runs = join(roots.stateRoot, "runs"), incomplete = [], reviewed = [];
-  let ids = []; try { ids = await readdir(runs); } catch (e) { if (e.code !== "ENOENT") throw e; }
-  for (const id of ids) {
-    if (!RUN_ID.test(id)) continue;
-    const path = join(runs, id, "journal.json"), moved = join(runs, id, "reviewed", "journal.json");
-    if (existsSync(moved)) {
-      try { const j = await readPrivateJson(moved); if (!j.targetHome || j.targetHome === targetHome) reviewed.push(id); }
-      catch { reviewed.push(id); }
-    }
-    if (!existsSync(path)) continue;
-    try {
-      const j = await readPrivateJson(path);
-      if (j.targetHome && j.targetHome !== targetHome) continue;
-      if (!Array.isArray(j.intended) || !Array.isArray(j.completed) || j.completed.length > j.intended.length || j.completed.length < j.intended.length || j.completed.some((action, i) => canonicalJson(action) !== canonicalJson(j.intended[i])) || (j.kind === "skill-package-local" && (j.schemaVersion !== 1 || !/^ws_[a-z0-9_-]{8,64}$/.test(j.workspace ?? "") || !/^dc_[a-z0-9_-]{8,64}$/.test(j.decision ?? "")))) incomplete.push(id);
-    } catch { incomplete.push(id); }
-  }
-  return { incomplete, reviewed };
-}
-async function writeFiles(dir, files, replace = false) {
-  const touchedDirs = new Set([dir]);
-  for (const rel of Object.keys(files).sort()) {
-    const parts = rel.split("/");
-    if (parts.length > 1) {
-      ensurePrivatePath(dir, parts.slice(0, -1));
-      for (let i = 1; i < parts.length; i++) touchedDirs.add(join(dir, ...parts.slice(0, i)));
-    }
-    const path = join(dir, ...parts);
-    if (replace && info(path)) await atomicReplace(path, files[rel]); else await writeNewFile(path, files[rel]);
-  }
-  for (const path of [...touchedDirs].sort((a, b) => b.length - a.length)) fsyncDir(path);
-}
-async function removeFiles(dir, rels) {
-  for (const rel of rels) await unlink(join(dir, ...rel.split("/")));
-  const dirs = new Set(rels.flatMap((rel) => { const p = rel.split("/").slice(0, -1); return p.map((_, i) => p.slice(0, i + 1).join("/")); }));
-  for (const rel of [...dirs].sort((a, b) => b.length - a.length)) {
-    try { await rmdir(join(dir, ...rel.split("/"))); }
-    catch (error) { if (error.code !== "ENOTEMPTY") throw error; }
-  }
 }
 export async function applyPackageInstall(roots, selection, input, { fingerprint, decisionId, runId }, { faults = {} } = {}) {
   selectionCheck(selection); safeHome(roots, input.targetHome);
@@ -185,28 +104,8 @@ export async function applyPackageInstall(roots, selection, input, { fingerprint
       assertWritable(roots, [action.path, journalPath]);
       const prior = await observed(action.path, manifest, selection.workspace, plan.mode);
       if (prior.status !== action.status || (prior.receipt ? digest(prior.receipt) : null) !== action.priorReceiptDigest) throw new DevctxError("STALE_VERSION", "Target changed during apply");
-      if (action.status === "create") {
-        await mkdir(dirname(action.path), { recursive: true, mode: 0o700 });
-        await mkdir(action.path, { mode: 0o700 });
-        await writeFiles(action.path, files);
-        if (faults.beforeReceipt) await faults.beforeReceipt(action);
-        await writeNewFile(join(action.path, marker), canonicalJson({ schemaVersion: 2, kind: "skill-package", skill: manifest.name, version: "0.0.0-local", audience: "personal", workspace: selection.workspace, revision: plan.revision, packageDigest: plan.packageDigest, files: fileHashes(files), runId: id }) + "\n");
-        fsyncDir(action.path);
-      } else if (action.status === "update") {
-        await writeFiles(action.path, files, true);
-        const removed = Object.keys(prior.receipt.files).filter((rel) => !Object.hasOwn(files, rel));
-        if (removed.length) await removeFiles(action.path, removed);
-        if (faults.beforeReceipt) await faults.beforeReceipt(action);
-        await atomicReplace(join(action.path, marker), canonicalJson({ schemaVersion: 2, kind: "skill-package", skill: manifest.name, version: "0.0.0-local", audience: "personal", workspace: selection.workspace, revision: plan.revision, packageDigest: plan.packageDigest, files: fileHashes(files), runId: id }) + "\n");
-      } else {
-        for (const rel of Object.keys(prior.receipt.files)) if (sha256(await readPrivateBytes(join(action.path, ...rel.split("/")), PACKAGE_LIMITS.fileBytes)) !== prior.receipt.files[rel]) throw new DevctxError("CONFLICT", "Installed skill changed");
-        for (const rel of Object.keys(prior.receipt.files)) await unlink(join(action.path, ...rel.split("/")));
-        if (faults.beforeReceipt) await faults.beforeReceipt(action);
-        await unlink(join(action.path, marker));
-        const dirs = new Set(Object.keys(prior.receipt.files).flatMap((rel) => { const p = rel.split("/").slice(0, -1); return p.map((_, i) => p.slice(0, i + 1).join("/")); }));
-        for (const rel of [...dirs].sort((a, b) => b.length - a.length)) await rmdir(join(action.path, ...rel.split("/")));
-        await rmdir(action.path);
-      }
+      const nextReceipt = { schemaVersion: 2, kind: "skill-package", skill: manifest.name, version: "0.0.0-local", audience: "personal", workspace: selection.workspace, revision: plan.revision, packageDigest: plan.packageDigest, files: fileHashes(files), runId: id };
+      await performPackageAction(roots, action, {files, priorReceipt: prior.receipt, nextReceipt, journalPath}, {faults});
       journal.completed.push(action);
       await atomicReplace(journalPath, canonicalJson(journal) + "\n");
     }
@@ -223,7 +122,10 @@ export async function packageInstallStatus(roots, selection, input) {
     const agents = agentsCheck(input.agents), actions = [];
     for (const agent of agents) {
       const path = join(input.targetHome, AGENT_HOMES[agent], manifest.name);
-      actions.push({ agent, skill: manifest.name, path, status: (await observed(path, manifest, selection.workspace, input.mode ?? "install")).status });
+      checkAgentParents(input.targetHome, agent);
+      if (agent === "codex") checkAgentParents(input.targetHome, agent, {codex: ".agents/skills"});
+      const competing = agent === "codex" && info(join(input.targetHome, ".agents/skills", manifest.name));
+      actions.push({ agent, skill: manifest.name, path, status: competing ? "conflict" : (await observed(path, manifest, selection.workspace, input.mode ?? "install")).status });
     }
     const markers = join(roots.stateRoot, "skill-installs", "consumed", selection.workspace);
     let consumed = []; try { consumed = (await readdir(markers)).filter((x) => /^dc_[a-z0-9_-]{8,64}\.json$/.test(x)).map((x) => x.slice(0, -5)).sort(); } catch (e) { if (e.code !== "ENOENT") throw e; }

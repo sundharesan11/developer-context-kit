@@ -14,6 +14,7 @@
   "docs/plans/skill-builder.md",
   "docs/plans/skill-source-acquisition.md",
   "docs/plans/skill-source-catalog.md",
+  "docs/plans/skill-source-installation.md",
   "docs/research/skill-collections.md",
   "package.json",
   "schemas/account.schema.json",
@@ -36,6 +37,7 @@
   "src/agents/envelope.mjs",
   "src/agents/install.mjs",
   "src/agents/package-install.mjs",
+  "src/agents/package-files.mjs",
   "src/auth/approval.mjs",
   "src/auth/connector.mjs",
   "src/auth/fake-provider.mjs",
@@ -80,6 +82,9 @@
   "src/skill-sources/github.mjs",
   "src/skill-sources/selection.mjs",
   "src/skill-sources/staging.mjs",
+  "src/skill-sources/package.mjs",
+  "src/skill-sources/installation.mjs",
+  "src/skill-sources/installation-commands.mjs",
   "templates/client-profile.md",
   "test/agents.test.mjs",
   "test/auth-hubs.test.mjs",
@@ -108,5 +113,7 @@
   "test/skill-install.test.mjs",
   "test/skill-sources.test.mjs",
   "test/skill-staging.test.mjs",
+  "test/skill-source-package.test.mjs",
+  "test/skill-source-install.test.mjs",
   "test/source-read.test.mjs"
 ]

@@ -34,3 +34,57 @@ Plans also include a digest of the prior ownership receipt for each target. An i
 Installed ownership checks hash the exact file bytes. A changed or invalid UTF-8 byte sequence is treated as a modification and is preserved. An update that would turn an owned file into a directory, a directory into a file, or change only a file path's letter case is a conflict at preview; uninstall the old revision with its own approval, then plan a separate install. This case check is conservative on case-sensitive filesystems too.
 
 The tool writes a private journal before target mutation. `RECOVERY_REQUIRED` means a run stopped with incomplete actions; package apply refuses that home until it is reviewed. Inspect the journal and target, then preserve a partial package by moving it within the pilot to `stateRoot/skill-installs/quarantine/<run-id>/<agent>/<skill>` (or copy, verify and remove for a cross-volume move), or restore exact verified prior files. Move `runs/<run-id>/journal.json` to `runs/<run-id>/reviewed/journal.json` only after that review. Then plan again and obtain a new decision. No command automatically deletes or repairs a partial target. Bundled `agents install` keeps its existing recovery behavior, while each apply now requires a new run directory and its CLI generates a fresh run ID by default.
+
+## Third-party source packages
+
+Source packages have separate decisions and schema-3 ownership receipts. They reuse B's filesystem executor and install lock, without creating personal workspaces or generic-content attestations. All operations below require a disposable `--pilot` and make no network requests. None runs helpers, native installers, hooks, host binaries or provider setup.
+
+Stage one package's exact required files, including licenses and notices. Review with `skill-sources package-review --pilot "$PILOT_FILE" --run "$STAGE_ID" --mapping-json "$MAPPING_JSON"`. A minimal repository-root mapping is:
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "example-skill",
+  "skillRoot": "",
+  "files": [{"source": "LICENSE", "target": "LICENSE"}, {"source": "SKILL.md", "target": "SKILL.md"}],
+  "requiredPaths": ["LICENSE", "SKILL.md"],
+  "licensePaths": ["LICENSE"],
+  "noticePaths": [],
+  "dependencies": [],
+  "compatibility": {"claude": "unreviewed", "codex": "unreviewed"},
+  "review": {"fileCompleteness": "unreviewed", "licensesAndNotices": "unreviewed", "dependencies": "unreviewed"}
+}
+```
+
+This example intentionally cannot be approved. Inspect all content and upstream requirements first. Review fields accept `user-reviewed`. A dependency has `name` and `status`, where status is `missing`, `unreviewed` or `user-confirmed-present`; the CLI installs none. Each compatibility value is `unreviewed`, `unsupported` or `user-reviewed-sandbox`. Empty dependency/notice lists are reviewed completeness claims, not automatic scans. Missing dependencies and unreviewed selected hosts remain blocking.
+
+Map every staged path exactly once. All required/legal paths must be mapped, `licensePaths` must be nonempty, and the selected root's `SKILL.md` is mandatory. Within a nested `skillRoot`, retain relative paths exactly. Only declared legal files can come from outside that root; they map to their original basename and appear as explicit relocations. Legal targets are root `LICENSE`, `NOTICE` or `COPYING`, optionally suffixed `.md` or `.txt`. Two legal files targeting the same name produce `LEGAL_TARGET_COLLISION`; nothing is dropped or renamed. Correct the selection and review again.
+
+The supported layout is root `SKILL.md`, legal files and text below `references/`, `scripts/` or `assets/`: 24 files, 128 KiB each, 256 KiB total, depth four. Binary content, unsupported paths, missing inline local links and unchecked reference-style links are held. Raw metadata stays byte-identical. A narrow envelope requires unique bare top-level keys and one scalar name; block descriptions and plain-key nested metadata are retained. Quoted/complex keys, aliases, anchors, tags, directives and flow collections are unsupported. `name-only-unverified` is not full YAML/schema validation. `devctx-` names, `synced` and `anthropic-skills` are reserved.
+
+Review output separates blocking `holds` from digest-bound `disclosures`: caller-unverified pins, name-only metadata checks, inert helpers, upstream executable modes copied as 0600, legal relocations and the unchanged `acquisitionAssessment`. Installed state comes from actual target inspection. Approval does not turn those disclosures into verified provenance or runtime compatibility.
+
+After explicit user review, record content approval and plan installation:
+
+```sh
+node bin/devctx.mjs skill-sources content-approve --pilot "$PILOT_FILE" --run "$STAGE_ID" --mapping-json "$MAPPING_JSON" --package-digest "$PACKAGE_DIGEST" --decision "$CONTENT_DECISION" --interaction-ref "$USER_INTERACTION" --response "Approved source content $PACKAGE_DIGEST with caller-supplied-unverified pin"
+node bin/devctx.mjs skill-sources local-plan --pilot "$PILOT_FILE" --content-decision "$CONTENT_DECISION" --home "$PILOT_HOME" --agent-json '["claude","codex"]' --mode install
+```
+
+Use the reviewed digest, a fresh `dc_` ID with 8–64 lowercase letters/digits/underscores/hyphens after its prefix, and the actual `user:` interaction reference. The response records evidence; the CLI does not authenticate the person. Changed content or declarations require a new content decision. All implementation approvals are synthetic fixtures.
+
+Present the exact plan to the user, then record and apply a separate action decision:
+
+```sh
+node bin/devctx.mjs skill-sources local-approve --pilot "$PILOT_FILE" --content-decision "$CONTENT_DECISION" --home "$PILOT_HOME" --agent-json '["claude","codex"]' --mode install --decision "$ACTION_DECISION" --plan-fingerprint "$PLAN_FINGERPRINT" --interaction-ref "$USER_INTERACTION" --response "Approved source install $PLAN_FINGERPRINT"
+node bin/devctx.mjs skill-sources local-apply --pilot "$PILOT_FILE" --content-decision "$CONTENT_DECISION" --home "$PILOT_HOME" --agent-json '["claude","codex"]' --mode install --decision "$ACTION_DECISION" --plan-fingerprint "$PLAN_FINGERPRINT"
+node bin/devctx.mjs skill-sources local-status --pilot "$PILOT_FILE" --content-decision "$CONTENT_DECISION" --home "$PILOT_HOME" --agent-json '["claude","codex"]' --mode install
+```
+
+Content decisions are reusable; action decisions are single-use. Update using a newly approved stage. Restore an older version by planning `install` with its retained content decision and obtaining a fresh action approval. This is intentional reapplication after a clean install, not automatic failure rollback. A changed source or package root requires separately approved removal and a new install.
+
+For removal use `--mode uninstall` throughout and response `Approved source uninstall <fingerprint>`. Its content decision must exactly match the current ownership receipt. Removal checks the stored decision, receipt, installed hashes and modes, without needing staging or the current catalog. Missing/corrupt staging blocks update/restoration but not removal of an intact owned package. Corrupt decisions or edited targets still block removal.
+
+Source sandbox layouts are `.claude/skills/<name>` and `.agents/skills/<name>` below the canonical pilot home. Personal B retains `.codex/skills`, now with a read-only conflict for a same-name shared Agents entry. Source operations check competing names in all three roots outside the selected targets. A dual-host source installation therefore requires both hosts selected for update/removal. There is no adoption, force, overlay, migration or host discovery mode. Foreign files, user edits, extra directories, links and added owner-execute bits are preserved.
+
+Writes are in place and journaled per host, not an atomic multi-host transaction. `local-status` reports consumed approvals and incomplete/reviewed runs. Incomplete shared journals block both package adapters; no command automatically rolls back or deletes partial targets. Retain staging/decisions for restoration and see [storage](STORAGE.md) for recovery boundaries.

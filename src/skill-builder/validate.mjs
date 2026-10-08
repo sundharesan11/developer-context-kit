@@ -50,9 +50,15 @@ export function validatePackage(files, expectedName) {
   }
   const { meta } = parseFrontmatter(files["SKILL.md"]);
   if (!SKILL_NAME.test(meta.name) || meta.name.length > 64 || meta.name !== expectedName || !meta.description || meta.description.length > 1024) throw new DevctxError("INVALID_INPUT", "Invalid skill metadata");
+  const {missing, unchecked} = checkPackageLinks(files, assertPackageRel);
+  return { valid: missing.length === 0, name: meta.name, files: paths.length, missing, unchecked, helpers: paths.some((p) => p.startsWith("scripts/")) ? "unverified" : "none" };
+}
+
+export function checkPackageLinks(files, assertRel = assertPackageRel, {skillBody} = {}) {
+  const paths = Object.keys(files).sort();
   const missing = [], unchecked = [];
   for (const rel of paths.filter((p) => p.endsWith(".md"))) {
-    const content = rel === "SKILL.md" ? parseFrontmatter(files[rel]).body : files[rel];
+    const content = rel === "SKILL.md" ? skillBody ?? parseFrontmatter(files[rel]).body : files[rel];
     let fenced = false;
     for (const line of content.split("\n")) {
       if (/^\s*```/.test(line)) { fenced = !fenced; continue; }
@@ -63,12 +69,12 @@ export function validatePackage(files, expectedName) {
         const resolved = posix.join(posix.dirname(rel), target);
         try {
           if (target.startsWith("/") || target.split("/").some((part) => !part || !/^[A-Za-z0-9._-]+$/.test(part))) throw new Error("unsafe");
-          assertPackageRel(resolved);
+          assertRel(resolved);
           if (!paths.includes(resolved)) missing.push(resolved);
         } catch { missing.push(target); }
       }
       if (/\[[^\]]+\]\[[^\]]*\]|<a\s/i.test(line)) unchecked.push(rel);
     }
   }
-  return { valid: missing.length === 0, name: meta.name, files: paths.length, missing, unchecked, helpers: paths.some((p) => p.startsWith("scripts/")) ? "unverified" : "none" };
+  return {missing, unchecked};
 }

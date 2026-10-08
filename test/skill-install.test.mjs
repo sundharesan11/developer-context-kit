@@ -11,6 +11,35 @@ import { digest, sha256 } from "../src/storage/canonical.mjs";
 const selection = { audience: "personal", workspace: "ws_install01" };
 const args = ["--audience", "personal", "--workspace", "ws_install01"];
 const response = (kind, hash) => `Approved ${kind} ${hash}`;
+
+test("package receipt is not published when output changes before receipt", async (t) => {
+  const x = await approvedInstall(t);
+  const input = {revisionId: "rv_install01", contentDecisionId: "dc_content01", targetHome: x.home, agents: ["claude"], mode: "install"};
+  await assert.rejects(applyPackageInstall(x.p.roots, selection, input,
+    {fingerprint: x.plan.fingerprint, decisionId: "dc_local001", runId: "run_verify001"},
+    {faults: {beforeReceipt: async (action) => writeFile(join(action.path, "SKILL.md"), "changed")}}
+  ), {code: "DEVCTX_INTEGRITY"});
+  assert.equal((await readdir(x.dir)).includes(".devctx-owned.json"), false);
+});
+
+test("personal Codex plan refuses a competing shared skills copy", async (t) => {
+  const x = await approvedInstall(t);
+  const competing = join(x.home, ".agents/skills/summarize-note");
+  await mkdir(competing, {recursive: true, mode: 0o700});
+  await writeFile(join(competing, "SKILL.md"), "Foreign content", {mode: 0o600});
+  const plan = await planPackageInstall(x.p.roots, selection, {revisionId: "rv_install01", contentDecisionId: "dc_content01", targetHome: x.home, agents: ["codex"], mode: "install"});
+  assert.equal(plan.actions[0].status, "conflict");
+  assert.equal(await readFile(join(competing, "SKILL.md"), "utf8"), "Foreign content");
+});
+
+test("package receipt refuses unexpected empty directories at publication", async (t) => {
+  const x = await approvedInstall(t);
+  const input = {revisionId: "rv_install01", contentDecisionId: "dc_content01", targetHome: x.home, agents: ["claude"], mode: "install"};
+  await assert.rejects(applyPackageInstall(x.p.roots, selection, input,
+    {fingerprint: x.plan.fingerprint, decisionId: "dc_local001", runId: "run_emptydir01"},
+    {faults: {beforeReceipt: async (action) => mkdir(join(action.path, "extra"), {mode: 0o700})}}
+  ), {code: "DEVCTX_INTEGRITY"});
+});
 async function cli(p, route, more = []) { return runCli(["skill", route, "--pilot", p.path, ...args, ...more]); }
 async function fixture(t, { oldReference = false, oldReferenceName = "old.md", oldNestedReference = false, name = "summarize-note", title = "Summary" } = {}) {
   const p = await makePilot(t);

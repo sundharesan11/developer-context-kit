@@ -14,6 +14,12 @@ export const COMMANDS = {
   "skill-sources preview": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/acquisition-commands.mjs")).previewCommand },
   "skill-sources stage": { rootOptions: false, load: async () => (await import("./skill-sources/acquisition-commands.mjs")).stageCommand },
   "skill-sources inspect": { rootOptions: false, load: async () => (await import("./skill-sources/acquisition-commands.mjs")).inspectCommand },
+  "skill-sources package-review": { rootOptions: false, load: async () => (await import("./skill-sources/installation-commands.mjs")).packageReviewCommand },
+  "skill-sources content-approve": { rootOptions: false, load: async () => (await import("./skill-sources/installation-commands.mjs")).contentApproveCommand },
+  "skill-sources local-plan": { rootOptions: false, load: async () => (await import("./skill-sources/installation-commands.mjs")).localPlanCommand },
+  "skill-sources local-approve": { rootOptions: false, load: async () => (await import("./skill-sources/installation-commands.mjs")).localApproveCommand },
+  "skill-sources local-apply": { rootOptions: false, load: async () => (await import("./skill-sources/installation-commands.mjs")).localApplyCommand },
+  "skill-sources local-status": { rootOptions: false, load: async () => (await import("./skill-sources/installation-commands.mjs")).localStatusCommand },
   doctor: { load: async () => ({ options: {}, run: ({}, ctx) => import("./config/doctor.mjs").then((m) => m.runDoctor(ctx.roots)) }) },
   init: { load: async () => (await import("./config/commands.mjs")).initCommand },
   "scope add": { load: async () => (await import("./config/commands.mjs")).scopeAddCommand },
@@ -85,7 +91,7 @@ export async function main(argv, options = {}) {
         pilot = await loadPilot(values.pilot, { home, env });
         roots = rootsFromPilot(pilot);
       } catch (error) {
-        if (!["skill-sources stage", "skill-sources inspect"].includes(command)) throw error;
+        if (!command.startsWith("skill-sources ")) throw error;
         throw new DevctxError(error instanceof DevctxError ? error.code : "STORAGE_ERROR", "Acquisition pilot could not be loaded", {field: "pilot"});
       }
       for (const [flag, key] of [["config-root", "configRoot"], ["data-root", "dataRoot"], ["state-root", "stateRoot"]]) {

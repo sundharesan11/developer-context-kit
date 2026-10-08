@@ -14,6 +14,47 @@ import { operationIdFor } from "../src/identity/ids.mjs";
 import { planOnboard, applyOnboard } from "../src/onboarding/onboard.mjs";
 export { sleep };
 export const now = () => new Date("2026-10-07T00:00:00.000Z");
+
+export async function stageSourceFixture(t, {p, version = 1, sourceId = "humanizer", skillRoot = "skills/example-skill", contents} = {}) {
+  const {getSource, loadBundledCatalog} = await import("../src/skill-sources/catalog.mjs");
+  const {gitBlobSha} = await import("../src/skill-sources/selection.mjs");
+  const {previewAcquisition} = await import("../src/skill-sources/github-package.mjs");
+  const {stageAcquisition} = await import("../src/skill-sources/staging.mjs");
+  p ??= await makePilot(t);
+  const prefix = skillRoot ? skillRoot + "/" : "";
+  contents ??= {
+    LICENSE: "Synthetic license bytes\r\n",
+    NOTICE: "Synthetic notice bytes\n",
+    [prefix + "SKILL.md"]: `---\nname: example-skill\ndescription: |\n  Synthetic example.\nlicense: MIT\nmetadata:\n  version: "${version}"\n---\n# Version ${version}\n[Guide](references/guide.md)\n`,
+    [prefix + "references/guide.md"]: "Synthetic guide.\n",
+    [prefix + "scripts/inert.mjs"]: "throw new Error('Acquired helper executed');\n"
+  };
+  const source = getSource(loadBundledCatalog(), sourceId);
+  const pin = {sourceId, channel: "stable-release", tag: "v" + version, commit: String(version).repeat(40)};
+  const tree = "b".repeat(40), nodes = new Map(), blobs = new Map();
+  for (const [path, content] of Object.entries(contents)) {
+    const bytes = Buffer.from(content), sha = gitBlobSha(bytes), parts = path.split("/");
+    for (let i = 1; i < parts.length; i++) { const dir = parts.slice(0, i).join("/"); nodes.set(dir, {path: dir, type: "tree", mode: "040000", sha: tree}); }
+    nodes.set(path, {path, type: "blob", mode: path.endsWith(".mjs") ? "100755" : "100644", sha, size: bytes.length});
+    blobs.set(sha, {sha, size: bytes.length, encoding: "base64", content: bytes.toString("base64")});
+  }
+  const request = async (url) => {
+    const path = new URL(url).pathname;
+    const body = path.includes("/commits/") ? {sha: pin.commit, tree: {sha: tree}} : path.includes("/trees/") ? {sha: tree, truncated: false, tree: [...nodes.values()]} : blobs.get(path.split("/").at(-1));
+    assertFixtureBody(body);
+    return new Response(JSON.stringify(body), {headers: {"content-type": "application/json"}});
+  };
+  const input = {pin, files: Object.keys(contents)};
+  const preview = await previewAcquisition(source, input, {request});
+  const staged = await stageAcquisition(p.roots, source, {...input, fingerprint: preview.fingerprint}, {request});
+  const mapping = {schemaVersion: 1, name: "example-skill", skillRoot,
+    files: Object.keys(contents).map((source) => ({source, target: prefix && source.startsWith(prefix) ? source.slice(prefix.length) : source})),
+    requiredPaths: Object.keys(contents), licensePaths: ["LICENSE"], noticePaths: Object.hasOwn(contents, "NOTICE") ? ["NOTICE"] : [], dependencies: [],
+    compatibility: {claude: "user-reviewed-sandbox", codex: "user-reviewed-sandbox"},
+    review: {fileCompleteness: "user-reviewed", licensesAndNotices: "user-reviewed", dependencies: "user-reviewed"}};
+  return {p, staged, mapping, contents, stageRunId: staged.runId, stagePath: join(p.dataRoot, "skill-sources/staging", staged.runId)};
+}
+function assertFixtureBody(body) { if (!body) throw new Error("Unexpected fixture request"); }
 export async function sandbox(t) {
   const dir = await realpath(await mkdtemp(join(tmpdir(), "devctx-t-")));
   t.after(() => rm(dir, { recursive: true, force: true }));
