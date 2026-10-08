@@ -1,16 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, writeFile, readFile, stat, readdir, unlink, rename, symlink, chmod } from "node:fs/promises";
+import { mkdir, writeFile, readFile, stat, readdir, unlink, rename, symlink, link, chmod, rmdir } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { makePilot, runCli } from "./helpers.mjs";
 import { createWorkspace, recordRequirements, recordDesign, approveDesign, createDraft, validateDraft } from "../src/skill-builder/workspace.mjs";
 import { planPackageInstall, applyPackageInstall } from "../src/agents/package-install.mjs";
+import { digest, sha256 } from "../src/storage/canonical.mjs";
 
 const selection = { audience: "personal", workspace: "ws_install01" };
 const args = ["--audience", "personal", "--workspace", "ws_install01"];
 const response = (kind, hash) => `Approved ${kind} ${hash}`;
 async function cli(p, route, more = []) { return runCli(["skill", route, "--pilot", p.path, ...args, ...more]); }
-async function fixture(t, { oldReference = false, name = "summarize-note" } = {}) {
+async function fixture(t, { oldReference = false, oldNestedReference = false, name = "summarize-note", title = "Summary" } = {}) {
   const p = await makePilot(t);
   await createWorkspace(p.roots, selection);
   const req = { goal: "Summarize a synthetic note", success: "A short summary", examples: ["Summarize note"], negativeExample: "Write note", inputs: [], permittedTools: [], forbiddenTools: [], permittedContext: [], forbiddenContext: [], supportedAgents: ["codex", "claude"], output: "Markdown", failure: "Explain", destination: "private", unknowns: [] };
@@ -21,8 +23,9 @@ async function fixture(t, { oldReference = false, name = "summarize-note" } = {}
   const recorded = await recordDesign(p.roots, selection, "rq_install01", "ds_install01", ds);
   await approveDesign(p.roots, selection, "ds_install01", "dc_design01", "user:synthetic", response("", recorded.digest).replace("  ", " "));
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate);
-  await writeFile(join(candidate, "SKILL.md"), `---\nname: ${name}\ndescription: Summarize a synthetic note.\n---\n# Summary\n`);
+  await writeFile(join(candidate, "SKILL.md"), `---\nname: ${name}\ndescription: Summarize a synthetic note.\n---\n# ${title}\n`);
   if (oldReference) { await mkdir(join(candidate, "references")); await writeFile(join(candidate, "references/old.md"), "Old synthetic reference.\n"); }
+  if (oldNestedReference) { await mkdir(join(candidate, "references/old.md"), { recursive: true }); await writeFile(join(candidate, "references/old.md/child.md"), "Nested synthetic reference.\n"); }
   const draft = await createDraft(p.roots, selection, { requirementsId: "rq_install01", designId: "ds_install01", decisionId: "dc_design01", revisionId: "rv_install01", candidate });
   const validation = await validateDraft(p.roots, selection, "rv_install01");
   assert.equal(validation.valid, true);
@@ -276,4 +279,125 @@ test("an intervening intact owned revision invalidates an approved update plan",
   assert.notEqual(changed.json.result.fingerprint, firstPlan.json.result.fingerprint);
   const stale = await cli(x.p, "local-apply", [...third, "--decision", "dc_third001", "--plan-fingerprint", firstPlan.json.result.fingerprint, "--run-id", "run_third001"]);
   assert.equal(stale.json.error.code, "DEVCTX_PLAN_MISMATCH");
+});
+
+test("invalid UTF-8 edit to an installed replacement character is preserved", async (t) => {
+  const x = await approvedInstall(t, { title: "Replaced � character" }); await applyApproved(x);
+  const path = join(x.dir, "SKILL.md"), original = await readFile(path);
+  const needle = Buffer.from([0xef, 0xbf, 0xbd]), offset = original.indexOf(needle);
+  assert.ok(offset >= 0);
+  await writeFile(path, Buffer.concat([original.subarray(0, offset), Buffer.from([0xff]), original.subarray(offset + needle.length)]));
+  const remove = await cli(x.p, "local-plan", ["--mode", "uninstall", "--revision", "rv_install01", "--home", x.home, "--agent", "claude"]);
+  assert.equal(remove.json.result.actions[0].status, "modified");
+  assert.ok((await readFile(path)).includes(0xff));
+});
+
+test("update refuses turning an owned file into a directory", async (t) => {
+  const x = await approvedInstall(t, { oldReference: true }); await applyApproved(x);
+  const candidate = join(x.p.inputsRoot, "file-to-dir"); await mkdir(join(candidate, "references/old.md"), { recursive: true });
+  await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a synthetic note.\n---\n# File to directory\n");
+  await writeFile(join(candidate, "references/old.md/child.md"), "New nested file.\n");
+  const draft = await createDraft(x.p.roots, selection, { requirementsId: "rq_install01", designId: "ds_install01", decisionId: "dc_design01", revisionId: "rv_install02", candidate });
+  await validateDraft(x.p.roots, selection, "rv_install02");
+  assert.equal((await cli(x.p, "content-approve", ["--revision", "rv_install02", "--decision", "dc_content02", "--interaction-ref", "user:synthetic", "--response", `Approved content ${draft.packageDigest} as personal generic non-confidential`])).code, 0);
+  const update = ["--mode", "install", "--revision", "rv_install02", "--content-decision", "dc_content02", "--home", x.home, "--agent", "claude"];
+  const plan = await cli(x.p, "local-plan", update);
+  assert.equal(plan.json.result.actions[0].status, "conflict");
+  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVCTX_CONFLICT");
+  assert.match(await readFile(join(x.dir, "references/old.md"), "utf8"), /Old synthetic/);
+});
+
+test("update refuses turning an owned directory into a file", async (t) => {
+  const x = await approvedInstall(t, { oldNestedReference: true }); await applyApproved(x);
+  const candidate = join(x.p.inputsRoot, "dir-to-file"); await mkdir(join(candidate, "references"), { recursive: true });
+  await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a synthetic note.\n---\n# Directory to file\n");
+  await writeFile(join(candidate, "references/old.md"), "New flat file.\n");
+  const draft = await createDraft(x.p.roots, selection, { requirementsId: "rq_install01", designId: "ds_install01", decisionId: "dc_design01", revisionId: "rv_install02", candidate });
+  await validateDraft(x.p.roots, selection, "rv_install02");
+  assert.equal((await cli(x.p, "content-approve", ["--revision", "rv_install02", "--decision", "dc_content02", "--interaction-ref", "user:synthetic", "--response", `Approved content ${draft.packageDigest} as personal generic non-confidential`])).code, 0);
+  const update = ["--mode", "install", "--revision", "rv_install02", "--content-decision", "dc_content02", "--home", x.home, "--agent", "claude"];
+  const plan = await cli(x.p, "local-plan", update);
+  assert.equal(plan.json.result.actions[0].status, "conflict");
+  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVCTX_CONFLICT");
+  assert.match(await readFile(join(x.dir, "references/old.md/child.md"), "utf8"), /Nested synthetic/);
+});
+
+test("tampered local decision keys and interaction reference are refused before consumption", async (t) => {
+  const x = await approvedInstall(t);
+  const path = join(x.p.dataRoot, "personal/skill-workspaces/ws_install01/decisions/dc_local001.json");
+  const original = JSON.parse(await readFile(path, "utf8"));
+  for (const changed of [{ ...original, unexpected: "field" }, { ...original, interactionRef: "not-a-user-reference" }]) {
+    await writeFile(path, JSON.stringify(changed));
+    const result = await cli(x.p, "local-apply", [...x.install, "--decision", "dc_local001", "--plan-fingerprint", x.plan.fingerprint, "--run-id", "run_package01"]);
+    assert.equal(result.json.error.code, "DEVCTX_INTEGRITY");
+  }
+});
+
+test("local plan requires an explicit mode", async (t) => {
+  const x = await approvedInstall(t);
+  const result = await cli(x.p, "local-plan", ["--revision", "rv_install01", "--content-decision", "dc_content01", "--home", x.home, "--agent", "claude"]);
+  assert.equal(result.json.error.code, "DEVCTX_INVALID_INPUT");
+});
+
+test("declared pilot home disappearing is a typed refusal", async (t) => {
+  const x = await approvedInstall(t);
+  await rmdir(x.home);
+  const result = await cli(x.p, "local-plan", x.install);
+  assert.equal(result.json.error.code, "DEVCTX_GATE_REQUIRED");
+});
+
+test("revision changes after journal creation cannot change installed bytes", async (t) => {
+  const x = await approvedInstall(t), input = { revisionId: "rv_install01", contentDecisionId: "dc_content01", targetHome: x.home, agents: ["claude"], mode: "install" };
+  const changeRevision = async () => {
+    const base = join(x.p.dataRoot, "personal/skill-workspaces/ws_install01"), dir = join(base, "drafts/rv_install01"), manifestPath = join(dir, "manifest.json"), validationPath = join(base, "validations/rv_install01/v1.json");
+    const altered = "---\nname: summarize-note\ndescription: Summarize a synthetic note.\n---\n# Altered after approval\n";
+    await writeFile(join(dir, "summarize-note/SKILL.md"), altered);
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    manifest.files.find((entry) => entry.path === "SKILL.md").sha256 = sha256(altered);
+    const { packageDigest, ...body } = manifest;
+    manifest.packageDigest = digest(body);
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    const validation = JSON.parse(await readFile(validationPath, "utf8"));
+    validation.packageDigest = manifest.packageDigest;
+    await writeFile(validationPath, JSON.stringify(validation));
+  };
+  await assert.rejects(applyPackageInstall(x.p.roots, selection, input, { fingerprint: x.plan.fingerprint, decisionId: "dc_local001", runId: "run_package01" }, { faults: { afterJournal: changeRevision } }), { code: "DEVCTX_STALE_VERSION" });
+  const { existsSync } = await import("node:fs");
+  assert.equal(existsSync(x.dir), false);
+});
+
+test("package plan refuses the real home and scoped audiences", async (t) => {
+  const x = await approvedInstall(t), input = { revisionId: "rv_install01", contentDecisionId: "dc_content01", targetHome: x.home, agents: ["claude"], mode: "install" };
+  await assert.rejects(planPackageInstall(x.p.roots, selection, { ...input, targetHome: homedir() }), { code: "DEVCTX_GATE_REQUIRED" });
+  for (const scoped of [{ audience: "company", scope: "acme", workspace: "ws_install01" }, { audience: "project", scope: "acme", project: "acme.atlas", workspace: "ws_install01" }]) {
+    await assert.rejects(planPackageInstall(x.p.roots, scoped, input), { code: "DEVCTX_GATE_REQUIRED" });
+    const flags = ["--audience", scoped.audience, "--scope", scoped.scope, ...(scoped.project ? ["--project", scoped.project] : []), "--workspace", scoped.workspace];
+    const approved = await runCli(["skill", "local-approve", "--pilot", x.p.path, ...flags, "--mode", "install", "--revision", "rv_install01", "--content-decision", "dc_content01", "--home", x.home, "--agent", "claude", "--decision", "dc_scoped01", "--plan-fingerprint", x.plan.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", x.plan.fingerprint)]);
+    assert.equal(approved.json.error.code, "DEVCTX_GATE_REQUIRED");
+  }
+});
+
+test("extra, symlinked and hardlinked installed entries are preserved", async (t) => {
+  const x = await approvedInstall(t); await applyApproved(x);
+  const status = async () => (await cli(x.p, "local-plan", ["--mode", "uninstall", "--revision", "rv_install01", "--home", x.home, "--agent", "claude"])).json.result.actions[0].status;
+  const extra = join(x.dir, "extra.md"); await writeFile(extra, "foreign");
+  assert.equal(await status(), "modified"); await unlink(extra);
+  await symlink(join(x.dir, "SKILL.md"), extra);
+  assert.equal(await status(), "modified"); await unlink(extra);
+  await link(join(x.dir, "SKILL.md"), extra);
+  assert.equal(await status(), "modified"); await unlink(extra);
+  assert.equal(await status(), "remove");
+});
+
+test("v1 and another workspace ownership receipts are conflicts", async (t) => {
+  const x = await approvedInstall(t), dir = x.dir;
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  await writeFile(join(dir, "SKILL.md"), "foreign", { mode: 0o600 });
+  await writeFile(join(dir, ".devctx-owned.json"), JSON.stringify({ schemaVersion: 1, skill: "summarize-note", version: "0.0.0-local", files: { "SKILL.md": sha256("foreign") }, runId: "run_foreign01" }), { mode: 0o600 });
+  assert.equal((await cli(x.p, "local-plan", x.install)).json.result.actions[0].status, "conflict");
+  await unlink(join(dir, "SKILL.md")); await unlink(join(dir, ".devctx-owned.json")); await rmdir(dir);
+  await applyApproved(x);
+  const receiptPath = join(dir, ".devctx-owned.json"), receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+  await writeFile(receiptPath, JSON.stringify({ ...receipt, workspace: "ws_foreign01" }));
+  assert.equal((await cli(x.p, "local-plan", x.install)).json.result.actions[0].status, "conflict");
 });

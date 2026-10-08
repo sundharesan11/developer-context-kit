@@ -29,7 +29,7 @@ export function ensurePrivatePath(root, segments = []) {
   for (const seg of segments) { at = safeJoin(at, seg); ensurePrivateDir(at); }
   return at;
 }
-export async function readPrivateText(path, limit = 131072) {
+export async function readPrivateBytes(path, limit = 131072) {
   let fd;
   try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); }
   catch (e) { if (e.code === "ELOOP") throw new DevctxError("PATH_UNSAFE", "Unsafe private path"); throw e; }
@@ -40,9 +40,10 @@ export async function readPrivateText(path, limit = 131072) {
     while (offset < buf.length) { const n = readSync(fd, buf, offset, buf.length - offset, offset); if (!n) break; offset += n; }
     const after = fstatSync(fd);
     if (offset !== before.size || before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs) throw new DevctxError("INTEGRITY", "Private file changed");
-    return buf.toString("utf8");
+    return buf;
   } finally { closeSync(fd); }
 }
+export async function readPrivateText(path, limit = 131072) { return (await readPrivateBytes(path, limit)).toString("utf8"); }
 export async function readPrivateJson(path, limit) { try { return JSON.parse(await readPrivateText(path, limit)); } catch (e) { if (e instanceof SyntaxError) throw new DevctxError("INTEGRITY", "Invalid private JSON"); throw e; } }
 export async function writeNewFile(path, content) {
   let fd;

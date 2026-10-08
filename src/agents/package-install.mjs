@@ -8,7 +8,7 @@ import { assertInPilot, assertWritable } from "../config/pilot.mjs";
 import { validateRoot } from "../config/roots.mjs";
 import { canonicalJson, digest, sha256 } from "../storage/canonical.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
-import { ensurePrivatePath, readPrivateJson, readPrivateText, writeNewFile, atomicReplace, fsyncDir, info, isWithin } from "../storage/fsx.mjs";
+import { ensurePrivatePath, readPrivateJson, readPrivateBytes, writeNewFile, atomicReplace, fsyncDir, info, isWithin } from "../storage/fsx.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { RUN_ID } from "../storage/runs.mjs";
 import { assertPackageRel, PACKAGE_LIMITS, VALIDATOR_VERSION } from "../skill-builder/validate.mjs";
@@ -22,7 +22,10 @@ function safeHome(roots, targetHome) {
   if (typeof targetHome !== "string") throw new DevctxError("INVALID_INPUT", "Target home required");
   const pilot = roots.pilot;
   assertInPilot(pilot, targetHome, "agentHomes");
-  const real = realpathSync.native(targetHome), home = realpathSync.native(homedir());
+  let real;
+  try { real = realpathSync.native(targetHome); }
+  catch (error) { if (error.code === "ENOENT") throw new DevctxError("GATE_REQUIRED", "Pilot agent home unavailable"); throw error; }
+  const home = realpathSync.native(homedir());
   if (isWithin(real, home) || isWithin(home, real)) throw new DevctxError("GATE_REQUIRED", "Real home refused");
   return pilot;
 }
@@ -75,8 +78,8 @@ async function observed(dir, manifest, workspace, mode) {
     if (JSON.stringify(found.filter((e) => e.directory).map((e) => e.rel).sort()) !== JSON.stringify([...expectedDirs].sort())) throw new Error("directories");
     let total = 0;
     for (const rel of keys) {
-      const body = await readPrivateText(join(dir, ...rel.split("/")), PACKAGE_LIMITS.fileBytes);
-      total += Buffer.byteLength(body);
+      const body = await readPrivateBytes(join(dir, ...rel.split("/")), PACKAGE_LIMITS.fileBytes);
+      total += body.length;
       if (total > PACKAGE_LIMITS.totalBytes || sha256(body) !== receipt.files[rel]) throw new Error("hash or size");
     }
   } catch { return { status: "modified" }; }
@@ -84,7 +87,10 @@ async function observed(dir, manifest, workspace, mode) {
   return { status: receipt.revision === manifest.revision && receipt.packageDigest === manifest.packageDigest ? "installed" : "update", receipt };
 }
 function fileHashes(files) { return Object.fromEntries(Object.keys(files).sort().map((rel) => [rel, sha256(files[rel])])); }
-export async function planPackageInstall(roots, selection, { revisionId, contentDecisionId, targetHome, agents, mode = "install" }) {
+function roleConflict(oldFiles, newFiles) {
+  return Object.keys(oldFiles).some((oldRel) => Object.keys(newFiles).some((newRel) => oldRel.startsWith(newRel + "/") || newRel.startsWith(oldRel + "/")));
+}
+export async function planPackageInstall(roots, selection, { revisionId, contentDecisionId, targetHome, agents, mode }) {
   selectionCheck(selection); const pilot = safeHome(roots, targetHome);
   if (!["install", "uninstall"].includes(mode) || (mode === "install" ? !contentDecisionId : !!contentDecisionId)) throw new DevctxError("INVALID_INPUT", "Invalid local action");
   const chosen = agentsCheck(agents);
@@ -99,7 +105,9 @@ export async function planPackageInstall(roots, selection, { revisionId, content
     checkAgentParents(targetHome, agent);
     const path = join(targetHome, AGENT_HOMES[agent], manifest.name);
     validateRoot(path, "target");
-    const { status, receipt } = await observed(path, manifest, selection.workspace, mode);
+    const prior = await observed(path, manifest, selection.workspace, mode);
+    const { receipt } = prior;
+    const status = prior.status === "update" && roleConflict(receipt.files, hashes) ? "conflict" : prior.status;
     actions.push({ agent, skill: manifest.name, path, status, priorReceiptDigest: receipt ? digest(receipt) : null, files: hashes });
   }
   return finalizePlan({ kind: "skill-package-local", mode, audience: "personal", workspace: selection.workspace, revision: revisionId, packageDigest: manifest.packageDigest, contentDecision: contentDecisionId ?? null, validatorVersion: validation?.validatorVersion ?? null, validationDigest: validation ? digest(validation) : null, helpers: validation?.helpers ?? null, targetHome, agents: chosen, actions });
@@ -166,7 +174,10 @@ export async function applyPackageInstall(roots, selection, input, { fingerprint
     const journalPath = join(runs, id, "journal.json");
     const journal = { schemaVersion: 1, kind: "skill-package-local", workspace: selection.workspace, decision: decisionId, planFingerprint: fingerprint, targetHome: plan.targetHome, intended, completed: [] };
     await writeNewFile(journalPath, canonicalJson(journal) + "\n");
-    const { manifest, files } = await loadLocalRevision(roots, selection, plan.revision, { requireValidation: plan.mode === "install" });
+    if (faults.afterJournal) await faults.afterJournal();
+    const { manifest, files, validation } = await loadLocalRevision(roots, selection, plan.revision, { requireValidation: plan.mode === "install" });
+    const reloadedHashes = fileHashes(files);
+    if (manifest.packageDigest !== plan.packageDigest || (validation ? digest(validation) : null) !== plan.validationDigest || intended.some((action) => canonicalJson(action.files) !== canonicalJson(reloadedHashes))) throw new DevctxError("STALE_VERSION", "Revision changed during apply");
     for (const action of intended) {
       assertWritable(roots, [action.path, journalPath]);
       const prior = await observed(action.path, manifest, selection.workspace, plan.mode);
@@ -185,7 +196,7 @@ export async function applyPackageInstall(roots, selection, input, { fingerprint
         if (faults.beforeReceipt) await faults.beforeReceipt(action);
         await atomicReplace(join(action.path, marker), canonicalJson({ schemaVersion: 2, kind: "skill-package", skill: manifest.name, version: "0.0.0-local", audience: "personal", workspace: selection.workspace, revision: plan.revision, packageDigest: plan.packageDigest, files: fileHashes(files), runId: id }) + "\n");
       } else {
-        for (const rel of Object.keys(prior.receipt.files)) if (sha256(await readPrivateText(join(action.path, ...rel.split("/")), PACKAGE_LIMITS.fileBytes)) !== prior.receipt.files[rel]) throw new DevctxError("CONFLICT", "Installed skill changed");
+        for (const rel of Object.keys(prior.receipt.files)) if (sha256(await readPrivateBytes(join(action.path, ...rel.split("/")), PACKAGE_LIMITS.fileBytes)) !== prior.receipt.files[rel]) throw new DevctxError("CONFLICT", "Installed skill changed");
         for (const rel of Object.keys(prior.receipt.files)) await unlink(join(action.path, ...rel.split("/")));
         if (faults.beforeReceipt) await faults.beforeReceipt(action);
         await unlink(join(action.path, marker));

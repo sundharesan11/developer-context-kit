@@ -72,3 +72,9 @@ test("bundled CLI can install, uninstall, and reinstall with unique default jour
     assert.equal(result.code, 0, JSON.stringify(result.json));
   }
 });
+test("bundled installer refuses an existing run directory without a journal", async (t) => {
+  const p = await makePilot(t), home = p.agentHomes[0], input = { targetHome: home, agents: ["claude"], mode: "install" };
+  const plan = await planInstall(p.pilot, input);
+  await mkdir(join(p.stateRoot, "runs/run_existing01"), { recursive: true, mode: 0o700 });
+  await assert.rejects(applyInstall(p.roots, p.pilot, input, { fingerprint: plan.fingerprint, runId: "run_existing01" }), { code: "DEVCTX_CONFLICT" });
+});

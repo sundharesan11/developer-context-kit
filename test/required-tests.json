@@ -93,6 +93,7 @@
   "quoted string metadata, thematic breaks and contained parent links validate",
   "quoted description cannot decode to multiple lines",
   "bundled CLI can install, uninstall, and reinstall with unique default journal IDs",
+  "bundled installer refuses an existing run directory without a journal",
   "synthetic content and action approvals install pinned copies in a disposable home",
   "uninstall requires a distinct approval and preserves the whole edited package",
   "uninstall of intact package removes only its owned files",
@@ -112,5 +113,15 @@
   "package installer rejects inherited object names as agents",
   "legacy incomplete installer journal conservatively blocks package apply",
   "package installer refuses an unsafe agent-skill parent directory",
-  "an intervening intact owned revision invalidates an approved update plan"
+  "an intervening intact owned revision invalidates an approved update plan",
+  "invalid UTF-8 edit to an installed replacement character is preserved",
+  "update refuses turning an owned file into a directory",
+  "update refuses turning an owned directory into a file",
+  "tampered local decision keys and interaction reference are refused before consumption",
+  "local plan requires an explicit mode",
+  "declared pilot home disappearing is a typed refusal",
+  "revision changes after journal creation cannot change installed bytes",
+  "package plan refuses the real home and scoped audiences",
+  "extra, symlinked and hardlinked installed entries are preserved",
+  "v1 and another workspace ownership receipts are conflicts"
 ]

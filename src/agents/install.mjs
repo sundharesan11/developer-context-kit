@@ -50,7 +50,9 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }) 
   assertWritable(roots, allPaths);
   return withPilotLock(roots, join(roots.stateRoot, "locks", "install.lock"), { kind: "install", runId }, async () => {
     assertWritable(roots, allPaths);
-    ensurePrivatePath(roots.stateRoot, ["runs", runId]);
+    ensurePrivatePath(roots.stateRoot, ["runs"]);
+    try { await mkdir(join(roots.stateRoot, "runs", runId), { mode: 0o700 }); }
+    catch (error) { if (error.code === "EEXIST") throw new DevctxError("CONFLICT", "Run ID already exists"); throw error; }
     const intended = plan.actions.filter((a) => ["create", "update", "remove"].includes(a.status)).map((a) => ({ agent: a.agent, skill: a.skill, status: a.status, path: a.path }));
     const journal = { planFingerprint: fingerprint, intended, completed: [] };
     await writeNewFile(journalPath, canonicalJson(journal) + "\n");

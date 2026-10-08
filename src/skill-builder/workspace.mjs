@@ -237,6 +237,9 @@ export async function loadLocalDecision(roots, selection, decisionId, expectedAc
   assertWritable(roots, []); localSelection(selection); needId("decision", decisionId);
   const path = await base(roots, selection);
   const value = await namedJson(jsonPath(path, "decisions", decisionId));
+  const common = ["schemaVersion", "action", "audience", "scope", "project", "workspace", "id", "revision", "packageDigest", "interactionRef", "responseText"];
+  const fields = expectedAction === "approve-content" ? [...common, "personalGenericNonConfidential"] : ["approve-local-install", "approve-local-uninstall"].includes(expectedAction) ? [...common, "contentDecision", "targetHome", "agents", "planFingerprint"] : [];
+  if (!fields.length || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(fields.sort()) || !/^user:[A-Za-z0-9._:-]{1,120}$/.test(value.interactionRef ?? "")) throw new DevctxError("INTEGRITY", "Malformed local decision");
   if (value.id !== decisionId || value.workspace !== selection.workspace || value.audience !== "personal" || value.scope !== null || value.project !== null || value.action !== expectedAction) throw new DevctxError("INTEGRITY", "Local decision mismatch");
   return value;
 }

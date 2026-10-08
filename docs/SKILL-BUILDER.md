@@ -31,4 +31,6 @@ Uninstall uses `--mode uninstall` and the installed receipt's exact `--revision`
 
 Plans also include a digest of the prior ownership receipt for each target. An intervening intact install changes that digest and invalidates an approved update or removal plan, even if its action status remains the same.
 
+Installed ownership checks hash the exact file bytes. A changed or invalid UTF-8 byte sequence is treated as a modification and is preserved. An update that would turn an owned file into a directory, or a directory into a file, is a conflict at preview; uninstall the old revision with its own approval, then plan a separate install.
+
 The tool writes a private journal before target mutation. `RECOVERY_REQUIRED` means a run stopped with incomplete actions; package apply refuses that home until it is reviewed. Inspect the journal and target, then preserve a partial package by moving it within the pilot to `stateRoot/skill-installs/quarantine/<run-id>/<agent>/<skill>` (or copy, verify and remove for a cross-volume move), or restore exact verified prior files. Move `runs/<run-id>/journal.json` to `runs/<run-id>/reviewed/journal.json` only after that review. Then plan again and obtain a new decision. No command automatically deletes or repairs a partial target. Existing bundled `agents install` behavior is unchanged.
