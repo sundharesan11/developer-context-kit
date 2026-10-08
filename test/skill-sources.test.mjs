@@ -151,15 +151,16 @@ test("skill source annotated tags stop at four objects and reject cycles", async
 });
 
 test("skill source HTTP fixture refuses redirects and oversized bodies", async (t) => {
-  for (const [route, entry, code] of [
+  for (const [route, entry, code, message] of [
     [base, { status: 301, headers: { location: "https://elsewhere.invalid" }, body: {} }, "DEVCTX_SOURCE_MOVED"],
     [`${base}/releases/latest`, { status: 302, body: {} }, "DEVCTX_REDIRECT_REFUSED"],
-    [`${base}/releases/latest`, { headers: { "content-length": "262145" }, body: {} }, "DEVCTX_UPSTREAM_INVALID"],
-    [`${base}/releases/latest`, { chunks: ["x".repeat(130000), "x".repeat(132145)] }, "DEVCTX_UPSTREAM_INVALID"]
+    [`${base}/releases/latest`, { headers: { "content-length": "262145" }, body: {} }, "DEVCTX_UPSTREAM_INVALID", "GitHub response too large"],
+    [`${base}/releases/latest`, { chunks: ["x".repeat(130000), "x".repeat(132145)] }, "DEVCTX_UPSTREAM_INVALID", "GitHub response too large"]
   ]) {
     const routes = { ...routesFor(), [route]: entry };
     const { request } = await fixture(t, routes);
-    await assert.rejects(checkSource(source(), { request }), (error) => error.code === code && !JSON.stringify(error.details).includes("elsewhere"));
+    await assert.rejects(checkSource(source(), { request }), (error) => error.code === code &&
+      (!message || error.message === message) && !JSON.stringify(error.details).includes("elsewhere"));
   }
 });
 
