@@ -177,5 +177,11 @@
   "malformed completed source journals block both package adapters",
   "source installation keeps unreviewed host compatibility and pilot gates visible",
   "source updates refuse path role changes case aliases and moved package roots",
-  "source package CLI requires a pilot and explicit two-step approvals"
+  "source package CLI requires a pilot and explicit two-step approvals",
+  "public alpha license metadata matches the canonical Apache text",
+  "public alpha guides exist and relative documentation links resolve",
+  "public alpha diagram is accessible static SVG with no remote resources",
+  "public alpha onboarding documents only implemented CLI routes",
+  "CI uses read-only pinned actions without privileged triggers or persistent credentials",
+  "CI evaluates both Node versions without claiming Linux support and checks private acceptance results"
 ]

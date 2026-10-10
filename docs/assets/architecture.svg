@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="600" viewBox="0 0 1120 600" role="img" aria-labelledby="title desc">
+  <title id="title">Developer Context Kit: the disposable pilot</title>
+  <desc id="desc">Bounded project sources flow to explicit CLI preview and approval, then to private configuration, data and state stores. The stores produce briefs and selected handoffs for manual use in a session. New observations return through explicit record operations. Nothing automatically publishes or connects accounts.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8Z" fill="#52627a"/></marker>
+  </defs>
+  <rect width="1120" height="600" rx="18" fill="#f5f7fb"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="36" y="44" font-size="13" font-weight="700" letter-spacing="2" fill="#52627a">DEVELOPER CONTEXT KIT</text>
+    <text x="36" y="83" font-size="29" font-weight="700" fill="#172539">Project context, outside the project repo.</text>
+    <text x="36" y="113" font-size="16" fill="#52627a">Implemented pilot · explicit operations · disposable local roots</text>
+
+    <rect x="36" y="158" width="248" height="162" rx="12" fill="#ffffff" stroke="#cfd7e3"/>
+    <text x="56" y="188" font-size="13" font-weight="700" fill="#52627a">01 / READ</text>
+    <text x="56" y="218" font-size="22" font-weight="700" fill="#172539">Project sources</text>
+    <text x="56" y="249" font-size="16" fill="#52627a">Bounded files + Git metadata</text>
+    <text x="56" y="277" font-size="16" fill="#52627a">Instructions stay in the repo</text>
+    <text x="56" y="304" font-size="14" font-weight="700" fill="#17604b">No onboarding repo writes</text>
+
+    <rect x="366" y="158" width="300" height="162" rx="12" fill="#eaf2ff" stroke="#a5bfec"/>
+    <text x="386" y="188" font-size="13" font-weight="700" fill="#36598a">02 / REVIEW &amp; WRITE</text>
+    <text x="386" y="218" font-size="22" font-weight="700" fill="#172539">Explicit CLI operations</text>
+    <text x="386" y="249" font-size="16" fill="#36598a">Scope + project identity</text>
+    <text x="386" y="277" font-size="16" fill="#36598a">Preview → approve → apply</text>
+    <text x="386" y="304" font-size="14" fill="#36598a">Record and proposal workflows</text>
+
+    <rect x="748" y="158" width="336" height="162" rx="12" fill="#eaf5ef" stroke="#a6caba"/>
+    <text x="768" y="188" font-size="13" font-weight="700" fill="#17604b">03 / KEEP PRIVATE</text>
+    <text x="768" y="218" font-size="22" font-weight="700" fill="#172539">Local stores</text>
+    <text x="768" y="249" font-size="16" fill="#17604b">Config · bindings and preferences</text>
+    <text x="768" y="277" font-size="16" fill="#17604b">Data · records and source evidence</text>
+    <text x="768" y="304" font-size="16" fill="#17604b">State · locks, journals and receipts</text>
+
+    <path d="M284 235H354" fill="none" stroke="#52627a" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M666 235H736" fill="none" stroke="#52627a" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="748" y="399" width="336" height="115" rx="12" fill="#ffffff" stroke="#cfd7e3"/>
+    <text x="768" y="432" font-size="21" font-weight="700" fill="#172539">Briefs + selected handoffs</text>
+    <text x="768" y="463" font-size="16" fill="#52627a">Hashes, freshness and unknowns</text>
+    <text x="768" y="491" font-size="16" fill="#52627a">Bounded context, not all memory</text>
+
+    <rect x="366" y="399" width="300" height="115" rx="12" fill="#ffffff" stroke="#cfd7e3"/>
+    <text x="386" y="432" font-size="21" font-weight="700" fill="#172539">Person or agent session</text>
+    <text x="386" y="463" font-size="16" fill="#52627a">You supply reviewed context</text>
+    <text x="386" y="491" font-size="16" fill="#52627a">No automatic session injection</text>
+
+    <path d="M916 320V387" fill="none" stroke="#52627a" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="932" y="362" font-size="14" fill="#52627a">read / export</text>
+    <path d="M748 456H678" fill="none" stroke="#52627a" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M516 399V332" fill="none" stroke="#52627a" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+    <text x="366" y="363" font-size="13" fill="#52627a">new evidence</text>
+
+    <text x="56" y="428" font-size="15" font-weight="700" fill="#52627a">NOT AUTOMATIC</text>
+    <text x="56" y="458" font-size="16" fill="#52627a">Account connections</text>
+    <text x="56" y="484" font-size="16" fill="#52627a">Company-hub publishing</text>
+    <text x="56" y="510" font-size="16" fill="#52627a">Agent-home activation</text>
+
+    <path d="M36 547H1084" stroke="#d9e0ea"/>
+    <text x="36" y="577" font-size="15" fill="#52627a">The pilot fence limits this CLI. It is not a sandbox for an agent or another same-user process.</text>
+  </g>
+</svg>

@@ -1,0 +1,79 @@
+name: Pilot CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pilot:
+    name: ${{ matrix.lane }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            node: '26.4.0'
+            lane: macOS pilot
+          - os: macos-15
+            node: '22.13.0'
+            lane: macOS minimum evaluation
+          - os: ubuntu-24.04
+            node: '26.4.0'
+            lane: Linux evaluation (unsupported)
+          - os: ubuntu-24.04
+            node: '22.13.0'
+            lane: Linux minimum evaluation (unsupported)
+    steps:
+      - name: Check out reviewed event revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Report environment
+        run: |
+          node --version
+          npm --version
+          git --version
+          git rev-parse HEAD
+      - name: Audit release files and dry-run package
+        run: npm run check:package
+      - name: Run complete test suite
+        run: npm test
+      - name: Run disposable acceptance checks
+        run: |
+          PILOT_PARENT="$(mktemp -d "$RUNNER_TEMP/devctx-ci.XXXXXX")"
+          PILOT_PARENT="$(cd "$PILOT_PARENT" && pwd -P)"
+          node scripts/acceptance.mjs --pilot-root "$PILOT_PARENT/pilot" --report "$PILOT_PARENT/report.json"
+          node --input-type=module - "$PILOT_PARENT/report.json" <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+          assert.equal(report.ok, true);
+          assert.equal(new Set(report.checks.map(check => check.id)).size, 25);
+          assert.equal(report.checks.length, 25);
+          assert.equal(report.checks.filter(check => check.status === 'passed').length, 24);
+          assert.deepEqual(report.checks.filter(check => check.status !== 'passed').map(({ id, status }) => ({ id, status })),
+            [{ id: 'fresh-agent-smoke', status: 'deferred' }]);
+          NODE
+      - name: Check whitespace and preserve checkout
+        run: |
+          git diff --check 4b825dc642cb6eb9a060e54bf8d69288fbee4904 HEAD
+          test -z "$(git status --porcelain --untracked-files=all)"

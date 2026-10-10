@@ -1,29 +1,89 @@
 # Developer Context Kit
 
-This repository is a **local package candidate** for a synthetic devctx pilot. The `devctx` command is **NOT currently installed** globally. Run `node bin/devctx.mjs help` from this checkout.
+Keep project context between coding-agent sessions.
 
-All root-bound commands require an explicit disposable `--pilot <pilot.json>` fence. This pilot supports synthetic project onboarding, scoped records, deterministic briefs, advisory handoffs, copies of three skills into listed pilot homes, and [private skill draft tooling](docs/SKILL-BUILDER.md). It makes no automatic private-to-public synchronization. It is not a sandbox: the agent host and other tools may have broader access.
+Developer Context Kit is a local CLI for recording project facts, decisions and handoffs outside the project repository. It builds bounded, source-linked briefs so you can carry reviewed context into the next session.
 
-No real-home activation, live account connection, client migration, outbound send, or public release is included. The package is private, and rights and license decisions remain with the owner.
+**Status: experimental pilot.** This is a **local package candidate**, not a daily-use agent installer. The `devctx` command is **NOT currently installed** globally by this checkout. All stateful commands require an explicit disposable pilot. Start with synthetic data.
 
-[Portable handoff export](docs/HANDOFF.md) writes explicitly selected project records as private Markdown beneath pilot dataRoot. It retains status, hashes, freshness and exclusions, with strict 12-record/32-KiB bounds and unsafe-content holds. Commands are documented, not executed; packets are not approved for publication and require recipient verification. No toolkit installation is needed to read one.
+[Start here](docs/GETTING-STARTED.md) · [Guided onboarding](docs/ONBOARDING.md) · [Documentation](docs/README.md) · [Roadmap](docs/ROADMAP.md)
 
-The [reviewed source installation bridge](docs/SKILL-BUILDER.md#third-party-source-packages) adds offline `skill-sources package-review`, `content-approve`, `local-plan`, `local-approve`, `local-apply`, and `local-status`. All require a disposable pilot. Explicit mappings name every selected/required file and license/notice; content and action approvals separately bind bytes, declarations, provenance and target effects. Missing dependencies and unreviewed compatibility block installation. Acquired scripts are never executed.
+## Why it exists
 
-Fixture tests cover installation, update, restoration of an older approved version and removal, with collision/edit protection and interrupted-write holds. Source targets are `.claude/skills` and `.agents/skills` below a pilot home. Personal B retains `.codex/skills` with an added competing-root check. These are sandbox filesystem layouts, not evidence of live discovery, real-source compatibility, twelve-source installation or an automatic updater. Source installation accepts at most 256 KiB total, below acquisition's 1 MiB cap.
+A repository tells an agent what the code is. It does not always explain why a decision was made, what remains uncertain, or where the last session stopped.
 
-`node bin/devctx.mjs skill-sources catalog` lists twelve public recipes with installation status `unverified` and makes no network request. `node bin/devctx.mjs skill-sources check --source <id>` reads public GitHub release and commit metadata without a pilot fence; it writes nothing and does not install skills. The check uses unauthenticated GitHub API requests, which reveal the caller's IP to GitHub and are subject to [60 requests per hour](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api). A check can use up to eight requests, so checking all twelve sources can exceed that limit.
+This kit provides a place to:
 
-Pinned acquisition adds three commands. Copy only `sourceId`, `channel`, `tag` and `commit` from your own fresh check into `PIN_JSON`; choose exact repository-relative file paths in `FILES_JSON`, including any licenses/notices you need. Supply a valid disposable pilot as `PILOT_FILE`. These shell variables contain caller selections, not default package recipes:
+- Keep facts and decisions scoped to one project.
+- Preserve sources, review status and supersession instead of silently replacing history.
+- Produce a brief or selected-record Markdown handoff for a person or agent to read.
+- Keep reusable toolkit code separate from private working context.
+
+It does not make an agent remember automatically. Someone must invoke the CLI and supply the resulting context to the session.
+
+## How it fits together
+
+![Project sources are previewed through the CLI, approved into private stores, and read as briefs or selected handoffs. New observations return through explicit record operations.](docs/assets/architecture.svg)
+
+1. Read bounded repository sources and preview proposed context.
+2. Approve onboarding into a named scope and project. The project repository stays unchanged.
+3. Resolve that project and produce a brief from its private records.
+4. Give the brief to a session; record new evidence and decisions explicitly.
+5. Review selected records before sharing a handoff or proposing a company learning.
+
+The diagram shows the implemented pilot, not a live agent integration. See [architecture and boundaries](docs/ARCHITECTURE.md).
+
+## Try it
+
+Requirements: Node.js and npm, Git, and a macOS shell. The verified environment is macOS with Node v26.4.0. The declared Node floor is `>=22.13.0`, but that floor has not been independently verified. Linux support is not claimed; Windows is unsupported.
+
+From a checkout containing this guide:
 
 ```sh
-node bin/devctx.mjs skill-sources preview --source humanizer --pin-json "$PIN_JSON" --files-json "$FILES_JSON"
-node bin/devctx.mjs skill-sources stage --pilot "$PILOT_FILE" --source humanizer --pin-json "$PIN_JSON" --files-json "$FILES_JSON" --preview-hash "$PREVIEW_HASH"
-node bin/devctx.mjs skill-sources inspect --pilot "$PILOT_FILE" --run "$STAGE_ID"
+node bin/devctx.mjs help
+DEMO_PARENT="$(mktemp -d /tmp/devctx-demo.XXXXXX)"
+DEMO_PARENT="$(cd "$DEMO_PARENT" && pwd -P)"
+node scripts/acceptance.mjs \
+  --pilot-root "$DEMO_PARENT/pilot" \
+  --report "$DEMO_PARENT/acceptance.json"
 ```
 
-Set `PREVIEW_HASH` from preview's `result.fingerprint` and `STAGE_ID` from stage's `result.runId`. For example, an explicit selection is `["SKILL.md","LICENSE"]`; preview refuses a missing file instead of choosing a substitute. A complete offline synthetic example, including a nested skill, is exercised with `node --test test/skill-acquisition.test.mjs test/skill-staging.test.mjs`; these tests make no live GitHub calls.
+This runs offline synthetic checks in a fresh disposable directory. It creates fixture repositories and private pilot files; it does not install into your real agent homes or connect accounts. The report intentionally defers fresh-agent discovery. It is a test harness, not a normal client workspace.
 
-Preview writes nothing and makes two metadata requests. Stage repeats the preview, verifies every selected blob's Git object hash and SHA-256, and writes only a fresh private directory under pilot `dataRoot/skill-sources/staging`. Inspect is offline and verifies the receipt and exact files. The pin is **caller-supplied-unverified**: acquisition does not recheck tag-to-commit binding or membership in upstream history; GitHub may serve objects from its fork network. The tag is a copied label, not proof of release provenance. Content, dependencies, compatibility, safety and redistribution remain unreviewed; `staged` never means installed.
+For checkout instructions, expected results and troubleshooting, use [Getting started](docs/GETTING-STARTED.md). For the actual preview → approval → brief workflow, follow [Guided onboarding](docs/ONBOARDING.md).
 
-Limits are 24 selected files, 128 KiB per file, 1 MiB decoded total, 10,000 tree entries, 2 MiB per metadata response, 256 KiB per blob JSON response, 8 MiB response total, 5 seconds per request and 30 seconds per operation. Truncated trees and larger packages return typed failures without fallback. Check + preview + maximum-size stage can use 8 + 2 + 26 = 36 anonymous requests, so a repeated stage can reach the hourly limit. Rate-limit errors retain bounded `retryAfterSeconds`/`resetAt` hints; a failed download creates no directories. Taste currently has no stable-release observation, so the supported check → copy pin → acquire workflow is unavailable for it. Caller-supplied labels remain unverified; there is no automatic branch fallback. See [storage](docs/STORAGE.md) for interrupted stages and [limitations](docs/LIMITATIONS.md) for custom discovery homes.
+## What works, and what does not
+
+| Area | Available in the disposable pilot | Not delivered |
+| --- | --- | --- |
+| Project context | Onboarding preview/apply, scoped records, source hashes, bounded briefs | Real-project activation and migration |
+| Continuity | Advisory handoffs and [selected-record Markdown export](docs/HANDOFF.md) | Automatic session injection, packet import or sharing |
+| Skill creation | [Requirements, design approval, drafts and validation](docs/SKILL-BUILDER.md) | Conversational creator and live behavior evaluation |
+| Skill sources | [12-source catalog, release checks, pinned acquisition and reviewed disposable installation](docs/SKILL-SOURCES.md) | Universal agent compatibility or weekly automatic updates |
+| Identity and learning | Fake-provider identity checks and private hub proposals | Live Slack/email/issue connectors, sends or company-hub writes |
+
+Claude and Codex filesystem layouts have fixture tests. Those tests do not prove that a fresh native session discovers or uses a skill. Gemini, Cursor and Command Code support is not established.
+
+## Your data stays separate
+
+The reusable repository contains code, schemas, generic templates and tests. Pilot configuration, project context and operation receipts live under separate private roots outside it. There is **no automatic private-to-public synchronization**.
+
+Do not store secrets in records. Keep credentials in a separately approved credential store. Bitwarden and Composio integration is not implemented.
+
+The pilot fence is **not a sandbox**. A coding agent or another same-user process can have wider access than this CLI. There is no backup or sync. Read the [limitations](docs/LIMITATIONS.md) and [security model](docs/SECURITY-MODEL.md) before evaluating private data.
+
+A personal assistant setup, an agent host and a company knowledge hub are optional surrounding systems—not prerequisites. This kit does not install or replace them.
+
+## Explore and contribute
+
+- [Documentation index](docs/README.md): guides, contracts and design history.
+- [Contributing](CONTRIBUTING.md): development setup, tests and public-safe examples.
+- [Security reporting](SECURITY.md): keep vulnerabilities and private data out of public issues.
+- [Release checklist](docs/RELEASING.md): what must pass before publication.
+- [Roadmap](docs/ROADMAP.md): remaining work toward daily use.
+
+## License
+
+The toolkit is licensed under [Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party skill sources retain their own licenses and notices. A catalog entry is not permission to redistribute its contents.
+
+`"private": true` in `package.json` prevents accidental npm publication. It is not a substitute for a license or a statement about GitHub visibility. This checkout is an unreleased candidate; publication and rights clearance remain separate release steps.
