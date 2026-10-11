@@ -21,7 +21,29 @@ test("F1 pilot fence rejects dot-prefixed, symlink and case aliases of protected
   const symlinkHome = join(p.sandbox, "home-link"); await mkdir(symlinkHome);
   await symlink(target, join(symlinkHome, ".claude"));
   await assert.rejects(loadPilot(await p.with({ pilotRoot: join(target, "pilot") }), { home: symlinkHome, kitRoot: "/nonexistent-kit", env: {} }), (e) => e.code === "DEVCTX_GATE_REQUIRED" && e.details.protected === "real-claude-home");
-  await assert.rejects(loadPilot(await p.with({ pilotRoot: join(p.fakeHome, ".CLAUDE", "p") }), { home: p.fakeHome, kitRoot: "/nonexistent-kit", env: {} }), (e) => e.code === "DEVCTX_GATE_REQUIRED" && e.details.protected === "real-claude-home");
+  const context = { home: p.fakeHome, kitRoot: "/nonexistent-kit", env: {} };
+  const protectedClaude = (e) => e.code === "DEVCTX_GATE_REQUIRED" && e.details.protected === "real-claude-home";
+  await assert.rejects(loadPilot(await p.with({ pilotRoot: join(p.fakeHome, ".claude") }), context), protectedClaude);
+  const upperHome = join(p.fakeHome, ".CLAUDE"), upperRoot = join(upperHome, "p");
+  const casePilot = await p.with({
+    pilotRoot: upperRoot,
+    configRoot: join(upperRoot, "config"), dataRoot: join(upperRoot, "data"),
+    stateRoot: join(upperRoot, "state"), inputsRoot: join(upperRoot, "inputs"),
+    agentHomes: [join(upperRoot, "homes/claude"), join(upperRoot, "homes/codex")],
+    repos: [join(upperRoot, "repos/atlas"), join(upperRoot, "repos/beacon")]
+  });
+  // Darwin conservatively folds case; a distinct spelling on Linux is not an alias.
+  if (process.platform === "darwin") {
+    await assert.rejects(loadPilot(casePilot, context), protectedClaude);
+  } else {
+    await assert.rejects(access(upperHome), { code: "ENOENT" }, "fixture requires a case-sensitive filesystem");
+    const loaded = await loadPilot(casePilot, context);
+    assert.equal(loaded.pilotRoot, upperRoot);
+    for (const path of [loaded.configRoot, loaded.dataRoot, loaded.stateRoot, loaded.inputsRoot, ...loaded.agentHomes, ...loaded.repos]) {
+      assert.ok(isWithin(path, upperRoot) && !isWithin(path, join(p.fakeHome, ".claude")), path);
+    }
+    await assert.rejects(access(upperHome), { code: "ENOENT" }, "validation must not create directories");
+  }
 });
 test("F2 operation ids use canonical digest and reject missing inputs", () => {
   const x = { scope: "acme", project: "acme.atlas", requestId: "req_fixture01" };
