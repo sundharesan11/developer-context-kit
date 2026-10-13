@@ -59,11 +59,13 @@ export async function commitBundle(roots, input, options = {}) {
   assertPublicInput(input); assertBundleOptions(options);
   return commitBundleInternal(roots, input, options);
 }
-// Onboarding only: the sole path that may stamp a record with an operation ID. readSnapshot trusts the claim only if that operation's manifest lists the record.
+// Onboarding only: the sole path that may stamp a record with an operation ID (and, for the client profile, supersede retired auto records). readSnapshot trusts the claim only if that operation's manifest lists the record.
 export async function commitOnboardingBundle(roots, input, options = {}) {
   if (!input || Object.keys(input).some((key) => ![...INPUT_KEYS, "operationId"].includes(key)) || !/^op_[a-f0-9]{24}$/.test(input.operationId ?? "")) throw new DevctxError("INVALID_INPUT", "Unexpected record field");
-  assertBundleOptions(options);
-  return commitBundleInternal(roots, input, options);
+  const { supersedes = [], ...rest } = options;
+  if (!Array.isArray(supersedes) || supersedes.some((x) => typeof x !== "string" || !RECORD_ID.test(x)) || canonicalJson(supersedes) !== canonicalJson([...new Set(supersedes)].sort())) throw new DevctxError("INVALID_INPUT", "Invalid onboarding supersession");
+  assertBundleOptions(rest);
+  return commitBundleInternal(roots, input, { ...rest, supersedes });
 }
 async function commitBundleInternal(roots, input, { now = () => new Date(), faults = {}, supersedes = [] } = {}) {
   const { scope, project, requestId, recordedBy, draft, operationId = null } = input;

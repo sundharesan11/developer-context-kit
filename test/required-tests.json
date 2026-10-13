@@ -210,5 +210,14 @@
   "U4 readPrivateBytes refuses a file whose ctime changes during the read",
   "U4 withLock closes its handle, removes its lock and surfaces the action error when cleanup fails",
   "U4 describeLock does not follow a symlinked lock file and a foreign symlink lock stays",
-  "U4 onboarding replay writes a run receipt lost after registry publish"
+  "U4 onboarding replay writes a run receipt lost after registry publish",
+  "re-onboarding retires the prior client profile by default and keeps user records byte-identical",
+  "re-onboarding with accept none keeps prior command, fact and environment records effective",
+  "re-onboarding with accept none keeps an earlier accepted README brief until a same-title brief is accepted",
+  "re-onboarding with keep-previous retires nothing and a later default re-onboard leaves one client profile",
+  "onboarding a second worktree does not retire the first worktree's records",
+  "re-onboarding does not retire a prior record the user already superseded",
+  "crash after bundles during re-onboarding commits the retirement once on retry",
+  "re-onboarding retry after a retire target changes fails naming the request-id remedy",
+  "re-onboarding apply with a fingerprint from before a retire-list change is PLAN_MISMATCH"
 ]

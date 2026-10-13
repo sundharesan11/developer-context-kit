@@ -14,13 +14,15 @@ import { recordIdFor, operationIdFor, assertScopeId, assertProjectId } from "../
 import { scanRepository } from "./scan.mjs";
 import { deriveCandidates } from "./candidates.mjs";
 import { renderProfile } from "./profile.mjs";
-import { commitOnboardingBundle, verifyManifestBundles } from "../records/store.mjs";
+import { commitOnboardingBundle, verifyManifestBundles, readSnapshot } from "../records/store.mjs";
 import { writeRunReceipt, ensureRunReceipt } from "../storage/runs.mjs";
 const template = readFileSync(fileURLToPath(new URL("../../templates/client-profile.md", import.meta.url)), "utf8");
+const PROFILE_TITLE = "Client profile";
 const conflict = () => new DevctxError("BINDING_CONFLICT", "Worktree bound elsewhere", { reason: "bound elsewhere" });
 function requestFor(input) {
   assertScopeId(input.scope); assertProjectId(input.project, input.scope);
-  const request = onboardRequest(input);
+  if (![undefined, true, false].includes(input.keepPrevious)) throw new DevctxError("INVALID_INPUT", "Invalid keep-previous flag");
+  const request = { ...onboardRequest(input), ...(input.keepPrevious ? { keepPrevious: true } : {}) };
   return { request, requestHash: requestHashFor(request), requestId: input.requestId ?? deterministicRequestId("onboard", request) };
 }
 function briefBody(plan) {
@@ -42,11 +44,19 @@ function selectedCandidates(plan) {
   return accept === "all" ? plan.candidates : accept === "none" ? [] : plan.candidates.filter((c) => accept.includes(c.cid));
 }
 function draftsFor(plan) {
-  const brief = { kind: "brief", status: "observed", title: "Client profile", body: briefBody(plan), sources: plan.candidates.find((c) => c.kind === "brief")?.sources ?? [], applicability: { level: "project" }, review: null };
-  return [{ id: recordIdFor({ scope: plan.scope, project: plan.project, requestId: plan.requestId }), requestId: plan.requestId, draft: brief }, ...selectedCandidates(plan).map((c) => {
+  const brief = { kind: "brief", status: "observed", title: PROFILE_TITLE, body: briefBody(plan), sources: plan.candidates.find((c) => c.kind === "brief")?.sources ?? [], applicability: { level: "project" }, review: null };
+  return [{ id: recordIdFor({ scope: plan.scope, project: plan.project, requestId: plan.requestId }), requestId: plan.requestId, draft: brief, supersedes: plan.retire.map((r) => r.id) }, ...selectedCandidates(plan).map((c) => {
     const requestId = "req_" + digest({ requestId: plan.requestId, cid: c.cid }).slice(7, 31);
     return { id: recordIdFor({ scope: plan.scope, project: plan.project, requestId }), requestId, draft: { kind: c.kind, status: "observed", title: c.title, body: c.body, sources: c.sources, applicability: { level: "project" }, review: null } };
   })];
+}
+// Auto records from earlier published onboardings of this worktree path that the new plan re-creates (same kind and title), unless already superseded (by anyone, so user targets are kept). readSnapshot has already dropped corrupt records and unlisted operation claims.
+async function retireList(roots, registry, input, recreated) {
+  const pathOf = (op) => op.path ?? registry.bindings.find((b) => b.operationId === op.operationId)?.path;
+  const earlier = new Set(registry.operations.filter((op) => op.scope === input.scope && op.project === input.project && pathOf(op) === input.repo).map((op) => op.operationId));
+  if (!earlier.size) return [];
+  const { records } = await readSnapshot(roots, input.scope, input.project);
+  return records.filter((r) => earlier.has(r.operationId) && recreated.has(canonicalJson([r.kind, r.title])) && r.effective !== "superseded").map((r) => ({ id: r.id, recordHash: r.recordHash })).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 export async function planOnboard(roots, pilot, input) {
   const { requestHash, requestId } = requestFor(input);
@@ -77,7 +87,8 @@ export async function planOnboard(roots, pilot, input) {
     } catch { /* A damaged orphan cannot be reused. */ }
   }
   const binding = { ...bindingBase, version };
-  const plan = { kind: "onboard", pilotDigest: pilot.digest, scope: input.scope, project: input.project, requestId, requestHash, root: scan.location.root, binding, sourceBindings: approvedSources, head: scan.location.head, bundles: [], candidates: derived.candidates, unknowns: derived.unknowns, conflicts: derived.conflicts, registryGeneration: registry.generation, repoWrites: [], accept: input.accept ?? "none" };
+  const plan = { kind: "onboard", pilotDigest: pilot.digest, scope: input.scope, project: input.project, requestId, requestHash, root: scan.location.root, binding, sourceBindings: approvedSources, head: scan.location.head, bundles: [], candidates: derived.candidates, unknowns: derived.unknowns, conflicts: derived.conflicts, registryGeneration: registry.generation, repoWrites: [], accept: input.accept ?? "none", retire: [] };
+  if (!input.keepPrevious) plan.retire = await retireList(roots, registry, input, new Set([["brief", PROFILE_TITLE], ...selectedCandidates(plan).map((c) => [c.kind, c.title])].map((x) => canonicalJson(x))));
   plan.bundles = draftsFor(plan).map((x) => ({ id: x.id, kind: x.draft.kind, title: x.draft.title, bodyHash: sha256(x.draft.body) }));
   return finalizePlan(plan);
 }
@@ -114,7 +125,10 @@ export async function applyOnboard(roots, pilot, input, { fingerprint, now = () 
     assertWritable(roots, exact);
     const bundles = [];
     for (const item of draftsFor(plan)) {
-      const result = await commitOnboardingBundle(roots, { scope: input.scope, project: input.project, requestId: item.requestId, recordedBy: { actor: "human", runId: "run_onboard0001" }, draft: item.draft, operationId }, { now, faults: { beforeRename: faults.beforeRename } });
+      const result = await commitOnboardingBundle(roots, { scope: input.scope, project: input.project, requestId: item.requestId, recordedBy: { actor: "human", runId: "run_onboard0001" }, draft: item.draft, operationId }, { now, faults: { beforeRename: faults.beforeRename }, supersedes: item.supersedes ?? [] }).catch((error) => {
+        if (error.code === "DEVCTX_CONFLICT") throw new DevctxError("CONFLICT", "Staged onboarding differs from current plan", { reason: "staged-bundle-changed", remedy: "re-run project onboard with a new --request-id" });
+        throw error;
+      });
       bundles.push({ id: result.recordId, recordHash: result.recordHash, bodyHash: result.bodyHash ?? plan.bundles.find((b) => b.id === result.recordId).bodyHash });
     }
     if (faults.afterBundles) await faults.afterBundles();
@@ -126,7 +140,7 @@ export async function applyOnboard(roots, pilot, input, { fingerprint, now = () 
     const manifestHash = await writeManifest(roots, manifest);
     if (faults.afterManifest) await faults.afterManifest();
     const generation = registry.generation + 1;
-    const entry = { operationId, requestId, requestHash, scope: input.scope, project: input.project, manifestHash, planFingerprint: fingerprint, generation };
+    const entry = { operationId, requestId, requestHash, scope: input.scope, project: input.project, path: input.repo, manifestHash, planFingerprint: fingerprint, generation };
     const bindingEntry = { path: input.repo, commonDir: plan.binding.roots.find((r) => r.path === input.repo).commonDir, scope: input.scope, project: input.project, bindingVersion: plan.binding.version, bindingHash, operationId, manifestHash };
     await publishRegistry(roots, { ...registry, generation, bindings: [...registry.bindings.filter((b) => b.path !== input.repo), bindingEntry], operations: [...registry.operations, entry] }, { expectGeneration: registry.generation });
     if (faults.afterRegistry) await faults.afterRegistry();
