@@ -63,14 +63,17 @@ Do not claim “works with every agent,” “automatically remembers everything
 
 ## Before calling it ready for daily use
 
+Items follow the [roadmap](ROADMAP.md) order.
+
+- [ ] Private-state backup/restore and upgrade compatibility.
 - [ ] Controlled real-project and real-home activation with reviewed targets and rollback.
 - [ ] Fresh Claude and Codex sessions finding and using the intended skills.
-- [ ] Private-state backup/restore and upgrade compatibility.
+- [ ] Session start and end hooks that carry context into and out of a session.
 - [ ] Reviewed selective migration from an existing personal setup.
 - [ ] Recovery tests for interrupted writes and documented operator actions.
 - [ ] Separate compatibility evidence for each additional agent host.
 
-Live connectors, company-hub distribution and a weekly skill updater require their own authorization and verification. They need not all ship before an offline daily-use release, but they must not be implied.
+Live connectors, company-hub distribution, skill export and a weekly skill updater require their own authorization and verification. They need not ship before an offline daily-use release, but they must not be implied. The open-source release comes after them in the roadmap.
 
 ## License and publishing settings
 

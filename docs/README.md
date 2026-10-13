@@ -19,7 +19,7 @@ Start with a disposable synthetic project. The kit is not yet a real-home instal
 - [Agent protocol](AGENT-PROTOCOL.md): task context, proposals and advisory boundaries.
 - [Skill builder](SKILL-BUILDER.md): requirements, approvals, drafts and disposable installation.
 - [Skill sources](SKILL-SOURCES.md): catalog, acquisition, provenance and installation limits.
-- [Auth boundary](AUTH.md): fake-provider contract; no live connectors.
+- [Auth boundary](AUTH.md): secret references, connector gate and approval contract; fake providers only, no live connectors.
 - [Security model](SECURITY-MODEL.md): trust assumptions and known residual risks.
 
 ## Contribution and publication
@@ -39,4 +39,5 @@ Plans describe their milestone, not proof that every planned feature shipped. Us
 - [Pinned acquisition](plans/skill-source-acquisition.md)
 - [Reviewed source installation](plans/skill-source-installation.md)
 - [Portable handoff](plans/portable-handoff.md)
+- [Needs-update audit fixes](plans/2026-10-14-001-fix-needs-update-audit-items-plan.md)
 - [Skill-collection research](research/skill-collections.md): dated upstream observations, not a live compatibility guarantee.

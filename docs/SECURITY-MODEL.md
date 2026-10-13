@@ -20,6 +20,16 @@ The source adapter preserves raw metadata/legal bytes and rejects ambiguous meta
 
 Updates/restoration revalidate staging and ownership. Removal requires the exact current content decision and intact stored receipt/bytes/modes, but deliberately does not require intact staging or current catalog metadata. This permits removal after staging loss while preserving edits. Writes remain in place with partial journals, without atomic rollback or a multi-host transaction. Node path-based operations retain the documented same-user residual race.
 
+## Record, Git and agent-home trust
+
+These rules reduce accidental damage and make tampering visible. They are not a defense against a malicious same-user process, which can rewrite records, manifests and the registry together. The residual race described above is unchanged.
+
+- Operation IDs are stamped only by onboarding. Public record APIs refuse them. Request IDs remain caller-chosen idempotency keys.
+- A record is trusted only when its ID matches its scope, project and request ID, any operation it claims lists it in a published manifest with the same hash and its supersession list is well formed and acyclic. Otherwise `readSnapshot` reports it as corrupt. See the manual review step in [Storage](STORAGE.md).
+- SHA-256 of the exact bytes is the source identity authority. Stored `mtimeMs` values are informational. Hashes detect change; they are not signatures.
+- Git queries fail closed. Only exit 128 with "not a git repository" counts as "not a repository". Any other failure, including a timeout or a refused repository, is `GIT_QUERY_FAILED`. Git output, remote count and remote URL length are bounded with `LIMIT`.
+- Agent-home writes require the installer's one named target home, which must be listed in `pilot.agentHomes`. Other mutators cannot write any agent home.
+
 ## Portable handoff boundary
 
 Handoff export uses a selected-project projection, not the personal brief. It excludes preferences, policies, binding paths/remotes and structured account identities; unsafe selected text holds instead of being redacted. Strict final byte bounds and dataRoot-only exclusive writes preserve the pilot fence. Bodies are inert fenced text. Pattern checks cannot establish confidentiality or rights, and hashes do not authenticate evidence. Present observations are checked twice, but path-based non-atomic writes retain the same-user residual race. Invalid-footer artifacts must not be consumed or shared. See [HANDOFF.md](HANDOFF.md).

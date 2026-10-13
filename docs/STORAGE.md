@@ -33,6 +33,36 @@ Apply consumes approval before journal creation. A failure in between leaves a c
 
 Clean-version restoration uses retained staging/content evidence and a new action approval. Interrupted writes require manual review, not automatic rollback. Removal needs the intact current decision and installed receipt/hashes but can proceed after staging loss. Source homes must be canonical paths; existing personal journal matching remains raw-string based, with broader personal canonicalization left separate.
 
+## Record trust rules
+
+Records are immutable, and a record ID is derived from its scope, project and request ID. On every read the store recomputes that ID and rejects a record whose stored ID does not match.
+
+- **Request IDs are the idempotency key.** A caller chooses the request ID. Repeating the same request returns the existing record; reusing the ID with different content fails with `CONFLICT`.
+- **Operation IDs are not caller input.** Public record APIs (`addRecord`, `commitBundle`, `supersedeRecord`, `proposeRecord` and `publishProposal`, behind the `record` commands) refuse an `operationId`. Only onboarding stamps one, through its internal commit path.
+- **An operation claim must be vouched for.** A record that names a published operation is trusted only when that operation's manifest lists the record with the same record hash. A record that claims an unpublished operation is hidden as uncommitted.
+- **Supersession must be well formed.** `supersedes` must be a list of distinct record IDs that does not include the record itself, and no cycle may exist among present records.
+
+`readSnapshot` reports a record that breaks any of these rules as corrupt with `INTEGRITY` instead of trusting it. Corrupt records are left out of briefs and supersession.
+
+### Reviewing a corrupt record
+
+1. Run `doctor`. Its `bundles` check fails with a count of corrupt records.
+2. `handoff export` for that project fails with `INTEGRITY` and names the corrupt record IDs.
+3. Inspect `dataRoot/scopes/<scope>/projects/<project>/records/<record-id>/` locally. Keep the files; do not edit, rename or delete them, and do not paste their content into a public issue.
+4. Decide with the owner what happened. The CLI has no repair or quarantine command, and a corrupt record cannot be superseded through `record supersede`.
+
+## File identity and interrupted writes
+
+SHA-256 of the exact bytes is the authority for source identity. A bound source must also match its device, inode, size and ancestor chain. The stored `mtimeMs` is kept for compatibility and is informational only; it is never compared across reads. Within one read, a change in size, modification time or change time during the read is refused as a changed file.
+
+- A failed new-file write removes its own partial file, but only while the path still names the file that call created. A failed atomic replace removes its temporary file.
+- Directory fsync opens the directory without following symlinks.
+- Lock files are created exclusively without following symlinks. Release always closes the handle and removes the lock only if it is still the same file; a cleanup error never hides the action's error. Lock holder details are read from at most 4,096 bytes of a regular file. Locks are still never broken automatically.
+- Run receipts are fsynced with their directories. If a published onboarding lost its receipt in a crash, a replay writes it again; an existing receipt that differs fails with `RECOVERY_REQUIRED`.
+- Git queries time out after 30 seconds and fail with `GIT_QUERY_FAILED`. Output over 16 MiB, more than 16 remotes or a remote URL over 2,048 bytes fails with `LIMIT`.
+
+Agent-home paths are writable only by an installer, and only the one target home it names. That home must be listed in `pilot.agentHomes`.
+
 ## Portable handoff files
 
 Private handoff exports live only at `dataRoot/exports/handoffs/<scope>/<project>/<name>.handoff.md`, in 0700 directories with exclusive 0600 files. They are not record mutations or publication receipts. Preflight holds leave no packet; interrupted writes may retain incomplete files, never overwritten or automatically deleted. Discard invalid-footer artifacts from use and preserve evidence for manual inspection. See [HANDOFF.md](HANDOFF.md) for the selected-record and digest contracts.

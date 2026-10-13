@@ -1,33 +1,40 @@
 # Readiness and remaining work
 
-Status snapshot: 2026-10-11. This is a reviewed synthetic local pilot, not a daily-use installer or a publicly released package. The pre-documentation baseline at `840f521` passed 228 tests across 30 files, 24 synthetic acceptance checks with one fresh-agent check deferred, and the package audit. These are dated baseline results, not evidence for later commits. This file tracks product capabilities, not private projects, accounts or tasks.
+Status snapshot: 2026-10-14. This is a reviewed synthetic local pilot, not a daily-use installer or a publicly released package. This file tracks product capabilities, not private projects, accounts or tasks.
 
-Skill-builder A/B, the source catalog, pinned acquisition, reviewed disposable source installation and portable selected-record handoff are implemented. The public-alpha documentation adds a guided first run, architecture and release checklist. [Pilot CI](CI.md) is configured for macOS and explicit Linux/version-floor evaluation lanes; run conclusions must be checked for each candidate. The core now carries Apache-2.0; publication still needs the gates in [Releasing](RELEASING.md).
+Latest recorded CI evidence: [Pilot CI](CI.md) run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four lanes (macOS 15 and Ubuntu 24.04, each with Node 26.4.0 and 22.13.0) passed 234 of 234 tests and 24 acceptance checks, with one fresh-agent smoke check deferred. That run is evidence for `8f1133a` only. Linux and the Node 22.13.0 floor remain evaluation lanes; support for them is not claimed. Later commits need their own run.
+
+Skill-builder A/B, the source catalog, pinned acquisition, reviewed disposable source installation and portable selected-record handoff are implemented. The public-alpha documentation adds a guided first run, architecture and release checklist. The core carries Apache-2.0; publication still needs the gates in [Releasing](RELEASING.md).
 
 ## What works in the pilot
 
-The historical core baseline had 88 passing tests, 23 passing synthetic acceptance checks, and a passing package audit. It provides scoped project onboarding, immutable context records, decisions and supersession, bounded context briefs, advisory agent handoffs, disposable skill installation, fake-provider identity checks, private learning proposals, and a read-only doctor. These are tool-level checks, not proof of real-agent behavior. The current branch also passes its package audit; the core acceptance count is not a new B-specific behavior test.
+The pilot provides scoped project onboarding, immutable context records, decisions and supersession, bounded context briefs, advisory agent handoffs, disposable skill installation, fake-provider identity checks, private learning proposals and a read-only doctor. These are tool-level checks, not proof of real-agent behavior. Earlier milestone counts (for example 88 tests and 23 acceptance checks for the first core baseline, and 228 tests across 30 files at `840f521`) are dated history, not evidence for later commits.
 
 The toolkit is licensed under Apache-2.0. The npm package remains marked private to prevent accidental publication. Owner rights/history clearance and the explicit public-release decision remain open. There is no live connector or send operation and no automatic migration. Installation files alone do not prove discovery by an agent.
 
 ## Delivery order
 
+The order favors daily use: protect private state first, then prove one real project, then connect sessions, then bring over an existing setup.
+
 | Priority | Work | Exit evidence |
 | --- | --- | --- |
-| 1 — in progress | Approved skill builder: private requirements, design approval, drafts and validation; then disposable installation and clean export preparation | Per-milestone tests and independent review; exact-hash approval checks; explicit live-evaluation status |
-| 2 — daily-use blocker | Controlled real-home activation and a small real-project onboarding pilot | Reviewed target/file preview, approval, preserved foreign skills, fresh Claude and Codex sessions finding the intended skills, rollback verified |
-| 3 — daily-use blocker | Registration and selective migration from an existing personal setup | Dry-run mapping and scope checks, approved selected records only, source preserved, no client-repo changes unless explicitly requested |
-| 4 — operational readiness | Private-state backup and restore, recovery guidance, upgrade compatibility | Restore into a separate private location, integrity checks, no live-file overwrite, documented failure recovery |
-| 5 — connected workflows | Live auth and connector adapters with actor/account/workspace verification | Explicit provider/account selection, secrets resolved outside records, mismatch tests, separate read/draft/send permissions |
-| 6 — runtime integration | Agent start/resume/handoff adapters and reviewable worker lifecycle | End-to-end context propagation and completion receipts; pruning requires user approval; advisory limits documented |
-| 7 — learning distribution | Optional company knowledge adapter and sanitized promotion | Reviewed proposal tied to source evidence and destination; explicit send approval; no company hub required for ordinary use |
-| 8 — open-source release | Core Apache-2.0, public-alpha guides and CI configured; provenance/history clearance, successful release-candidate CI and versioned release process remain | Owner rights clearance, fresh-machine setup, reviewed version/platform evidence, verified private reporting channel, explicit repository and release approval |
+| 1: daily-use blocker | Private-state backup and restore, recovery guidance, upgrade compatibility | Restore into a separate private location, integrity checks, no live-file overwrite, documented failure recovery |
+| 2: daily-use blocker | Controlled real-home activation and a small real-project onboarding pilot | Reviewed target/file preview, approval, preserved foreign skills, fresh Claude and Codex sessions finding the intended skills, rollback verified |
+| 3: daily-use blocker | Session start and end hooks: agent start, resume and handoff adapters with a reviewable worker lifecycle | End-to-end context propagation and completion receipts; pruning requires user approval; advisory limits documented |
+| 4: daily-use blocker | Registration and selective migration from an existing personal setup | Dry-run mapping and scope checks, approved selected records only, source preserved, no client-repo changes unless explicitly requested |
+| 5: connected workflows | Live auth and connector adapters with actor/account/workspace verification | Explicit provider/account selection, secrets resolved outside records, mismatch tests, separate read/draft/send permissions |
+| 6: learning distribution | Optional company knowledge hub adapter and sanitized promotion | Reviewed proposal tied to source evidence and destination; explicit send approval; no company hub required for ordinary use |
+| 7: skill distribution | Skill export (skill-builder milestone C): explicit file selection and privacy/rights review | Export preparation tests; export is not publication |
+| 8: skill updates | Weekly third-party skill updater and scheduler | Disabled schedule and harmless run first; fresh-host discovery evidence; explicit user enablement |
+| 9: open-source release | Core Apache-2.0, public-alpha guides and CI configured; provenance/history clearance, successful release-candidate CI and versioned release process remain | Owner rights clearance, fresh-machine setup, reviewed version/platform evidence, verified private reporting channel, explicit repository and release approval |
 
-Priorities 5–7 need not block an offline daily-use pilot. Do not build every connector before validating the core with one real project. None of these rows authorizes an account connection, publication, installation, migration or outbound action on its own.
+Priorities 5–8 need not block an offline daily-use pilot. The open-source release comes last. Do not build every connector before validating the core with one real project. None of these rows authorizes an account connection, publication, installation, migration or outbound action on its own.
+
+**Frozen:** skill-builder and skill-source feature work is frozen until the daily-use blockers (priorities 1–4) ship. Bug fixes and safety fixes continue. Skill export and the weekly updater resume at priorities 7 and 8.
 
 ## Skill-builder milestones
 
-The approved design is [skill-builder.md](plans/skill-builder.md).
+Frozen: bug fixes only. Milestone C is delivery priority 7. The approved design is [skill-builder.md](plans/skill-builder.md).
 
 1. **A: private creation tooling implemented.** Requirements → approved design → immutable draft → validation. The conversational skill and live behavior evaluation remain deferred.
 2. **B: disposable installation implemented and reviewed.** Approved generic/personal packages only, using owned copies and conflict-preserving removal. Plans bind content, validation and prior installed state. Byte edits, path-role changes and case-only renames are preserved/refused. Real homes remain gated.
@@ -36,6 +43,8 @@ The approved design is [skill-builder.md](plans/skill-builder.md).
 Live-model behavior evaluation needs an approved provider/account and synthetic fixture scope. Report it deferred when not run. Static format checks and scripted approval tests cannot demonstrate useful clarification, routing or writing quality. Fresh-session discovery is a separate activation check.
 
 ## Requested addition: third-party catalog and weekly updates
+
+Frozen: bug fixes only. The weekly updater is delivery priority 8.
 
 The twelve-source managed design is approved. See [source audit and delivery design](research/skill-collections.md) for verified repository names, observed releases, installation differences and exit evidence. The first bounded slice, the [read-only catalog and release checker](plans/skill-source-catalog.md), is implemented. It validates the twelve public recipes, resolves stable releases to commit IDs, compares a supplied prior lock, and reports absent releases or typed failures. It does not save locks, download packages, install skills or schedule jobs.
 
@@ -59,16 +68,23 @@ Synthetic tests cover CLI packets, deterministic bytes, scope isolation, disclos
 
 ## Known core follow-ups
 
-These are recorded residuals from the bounded pilot review, not claims that each is exploitable:
+The six residuals recorded by the bounded pilot review are resolved on branch `fix/needs-update-audit` ([plan](plans/2026-10-14-001-fix-needs-update-audit-items-plan.md)). They were recorded residuals, not claims that each was exploitable:
 
-- The CLI install → uninstall → reinstall journal-ID collision is fixed and reviewed in B, with fresh generated IDs, exclusive run directories and regression tests.
-- Tighten which mutators can write agent-home paths, and allow the acceptance harness to receive the run's additional forbidden paths.
-- Fail closed on unexpected Git configuration-query errors; retain the tests that prove filters and hooks do not execute during discovery.
-- Review low-level interrupted-file writes, lock-handle cleanup, Git output bounds and file-identity precision.
-- Clarify caller-supplied operation IDs and on-disk supersession trust. This is a same-user local tool, not a security boundary against a malicious process with the same filesystem access.
-- Decide how repeated onboarding retires old effective brief records.
+- Resolved: the CLI install → uninstall → reinstall journal-ID collision was fixed and reviewed in B, with fresh generated IDs, exclusive run directories and regression tests.
+- Resolved: agent-home writes now require the installer's named target home, which must be listed in `pilot.agentHomes`; other mutators cannot write any agent home. The acceptance harness accepts repeated `--forbidden <path>` options and records them in its report. See [Security model](SECURITY-MODEL.md).
+- Resolved: unexpected Git query failures, including timeouts and refused repositories, fail closed with `GIT_QUERY_FAILED`. Only exit 128 with "not a git repository" means "not a repository". The tests that prove filters and hooks do not run during discovery remain. See [Agent protocol](AGENT-PROTOCOL.md).
+- Resolved: failed writes remove their own partial or temporary file, lock handles always close, run receipts are fsynced and restored on replay and Git output, remote count and remote URL length are bounded with `LIMIT`. SHA-256 is the file-identity authority; `mtimeMs` is informational. See [Storage](STORAGE.md).
+- Resolved: public record APIs refuse caller-supplied operation IDs. Records that falsely claim an onboarding operation, or carry malformed, self-referencing or cyclic supersession, are reported as corrupt. This is a same-user local tool, not a security boundary against a malicious process with the same filesystem access. See [Storage](STORAGE.md).
+- Resolved: re-onboarding a worktree retires earlier auto-created records that the new onboarding re-creates, unless `--keep-previous` is given. See [Guided onboarding](ONBOARDING.md).
 
-The baseline was verified on macOS with Node v26.4.0. The declared minimum Node version has not been independently verified. Linux support needs its own suite and acceptance run; Windows is unsupported. Multi-device synchronization is not implemented.
+Known items found during that work, not yet changed:
+
+- CLI record commands attribute every record to `recordedBy: {actor: "human", runId: "run_cli00001"}`. This is a fixed label, not an identity attestation.
+- `record publish --apply` always acts as the controller. The CLI does not check who is running it.
+- The default onboarding request ID is derived from the command inputs, not from source hashes. Re-running onboarding with the same flags after sources change reuses that ID, so it replays or refuses instead of onboarding again. Pass a new `--request-id` for a fresh onboarding.
+- Bundled skills are checked for real command routes only. Their flags are not checked against each command's declared options.
+
+Windows is unsupported. Multi-device synchronization is not implemented.
 
 ## Keep private data out of the release
 

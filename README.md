@@ -35,7 +35,7 @@ The diagram shows the implemented pilot, not a live agent integration. See [arch
 
 ## Try it
 
-Requirements: Node.js and npm, Git, and a macOS shell. The verified environment is macOS with Node v26.4.0. The declared Node floor is `>=22.13.0`, but that floor has not been independently verified. Linux support is not claimed; Windows is unsupported.
+Requirements: Node.js and npm, Git, and a macOS shell. The reference environment is macOS with Node v26.4.0. The declared Node floor is `>=22.13.0`. [CI](docs/CI.md) run 38154524118 at commit `8f1133a` (2026-10-11) passed all tests and acceptance checks on macOS and Ubuntu with both Node 26.4.0 and 22.13.0. That is evaluation evidence for one commit; support for the Node floor is not claimed. Linux support is not claimed; Windows is unsupported.
 
 From a checkout containing this guide:
 
@@ -56,10 +56,10 @@ For checkout instructions, expected results and troubleshooting, use [Getting st
 
 | Area | Available in the disposable pilot | Not delivered |
 | --- | --- | --- |
-| Project context | Onboarding preview/apply, scoped records, source hashes, bounded briefs | Real-project activation and migration |
-| Continuity | Advisory handoffs and [selected-record Markdown export](docs/HANDOFF.md) | Automatic session injection, packet import or sharing |
-| Skill creation | [Requirements, design approval, drafts and validation](docs/SKILL-BUILDER.md) | Conversational creator and live behavior evaluation |
-| Skill sources | [12-source catalog, release checks, pinned acquisition and reviewed disposable installation](docs/SKILL-SOURCES.md) | Universal agent compatibility or weekly automatic updates |
+| Project context | Onboarding preview/apply with re-onboard retirement, scoped records, source hashes, bounded briefs | Backup and restore, real-project activation and migration |
+| Continuity | Advisory handoffs and [selected-record Markdown export](docs/HANDOFF.md) | Session start and end hooks, packet import or sharing |
+| Skill creation | [Requirements, design approval, drafts and validation](docs/SKILL-BUILDER.md) (frozen: bug fixes only) | Conversational creator, live behavior evaluation and export |
+| Skill sources | [12-source catalog, release checks, pinned acquisition and reviewed disposable installation](docs/SKILL-SOURCES.md) (frozen: bug fixes only) | Universal agent compatibility or weekly automatic updates |
 | Identity and learning | Fake-provider identity checks and private hub proposals | Live Slack/email/issue connectors, sends or company-hub writes |
 
 Claude and Codex filesystem layouts have fixture tests. Those tests do not prove that a fresh native session discovers or uses a skill. Gemini, Cursor and Command Code support is not established.
@@ -80,7 +80,7 @@ A personal assistant setup, an agent host and a company knowledge hub are option
 - [Contributing](CONTRIBUTING.md): development setup, tests and public-safe examples.
 - [Security reporting](SECURITY.md): keep vulnerabilities and private data out of public issues.
 - [Release checklist](docs/RELEASING.md): what must pass before publication.
-- [Roadmap](docs/ROADMAP.md): remaining work toward daily use.
+- [Roadmap](docs/ROADMAP.md): remaining work toward daily use, starting with backup and restore.
 
 ## License
 

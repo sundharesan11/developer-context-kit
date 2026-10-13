@@ -24,7 +24,7 @@ git --version
 node bin/devctx.mjs help
 ```
 
-The verified environment is macOS with Node v26.4.0. The manifest declares Node `>=22.13.0`; that floor still needs validation. Linux support is not claimed. Windows is unsupported.
+The reference environment is macOS with Node v26.4.0. The manifest declares Node `>=22.13.0`. [CI](CI.md) run 38154524118 at commit `8f1133a` (2026-10-11) passed on macOS and Ubuntu with Node 26.4.0 and 22.13.0. Those are evaluation lanes for that commit, not a support claim. Support for the Node floor and for Linux is not claimed. Windows is unsupported.
 
 There are no third-party runtime dependencies. Do not run `npm install -g`, `npm link` or an unrelated package with the same name. Run the CLI from this checkout.
 
@@ -64,7 +64,7 @@ No files are added to the project by onboarding. Private context is stored outsi
 
 You can inspect briefs, exercise the [skill builder](SKILL-BUILDER.md) and review a [private handoff export](HANDOFF.md). Do not point the pilot at a real client checkout or edit the guards to reach your normal agent homes.
 
-Fresh native-agent discovery, real-project activation, migration and backup/restore remain [roadmap work](ROADMAP.md). A globally installed skill from another setup is not evidence that it uses this kit.
+Backup and restore, real-project activation with fresh native-agent discovery, session hooks and migration remain [roadmap work](ROADMAP.md), in that order. A globally installed skill from another setup is not evidence that it uses this kit.
 
 The kit does not delete demo directories. Temporary directories can disappear after a reboot or system cleanup. Keep only synthetic data in them. Inspect the exact directory before manually disposing of it.
 

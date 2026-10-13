@@ -41,7 +41,7 @@ Expected: 24 passed checks and one explicitly deferred fresh-agent smoke check. 
 5. Update the relevant guide or contract. Execute changed onboarding commands in a fresh disposable directory.
 6. Include test results, environment and remaining limitations in the pull request.
 
-The [roadmap](docs/ROADMAP.md) identifies the next capability gaps. Do not infer support from a design document or a filesystem fixture alone.
+The [roadmap](docs/ROADMAP.md) orders the next capability gaps. Skill-builder and skill-source feature work is frozen: send bug fixes there, not new features. Do not infer support from a design document or a filesystem fixture alone.
 
 ## Keep examples public-safe
 

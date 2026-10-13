@@ -15,6 +15,10 @@ Each matrix job has a distinct name and a 20-minute timeout. Failures remain vis
 
 A green job establishes synthetic behavior on that runner and commit. It does not prove native agent discovery, real-client onboarding, backup/restore or a supported operating-system release. Keep the [limitations](LIMITATIONS.md) until compatibility evidence has been reviewed. No branch protection or required checks are configured by this file.
 
+## Last verified run
+
+Last verified run: run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four jobs passed: 234 of 234 tests, 24 acceptance checks passed and one `fresh-agent-smoke` deferred in every lane. This result applies to `8f1133a` only. Later commits, including branch work, need their own run before anyone cites its counts. The Linux and Node 22.13.0 lanes passing does not make either a supported configuration.
+
 ## What each job does
 
 1. Check out the event revision without leaving Git credentials in repository configuration.

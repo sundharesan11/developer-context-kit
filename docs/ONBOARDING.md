@@ -114,7 +114,20 @@ node bin/devctx.mjs project onboard \
 
 Expect `ok: true`, record hashes and a binding receipt. If files or registry state changed, apply refuses a stale plan. Preview again and review the new fingerprint.
 
-An exact retry of a completed request is replayed. Reusing its request ID with changed inputs is a conflict. A new onboarding request can add new records; retirement of old effective brief records is still a [known follow-up](ROADMAP.md). Do not use repeated onboarding as an automatic refresh loop.
+An exact retry of a completed request is replayed. Reusing its request ID with changed inputs is a conflict. Do not use repeated onboarding as an automatic refresh loop.
+
+### Onboarding the same worktree again
+
+A later onboarding of the same worktree retires earlier records by default. The preview lists them in `result.retire`, each with its record ID and record hash. Review that list before you approve the fingerprint; it is part of the plan, so a changed list needs a new preview.
+
+- Only auto-created records from earlier onboardings of the same worktree path are candidates. Records from another worktree are never retired.
+- A record is retired only when the new onboarding re-creates its kind and title. With `--accept none`, only the earlier client profile is replaced; earlier accepted commands, facts and README briefs stay effective.
+- Records you created, and records already superseded by anyone, are never retired.
+- Retired records are not deleted. The new client profile record supersedes them, so briefs omit them and history keeps them.
+
+Add `--keep-previous` to the preview and to the apply to retire nothing. The preview then shows `retire: []`.
+
+The default request ID is derived from the command inputs, not from source contents. After sources change, onboard again with a new `--request-id`. If an interrupted apply is retried after its plan changed, apply refuses with `DEVCTX_CONFLICT` and the remedy "re-run project onboard with a new --request-id". Follow that remedy; do not delete staged files.
 
 ## 5. Resolve and read context
 
@@ -168,4 +181,4 @@ This manual evaluation is not proof of native skill discovery. For a bounded Mar
 
 Before real-project use is supported, collect an approved scope and repository binding, selected source documents, objectives, environments, known commands, owners, decisions, unknowns and sharing rules. Store secrets separately and record references only when the relevant adapter supports them.
 
-The remaining activation work must verify fresh-agent discovery, private backup/restore, rollback, migration and account selection. Do not move client context into this public repository while waiting for those features.
+The remaining work follows the [roadmap](ROADMAP.md) order: private backup and restore, real activation with rollback and fresh-agent discovery, session start and end hooks, then selective migration. Account selection comes later with live connectors. Do not move client context into this public repository while waiting for those features.
