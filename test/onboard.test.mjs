@@ -223,3 +223,29 @@ test("re-onboarding apply with a fingerprint from before a retire-list change is
   await assert.rejects(applyOnboard(s.roots, s.pilot, input, { fingerprint: plan.fingerprint, now }), { code: "DEVCTX_PLAN_MISMATCH" });
   assert.equal((await readRegistry(s.roots)).sha, before.sha);
 });
+test("re-onboarding retires profiles from earlier path-less registry operations of the same worktree", async (t) => {
+  const s = await committedProject(t);
+  const first = await autoProfile(s);
+  await reonboard(s, { requestId: "req_keepprev01", keepPrevious: true });
+  assert.equal((await profiles(s)).length, 2);
+  const registryPath = join(s.roots.configRoot, "registry.json");
+  const legacy = JSON.parse(await readFile(registryPath, "utf8"));
+  legacy.operations = legacy.operations.map(({ path, ...op }) => op);
+  await writeFile(registryPath, JSON.stringify(legacy) + "\n");
+  const { plan, receipt } = await reonboard(s, { requestId: "req_reonboard01" });
+  assert.ok(plan.retire.some((r) => r.id === first.id && r.recordHash === first.recordHash));
+  assert.deepEqual((await profiles(s)).map((r) => r.id), [receipt.bundles[0].id]);
+});
+test("re-onboarding preview over a damaged bundle names the keep-previous remedy; keep-previous previews", async (t) => {
+  const s = await committedProject(t);
+  const prior = await autoProfile(s);
+  await writeFile(join(s.dataRoot, "scopes/acme/projects/acme.atlas/records", prior.id, "body.md"), "tampered\n");
+  const err = await planOnboard(s.roots, s.pilot, { ...s.input, requestId: "req_reonboard01" }).catch((e) => e);
+  assert.equal(err.code, "DEVCTX_RECOVERY_REQUIRED");
+  assert.match(err.details.remedy, /--keep-previous/);
+  const kept = await planOnboard(s.roots, s.pilot, { ...s.input, requestId: "req_reonboard01", keepPrevious: true });
+  assert.deepEqual(kept.retire, []);
+  const cli = await runCli(["project", "onboard", "--pilot", s.path, "--scope", "acme", "--project", "acme.atlas", "--repo", s.repo, "--environment", "staging", "--accept", "all", "--request-id", "req_reonboard02"]);
+  assert.notEqual(cli.code, 0);
+  assert.match(JSON.stringify(cli.json), /--keep-previous/);
+});

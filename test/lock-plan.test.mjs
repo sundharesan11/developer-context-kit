@@ -81,3 +81,17 @@ test("U4 onboarding replay writes a run receipt lost after registry publish", as
   await writeFile(receiptPath, JSON.stringify({ ...receipt, committedGeneration: 99 }) + "\n", { mode: 0o600 });
   await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, opts), { code: "DEVCTX_RECOVERY_REQUIRED" });
 });
+test("U4 onboarding replay restores an empty or truncated run receipt left by a hard kill", async (t) => {
+  const s = await onboardFixture(t);
+  const opts = { fingerprint: s.plan.fingerprint, now };
+  const first = await applyOnboard(s.roots, s.pilot, s.input, opts);
+  const receiptPath = join(s.roots.stateRoot, "runs", "run_" + first.operationId.slice(3), "receipt.json");
+  const { replayed, ...receipt } = first;
+  for (const torn of ["", JSON.stringify(receipt).slice(0, 40)]) {
+    await writeFile(receiptPath, torn, { mode: 0o600 });
+    const replay = await applyOnboard(s.roots, s.pilot, s.input, opts);
+    assert.equal(replay.replayed, true);
+    assert.deepEqual(JSON.parse(await readFile(receiptPath, "utf8")), receipt);
+    assert.equal((await lstat(receiptPath)).mode & 0o777, 0o600);
+  }
+});

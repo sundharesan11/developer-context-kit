@@ -50,12 +50,25 @@ function draftsFor(plan) {
     return { id: recordIdFor({ scope: plan.scope, project: plan.project, requestId }), requestId, draft: { kind: c.kind, status: "observed", title: c.title, body: c.body, sources: c.sources, applicability: { level: "project" }, review: null } };
   })];
 }
+// Worktree path of a published onboarding. Legacy operations carry no path: use the current binding entry, else the operation's own binding version, whose last root is the worktree that onboarding added. Unreadable history is skipped.
+async function operationPath(roots, registry, op) {
+  if (op.path) return op.path;
+  const bound = registry.bindings.find((b) => b.operationId === op.operationId);
+  if (bound) return bound.path;
+  try {
+    const manifest = await readManifest(roots, op.scope, op.project, op.operationId, op.manifestHash);
+    return (await readBindingByHash(roots, op.scope, op.project, manifest.bindingHash)).roots?.at(-1)?.path;
+  } catch { return undefined; }
+}
 // Auto records from earlier published onboardings of this worktree path that the new plan re-creates (same kind and title), unless already superseded (by anyone, so user targets are kept). readSnapshot has already dropped corrupt records and unlisted operation claims.
 async function retireList(roots, registry, input, recreated) {
-  const pathOf = (op) => op.path ?? registry.bindings.find((b) => b.operationId === op.operationId)?.path;
-  const earlier = new Set(registry.operations.filter((op) => op.scope === input.scope && op.project === input.project && pathOf(op) === input.repo).map((op) => op.operationId));
+  const earlier = new Set();
+  for (const op of registry.operations) if (op.scope === input.scope && op.project === input.project && (await operationPath(roots, registry, op)) === input.repo) earlier.add(op.operationId);
   if (!earlier.size) return [];
-  const { records } = await readSnapshot(roots, input.scope, input.project);
+  const { records } = await readSnapshot(roots, input.scope, input.project).catch((error) => {
+    if (error.code === "DEVCTX_RECOVERY_REQUIRED") throw new DevctxError("RECOVERY_REQUIRED", error.message, { ...error.details, remedy: "repair the project records, or re-run project onboard with --keep-previous to skip retiring earlier records" });
+    throw error;
+  });
   return records.filter((r) => earlier.has(r.operationId) && recreated.has(canonicalJson([r.kind, r.title])) && r.effective !== "superseded").map((r) => ({ id: r.id, recordHash: r.recordHash })).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 export async function planOnboard(roots, pilot, input) {

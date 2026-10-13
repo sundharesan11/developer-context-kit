@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { writeFile, access, mkdir, chmod } from "node:fs/promises";
 import { sandbox, makeRepo, fixtureGit, treeSnapshot, makePilot, seedCommittedProject, now } from "./helpers.mjs";
 import { git, locateWorktree } from "../src/identity/git.mjs";
@@ -87,6 +88,13 @@ test("Git more than 16 remotes or a remote URL above 2 KiB is LIMIT", async (t) 
   const long = await makeRepo(join(dir, "long"), { a: "a" });
   await fixtureGit(long, ["remote", "add", "origin", "https://git.example.com/" + "a".repeat(2048)]);
   await assert.rejects(locateWorktree(long), { code: "DEVCTX_LIMIT" });
+});
+test("Git remote whose URL query fails is GIT_QUERY_FAILED, not a silently dropped remote", async (t) => {
+  const repo = await makeRepo(join(await sandbox(t), "atlas"), { a: "a" });
+  await fixtureGit(repo, ["remote", "add", "origin", "https://git.example.com/acme/atlas.git"]);
+  const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+  await gitStub(t, `case " $* " in *" remote get-url "*) exit 2;; esac\nexec '${real}' "$@"`);
+  await assert.rejects(locateWorktree(repo), { code: "DEVCTX_GIT_QUERY_FAILED" });
 });
 test("Git doctor reports GIT_QUERY_FAILED for a bound repository with broken config", async (t) => {
   const s = await seedCommittedProject(t);

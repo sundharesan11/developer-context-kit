@@ -54,8 +54,7 @@ export async function locateWorktree(cwd) {
   const names = gitQuery(canonical, ["remote"]).stdout.trim().split("\n").filter(Boolean);
   if (names.length > GIT_LIMITS.maxRemotes) throw new DevctxError("LIMIT", "Too many Git remotes", { max: GIT_LIMITS.maxRemotes });
   for (const name of names) {
-    const result = git(canonical, ["remote", "get-url", name]);
-    if (!result.ok) continue;
+    const result = gitQuery(canonical, ["remote", "get-url", "--", name]);
     if (Buffer.byteLength(result.stdout.trim()) > GIT_LIMITS.maxUrlBytes) throw new DevctxError("LIMIT", "Git remote URL too long", { max: GIT_LIMITS.maxUrlBytes });
     remotes.push({ name, url: stripCredentials(result.stdout.trim()) });
   }

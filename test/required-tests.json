@@ -219,5 +219,9 @@
   "re-onboarding does not retire a prior record the user already superseded",
   "crash after bundles during re-onboarding commits the retirement once on retry",
   "re-onboarding retry after a retire target changes fails naming the request-id remedy",
-  "re-onboarding apply with a fingerprint from before a retire-list change is PLAN_MISMATCH"
+  "re-onboarding apply with a fingerprint from before a retire-list change is PLAN_MISMATCH",
+  "U4 onboarding replay restores an empty or truncated run receipt left by a hard kill",
+  "re-onboarding retires profiles from earlier path-less registry operations of the same worktree",
+  "re-onboarding preview over a damaged bundle names the keep-previous remedy; keep-previous previews",
+  "Git remote whose URL query fails is GIT_QUERY_FAILED, not a silently dropped remote"
 ]
