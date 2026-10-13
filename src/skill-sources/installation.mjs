@@ -197,12 +197,12 @@ export async function applySourceInstall(roots, input, {decisionId: id, fingerpr
         const {competing} = targetChecks(roots, input, loaded.review.mapping.name);
         const prior = await observed(roots, action.path, loaded.review, input.contentDecisionId, input.mode);
         if (competing.length || prior.status !== action.status || (prior.receipt ? digest(prior.receipt) : null) !== action.priorReceiptDigest) fail("STALE_VERSION");
-        await performPackageAction(roots, action, {files: loaded.files ?? {}, priorReceipt: prior.receipt, nextReceipt: receiptFor(loaded.review, input.contentDecisionId, run), journalPath}, {faults});
+        await performPackageAction(roots, action, {files: loaded.files ?? {}, priorReceipt: prior.receipt, nextReceipt: receiptFor(loaded.review, input.contentDecisionId, run), journalPath, targetHome: input.targetHome}, {faults});
         journal.completed.push(action); await atomicReplace(journalPath, canonicalJson(journal) + "\n");
         await faults.afterAction?.(action);
       }
       return {applied: true, runId: run, actions: plan.actions};
-    }, {destinations: [input.targetHome, consumed, runPath]});
+    }, {destinations: [input.targetHome, consumed, runPath], targetHome: input.targetHome});
   });
 }
 export async function sourceInstallStatus(roots, input) {
@@ -214,6 +214,6 @@ export async function sourceInstallStatus(roots, input) {
       const dir = join(roots.stateRoot, "skill-source-installs/consumed");
       if (info(dir)) { strictPath(roots.stateRoot, ["skill-source-installs", "consumed"]); consumed = (await readdir(dir)).filter((v) => DECISION.test(v.slice(0, -5)) && v.endsWith(".json")).map((v) => v.slice(0, -5)).sort(); }
       return {status: history.incomplete.length ? "RECOVERY_REQUIRED" : "ok", ...history, consumed, actions: plan.actions, planned: plan};
-    }, {destinations: [input.targetHome]});
+    }, {destinations: [input.targetHome], targetHome: input.targetHome});
   });
 }

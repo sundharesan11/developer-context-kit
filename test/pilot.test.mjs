@@ -5,6 +5,7 @@ import { mkdir, symlink, readdir } from "node:fs/promises";
 import { makePilot, runCli } from "./helpers.mjs";
 import { loadPilot, assertWritable } from "../src/config/pilot.mjs";
 import { toJson } from "../src/errors.mjs";
+import { withPilotLock, registryLockPath, scopeLockPath } from "../src/storage/lock.mjs";
 import { listCommands, isRootFree } from "../src/cli.mjs";
 test("pilot fence refuses real agent homes, configured homes, default roots and forbidden overlap", async (t) => {
   const p = await makePilot(t);
@@ -31,6 +32,27 @@ test("assertWritable rechecks the fence at write time; escaped member is refused
   await symlink(outside, p.dataRoot);
   await assert.rejects(Promise.resolve().then(() => assertWritable(p.roots, [join(p.dataRoot, "scopes")])), (e) => ["DEVCTX_GATE_REQUIRED", "DEVCTX_PATH_UNSAFE"].includes(e.code));
   assert.deepEqual(await readdir(outside), []);
+});
+test("assertWritable refuses agent-home destinations without an explicit installer target", async (t) => {
+  const p = await makePilot(t), [home] = p.agentHomes, inside = join(home, ".claude/skills/x");
+  for (const destinations of [[home], [inside], [p.dataRoot, inside]]) {
+    await assert.rejects(Promise.resolve().then(() => assertWritable(p.roots, destinations)), (e) => e.code === "DEVCTX_GATE_REQUIRED" && e.details.field === "destination");
+    await assert.rejects(Promise.resolve().then(() => assertWritable(p.roots, destinations, {})), { code: "DEVCTX_GATE_REQUIRED" });
+  }
+  let called = false;
+  for (const lock of [registryLockPath(p.roots), scopeLockPath(p.roots, "acme")]) await assert.rejects(withPilotLock(p.roots, lock, { kind: "record-add" }, async () => { called = true; }, { destinations: [p.dataRoot, inside] }), { code: "DEVCTX_GATE_REQUIRED" });
+  assert.equal(called, false);
+  assert.doesNotThrow(() => assertWritable(p.roots, [p.configRoot, join(p.dataRoot, "exports/handoffs/x"), join(p.stateRoot, "runs/run_x/journal.json")]));
+});
+test("assertWritable installer target permits only its own listed agent home", async (t) => {
+  const p = await makePilot(t), [a, b] = p.agentHomes;
+  assert.doesNotThrow(() => assertWritable(p.roots, [join(a, ".claude/skills/x"), join(p.stateRoot, "runs/run_x/journal.json"), join(p.stateRoot, "skill-installs/consumed/x.json")], { targetHome: a }));
+  await assert.rejects(Promise.resolve().then(() => assertWritable(p.roots, [join(b, ".claude/skills/x")], { targetHome: a })), (e) => e.code === "DEVCTX_GATE_REQUIRED" && e.details.field === "destination");
+  for (const targetHome of [join(a, ".claude"), join(p.pilot.pilotRoot, "homes/other"), p.fakeHome, p.dataRoot, a + "/", null, 17]) await assert.rejects(Promise.resolve().then(() => assertWritable(p.roots, [join(a, "x")], { targetHome })), { code: "DEVCTX_GATE_REQUIRED" });
+  let called = false;
+  await assert.rejects(withPilotLock(p.roots, join(p.stateRoot, "locks/install.lock"), { kind: "install" }, async () => { called = true; }, { destinations: [b], targetHome: a }), { code: "DEVCTX_GATE_REQUIRED" });
+  assert.equal(called, false);
+  assert.equal(await withPilotLock(p.roots, join(p.stateRoot, "locks/install.lock"), { kind: "install" }, async () => "ok", { destinations: [a], targetHome: a }), "ok");
 });
 test("CLI: only version, help, and skill source reads are root-free; every other route requires --pilot", async () => {
   const routes = listCommands();

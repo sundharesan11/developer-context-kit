@@ -8,6 +8,8 @@ import { buildEnvelope, checkEnvelopeFresh, completionDraft } from "../src/agent
 import { planInstall, applyInstall, installStatus } from "../src/agents/install.mjs";
 import { proposeRecord, publishProposal, readSnapshot } from "../src/records/store.mjs";
 import { buildBrief } from "../src/context/brief.mjs";
+import { performPackageAction } from "../src/agents/package-files.mjs";
+import { existsSync } from "node:fs";
 test("handoff: claude proposes, controller publishes, codex brief shows it with provenance", async (t) => {
   const s = await twoScopes(t);
   const env = await buildEnvelope(s.roots, { scope: "acme", cwd: s.atlas, taskId: "task-1", runId: "run_claude01", parentRunId: "run_parent01", deliverable: "fix", verificationCommands: ["node --test"], allowedOutputPaths: [join(s.atlas, "src")], allowedOperations: ["read", "edit-files"], constraints: [] }, { now });
@@ -77,4 +79,10 @@ test("bundled installer refuses an existing run directory without a journal", as
   const plan = await planInstall(p.pilot, input);
   await mkdir(join(p.stateRoot, "runs/run_existing01"), { recursive: true, mode: 0o700 });
   await assert.rejects(applyInstall(p.roots, p.pilot, input, { fingerprint: plan.fingerprint, runId: "run_existing01" }), { code: "DEVCTX_CONFLICT" });
+});
+test("installer file writes are confined to the opted-in target agent home", async (t) => {
+  const p = await makePilot(t), [a, b] = p.agentHomes, path = join(b, ".claude/skills/devctx-x"), journalPath = join(p.stateRoot, "runs/run_cross001/journal.json");
+  const files = { "SKILL.md": "x" }, nextReceipt = { schemaVersion: 2, files: { "SKILL.md": "x" } };
+  for (const targetHome of [a, undefined]) await assert.rejects(performPackageAction(p.roots, { path, status: "create" }, { files, nextReceipt, journalPath, targetHome }), { code: "DEVCTX_GATE_REQUIRED" });
+  assert.equal(existsSync(join(b, ".claude")), false);
 });

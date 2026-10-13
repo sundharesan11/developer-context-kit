@@ -38,11 +38,11 @@ export async function withLock(lockPath, owner, action, { waitMs = 2000 } = {}) 
     try { const current = await lstat(lockPath); if (current.dev === own.dev && current.ino === own.ino) await unlink(lockPath); } catch (error) { if (error.code !== "ENOENT") throw error; }
   }
 }
-export async function withPilotLock(roots, lockPath, owner, action, { destinations, waitMs = 2000 } = {}) {
+export async function withPilotLock(roots, lockPath, owner, action, { destinations, waitMs = 2000, targetHome } = {}) {
   if (!Array.isArray(destinations) || !destinations.length) throw new DevctxError("INVALID_INPUT", "Lock destinations required");
-  assertWritable(roots, [lockPath, ...destinations]);
+  assertWritable(roots, [lockPath, ...destinations], { targetHome });
   const rel = relative(roots.stateRoot, dirname(lockPath));
   if (rel !== "locks") throw new DevctxError("PATH_UNSAFE", "Lock path outside lock directory");
   ensurePrivatePath(roots.stateRoot, ["locks"]);
-  return withLock(lockPath, owner, async () => { assertWritable(roots, [lockPath, ...destinations]); return action(); }, { waitMs });
+  return withLock(lockPath, owner, async () => { assertWritable(roots, [lockPath, ...destinations], { targetHome }); return action(); }, { waitMs });
 }

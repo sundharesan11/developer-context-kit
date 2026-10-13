@@ -143,7 +143,7 @@ test("source installer shares the personal install lock and never breaks a forei
   await withPilotLock(x.p.roots, join(x.p.stateRoot, "locks/install.lock"), {kind: "fixture-owner"}, async () => {
     await assert.rejects(apply(x, a), {code: "DEVCTX_BUSY"});
     assert.equal(existsSync(join(x.p.stateRoot, "locks/install.lock")), true);
-  }, {destinations: [x.input.targetHome]});
+  }, {destinations: [x.input.targetHome], targetHome: x.input.targetHome});
   assert.equal(existsSync(target(x)), false);
 });
 

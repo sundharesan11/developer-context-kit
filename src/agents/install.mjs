@@ -47,9 +47,9 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }) 
   assertInPilot(pilot, input.targetHome, "agentHomes");
   const journalPath = join(roots.stateRoot, "runs", runId, "journal.json");
   const allPaths = [journalPath, ...plan.actions.flatMap((a) => [a.path, join(a.path, "SKILL.md"), join(a.path, ".devctx-owned.json")])];
-  assertWritable(roots, allPaths);
+  assertWritable(roots, allPaths, { targetHome: input.targetHome });
   return withPilotLock(roots, join(roots.stateRoot, "locks", "install.lock"), { kind: "install", runId }, async () => {
-    assertWritable(roots, allPaths);
+    assertWritable(roots, allPaths, { targetHome: input.targetHome });
     ensurePrivatePath(roots.stateRoot, ["runs"]);
     try { await mkdir(join(roots.stateRoot, "runs", runId), { mode: 0o700 }); }
     catch (error) { if (error.code === "EEXIST") throw new DevctxError("CONFLICT", "Run ID already exists"); throw error; }
@@ -57,7 +57,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }) 
     const journal = { planFingerprint: fingerprint, intended, completed: [] };
     await writeNewFile(journalPath, canonicalJson(journal) + "\n");
     for (const action of intended) {
-      assertWritable(roots, [action.path, join(action.path, "SKILL.md"), join(action.path, ".devctx-owned.json"), journalPath]);
+      assertWritable(roots, [action.path, join(action.path, "SKILL.md"), join(action.path, ".devctx-owned.json"), journalPath], { targetHome: input.targetHome });
       if (action.status === "create") {
         await mkdir(dirname(action.path), { recursive: true, mode: 0o700 });
         await mkdir(action.path, { mode: 0o700 });
@@ -76,7 +76,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }) 
       await atomicReplace(journalPath, canonicalJson(journal) + "\n");
     }
     return { applied: true, actions: plan.actions };
-  }, { destinations: allPaths });
+  }, { destinations: allPaths, targetHome: input.targetHome });
 }
 export async function installStatus(roots, pilot, { targetHome }) {
   assertInPilot(pilot, targetHome, "agentHomes");

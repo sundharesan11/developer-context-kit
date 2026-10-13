@@ -71,13 +71,15 @@ export function assertInPilot(pilot, path, field) {
   if (field === "inputsRoot" ? !isWithin(path, pilot.inputsRoot) : !pilot[field]?.includes(path)) fail(field);
   validateRoot(path, field);
 }
-export function assertWritable(roots, destinations) {
+export function assertWritable(roots, destinations, { targetHome } = {}) {
   const pilot = roots?.pilot;
   if (!pilot || pilotDigest(pilot) !== pilot.digest || roots.configRoot !== pilot.configRoot || roots.dataRoot !== pilot.dataRoot || roots.stateRoot !== pilot.stateRoot) fail("pilot");
   validate(pilot, pilot._context, true);
+  if (targetHome !== undefined && (typeof targetHome !== "string" || !pilot.agentHomes.includes(targetHome))) fail("targetHome");
+  const allowed = [pilot.configRoot, pilot.dataRoot, pilot.stateRoot, ...(targetHome === undefined ? [] : [targetHome])];
   for (const path of destinations) {
     validateRoot(path, "destination", true);
-    if (![pilot.configRoot, pilot.dataRoot, pilot.stateRoot, ...pilot.agentHomes].some((root) => isWithin(comparable(path), comparable(root)))) fail("destination");
+    if (!allowed.some((root) => isWithin(comparable(path), comparable(root)))) fail("destination");
     for (const forbidden of pilot.forbidden) if (touches(path, forbidden)) fail("destination");
   }
 }

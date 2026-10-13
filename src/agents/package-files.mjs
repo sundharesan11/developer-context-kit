@@ -99,8 +99,8 @@ async function removeFiles(dir, rels) {
   }
 }
 
-export async function performPackageAction(roots, action, {files, priorReceipt, nextReceipt, journalPath}, {faults = {}} = {}) {
-  assertWritable(roots, [action.path, journalPath]);
+export async function performPackageAction(roots, action, {files, priorReceipt, nextReceipt, journalPath, targetHome}, {faults = {}} = {}) {
+  assertWritable(roots, [action.path, journalPath], {targetHome});
   validateRoot(action.path, "target");
   if (!["create", "update", "remove"].includes(action.status)) throw new DevctxError("INVALID_INPUT", "Invalid package action");
   if (action.status === "create") {
@@ -116,7 +116,7 @@ export async function performPackageAction(roots, action, {files, priorReceipt, 
     for (const rel of Object.keys(priorReceipt.files)) await unlink(join(action.path, ...rel.split("/")));
   }
   await faults.beforeReceipt?.(action);
-  assertWritable(roots, [action.path, journalPath]);
+  assertWritable(roots, [action.path, journalPath], {targetHome});
   validateRoot(action.path, "target");
   if (action.status === "remove") {
     await unlink(join(action.path, marker));

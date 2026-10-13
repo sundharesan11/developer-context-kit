@@ -101,16 +101,16 @@ export async function applyPackageInstall(roots, selection, input, { fingerprint
     const reloadedHashes = fileHashes(files);
     if (manifest.packageDigest !== plan.packageDigest || (validation ? digest(validation) : null) !== plan.validationDigest || intended.some((action) => canonicalJson(action.files) !== canonicalJson(reloadedHashes))) throw new DevctxError("STALE_VERSION", "Revision changed during apply");
     for (const action of intended) {
-      assertWritable(roots, [action.path, journalPath]);
+      assertWritable(roots, [action.path, journalPath], { targetHome: input.targetHome });
       const prior = await observed(action.path, manifest, selection.workspace, plan.mode);
       if (prior.status !== action.status || (prior.receipt ? digest(prior.receipt) : null) !== action.priorReceiptDigest) throw new DevctxError("STALE_VERSION", "Target changed during apply");
       const nextReceipt = { schemaVersion: 2, kind: "skill-package", skill: manifest.name, version: "0.0.0-local", audience: "personal", workspace: selection.workspace, revision: plan.revision, packageDigest: plan.packageDigest, files: fileHashes(files), runId: id };
-      await performPackageAction(roots, action, {files, priorReceipt: prior.receipt, nextReceipt, journalPath}, {faults});
+      await performPackageAction(roots, action, {files, priorReceipt: prior.receipt, nextReceipt, journalPath, targetHome: input.targetHome}, {faults});
       journal.completed.push(action);
       await atomicReplace(journalPath, canonicalJson(journal) + "\n");
     }
     return { applied: true, runId: id, actions: plan.actions };
-  }, { destinations: [input.targetHome, consumed, join(runs, id)] });
+  }, { destinations: [input.targetHome, consumed, join(runs, id)], targetHome: input.targetHome });
 }
 export async function packageInstallStatus(roots, selection, input) {
   selectionCheck(selection); safeHome(roots, input.targetHome);
@@ -136,5 +136,5 @@ export async function packageInstallStatus(roots, selection, input) {
       planned = await planPackageInstall(roots, selection, input);
     }
     return { status: history.incomplete.length ? "RECOVERY_REQUIRED" : "ok", ...history, consumed, actions, planned };
-  }, { destinations: [input.targetHome] });
+  }, { destinations: [input.targetHome], targetHome: input.targetHome });
 }
