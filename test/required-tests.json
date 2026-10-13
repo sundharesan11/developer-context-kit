@@ -197,5 +197,8 @@
   "Git more than 16 remotes or a remote URL above 2 KiB is LIMIT",
   "Git doctor reports GIT_QUERY_FAILED for a bound repository with broken config",
   "Git init refuses roots inside a repository whose config is broken",
-  "Git non-repository directory keeps its not-a-repo meaning"
+  "Git non-repository directory keeps its not-a-repo meaning",
+  "U5 public record APIs refuse caller operation ids including edited proposals",
+  "U5 planted operation claims, bad supersession and mismatched ids are corrupt not trusted",
+  "U5 handoff export refuses a corrupt snapshot naming the record id"
 ]

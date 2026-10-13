@@ -16,5 +16,7 @@ function checkRequest({ scope, project, requestId }) {
   assertScopeId(scope); assertProjectId(project, scope);
   if (typeof requestId !== "string" || !/^req_[a-z0-9_-]{8,64}$/.test(requestId)) invalid();
 }
+// Record IDs are derived, never trusted from disk: readBundle recomputes recordIdFor from the stored scope, project and requestId.
 export const recordIdFor = (value) => { checkRequest(value); return "rec_" + hex(value.scope + "\0" + value.project + "\0" + value.requestId); };
+// Operation IDs are stamped only by onboarding (commitOnboardingBundle); public record APIs refuse them and readSnapshot trusts one only when its manifest lists the record.
 export const operationIdFor = (value) => { checkRequest(value); return "op_" + digest({ scope: value.scope, project: value.project, requestId: value.requestId }).slice(7, 31); };

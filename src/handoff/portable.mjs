@@ -59,7 +59,7 @@ export async function buildPortableHandoff(roots, pilot, input) {
     const resolved = await resolveContext(roots, { scope, cwd });
     assertInPilot(pilot, resolved.worktree.root, "repos");
     const snapshot = await readSnapshot(roots, scope, resolved.project);
-    if (snapshot.corrupt.length) throw new DevctxError("INTEGRITY", "Project snapshot is incomplete");
+    if (snapshot.corrupt.length) throw new DevctxError("INTEGRITY", "Project snapshot is incomplete", { records: snapshot.corrupt.map((c) => c.id) });
     const selected = new Set(recordIds), records = [];
     for (const id of [...recordIds].sort()) {
       const record = snapshot.records.find((item) => item.id === id);

@@ -98,5 +98,9 @@ export function portableRecord(record, { projected = false } = {}) {
 const SAFE_CODES = new Set(["INVALID_INPUT", "INVALID_ID", "LIMIT", "HANDOFF_UNSAFE", "SENSITIVE_CONTENT", "GATE_REQUIRED", "PATH_UNSAFE", "PATH_ESCAPE", "PROJECT_UNBOUND", "RECORD_NOT_EXPORTABLE", "INTEGRITY", "RECOVERY_REQUIRED", "SOURCE_CHANGED", "CONFLICT", "GIT_UNAVAILABLE", "STORAGE_ERROR", "SCHEMA_UNSUPPORTED"]);
 export function handoffError(error) {
   const code = error instanceof DevctxError ? error.code.replace(/^DEVCTX_/, "") : "STORAGE_ERROR";
-  return new DevctxError(SAFE_CODES.has(code) ? code : "STORAGE_ERROR", "Portable handoff held; inspect selected evidence and pilot locally");
+  const message = "Portable handoff held; inspect selected evidence and pilot locally";
+  // Corrupt-record IDs are opaque hashes; pass them through so an operator can find the record.
+  const ids = code === "INTEGRITY" ? error.details?.records : null;
+  if (Array.isArray(ids) && ids.length && ids.every((id) => typeof id === "string" && RECORD_ID.test(id))) return new DevctxError(code, message + "; corrupt records: " + ids.slice(0, 5).join(", ") + (ids.length > 5 ? ", ..." : ""), { records: ids });
+  return new DevctxError(SAFE_CODES.has(code) ? code : "STORAGE_ERROR", message);
 }

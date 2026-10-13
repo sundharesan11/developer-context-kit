@@ -9,7 +9,7 @@ import { readPrivateJson, readPrivateText, writeNewFile, ensurePrivatePath, fsyn
 import { withPilotLock, scopeLockPath } from "../storage/lock.mjs";
 import { canonicalJson, digest, sha256 } from "../storage/canonical.mjs";
 import { REQUEST_ID } from "../storage/plan.mjs";
-import { recordIdFor, assertScopeId, assertProjectId } from "../identity/ids.mjs";
+import { recordIdFor, assertScopeId, assertProjectId, RECORD_ID } from "../identity/ids.mjs";
 import { buildRecord, validateRecord, validateDraft, recordHash } from "./schema.mjs";
 import { assertNoSensitive, findForbiddenFields } from "./redact.mjs";
 const dirFor = (roots, scope, project) => join(roots.dataRoot, "scopes", scope, "projects", project);
@@ -20,7 +20,7 @@ async function readBundle(roots, scope, project, id) {
     const dir = recDir(roots, scope, project, id);
     const record = validateRecord(await readPrivateJson(join(dir, "record.json")));
     const body = await readPrivateText(join(dir, "body.md"), 32768);
-    if (record.id !== id || record.scope !== scope || record.project !== project || sha256(body) !== record.bodyHash || Buffer.byteLength(body) !== record.bodyBytes) throw new DevctxError("INTEGRITY", "Bundle mismatch");
+    if (record.id !== id || recordIdFor({ scope, project, requestId: record.requestId }) !== id || record.scope !== scope || record.project !== project || sha256(body) !== record.bodyHash || Buffer.byteLength(body) !== record.bodyBytes) throw new DevctxError("INTEGRITY", "Bundle mismatch");
     return { record, body };
   } catch (error) { if (error.code === "ENOENT") throw new DevctxError("INTEGRITY", "Bundle missing"); throw error; }
 }
@@ -48,12 +48,21 @@ export async function verifyManifestBundles(roots, scope, project, manifest) {
     }
   } catch { throw recovery(); }
 }
+const INPUT_KEYS = ["scope", "project", "requestId", "recordedBy", "draft"];
 function assertPublicInput(input) {
-  if (!input || Object.keys(input).some((key) => !["scope", "project", "requestId", "recordedBy", "draft", "operationId"].includes(key))) throw new DevctxError("INVALID_INPUT", "Unexpected record field");
+  if (!input || Object.keys(input).some((key) => !INPUT_KEYS.includes(key))) throw new DevctxError("INVALID_INPUT", "Unexpected record field");
+}
+function assertBundleOptions(options) {
+  if (Object.keys(options).some((key) => !["now", "faults"].includes(key))) throw new DevctxError("INVALID_INPUT", "Unexpected bundle option");
 }
 export async function commitBundle(roots, input, options = {}) {
-  assertPublicInput(input);
-  if (Object.keys(options).some((key) => !["now", "faults"].includes(key))) throw new DevctxError("INVALID_INPUT", "Unexpected bundle option");
+  assertPublicInput(input); assertBundleOptions(options);
+  return commitBundleInternal(roots, input, options);
+}
+// Onboarding only: the sole path that may stamp a record with an operation ID. readSnapshot trusts the claim only if that operation's manifest lists the record.
+export async function commitOnboardingBundle(roots, input, options = {}) {
+  if (!input || Object.keys(input).some((key) => ![...INPUT_KEYS, "operationId"].includes(key)) || !/^op_[a-f0-9]{24}$/.test(input.operationId ?? "")) throw new DevctxError("INVALID_INPUT", "Unexpected record field");
+  assertBundleOptions(options);
   return commitBundleInternal(roots, input, options);
 }
 async function commitBundleInternal(roots, input, { now = () => new Date(), faults = {}, supersedes = [] } = {}) {
@@ -84,6 +93,31 @@ async function commitBundleInternal(roots, input, { now = () => new Date(), faul
   fsyncDir(join(base, "records"));
   return { recordId: id, recordHash: recordHash(record), created: true, bodyHash: record.bodyHash };
 }
+// Map of published operation ID -> (record ID -> record hash) from that operation's manifest; other projects' operations list nothing here.
+async function operationBundles(roots, scope, project, operations) {
+  const claims = new Map();
+  for (const op of operations) {
+    const listed = new Map();
+    claims.set(op.operationId, listed);
+    if (op.scope !== scope || op.project !== project) continue;
+    try { for (const b of (await readManifest(roots, scope, project, op.operationId, op.manifestHash)).bundles) listed.set(b.id, b.recordHash); } catch { /* An unreadable manifest vouches for no record. */ }
+  }
+  return claims;
+}
+// Records that can reach themselves through supersession among present records (self-reference is rejected earlier).
+function cycleMembers(records) {
+  const edges = new Map(records.map((r) => [r.id, r.supersedes])), cyclic = new Set();
+  for (const id of edges.keys()) {
+    const seen = new Set(), queue = [...edges.get(id)];
+    while (queue.length) {
+      const next = queue.pop();
+      if (next === id) { cyclic.add(id); break; }
+      if (seen.has(next) || !edges.has(next)) continue;
+      seen.add(next); queue.push(...edges.get(next));
+    }
+  }
+  return cyclic;
+}
 export async function readSnapshot(roots, scope, project) {
   const committed = await requireCommittedProject(roots, scope, project);
   const directory = join(dirFor(roots, scope, project), "records");
@@ -92,13 +126,21 @@ export async function readSnapshot(roots, scope, project) {
   const records = [], corrupt = [];
   let hiddenUncommitted = 0;
   const published = new Set(committed.registry.operations.map((op) => op.operationId));
+  const claims = await operationBundles(roots, scope, project, committed.registry.operations);
+  const candidates = [];
   for (const id of ids) {
     try {
       const { record, body } = await readBundle(roots, scope, project, id);
       if (record.operationId && !published.has(record.operationId)) { hiddenUncommitted++; continue; }
-      records.push({ ...record, body, recordHash: recordHash(record), effective: record.status, supersededBy: [] });
+      const hash = recordHash(record);
+      if (record.operationId && claims.get(record.operationId)?.get(id) !== hash) throw new DevctxError("INTEGRITY", "Unlisted operation claim");
+      if (!Array.isArray(record.supersedes) || record.supersedes.some((x) => typeof x !== "string" || !RECORD_ID.test(x) || x === id) || new Set(record.supersedes).size !== record.supersedes.length) throw new DevctxError("INTEGRITY", "Invalid supersession");
+      candidates.push({ ...record, body, recordHash: hash, effective: record.status, supersededBy: [] });
     } catch { corrupt.push({ id, code: "DEVCTX_INTEGRITY" }); }
   }
+  const cyclic = cycleMembers(candidates);
+  for (const r of candidates) if (cyclic.has(r.id)) corrupt.push({ id: r.id, code: "DEVCTX_INTEGRITY" }); else records.push(r);
+  corrupt.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const byId = new Map(records.map((r) => [r.id, r]));
   for (const r of records) for (const id of r.supersedes) {
     const predecessor = byId.get(id);

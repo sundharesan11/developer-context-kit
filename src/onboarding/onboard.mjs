@@ -14,7 +14,7 @@ import { recordIdFor, operationIdFor, assertScopeId, assertProjectId } from "../
 import { scanRepository } from "./scan.mjs";
 import { deriveCandidates } from "./candidates.mjs";
 import { renderProfile } from "./profile.mjs";
-import { commitBundle, verifyManifestBundles } from "../records/store.mjs";
+import { commitOnboardingBundle, verifyManifestBundles } from "../records/store.mjs";
 import { writeRunReceipt } from "../storage/runs.mjs";
 const template = readFileSync(fileURLToPath(new URL("../../templates/client-profile.md", import.meta.url)), "utf8");
 const conflict = () => new DevctxError("BINDING_CONFLICT", "Worktree bound elsewhere", { reason: "bound elsewhere" });
@@ -112,7 +112,7 @@ export async function applyOnboard(roots, pilot, input, { fingerprint, now = () 
     assertWritable(roots, exact);
     const bundles = [];
     for (const item of draftsFor(plan)) {
-      const result = await commitBundle(roots, { scope: input.scope, project: input.project, requestId: item.requestId, recordedBy: { actor: "human", runId: "run_onboard0001" }, draft: item.draft, operationId }, { now, faults: { beforeRename: faults.beforeRename } });
+      const result = await commitOnboardingBundle(roots, { scope: input.scope, project: input.project, requestId: item.requestId, recordedBy: { actor: "human", runId: "run_onboard0001" }, draft: item.draft, operationId }, { now, faults: { beforeRename: faults.beforeRename } });
       bundles.push({ id: result.recordId, recordHash: result.recordHash, bodyHash: result.bodyHash ?? plan.bundles.find((b) => b.id === result.recordId).bodyHash });
     }
     if (faults.afterBundles) await faults.afterBundles();
