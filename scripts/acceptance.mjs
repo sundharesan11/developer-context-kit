@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile, readFile, readdir, lstat, readlink, symlink, realpath, chmod } from "node:fs/promises";
-import { join, resolve, dirname, relative } from "node:path";
+import { join, resolve, dirname, relative, isAbsolute } from "node:path";
 import { tmpdir, homedir } from "node:os";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { main } from "../src/cli.mjs";
@@ -23,12 +23,16 @@ const arg = (name) => { const i = args.indexOf(name); return i < 0 ? null : args
 const pilotRoot = resolve(arg("--pilot-root") ?? "");
 const reportPath = arg("--report");
 if (!arg("--pilot-root") || !reportPath || existsSync(pilotRoot)) { process.stdout.write(JSON.stringify({ ok: false, error: "PILOT_ROOT_REQUIRED_AND_ABSENT" }) + "\n"); process.exit(1); }
+const canonical = (path) => { try { return typeof path === "string" && isAbsolute(path) && resolve(path) === path && realpathSync(path) === path; } catch { return false; } };
+const extraForbidden = args.flatMap((name, i) => name === "--forbidden" ? [args[i + 1]] : []);
+if (!extraForbidden.every(canonical)) { process.stdout.write(JSON.stringify({ ok: false, error: "FORBIDDEN_PATH_INVALID" }) + "\n"); process.exit(1); }
 const kit = resolve(import.meta.dirname, "..");
 const pre = mkdtempSync(join(tmpdir(), "devctx-acc-preflight-"));
-const pilotSpec = { schemaVersion: 1, pilotRoot, configRoot: join(pilotRoot, "config"), dataRoot: join(pilotRoot, "data"), stateRoot: join(pilotRoot, "state"), inputsRoot: join(pilotRoot, "inputs"), agentHomes: [join(pilotRoot, "homes/claude"), join(pilotRoot, "homes/codex")], repos: [join(pilotRoot, "repos/atlas"), join(pilotRoot, "repos/beacon")], forbidden: [kit] };
+const pilotSpec = { schemaVersion: 1, pilotRoot, configRoot: join(pilotRoot, "config"), dataRoot: join(pilotRoot, "data"), stateRoot: join(pilotRoot, "state"), inputsRoot: join(pilotRoot, "inputs"), agentHomes: [join(pilotRoot, "homes/claude"), join(pilotRoot, "homes/codex")], repos: [join(pilotRoot, "repos/atlas"), join(pilotRoot, "repos/beacon")], forbidden: [kit, ...extraForbidden] };
 const preflightFile = join(pre, "pilot.json");
 await writeFile(preflightFile, JSON.stringify(pilotSpec), { mode: 0o600 });
-await loadPilot(preflightFile, { home: homedir(), env: process.env });
+try { await loadPilot(preflightFile, { home: homedir(), env: process.env }); }
+catch (error) { process.stdout.write(JSON.stringify({ ok: false, error: "PILOT_PREFLIGHT_REFUSED", code: error.code ?? null, details: error.details ?? null }) + "\n"); process.exit(1); }
 await mkdir(pilotRoot, { mode: 0o700 });
 const pilotFile = join(pilotRoot, "pilot.json");
 await writeFile(pilotFile, JSON.stringify(pilotSpec), { mode: 0o600 });
@@ -147,7 +151,7 @@ checks.push({ id: "fresh-agent-smoke", status: "deferred", detail: "needs real-h
 const required = ["onboard-acme-zero-diff", "onboard-globex-zero-diff", "scripts-hooks-fsmonitor-not-run", "resolve-exact", "wrong-scope-rejected", "symlink-cwd-rejected", "unconfirmed-worktree-rejected", "duplicate-binding-rejected", "source-change-stale-plan", "provenance-and-supersession", "handoff-claude-to-codex", "idempotent-retry", "reused-request-conflict", "stale-hash-rejected", "crash-recovery-onboard", "lock-busy-not-broken", "no-cross-scope-canary", "install-preview-apply-idempotent-conflict-uninstall", "real-home-refused", "fake-auth-wrong-actor", "hub-proposal-no-write", "doctor-readonly", "handoff-export-portable", "package-allowlist", "fresh-agent-smoke"];
 const ids = new Set(checks.map((c) => c.id));
 const ok = required.every((id) => ids.has(id)) && checks.every((c) => c.status === "passed" || c.id === "fresh-agent-smoke" && c.status === "deferred");
-const report = { schemaVersion: 1, ok, pilotRoot, checks };
+const report = { schemaVersion: 1, ok, pilotRoot, forbidden: pilotSpec.forbidden, checks };
 await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 });
 process.stdout.write(JSON.stringify({ ok, checks: checks.map(({ id, status }) => ({ id, status })), report: reportPath }) + "\n");
 process.exitCode = ok ? 0 : 1;

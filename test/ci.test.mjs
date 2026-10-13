@@ -1,9 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { existsSync, mkdtempSync, realpathSync } from "node:fs";
+import { readFile, rm } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 
 const workflowPath = join(import.meta.dirname, "../.github/workflows/ci.yml");
+const acceptancePath = join(import.meta.dirname, "../scripts/acceptance.mjs");
+function canonicalTemp(t, prefix) {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  return dir;
+}
+function runAcceptance(parts) {
+  const r = spawnSync(process.execPath, [acceptancePath, ...parts], { encoding: "utf8", env: { PATH: process.env.PATH, HOME: process.env.HOME } });
+  return { status: r.status, out: JSON.parse(r.stdout.trim().split("\n").at(-1)) };
+}
 
 test("CI uses read-only pinned actions without privileged triggers or persistent credentials", async () => {
   const text = await readFile(workflowPath, "utf8");
@@ -33,4 +46,38 @@ test("CI evaluates both Node versions without claiming Linux support and checks 
   assert.ok(text.indexOf("run: npm run check:package") < text.indexOf("run: npm test"));
   assert.match(text, /report\.checks\.length, 25/);
   assert.match(text, /status === 'passed'\)\.length, 24/);
+});
+
+test("acceptance forbidden path overlapping the pilot fails preflight without fixture writes", async (t) => {
+  const parent = canonicalTemp(t, "devctx-acc-overlap-"), pilotRoot = join(parent, "pilot"), report = join(parent, "report.json");
+  const r = runAcceptance(["--pilot-root", pilotRoot, "--report", report, "--forbidden", parent]);
+  assert.notEqual(r.status, 0);
+  assert.equal(r.out.ok, false);
+  assert.equal(r.out.error, "PILOT_PREFLIGHT_REFUSED");
+  assert.equal(existsSync(pilotRoot), false);
+  assert.equal(existsSync(report), false);
+});
+
+test("acceptance forbidden option rejects relative non-canonical and missing values", async (t) => {
+  const parent = canonicalTemp(t, "devctx-acc-usage-"), other = canonicalTemp(t, "devctx-acc-other-");
+  for (const value of ["relative/dir", other + "/../" + other.split("/").at(-1), other + "/", join(other, "missing"), "--report"]) {
+    const pilotRoot = join(parent, "pilot"), report = join(parent, "report.json");
+    const r = runAcceptance(["--pilot-root", pilotRoot, "--report", report, "--forbidden", value]);
+    assert.equal(r.status, 1, value);
+    assert.deepEqual(r.out, { ok: false, error: "FORBIDDEN_PATH_INVALID" }, value);
+    assert.equal(existsSync(pilotRoot), false, value);
+  }
+  const r = runAcceptance(["--pilot-root", join(parent, "pilot"), "--report", join(parent, "report.json"), "--forbidden"]);
+  assert.deepEqual(r.out, { ok: false, error: "FORBIDDEN_PATH_INVALID" });
+});
+
+test("acceptance records every extra forbidden path in its report", async (t) => {
+  const parent = canonicalTemp(t, "devctx-acc-report-"), first = canonicalTemp(t, "devctx-acc-forbid1-"), second = canonicalTemp(t, "devctx-acc-forbid2-");
+  const report = join(parent, "report.json");
+  const r = runAcceptance(["--pilot-root", join(parent, "pilot"), "--report", report, "--forbidden", first, "--forbidden", second]);
+  assert.equal(r.status, 0);
+  const saved = JSON.parse(await readFile(report, "utf8"));
+  assert.equal(saved.ok, true);
+  assert.equal(saved.checks.length, 25);
+  assert.deepEqual(saved.forbidden, [resolve(import.meta.dirname, ".."), first, second]);
 });

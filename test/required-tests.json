@@ -183,5 +183,8 @@
   "public alpha diagram is accessible static SVG with no remote resources",
   "public alpha onboarding documents only implemented CLI routes",
   "CI uses read-only pinned actions without privileged triggers or persistent credentials",
-  "CI evaluates both Node versions without claiming Linux support and checks private acceptance results"
+  "CI evaluates both Node versions without claiming Linux support and checks private acceptance results",
+  "acceptance forbidden path overlapping the pilot fails preflight without fixture writes",
+  "acceptance forbidden option rejects relative non-canonical and missing values",
+  "acceptance records every extra forbidden path in its report"
 ]
