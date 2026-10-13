@@ -90,3 +90,50 @@ test("docs state the candidate's limits in pinned phrases", async () => {
     for (const p of phrases) assert.ok(text.includes(p), `${file}: ${p}`);
   }
 });
+
+const BUNDLED_SKILLS = ["devctx-onboard", "devctx-resume", "devctx-record"];
+const readBundledSkill = (name) => readFile(join(import.meta.dirname, "..", "skills", name, "SKILL.md"), "utf8");
+test("bundled skills invoke only implemented CLI routes through DEVCTX_KIT", async () => {
+  const { COMMANDS } = await import("../src/cli.mjs");
+  for (const name of BUNDLED_SKILLS) {
+    const text = await readBundledSkill(name);
+    assert.doesNotMatch(text, /node bin\/devctx\.mjs/, name + ": checkout-relative command");
+    let count = 0;
+    for (const match of text.matchAll(/devctx\.mjs"?[ \t]+([a-z-]+)(?:[ \t]+([a-z-]+))?/g)) {
+      const first = match[1], second = match[2];
+      assert.ok(COMMANDS[first] || COMMANDS[first + " " + second], name + ": " + match[0]);
+      count++;
+    }
+    assert.ok(count > 0, name + " invokes the CLI");
+    for (const match of text.matchAll(/node[^\n]*devctx\.mjs[^\n]*/g)) {
+      assert.match(match[0], /node "\$DEVCTX_KIT\/bin\/devctx\.mjs" /, name + ": " + match[0]);
+      assert.doesNotMatch(match[0], /record publish/, name + " never invokes record publish");
+    }
+  }
+});
+test("bundled skill frontmatter passes skill-builder rules with a one-line description", async () => {
+  const { validatePackage, parseFrontmatter } = await import("../src/skill-builder/validate.mjs");
+  for (const name of BUNDLED_SKILLS) {
+    const text = await readBundledSkill(name);
+    const result = validatePackage({ "SKILL.md": text }, name);
+    assert.equal(result.valid, true, name);
+    assert.equal(result.unchecked.length, 0, name);
+    const { meta, body } = parseFrontmatter(text);
+    assert.deepEqual(Object.keys(meta).sort(), ["description", "name"]);
+    assert.match(meta.description, /^Use when /, name);
+    assert.ok(meta.description.length <= 1024, name);
+    assert.match(text, /^description:\s*(.+)$/m, name + " is discoverable");
+    assert.match(body, /^# /m, name + " has a title");
+  }
+});
+test("bundled skills state the DEVCTX_KIT validation and pilot-path rules", async () => {
+  const phrases = ["DEVCTX_KIT", "absolute path", "real path", "bin/devctx.mjs", "package.json", "developer-context-kit",
+    "inside the current repository", "confirm", "pilot path", "kit checkout", "repos", "--scope",
+    "GATE_REQUIRED", "GIT_QUERY_FAILED", "PROJECT_UNBOUND", "record publish --apply", "untrusted", "Never send or share"];
+  for (const name of BUNDLED_SKILLS) {
+    const text = await readBundledSkill(name);
+    for (const phrase of phrases) assert.ok(text.includes(phrase), name + ": " + phrase);
+  }
+  assert.match(await readBundledSkill("devctx-record"), /attributed to "human"/);
+  assert.match(await readBundledSkill("devctx-resume"), /freshness/);
+});
