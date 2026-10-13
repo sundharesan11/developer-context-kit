@@ -186,5 +186,13 @@
   "CI evaluates both Node versions without claiming Linux support and checks private acceptance results",
   "acceptance forbidden path overlapping the pilot fails preflight without fixture writes",
   "acceptance forbidden option rejects relative non-canonical and missing values",
-  "acceptance records every extra forbidden path in its report"
+  "acceptance records every extra forbidden path in its report",
+  "Git unreadable include fails closed with GIT_QUERY_FAILED before any filter runs",
+  "Git malformed config is GIT_QUERY_FAILED, not a non-repository",
+  "Git query that hangs past the timeout is GIT_QUERY_FAILED",
+  "Git output above the buffer is LIMIT",
+  "Git more than 16 remotes or a remote URL above 2 KiB is LIMIT",
+  "Git doctor reports GIT_QUERY_FAILED for a bound repository with broken config",
+  "Git init refuses roots inside a repository whose config is broken",
+  "Git non-repository directory keeps its not-a-repo meaning"
 ]

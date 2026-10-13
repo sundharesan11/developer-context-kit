@@ -37,7 +37,7 @@ export async function runDoctor(roots) {
   let registry;
   try { registry = (await readRegistry(roots)).value; }
   catch (error) { checks.push(check("registry", existsSync(join(roots.configRoot, "registry.json")) ? "fail" : "unavailable", error.code ?? "unavailable")); }
-  let bundleProblems = 0, boundProblems = 0, registryProblems = 0;
+  let bundleProblems = 0, boundProblems = 0, registryProblems = 0, gitQueryFailed = 0;
   if (registry) for (const entry of registry.bindings) {
     try {
       const op = registry.operations.find((x) => x.operationId === entry.operationId);
@@ -50,7 +50,7 @@ export async function runDoctor(roots) {
     try { const snap = await readSnapshot(roots, entry.scope, entry.project); bundleProblems += snap.corrupt.length; }
     catch { bundleProblems++; }
     try { const loc = await locateWorktree(entry.path); if (!loc.git || loc.commonDir !== entry.commonDir) boundProblems++; }
-    catch { boundProblems++; }
+    catch (error) { if (error?.code === "DEVCTX_GIT_QUERY_FAILED") gitQueryFailed++; else boundProblems++; }
   }
   if (registry) checks.push(check("registry", registryProblems ? "fail" : "ok", registryProblems ? { code: "DEVCTX_RECOVERY_REQUIRED", invalidEntries: registryProblems } : { generation: registry.generation }));
   checks.push(check("bundles", bundleProblems ? "fail" : registry ? "ok" : "unavailable", { corrupt: bundleProblems }));
@@ -62,6 +62,6 @@ export async function runDoctor(roots) {
     catch { incomplete.push(run); }
   }
   checks.push(check("install-journals", incomplete.length ? "warn" : "ok", incomplete));
-  checks.push(check("bound-roots", boundProblems ? "fail" : registry ? "ok" : "unavailable", { changed: boundProblems }));
+  checks.push(check("bound-roots", boundProblems || gitQueryFailed ? "fail" : registry ? "ok" : "unavailable", gitQueryFailed ? { code: "DEVCTX_GIT_QUERY_FAILED", changed: boundProblems, gitQueryFailed } : { changed: boundProblems }));
   return { ok: !checks.some((c) => c.status === "fail"), checks };
 }

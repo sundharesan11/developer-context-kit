@@ -9,7 +9,7 @@ import { canonicalJson, sha256 } from "../storage/canonical.mjs";
 import { readPrivateJson, readPrivateText, writeNewFile, ensurePrivateDir, ensurePrivatePath, fsyncDir } from "../storage/fsx.mjs";
 import { withPilotLock, registryLockPath, scopeLockPath } from "../storage/lock.mjs";
 import { assertNoSensitive } from "../records/redact.mjs";
-import { git } from "../identity/git.mjs";
+import { gitQuery } from "../identity/git.mjs";
 import { deepestExisting } from "./roots.mjs";
 const invalid = () => { throw new DevctxError("INVALID_INPUT", "Invalid configuration"); };
 export function validatePreferences(value = {}) {
@@ -33,7 +33,7 @@ export async function applyInit(roots, { actorRefs = [], preferences = {}, now =
   actorRefs.forEach(assertActorRef);
   const userPath = join(roots.configRoot, "user.json"), registryPath = join(roots.configRoot, "registry.json");
   for (const root of [roots.configRoot, roots.dataRoot, roots.stateRoot]) {
-    if (git(deepestExisting(root), ["rev-parse", "--is-inside-work-tree"]).stdout.trim() === "true") throw new DevctxError("PATH_UNSAFE", "Private roots inside Git worktree");
+    if (gitQuery(deepestExisting(root), ["rev-parse", "--is-inside-work-tree"], { notRepo: true }).stdout.trim() === "true") throw new DevctxError("PATH_UNSAFE", "Private roots inside Git worktree");
   }
   assertWritable(roots, [roots.configRoot, roots.dataRoot, roots.stateRoot, userPath, registryPath]);
   return withPilotLock(roots, registryLockPath(roots), { kind: "init" }, async () => {
