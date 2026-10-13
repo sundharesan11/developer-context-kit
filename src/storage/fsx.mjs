@@ -1,4 +1,4 @@
-import { constants, lstatSync, realpathSync, openSync, closeSync, fstatSync, readSync, writeSync, fsyncSync, mkdirSync, renameSync } from "node:fs";
+import { constants, lstatSync, realpathSync, openSync, closeSync, fstatSync, readSync, writeSync, fsyncSync, mkdirSync, renameSync, unlinkSync } from "node:fs";
 import { dirname, join, relative, isAbsolute, sep } from "node:path";
 import { randomBytes } from "node:crypto";
 import { DevctxError } from "../errors.mjs";
@@ -29,7 +29,7 @@ export function ensurePrivatePath(root, segments = []) {
   for (const seg of segments) { at = safeJoin(at, seg); ensurePrivateDir(at); }
   return at;
 }
-export async function readPrivateBytes(path, limit = 131072) {
+export async function readPrivateBytes(path, limit = 131072, { faults = {} } = {}) {
   let fd;
   try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); }
   catch (e) { if (e.code === "ELOOP") throw new DevctxError("PATH_UNSAFE", "Unsafe private path"); throw e; }
@@ -38,24 +38,41 @@ export async function readPrivateBytes(path, limit = 131072) {
     if (before.size > limit) throw new DevctxError("LIMIT", "Private file exceeds limit");
     const buf = Buffer.alloc(before.size); let offset = 0;
     while (offset < buf.length) { const n = readSync(fd, buf, offset, buf.length - offset, offset); if (!n) break; offset += n; }
+    if (faults.afterRead) await faults.afterRead();
     const after = fstatSync(fd);
-    if (offset !== before.size || before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs) throw new DevctxError("INTEGRITY", "Private file changed");
+    if (offset !== before.size || before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw new DevctxError("INTEGRITY", "Private file changed");
     return buf;
   } finally { closeSync(fd); }
 }
 export async function readPrivateText(path, limit = 131072) { return (await readPrivateBytes(path, limit)).toString("utf8"); }
 export async function readPrivateJson(path, limit) { try { return JSON.parse(await readPrivateText(path, limit)); } catch (e) { if (e instanceof SyntaxError) throw new DevctxError("INTEGRITY", "Invalid private JSON"); throw e; } }
-export async function writeNewFile(path, content) {
-  let fd;
+// faults is a test seam: beforeWrite/beforeFsync run inside the write so a failure can be injected.
+export async function writeNewFile(path, content, { faults = {} } = {}) {
+  let fd, own;
   try { fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600); }
   catch (e) { if (e.code === "EEXIST") throw new DevctxError("CONFLICT", "Private file already exists"); throw e; }
-  try { const buf = Buffer.from(content); let off = 0; while (off < buf.length) off += writeSync(fd, buf, off, buf.length - off); fsyncSync(fd); }
-  finally { closeSync(fd); }
+  try {
+    own = fstatSync(fd);
+    if (faults.beforeWrite) await faults.beforeWrite();
+    const buf = Buffer.from(content); let off = 0; while (off < buf.length) off += writeSync(fd, buf, off, buf.length - off);
+    if (faults.beforeFsync) await faults.beforeFsync();
+    fsyncSync(fd);
+  } catch (error) {
+    // Remove the partial file only while the path still names the file this call created.
+    try { const current = own && lstatSync(path); if (current && current.dev === own.dev && current.ino === own.ino) unlinkSync(path); } catch { /* The original error matters more. */ }
+    throw error;
+  } finally { closeSync(fd); }
 }
-export function fsyncDir(path) { const fd = openSync(path, constants.O_RDONLY); try { fsyncSync(fd); } finally { closeSync(fd); } }
-export async function atomicReplace(path, content) {
+export function fsyncDir(path) {
+  let fd;
+  try { fd = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW); }
+  catch (e) { if (e.code === "ELOOP" || e.code === "ENOTDIR") throw new DevctxError("PATH_UNSAFE", "Unsafe private path"); throw e; }
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+export async function atomicReplace(path, content, { faults = {} } = {}) {
   const temp = join(dirname(path), ".devctx-" + randomBytes(8).toString("hex") + ".tmp");
-  await writeNewFile(temp, content);
-  renameSync(temp, path);
+  await writeNewFile(temp, content, { faults });
+  try { if (faults.beforeRename) await faults.beforeRename(); renameSync(temp, path); }
+  catch (error) { try { unlinkSync(temp); } catch { /* The original error matters more. */ } throw error; }
   fsyncDir(dirname(path));
 }

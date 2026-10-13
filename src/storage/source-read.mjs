@@ -72,6 +72,10 @@ export async function readApprovedSource(root, rel, { faults = {} } = {}) {
     return { rel, dev: st1.dev, ino: st1.ino, size: st1.size, mtimeMs: st1.mtimeMs, sha256: "sha256:" + createHash("sha256").update(bytes).digest("hex"), ancestors: beforeAncestors.result, text, utf8Valid: Buffer.from(text, "utf8").equals(bytes) };
   } finally { await handle.close(); }
 }
+// File identity (KTD3): sha256 of the exact bytes is the authority. dev, ino, size and the ancestor chain
+// must also match when a binding is verified. mtimeMs is stored for compatibility and is informational only:
+// its millisecond float loses precision, so it is never compared across reads; within one read, the
+// mtimeMs/ctimeMs comparison above only detects a change racing that read.
 export function sourceIdentity(bound) {
   const { rel, dev, ino, size, mtimeMs, sha256, ancestors } = bound;
   return { rel, dev, ino, size, mtimeMs, sha256, ancestors };

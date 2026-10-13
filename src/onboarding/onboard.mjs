@@ -15,7 +15,7 @@ import { scanRepository } from "./scan.mjs";
 import { deriveCandidates } from "./candidates.mjs";
 import { renderProfile } from "./profile.mjs";
 import { commitOnboardingBundle, verifyManifestBundles } from "../records/store.mjs";
-import { writeRunReceipt } from "../storage/runs.mjs";
+import { writeRunReceipt, ensureRunReceipt } from "../storage/runs.mjs";
 const template = readFileSync(fileURLToPath(new URL("../../templates/client-profile.md", import.meta.url)), "utf8");
 const conflict = () => new DevctxError("BINDING_CONFLICT", "Worktree bound elsewhere", { reason: "bound elsewhere" });
 function requestFor(input) {
@@ -98,7 +98,9 @@ export async function applyOnboard(roots, pilot, input, { fingerprint, now = () 
       if (manifest.requestHash !== requestHash || manifest.planFingerprint !== published.planFingerprint || manifest.operationId !== published.operationId) throw new DevctxError("RECOVERY_REQUIRED", "Published operation mismatch");
       await readBindingByHash(roots, input.scope, input.project, manifest.bindingHash);
       await verifyManifestBundles(roots, input.scope, input.project, manifest);
-      return { ...onboardReceipt(published, manifest), replayed: true };
+      const receipt = onboardReceipt(published, manifest);
+      await ensureRunReceipt(roots, "run_" + published.operationId.slice(3), receipt);
+      return { ...receipt, replayed: true };
     }
     const plan = await planOnboard(roots, pilot, { ...input, requestId });
     assertFingerprint(plan, fingerprint);

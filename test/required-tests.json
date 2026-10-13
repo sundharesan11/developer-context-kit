@@ -203,5 +203,12 @@
   "Git non-repository directory keeps its not-a-repo meaning",
   "U5 public record APIs refuse caller operation ids including edited proposals",
   "U5 planted operation claims, bad supersession and mismatched ids are corrupt not trusted",
-  "U5 handoff export refuses a corrupt snapshot naming the record id"
+  "U5 handoff export refuses a corrupt snapshot naming the record id",
+  "U4 writeNewFile removes its partial file after an injected write failure and a retry succeeds",
+  "U4 atomicReplace leaves no temp file after an injected rename failure",
+  "U4 fsyncDir refuses a symlinked or non-directory path",
+  "U4 readPrivateBytes refuses a file whose ctime changes during the read",
+  "U4 withLock closes its handle, removes its lock and surfaces the action error when cleanup fails",
+  "U4 describeLock does not follow a symlinked lock file and a foreign symlink lock stays",
+  "U4 onboarding replay writes a run receipt lost after registry publish"
 ]
