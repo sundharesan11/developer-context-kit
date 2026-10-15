@@ -232,7 +232,7 @@ Layout of `~/.devctx` after activation:
 - **Requirements:** R1, R6; KTD2, KTD7.
 - **Dependencies:** U1.
 - **Files:** `src/config/live.mjs` (new), `src/config/commands.mjs`, `src/cli.mjs`, `test/live-profile.test.mjs`, `scripts/package-allowlist.json`.
-- **Approach:** `live init` previews the profile and store layout from the account home, `--agent`, optional `--repo` and the running kit, then writes them on `--apply` with the plan fingerprint. `live add-repo` appends one repository. `live set-kit` runs from the new kit and changes the kit path and commit; its preview shows the old and new values. Each apply records the approved digest under the pilot lock. All refuse an existing non-empty store without a profile.
+- **Approach:** `live init` previews the profile and store layout from the account home, `--agent`, optional `--repo` and the running kit, then writes them on `--apply` with the plan fingerprint. `live add-repo` appends one repository. `live set-kit` runs from the new kit and changes the kit path and commit; its preview shows the old and new values. Each apply records the approved digest under the pilot lock. All refuse an existing non-empty store without a profile. `live init` refuses when `~/.devctx` is not 0700 and never changes its mode; `docs/LIVE.md` creates it at 0700 before the clone.
 - **Test scenarios:**
   - `live init` preview writes nothing, and apply creates 0700 folders, the profile and the approved digest.
   - A stale fingerprint is refused.
@@ -247,7 +247,7 @@ Layout of `~/.devctx` after activation:
 - **Requirements:** R13, R16; KTD11.
 - **Dependencies:** U1, U4.
 - **Files:** `scripts/repo-snapshot.mjs` (new), `test/live-onboard.test.mjs` (new), `test/helpers.mjs`, `scripts/package-allowlist.json`, `src/onboarding/onboard.mjs` if a gap appears.
-- **Approach:** add a read-only `scripts/repo-snapshot.mjs` implementing the R16 snapshot, used by tests and by U8. Run preview, apply and brief against a fixture repository outside `pilotRoot`, on a feature branch with a second worktree.
+- **Approach:** add a read-only `scripts/repo-snapshot.mjs` implementing the R16 snapshot, used by tests and by U8. It calls Git only through `gitQuery`, so it never refreshes the index. Run preview, apply and brief against a fixture repository outside `pilotRoot`, on a feature branch with a second worktree.
 - **Execution note:** expected to be test work; change code only if a write is found.
 - **Test scenarios:**
   - Covers AE4. The snapshot is identical before and after onboarding.
@@ -312,7 +312,7 @@ Layout of `~/.devctx` after activation:
 | Whitespace | `git diff --check` | all |
 | Acceptance | `node scripts/acceptance.mjs --pilot-root <new temp dir> --report <file>` | U7 |
 | CI | all four Pilot CI lanes green on the branch, then on main | merge |
-| Plan review | independent Claude review through Orca before implementation | plan |
+| Plan review | independent Claude review through Orca before implementation: approved at `f6b98c9` after three focused rounds (Orca terminal `plan-review-live`) | plan |
 | Diff review | `ce-code-review` plus an independent Claude diff review through Orca | merge |
 | Activation evidence | private evidence files for R15 | U8 |
 
