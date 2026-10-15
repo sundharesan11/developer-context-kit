@@ -75,7 +75,7 @@ A worker proposes. A controller publishes. These are separate steps.
 
 ## 7. Bundled skills
 
-The `devctx-onboard`, `devctx-resume` and `devctx-record` skills call the CLI as `node "$DEVCTX_KIT/bin/devctx.mjs"`. Before the first call they check that `DEVCTX_KIT` is an absolute path whose real path is outside the current repository, that it contains `bin/devctx.mjs` and a `package.json` named `developer-context-kit`, and that the user has confirmed it. The user must supply the pilot path; the skills refuse one inside the current repository or the kit checkout. See [Architecture](ARCHITECTURE.md).
+The `devctx-onboard`, `devctx-resume` and `devctx-record` skills call the CLI as `node "$DEVCTX_KIT/bin/devctx.mjs"`. Before the first call they check that `DEVCTX_KIT` is an absolute path whose real path is outside the current repository, that it contains `bin/devctx.mjs` and a `package.json` named `developer-context-kit`, and that the user has confirmed it. They offer the live profile `~/.devctx/live.json` as the pilot path, or take a disposable pilot path from the user, and ask the user to confirm it once per session. They refuse a pilot path inside the current repository or the kit checkout. They compare the `kitCommit` in the installed skill's `.devctx-owned.json` with the commit checked out at `DEVCTX_KIT`, and warn the user when they differ. They never run `live init`, `live add-repo` or `live set-kit`. See [Architecture](ARCHITECTURE.md) and [Live activation](LIVE.md).
 
 ## Errors that mean stop and ask
 

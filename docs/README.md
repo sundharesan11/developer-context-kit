@@ -1,6 +1,6 @@
 # Documentation
 
-Start with a disposable synthetic project. The kit is not yet a real-home installer.
+Start with a disposable synthetic project. Live mode for one real machine is implemented; follow the [live activation runbook](LIVE.md) only after the demo.
 
 ## First use
 
@@ -10,6 +10,7 @@ Start with a disposable synthetic project. The kit is not yet a real-home instal
 | How do I run a safe demo? | [Getting started](GETTING-STARTED.md) |
 | How do preview, approval and context work? | [Guided onboarding](ONBOARDING.md) |
 | Where does each part fit? | [Architecture](ARCHITECTURE.md) |
+| How do I activate it on my machine? | [Live activation](LIVE.md) |
 | What works and what remains? | [Roadmap](ROADMAP.md) and [Limitations](LIMITATIONS.md) |
 
 ## Workflow and data contracts

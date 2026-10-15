@@ -4,7 +4,7 @@ Keep project context between coding-agent sessions.
 
 Developer Context Kit is a local CLI for recording project facts, decisions and handoffs outside the project repository. It builds bounded, source-linked briefs so you can carry reviewed context into the next session.
 
-**Status: experimental pilot.** This is a **local package candidate**, not a daily-use agent installer. The `devctx` command is **NOT currently installed** globally by this checkout. All stateful commands require an explicit disposable pilot. Start with synthetic data.
+**Status: experimental pilot.** This is a **local package candidate**, not a daily-use agent installer. The `devctx` command is **NOT currently installed** globally by this checkout. All stateful commands require an explicit pilot file: a disposable pilot, or a live profile for one real machine. Start with synthetic data. Live mode is implemented; its activation evidence on a real machine is pending. See the [live activation runbook](docs/LIVE.md).
 
 [Start here](docs/GETTING-STARTED.md) · [Guided onboarding](docs/ONBOARDING.md) · [Documentation](docs/README.md) · [Roadmap](docs/ROADMAP.md)
 
@@ -54,15 +54,16 @@ For checkout instructions, expected results and troubleshooting, use [Getting st
 
 ## What works, and what does not
 
-| Area | Available in the disposable pilot | Not delivered |
+| Area | Available | Not delivered |
 | --- | --- | --- |
-| Project context | Onboarding preview/apply with re-onboard retirement, scoped records, source hashes, bounded briefs | Backup and restore, real-project activation and migration |
+| Project context | Onboarding preview/apply with re-onboard retirement, scoped records, source hashes, bounded briefs | Backup and restore, migration |
 | Continuity | Advisory handoffs and [selected-record Markdown export](docs/HANDOFF.md) | Session start and end hooks, packet import or sharing |
 | Skill creation | [Requirements, design approval, drafts and validation](docs/SKILL-BUILDER.md) (frozen: bug fixes only) | Conversational creator, live behavior evaluation and export |
 | Skill sources | [12-source catalog, release checks, pinned acquisition and reviewed disposable installation](docs/SKILL-SOURCES.md) (frozen: bug fixes only) | Universal agent compatibility or weekly automatic updates |
+| Live mode | [Live profile](docs/LIVE.md) with a pinned kit clone, bundled-skill install and uninstall beside foreign skills, rollback check, read-only onboarding of a real repository | Activation evidence on a real machine, a global `devctx` command |
 | Identity and learning | Fake-provider identity checks and private hub proposals | Live Slack/email/issue connectors, sends or company-hub writes |
 
-Claude and Codex filesystem layouts have fixture tests. Those tests do not prove that a fresh native session discovers or uses a skill. Gemini, Cursor and Command Code support is not established.
+Claude and Codex filesystem layouts have fixture tests. Those tests do not prove that a fresh native session discovers or uses a skill. Gemini, Cursor and Command Code support is not established. Cursor reads `~/.agents/skills` and will see live Codex installs.
 
 ## Your data stays separate
 
@@ -80,6 +81,7 @@ A personal assistant setup, an agent host and a company knowledge hub are option
 - [Contributing](CONTRIBUTING.md): development setup, tests and public-safe examples.
 - [Security reporting](SECURITY.md): keep vulnerabilities and private data out of public issues.
 - [Release checklist](docs/RELEASING.md): what must pass before publication.
+- [Live activation](docs/LIVE.md): the runbook for one real machine and one real repository.
 - [Roadmap](docs/ROADMAP.md): remaining work toward daily use, starting with backup and restore.
 
 ## License

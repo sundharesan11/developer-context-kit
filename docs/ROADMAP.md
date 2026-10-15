@@ -1,10 +1,10 @@
 # Readiness and remaining work
 
-Status snapshot: 2026-10-14. This is a reviewed synthetic local pilot, not a daily-use installer or a publicly released package. This file tracks product capabilities, not private projects, accounts or tasks.
+Status snapshot: 2026-10-16. This is a reviewed local pilot with an implemented live mode, not a daily-use installer or a publicly released package. This file tracks product capabilities, not private projects, accounts or tasks.
 
 Latest recorded CI evidence: [Pilot CI](CI.md) run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four lanes (macOS 15 and Ubuntu 24.04, each with Node 26.4.0 and 22.13.0) passed 234 of 234 tests and 24 acceptance checks, with one fresh-agent smoke check deferred. That run is evidence for `8f1133a` only. Linux and the Node 22.13.0 floor remain evaluation lanes; support for them is not claimed. Later commits need their own run.
 
-Skill-builder A/B, the source catalog, pinned acquisition, reviewed disposable source installation and portable selected-record handoff are implemented. The public-alpha documentation adds a guided first run, architecture and release checklist. The core carries Apache-2.0; publication still needs the gates in [Releasing](RELEASING.md).
+Skill-builder A/B, the source catalog, pinned acquisition, reviewed disposable source installation, portable selected-record handoff and live mode are implemented. Live mode's activation evidence on a real machine is pending; see [Live activation](LIVE.md). The public-alpha documentation adds a guided first run, architecture and release checklist. The core carries Apache-2.0; publication still needs the gates in [Releasing](RELEASING.md).
 
 ## What works in the pilot
 
@@ -19,7 +19,7 @@ The order favors daily use: protect private state first, then prove one real pro
 | Priority | Work | Exit evidence |
 | --- | --- | --- |
 | 1: daily-use blocker | Private-state backup and restore, recovery guidance, upgrade compatibility | Restore into a separate private location, integrity checks, no live-file overwrite, documented failure recovery |
-| 2: daily-use blocker | Controlled real-home activation and a small real-project onboarding pilot | Reviewed target/file preview, approval, preserved foreign skills, fresh Claude and Codex sessions finding the intended skills, rollback verified |
+| 2: daily-use blocker | Controlled real-home activation and a small real-project onboarding pilot. **Implemented; activation evidence pending.** Live profile, live-safe bundled install, rollback check and read-only onboarding; runbook in [LIVE.md](LIVE.md) | Reviewed target/file preview, approval, preserved foreign skills, fresh Claude and Codex sessions finding the intended skills, rollback verified |
 | 3: daily-use blocker | Session start and end hooks: agent start, resume and handoff adapters with a reviewable worker lifecycle | End-to-end context propagation and completion receipts; pruning requires user approval; advisory limits documented |
 | 4: daily-use blocker | Registration and selective migration from an existing personal setup | Dry-run mapping and scope checks, approved selected records only, source preserved, no client-repo changes unless explicitly requested |
 | 5: connected workflows | Live auth and connector adapters with actor/account/workspace verification | Explicit provider/account selection, secrets resolved outside records, mismatch tests, separate read/draft/send permissions |
@@ -28,7 +28,7 @@ The order favors daily use: protect private state first, then prove one real pro
 | 8: skill updates | Weekly third-party skill updater and scheduler | Disabled schedule and harmless run first; fresh-host discovery evidence; explicit user enablement |
 | 9: open-source release | Core Apache-2.0, public-alpha guides and CI configured; provenance/history clearance, successful release-candidate CI and versioned release process remain | Owner rights clearance, fresh-machine setup, reviewed version/platform evidence, verified private reporting channel, explicit repository and release approval |
 
-Priorities 5–8 need not block an offline daily-use pilot. The open-source release comes last. Do not build every connector before validating the core with one real project. None of these rows authorizes an account connection, publication, installation, migration or outbound action on its own.
+The owner deferred priority 1 on 2026-10-16, so priority 2 was built first. Until backup ships, the live store has no backup; see [Limitations](LIMITATIONS.md). Priorities 5–8 need not block an offline daily-use pilot. The open-source release comes last. Do not build every connector before validating the core with one real project. None of these rows authorizes an account connection, publication, installation, migration or outbound action on its own.
 
 **Frozen:** skill-builder and skill-source feature work is frozen until the daily-use blockers (priorities 1–4) ship. Bug fixes and safety fixes continue. Skill export and the weekly updater resume at priorities 7 and 8.
 

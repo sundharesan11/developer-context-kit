@@ -62,9 +62,9 @@ No files are added to the project by onboarding. Private context is stored outsi
 
 ## 4. Evaluate, then stop at the boundary
 
-You can inspect briefs, exercise the [skill builder](SKILL-BUILDER.md) and review a [private handoff export](HANDOFF.md). Do not point the pilot at a real client checkout or edit the guards to reach your normal agent homes.
+You can inspect briefs, exercise the [skill builder](SKILL-BUILDER.md) and review a [private handoff export](HANDOFF.md). Do not point a disposable pilot at a real client checkout or edit the guards to reach your normal agent homes. Real use goes through a live profile instead; see [Live activation](LIVE.md).
 
-Backup and restore, real-project activation with fresh native-agent discovery, session hooks and migration remain [roadmap work](ROADMAP.md), in that order. A globally installed skill from another setup is not evidence that it uses this kit.
+Live mode is implemented, and [Live activation](LIVE.md) is its runbook. Its evidence on a real machine, including fresh native-agent discovery, is pending. Backup and restore, session hooks and migration remain [roadmap work](ROADMAP.md). A globally installed skill from another setup is not evidence that it uses this kit.
 
 The kit does not delete demo directories. Temporary directories can disappear after a reboot or system cleanup. Keep only synthetic data in them. Inspect the exact directory before manually disposing of it.
 

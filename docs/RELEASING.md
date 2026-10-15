@@ -57,7 +57,7 @@ Keep raw reports private until reviewed. A release note may summarize counts, en
 
 Suggested factual description:
 
-> Developer Context Kit is an experimental local CLI for scoped project context, decisions and handoffs. Its current pilot uses disposable directories and synthetic tests. Real-agent activation, live connectors and automatic skill updates are still under development.
+> Developer Context Kit is an experimental local CLI for scoped project context, decisions and handoffs. Its pilot uses disposable directories and synthetic tests. A live mode for one real machine is implemented but not yet proven by activation evidence. Live connectors and automatic skill updates are still under development.
 
 Do not claim “works with every agent,” “automatically remembers everything,” “secure sandbox,” or “weekly updates are enabled.” Do not present a previous milestone's test count as evidence for a different commit.
 
@@ -66,7 +66,7 @@ Do not claim “works with every agent,” “automatically remembers everything
 Items follow the [roadmap](ROADMAP.md) order.
 
 - [ ] Private-state backup/restore and upgrade compatibility.
-- [ ] Controlled real-project and real-home activation with reviewed targets and rollback.
+- [ ] Controlled real-project and real-home activation with reviewed targets and rollback. Live mode is implemented ([Live activation](LIVE.md)); activation evidence is pending.
 - [ ] Fresh Claude and Codex sessions finding and using the intended skills.
 - [ ] Session start and end hooks that carry context into and out of a session.
 - [ ] Reviewed selective migration from an existing personal setup.
