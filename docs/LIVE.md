@@ -54,11 +54,11 @@ REPO='<absolute real path of the repository>'
 Onboarding refuses a repository that Git filters could touch, and stops on a slow `git status`. Check both before any write. These commands mirror the kit's checks and write nothing.
 
 ```sh
-git -C "$REPO" config --includes --name-only --get-regexp '^(filter|diff)\.'
-time git --no-optional-locks -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.untrackedCache=false -C "$REPO" status --porcelain=v1 -z --untracked-files=normal --ignore-submodules=all | wc -c
+GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$REPO" config --includes --name-only --get-regexp '^(filter|diff)\.'
+time GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git --no-optional-locks -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.untrackedCache=false -C "$REPO" status --porcelain=v1 -z --untracked-files=normal --ignore-submodules=all | wc -c
 ```
 
-- Any output from the first command means onboarding will fail with `PATH_UNSAFE`. The check reads every configuration the repository sees, including global settings such as a Git LFS filter. Stop. Never change the repository's Git configuration to get past it.
+- Any output from the first command means onboarding will fail with `PATH_UNSAFE`. The kit ignores global and system Git configuration, so only the repository's own configuration counts, such as a repository-local Git LFS filter. Stop. Never change the repository's Git configuration to get past it.
 - The status must finish well inside 30 seconds and print less than 16 MiB. Otherwise onboarding fails with `GIT_QUERY_FAILED` or `LIMIT`. Stop.
 - Run both in a shell with no `GIT_*` variables set, as the kit does.
 
@@ -245,7 +245,7 @@ node "$KIT/bin/devctx.mjs" agents rollback-check --pilot "$PROFILE" --run-id '<i
 
 Repeat for `codex`. Uninstall removes only entries whose receipt matches a completed install in this store. Edited or foreign entries are preserved and reported.
 
-The rollback check compares the folder with the inventory taken before that install run. It is read-only. It fails on any difference in `devctx-*` entries. It lists changes to foreign top-level entries with their times; other tools change those folders too, so the owner reviews each one. Run it right after uninstall, so foreign churn stays small.
+The rollback check compares the folder with the inventory taken before that install run. It is read-only. It fails with `DEVCTX_ROLLBACK_MISMATCH` and exit code 1 on any difference in `devctx-*` entries. It lists changes to foreign top-level entries with their times; other tools change those folders too, so the owner reviews each one. Run it right after uninstall, so foreign churn stays small.
 
 Then reinstall with a fresh preview and approval (step 13), and repeat a fresh-session check (step 15).
 
