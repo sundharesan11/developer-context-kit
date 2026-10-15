@@ -10,6 +10,7 @@ import { sha256, canonicalJson, digest } from "../storage/canonical.mjs";
 import { readPrivateJson, readPrivateBytes, writeNewFile, atomicReplace, ensurePrivatePath, fsyncDir, info, isWithin } from "../storage/fsx.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { RUN_ID } from "../storage/runs.mjs";
+import { recordInventory, INVENTORY } from "./inventory.mjs";
 export const AGENT_HOMES = { claude: ".claude/skills", codex: ".agents/skills" };
 // Earlier releases wrote Codex skills here. Status reports leftovers; nothing ever acts on them.
 export const LEGACY_HOMES = { codex: ".codex/skills" };
@@ -163,10 +164,14 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
     assertFingerprint(plan, fingerprint);
     const intended = plan.actions.filter((a) => WRITES.includes(a.status));
     if (!intended.length) return { applied: false, actions: plan.actions };
-    for (const a of intended) assertWritable(roots, [...entryPaths(a.path), journalPath], { targetHome: a.root });
+    for (const a of intended) assertWritable(roots, [...entryPaths(a.path), journalPath, join(runDir, INVENTORY)], { targetHome: a.root });
     ensurePrivatePath(roots.stateRoot, ["runs"]);
     try { await mkdir(runDir, { mode: 0o700 }); }
     catch (error) { if (error.code === "EEXIST") throw new DevctxError("CONFLICT", "Run ID already exists"); throw error; }
+    // The inventory of every target skill folder comes first; faults.afterInventory is a test seam just after it.
+    const folders = [...new Map(plan.actions.map((a) => [a.agent, { agent: a.agent, dir: dirname(a.path) }])).values()];
+    await recordInventory(runDir, { runId, profileId: profileOf(pilot), mode: plan.mode, folders });
+    await faults.afterInventory?.();
     const copies = ensurePrivatePath(roots.stateRoot, ["runs", runId, "copies"]);
     // Before the first target write, the run folder keeps the old and new bytes that the journal's hashes name.
     const entries = [], bytes = [];

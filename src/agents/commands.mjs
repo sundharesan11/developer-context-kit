@@ -1,6 +1,7 @@
 import { DevctxError } from "../errors.mjs";
 import { randomBytes } from "node:crypto";
 import { planInstall, applyInstall, installStatus, planRecovery, applyRecovery } from "./install.mjs";
+import { rollbackCheck } from "./inventory.mjs";
 const options = { home: { type: "string" }, agent: { type: "string", multiple: true }, apply: { type: "boolean" }, "plan-fingerprint": { type: "string" }, "run-id": { type: "string" } };
 const agents = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
 const command = (mode) => ({ options, async run(values, ctx) {
@@ -18,3 +19,5 @@ export const agentsRecoverCommand = { options: { apply: { type: "boolean" }, "pl
   if (!values["plan-fingerprint"]) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
   return applyRecovery(ctx.roots, ctx.pilot, { fingerprint: values["plan-fingerprint"] });
 } };
+// Read-only: compares the skill folders now with an install run's pre-apply inventory.
+export const agentsRollbackCheckCommand = { options: { "run-id": { type: "string" } }, run: (values, ctx) => rollbackCheck(ctx.roots, ctx.pilot, { runId: values["run-id"] }) };

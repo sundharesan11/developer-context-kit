@@ -53,6 +53,7 @@
   "src/agents/commands.mjs",
   "src/agents/envelope.mjs",
   "src/agents/install.mjs",
+  "src/agents/inventory.mjs",
   "src/agents/package-files.mjs",
   "src/agents/package-install.mjs",
   "src/auth/approval.mjs",

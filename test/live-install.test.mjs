@@ -2,12 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import { mkdir, writeFile, readFile, readdir, chmod, symlink, readlink, lstat, rm, stat } from "node:fs/promises";
+import { mkdir, writeFile, readFile, readdir, chmod, symlink, readlink, lstat, rm, stat, utimes } from "node:fs/promises";
 import { sandbox, makeRepo, fixtureGit, treeSnapshot, makePilot, runCli } from "./helpers.mjs";
 import { loadPilot, rootsFromPilot, recordApprovedDigest } from "../src/config/pilot.mjs";
 import { ensureRoots } from "../src/config/roots.mjs";
 import { canonicalJson, sha256 } from "../src/storage/canonical.mjs";
 import { planInstall, applyInstall, installStatus, planRecovery, applyRecovery, SKILL_NAMES } from "../src/agents/install.mjs";
+import { rollbackCheck } from "../src/agents/inventory.mjs";
 
 const crash = () => { throw new Error("injected crash"); };
 const kitFiles = (label, skills = SKILL_NAMES) => Object.fromEntries(skills.map((s) => [`skills/${s}/SKILL.md`, `---\nname: ${s}\ndescription: ${label} fixture.\n---\n${label} ${s}\n`]));
@@ -36,7 +37,7 @@ async function liveInstall(t) {
       ensureRoots(rootsFromPilot(draft));
       await recordApprovedDigest(rootsFromPilot(draft));
       const pilot = await loadPilot(path, context);
-      return { pilot, roots: rootsFromPilot(pilot), commit };
+      return { pilot, roots: rootsFromPilot(pilot), commit, path, kit };
     },
     async kit(name, files) { return pinnedKit(join(devctx, name), files); }
   };
@@ -254,4 +255,138 @@ test("bundled CLI recover previews and applies an approved recovery plan", async
   assert.equal(applied.code, 0, JSON.stringify(applied.json));
   assert.equal(existsSync(join(home, ".claude/skills/devctx-onboard")), false);
   assert.equal((await installStatus(p.roots, p.pilot, { targetHome: home })).status, "ok");
+});
+
+// Foreign trees in both skill folders: a nested directory, a plain file, a symlinked directory tree and a foreign devctx-* file.
+async function foreignTrees(f) {
+  const outside = join(f.sb, "outside-tree");
+  await mkdir(join(outside, "deep/a/b"), { recursive: true });
+  await writeFile(join(outside, "deep/a/b/buried-secret.md"), "outside\n");
+  for (const dir of [f.claude, f.codex]) {
+    await mkdir(join(dir, "team-skill/references"), { recursive: true });
+    await writeFile(join(dir, "team-skill/SKILL.md"), "team\n");
+    await writeFile(join(dir, "team-skill/references/notes.md"), "notes\n");
+    await writeFile(join(dir, "README.txt"), "folder readme\n");
+    await symlink(outside, join(dir, "linked-tree"));
+    await writeFile(join(dir, "devctx-notes.md"), "a foreign devctx-named file\n");
+  }
+  return outside;
+}
+const foreignHashes = async (f, outside) => Promise.all([f.claude, f.codex].flatMap((dir) => [treeSnapshot(join(dir, "team-skill")), readFile(join(dir, "README.txt"), "utf8"), readlink(join(dir, "linked-tree"))]).concat([treeSnapshot(outside)]));
+const check = (f, p, runId) => runCli(["agents", "rollback-check", "--pilot", p.path, "--run-id", runId], { home: f.home, env: {}, kitRoot: p.kit });
+const inventoryOf = async (p, runId) => JSON.parse(await readFile(join(p.roots.stateRoot, "runs", runId, "inventory.json"), "utf8"));
+
+test("live AE2: install then uninstall of both agents passes the rollback check and leaves foreign trees unchanged", async (t) => {
+  const f = await liveInstall(t), p = await f.use(), input = { agents: ["claude", "codex"], mode: "install" };
+  const outside = await foreignTrees(f), before = await foreignHashes(f, outside);
+  const tops = [(await readdir(f.claude)).sort(), (await readdir(f.codex)).sort()];
+  await install(p, input, "run_ae2install");
+  await install(p, { ...input, mode: "uninstall" }, "run_ae2uninst1");
+  assert.deepEqual(await foreignHashes(f, outside), before);
+  assert.deepEqual([(await readdir(f.claude)).sort(), (await readdir(f.codex)).sort()], tops);
+  const result = await rollbackCheck(p.roots, p.pilot, { runId: "run_ae2install" });
+  assert.equal(result.status, "ok");
+  assert.deepEqual(result.folders.map((x) => [x.agent, x.dir, x.existedBefore, x.devctx.length, x.foreign.length]), [["claude", f.claude, true, 0, 0], ["codex", f.codex, true, 0, 0]]);
+  const cli = await check(f, p, "run_ae2install");
+  assert.equal(cli.code, 0, JSON.stringify(cli.json));
+  assert.equal(cli.json.result.status, "ok");
+  // The uninstall run records its own inventory, taken before its first write.
+  const uninstallInventory = await inventoryOf(p, "run_ae2uninst1");
+  assert.equal(uninstallInventory.mode, "uninstall");
+  assert.ok(uninstallInventory.folders.every((x) => SKILL_NAMES.every((s) => x.devctx.some((r) => r.path === s + "/SKILL.md"))));
+  await assert.rejects(rollbackCheck(p.roots, p.pilot, { runId: "run_ae2uninst1" }), { code: "DEVCTX_INVALID_INPUT" });
+  await assert.rejects(rollbackCheck(p.roots, p.pilot, { runId: "run_neverran01" }), { code: "DEVCTX_NOT_FOUND" });
+  await assert.rejects(rollbackCheck(p.roots, p.pilot, { runId: "../escape" }), { code: "DEVCTX_INVALID_ID" });
+});
+
+test("live rollback check fails on a leftover or missing devctx entry after uninstall", async (t) => {
+  const f = await liveInstall(t), p = await f.use(), input = { agents: ["claude", "codex"], mode: "install" };
+  await foreignTrees(f);
+  await install(p, input, "run_leftover01");
+  await install(p, { ...input, mode: "uninstall" }, "run_leftunin01");
+  await writeFile(join(f.claude, "devctx-leftover.md"), "left behind\n");
+  await rm(join(f.codex, "devctx-notes.md"));
+  await assert.rejects(rollbackCheck(p.roots, p.pilot, { runId: "run_leftover01" }), (error) => {
+    assert.equal(error.code, "DEVCTX_ROLLBACK_MISMATCH");
+    const [claude, codex] = error.details.folders;
+    assert.deepEqual(claude.devctx.map((x) => [x.path, x.change]), [["devctx-leftover.md", "added"]]);
+    assert.deepEqual(codex.devctx.map((x) => [x.path, x.change]), [["devctx-notes.md", "removed"]]);
+    return true;
+  });
+  const cli = await check(f, p, "run_leftover01");
+  assert.equal(cli.code, 1);
+  assert.equal(cli.json.ok, false);
+  assert.equal(cli.json.error.code, "DEVCTX_ROLLBACK_MISMATCH");
+});
+
+test("live rollback check lists a foreign top-level file edited after install with timestamps and passes", async (t) => {
+  const f = await liveInstall(t), p = await f.use(), input = { agents: ["claude"], mode: "install" };
+  await foreignTrees(f);
+  await install(p, input, "run_foreign001");
+  await writeFile(join(f.claude, "README.txt"), "edited by the owner\n");
+  const later = new Date(Date.now() + 60000);
+  await utimes(join(f.claude, "README.txt"), later, later);
+  await install(p, { ...input, mode: "uninstall" }, "run_foreignun1");
+  const result = await rollbackCheck(p.roots, p.pilot, { runId: "run_foreign001" });
+  assert.equal(result.status, "ok");
+  assert.deepEqual(result.folders.map((x) => x.agent), ["claude"]);
+  assert.equal(result.folders[0].foreign.length, 1);
+  const [change] = result.folders[0].foreign;
+  assert.deepEqual([change.name, change.change], ["README.txt", "changed"]);
+  assert.equal(change.now.mtime, later.toISOString());
+  assert.notEqual(change.before.mtime, change.now.mtime);
+});
+
+test("live inventory of a folder with over 150 foreign entries and symlinked trees records top-level entries only", async (t) => {
+  const f = await liveInstall(t), p = await f.use();
+  const outside = await foreignTrees(f);
+  for (let i = 0; i < 150; i++) await writeFile(join(f.claude, `foreign-${String(i).padStart(3, "0")}.md`), "x" + i + "\n");
+  for (let i = 0; i < 5; i++) await symlink(outside, join(f.claude, `linked-${i}`));
+  await symlink(outside, join(f.claude, "devctx-linked"));
+  const top = (await readdir(f.claude)).length;
+  await install(p, { agents: ["claude"], mode: "install" }, "run_wide00001");
+  const inventory = await inventoryOf(p, "run_wide00001");
+  const [claude] = inventory.folders;
+  assert.equal(claude.existed, true);
+  assert.equal(claude.entries.length + new Set(claude.devctx.map((r) => r.path.split("/")[0])).size, top);
+  assert.ok(claude.entries.length > 150);
+  assert.deepEqual(claude.devctx.map((r) => [r.path, r.type]), [["devctx-linked", "link"], ["devctx-notes.md", "file"]]);
+  assert.equal(claude.entries.find((e) => e.name === "linked-0").link, outside);
+  assert.equal(JSON.stringify(inventory).includes("buried-secret"), false);
+  assert.equal(JSON.stringify(inventory).includes("references"), false);
+});
+
+test("live rollback check makes no writes to the store or the skill folders", async (t) => {
+  const f = await liveInstall(t), p = await f.use(), input = { agents: ["claude", "codex"], mode: "install" };
+  await foreignTrees(f);
+  await install(p, input, "run_nowrite001");
+  const snap = () => Promise.all([treeSnapshot(p.pilot.pilotRoot), treeSnapshot(f.devctx), treeSnapshot(f.claude), treeSnapshot(f.codex)]);
+  // Checked while installed, when it fails, and again after uninstall, when it passes.
+  let before = await snap();
+  await assert.rejects(rollbackCheck(p.roots, p.pilot, { runId: "run_nowrite001" }), { code: "DEVCTX_ROLLBACK_MISMATCH" });
+  assert.equal((await check(f, p, "run_nowrite001")).code, 1);
+  assert.deepEqual(await snap(), before);
+  await install(p, { ...input, mode: "uninstall" }, "run_nowriteun1");
+  before = await snap();
+  assert.equal((await rollbackCheck(p.roots, p.pilot, { runId: "run_nowrite001" })).status, "ok");
+  assert.equal((await check(f, p, "run_nowrite001")).code, 0);
+  assert.deepEqual(await snap(), before);
+});
+
+test("live inventory is written before the first copy or target write", async (t) => {
+  const f = await liveInstall(t), p = await f.use(), input = { agents: ["claude", "codex"], mode: "install" };
+  await foreignTrees(f);
+  const before = [await treeSnapshot(f.claude), await treeSnapshot(f.codex)];
+  await assert.rejects(install(p, input, "run_invfault1", { faults: { afterInventory: crash } }), /injected crash/);
+  const inventory = await inventoryOf(p, "run_invfault1");
+  assert.deepEqual([inventory.runId, inventory.mode, inventory.folders.map((x) => x.agent)], ["run_invfault1", "install", ["claude", "codex"]]);
+  assert.deepEqual(await readdir(join(p.roots.stateRoot, "runs/run_invfault1")), ["inventory.json"]);
+  assert.deepEqual([await treeSnapshot(f.claude), await treeSnapshot(f.codex)], before);
+  await install(p, input, "run_invafter1");
+  assert.ok((await planInstall(p.pilot, input)).actions.every((a) => a.status === "installed"));
+});
+
+test("help lists agents rollback-check", async () => {
+  const help = await runCli(["help"]);
+  assert.ok(help.json.result.commands.includes("agents rollback-check"));
 });
