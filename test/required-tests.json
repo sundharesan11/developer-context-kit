@@ -272,5 +272,8 @@
   "live onboarding preview, apply and brief leave the client repository snapshot identical",
   "live onboarding of a dirty worktree warns instead of refusing and the second worktree is not confirmed",
   "repo snapshot detects tracked, untracked and .git changes, ignores logs and FETCH_HEAD, and never hashes ignored files",
-  "repo snapshot CLI writes a private file outside the repository and compares by path"
+  "repo snapshot CLI writes a private file outside the repository and compares by path",
+  "repo snapshot detects a rewrite and a nested new file inside a wholly ignored folder without writing to the repository",
+  "repo snapshot records a symlink inside an ignored folder without following it",
+  "repo snapshot fails loudly when ignored folders exceed the node cap"
 ]

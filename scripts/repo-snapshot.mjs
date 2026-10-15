@@ -2,8 +2,14 @@
 // Usage: node scripts/repo-snapshot.mjs --repo <path> --out <file>   writes a new 0600 JSON snapshot
 //        node scripts/repo-snapshot.mjs --compare <a> <b>             exit 0 identical, 1 different
 // Tracked and untracked files and .git (outside objects, logs and FETCH_HEAD) are hashed; ignored files
-// are recorded by path, size and modification time only, a wholly ignored folder as one entry. Git runs only through gitQuery, which never
-// refreshes the index or takes optional locks. The snapshot never writes inside the repository.
+// are recorded by path, size and modification time only, never by content. Git lists a wholly ignored
+// folder (such as node_modules) as one entry to stay inside gitQuery's output limit; the snapshot then
+// walks it with lstat only, never following symlinks, and records file, folder and symlink counts, total
+// bytes, the newest mtime and a sha256 over every node's path, type, size and mtime, so any add, remove,
+// resize or touch inside changes the entry. Ignored folders together may hold at most maxNodes nodes
+// (default 2,000,000, or DEVCTX_SNAPSHOT_MAX_NODES); beyond that the snapshot fails rather than pass.
+// Git runs only through gitQuery, which never refreshes the index or takes optional locks. The snapshot
+// never writes inside the repository.
 import { createReadStream, lstatSync, readdirSync, readlinkSync, realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -48,16 +54,51 @@ function walk(dir, base = dir, out = []) {
   }
   return out;
 }
-export async function snapshotRepo(repo) {
+export const DEFAULT_MAX_NODES = 2_000_000;
+function maxNodesFrom(env) {
+  const raw = env.DEVCTX_SNAPSHOT_MAX_NODES;
+  if (raw === undefined || raw === "") return DEFAULT_MAX_NODES;
+  if (!/^[1-9][0-9]*$/.test(raw)) throw new DevctxError("INVALID_INPUT", "DEVCTX_SNAPSHOT_MAX_NODES must be a positive integer");
+  return Number(raw);
+}
+// Aggregate of a wholly ignored folder: lstat only, children sorted by name, depth first, so the digest is
+// deterministic. budget.left counts down across every ignored folder of one snapshot.
+function ignoredFolder(dir, rel, budget) {
+  const hash = createHash("sha256");
+  const agg = { files: 0, dirs: 0, links: 0, bytes: 0, maxMtimeMs: 0 };
+  const stack = [""];
+  while (stack.length) {
+    const sub = stack.pop();
+    const childDirs = [];
+    for (const name of readdirSync(join(dir, sub)).sort()) {
+      if (--budget.left < 0) throw new DevctxError("SNAPSHOT_TOO_LARGE", "Ignored folders exceed the snapshot node cap; raise DEVCTX_SNAPSHOT_MAX_NODES or snapshot a smaller repository", { maxNodes: budget.max, folder: rel });
+      const path = sub ? sub + "/" + name : name;
+      const st = lstatSync(join(dir, path));
+      const type = st.isSymbolicLink() ? "link" : st.isDirectory() ? "dir" : st.isFile() ? "file" : "other";
+      if (type === "link") agg.links++;
+      else if (type === "dir") { agg.dirs++; childDirs.push(path); }
+      else if (type === "file") agg.files++;
+      if (type !== "dir") agg.bytes += st.size;
+      if (st.mtimeMs > agg.maxMtimeMs) agg.maxMtimeMs = st.mtimeMs;
+      hash.update(`${path}\0${type}\0${type === "dir" ? 0 : st.size}\0${st.mtimeMs}\n`);
+    }
+    for (let i = childDirs.length - 1; i >= 0; i--) stack.push(childDirs[i]);
+  }
+  return { ...agg, sha256: hash.digest("hex") };
+}
+export async function snapshotRepo(repo, { maxNodes = maxNodesFrom(process.env) } = {}) {
+  const budget = { max: maxNodes, left: maxNodes };
   const { root, commonDir } = located(repo);
   const entries = {};
   for (const rel of list(root, ["--cached"])) entries[rel] = await hashed(join(root, rel), "tracked");
   for (const rel of list(root, ["--others", "--exclude-standard"])) entries[rel] = await hashed(join(root, rel), "untracked");
   // --directory collapses a wholly ignored folder (such as node_modules) to one entry, keeping
-  // the listing inside gitQuery's output limit on large repositories.
+  // the listing inside gitQuery's output limit on large repositories; its contents are aggregated.
   for (const rel of list(root, ["--others", "--ignored", "--exclude-standard", "--directory"])) {
     const st = lstatSync(join(root, rel), { throwIfNoEntry: false });
-    entries[rel] = !st ? { class: "ignored", type: "missing" } : st.isDirectory() ? { class: "ignored", type: "dir", mtimeMs: st.mtimeMs } : { class: "ignored", size: st.size, mtimeMs: st.mtimeMs };
+    entries[rel] = !st ? { class: "ignored", type: "missing" }
+      : st.isDirectory() ? { class: "ignored", type: "dir", mtimeMs: st.mtimeMs, ...ignoredFolder(join(root, rel), rel, budget) }
+      : { class: "ignored", size: st.size, mtimeMs: st.mtimeMs };
   }
   const dotGit = join(root, ".git");
   const prefix = commonDir === dotGit ? ".git" : "git-common-dir";
