@@ -391,3 +391,128 @@ test("help lists agents rollback-check", async () => {
   const help = await runCli(["help"]);
   assert.ok(help.json.result.commands.includes("agents rollback-check"));
 });
+
+test("live recovery persists a completed update in a run that also holds an entry, and an approved release closes the hold", async (t) => {
+  const f = await liveInstall(t), a = await f.use(), input = { agents: ["claude"], mode: "install" };
+  await install(a, input, "run_mixbase01");
+  const b = await f.use(await f.kit("kit-b", kitFiles("Kit B")));
+  await assert.rejects(install(b, input, "run_mixupd001", { faults: { afterSkill: crash } }), /injected crash/);
+  // A second started entry that was never written still matches its old hashes, so recovery completes it from the copies.
+  const journalPath = join(b.roots.stateRoot, "runs/run_mixupd001/journal.json");
+  const journal = JSON.parse(await readFile(journalPath, "utf8"));
+  journal.started.push(1);
+  await writeFile(journalPath, canonicalJson(journal) + "\n");
+  await writeFile(join(f.claude, "devctx-onboard/SKILL.md"), "someone else's bytes\n");
+  const { plan, result } = await recover(b);
+  assert.deepEqual(plan.actions.map((x) => [x.skill, x.op]), [["devctx-onboard", "hold"], ["devctx-resume", "complete-update"]]);
+  assert.deepEqual(result.closed, []);
+  assert.match(await readFile(join(f.claude, "devctx-resume/SKILL.md"), "utf8"), /Kit B devctx-resume/);
+  const persisted = JSON.parse(await readFile(journalPath, "utf8"));
+  assert.ok(persisted.completed.some((e) => e.skill === "devctx-resume"));
+  assert.notEqual(persisted.closed, true);
+  assert.deepEqual((await planRecovery(b.roots, b.pilot)).actions.map((x) => [x.skill, x.op]), [["devctx-onboard", "hold"]]);
+  const preview = await planRecovery(b.roots, b.pilot, { release: true });
+  assert.equal(preview.release, true);
+  assert.deepEqual(preview.actions.map((x) => [x.skill, x.op, x.reason]), [["devctx-onboard", "hold", "unmatched-file"]]);
+  await assert.rejects(applyRecovery(b.roots, b.pilot, { fingerprint: preview.fingerprint }), { code: "DEVCTX_PLAN_MISMATCH" });
+  const released = await applyRecovery(b.roots, b.pilot, { fingerprint: preview.fingerprint, release: true });
+  assert.deepEqual(released.closed, ["run_mixupd001"]);
+  assert.equal(await readFile(join(f.claude, "devctx-onboard/SKILL.md"), "utf8"), "someone else's bytes\n");
+  assert.equal((await installStatus(b.roots, b.pilot, {})).status, "ok");
+  // The completed update is owned: uninstall removes it, and the held entry is left in place.
+  const uninstall = await planInstall(b.pilot, { ...input, mode: "uninstall" });
+  assert.deepEqual(uninstall.actions.map((x) => [x.skill, x.status]), [["devctx-onboard", "modified"], ["devctx-resume", "remove"], ["devctx-record", "remove"]]);
+  await applyInstall(b.roots, b.pilot, { ...input, mode: "uninstall" }, { fingerprint: uninstall.fingerprint, runId: "run_mixunin01" });
+  assert.deepEqual(await readdir(f.claude), ["devctx-onboard"]);
+});
+
+test("live truncated journal is held as unreadable until an approved release closes it, and the preview writes nothing", async (t) => {
+  const f = await liveInstall(t), p = await f.use(), codex = { agents: ["codex"], mode: "install" };
+  await assert.rejects(install(p, { agents: ["claude"], mode: "install" }, "run_torn00001", { faults: { afterReceipt: crash } }), /injected crash/);
+  const journalPath = join(p.roots.stateRoot, "runs/run_torn00001/journal.json"), torn = (await readFile(journalPath)).subarray(0, 40);
+  await writeFile(journalPath, torn);
+  await assert.rejects(install(p, codex, "run_blocked02"), { code: "DEVCTX_RECOVERY_REQUIRED" });
+  const { plan, result } = await recover(p);
+  assert.deepEqual(plan.actions.map((x) => [x.runId, x.op, x.reason, x.journalHash]), [["run_torn00001", "hold", "unreadable-journal", sha256(torn)]]);
+  assert.deepEqual(result.closed, []);
+  const cli = (args) => runCli(["agents", "recover", "--pilot", p.path, "--release", ...args], { home: f.home, env: {}, kitRoot: p.kit });
+  const snap = () => Promise.all([treeSnapshot(p.roots.stateRoot), treeSnapshot(f.claude), treeSnapshot(f.codex)]);
+  const before = await snap();
+  const preview = await cli([]);
+  assert.equal(preview.code, 0, JSON.stringify(preview.json));
+  assert.equal(preview.json.result.release, true);
+  assert.deepEqual(preview.json.result.actions.map((x) => [x.runId, x.reason]), [["run_torn00001", "unreadable-journal"]]);
+  assert.deepEqual(await snap(), before);
+  const applied = await cli(["--apply", "--plan-fingerprint", preview.json.result.fingerprint]);
+  assert.equal(applied.code, 0, JSON.stringify(applied.json));
+  assert.deepEqual(applied.json.result.closed, ["run_torn00001"]);
+  assert.deepEqual(await readFile(join(p.roots.stateRoot, "runs/run_torn00001/journal.released.json")), torn);
+  assert.ok(existsSync(join(f.claude, "devctx-onboard/SKILL.md")));
+  assert.equal((await installStatus(p.roots, p.pilot, {})).status, "ok");
+  assert.equal((await install(p, codex, "run_aftertorn1")).applied, true);
+  assert.deepEqual((await planInstall(p.pilot, { agents: ["claude"], mode: "install" })).actions.filter((x) => x.skill === "devctx-onboard").map((x) => [x.status, x.reason]), [["conflict", "unowned-receipt"]]);
+});
+
+test("live recovery holds a started create without a created marker and leaves a foreign folder untouched", async (t) => {
+  const f = await liveInstall(t), p = await f.use(), input = { agents: ["claude"], mode: "install" };
+  await assert.rejects(install(p, input, "run_nomarker1", { faults: { beforeFolder: crash } }), /injected crash/);
+  const journal = JSON.parse(await readFile(join(p.roots.stateRoot, "runs/run_nomarker1/journal.json"), "utf8"));
+  assert.deepEqual([journal.started, journal.created ?? []], [[0], []]);
+  const foreign = join(f.claude, "devctx-onboard");
+  await mkdir(foreign);
+  const before = await lstat(foreign);
+  const { plan } = await recover(p);
+  assert.deepEqual(plan.actions.map((x) => [x.skill, x.op, x.reason]), [["devctx-onboard", "hold", "uncreated-entry"]]);
+  assert.equal((await lstat(foreign)).ino, before.ino);
+  assert.equal((await installStatus(p.roots, p.pilot, {})).status, "RECOVERY_REQUIRED");
+  await rm(foreign, { recursive: true });
+  const after = await recover(p);
+  assert.deepEqual(after.plan.actions.map((x) => [x.skill, x.op, x.present]), [["devctx-onboard", "remove-create", false]]);
+  assert.equal((await installStatus(p.roots, p.pilot, {})).status, "ok");
+  // A crash just after the folder is made records the marker, so that folder is removed.
+  await assert.rejects(install(p, input, "run_marker001", { faults: { afterFolder: crash } }), /injected crash/);
+  assert.deepEqual(JSON.parse(await readFile(join(p.roots.stateRoot, "runs/run_marker001/journal.json"), "utf8")).created, [0]);
+  assert.deepEqual((await recover(p)).plan.actions.map((x) => [x.op, x.present]), [["remove-create", true]]);
+  assert.equal(existsSync(foreign), false);
+});
+
+test("live crash during uninstall finishes the remove through an approved recovery", async (t) => {
+  for (const fault of ["afterSkill", "afterReceipt"]) {
+    const f = await liveInstall(t), p = await f.use(), input = { agents: ["claude"], mode: "install" };
+    await install(p, input, "run_uninbase01");
+    await assert.rejects(install(p, { ...input, mode: "uninstall" }, "run_unincrash1", { faults: { [fault]: crash } }), /injected crash/);
+    assert.equal((await installStatus(p.roots, p.pilot, {})).status, "RECOVERY_REQUIRED", fault);
+    await assert.rejects(install(p, { ...input, mode: "uninstall" }, "run_uninblock1"), { code: "DEVCTX_RECOVERY_REQUIRED" });
+    const { plan, result } = await recover(p);
+    assert.deepEqual(plan.actions.map((x) => [x.skill, x.op]), [["devctx-onboard", "finish-remove"]], fault);
+    assert.deepEqual(result.closed, ["run_unincrash1"]);
+    assert.equal(existsSync(join(f.claude, "devctx-onboard")), false);
+    assert.equal((await installStatus(p.roots, p.pilot, {})).status, "ok");
+    await install(p, { ...input, mode: "uninstall" }, "run_uninagain1");
+    assert.deepEqual(await readdir(f.claude), []);
+  }
+});
+
+test("live rollback check refuses an uninstall run, an inventory of another profile and a folder replaced by a file", async (t) => {
+  const f = await liveInstall(t), p = await f.use(), input = { agents: ["claude", "codex"], mode: "install" };
+  await install(p, input, "run_guardins1");
+  await install(p, { ...input, mode: "uninstall" }, "run_guardun01");
+  await assert.rejects(rollbackCheck(p.roots, p.pilot, { runId: "run_guardun01" }), { code: "DEVCTX_INVALID_INPUT" });
+  const path = join(p.roots.stateRoot, "runs/run_guardins1/inventory.json"), original = await readFile(path);
+  await writeFile(path, canonicalJson({ ...JSON.parse(original.toString("utf8")), profileId: "prof_fedcba9876543210" }) + "\n");
+  await assert.rejects(rollbackCheck(p.roots, p.pilot, { runId: "run_guardins1" }), { code: "DEVCTX_GATE_REQUIRED" });
+  await writeFile(path, original);
+  assert.equal((await rollbackCheck(p.roots, p.pilot, { runId: "run_guardins1" })).status, "ok");
+  await rm(f.codex, { recursive: true });
+  await writeFile(f.codex, "not a folder\n");
+  await assert.rejects(rollbackCheck(p.roots, p.pilot, { runId: "run_guardins1" }), (error) => {
+    assert.equal(error.code, "DEVCTX_ROLLBACK_MISMATCH");
+    assert.deepEqual(error.details.folders.map((x) => [x.agent, x.folder.now]), [["claude", "dir"], ["codex", "file"]]);
+    return true;
+  });
+});
+
+test("help lists locks release", async () => {
+  const help = await runCli(["help"]);
+  assert.ok(help.json.result.commands.includes("locks release"));
+});

@@ -1,5 +1,5 @@
 import { readFileSync, existsSync, readdirSync, realpathSync } from "node:fs";
-import { mkdir, unlink, rmdir, readdir } from "node:fs/promises";
+import { mkdir, unlink, rmdir, readdir, rename } from "node:fs/promises";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
@@ -69,7 +69,10 @@ async function readJournals(stateRoot) {
 }
 const wellFormed = (id, j) => j.schemaVersion === 2 && j.runId === id && Array.isArray(j.intended) && Array.isArray(j.started) && Array.isArray(j.completed) && j.intended.every((e) => isObject(e) && WRITES.includes(e.status) && typeof e.path === "string" && typeof e.root === "string" && SKILL_NAMES.includes(e.skill));
 const bundledFor = (pilot, j) => j?.kind === KIND && j.profileId === profileOf(pilot);
-const finished = (j) => j.closed === true || (j.completed.length === j.intended.length && j.completed.every((e, i) => canonicalJson(e) === canonicalJson(j.intended[i])));
+// Completion is by entry, not position: recovery may complete a later entry while an earlier one is held.
+const isCompleted = (j, entry) => j.completed.some((e) => canonicalJson(e) === canonicalJson(entry));
+const finished = (j) => j.closed === true || j.intended.every((e) => isCompleted(j, e));
+const journalBytes = (journal) => canonicalJson(journal) + "\n";
 // Runs that block a new apply: this profile's unfinished bundled runs, unreadable journals, and in the pilot legacy unkinded ones.
 async function incompleteRuns(pilot) {
   const runs = [];
@@ -128,12 +131,15 @@ export async function planInstall(pilot, { targetHome, agents, mode = "install" 
   }
   return finalizePlan({ kind: "skill-install", mode, targetHome: targetHome ?? null, profileId: profileOf(pilot), kitCommit: pilot.live?.kitCommit ?? null, agents: roots.map((r) => r.agent), actions });
 }
-// faults.afterFolder, afterSkill and afterReceipt are test seams that crash between the writes of one action.
-async function perform(pilot, entry, bytes, faults) {
+// faults.beforeFolder, afterFolder, afterSkill and afterReceipt are test seams that crash between the writes of one action.
+// created runs right after this call makes the folder, so the journal can prove the folder is ours.
+async function perform(pilot, entry, bytes, faults, created) {
   const { path, status } = entry;
   if (status === "create") {
     if (!pilot.live) await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+    await faults.beforeFolder?.(entry);
     await mkdir(path, { mode: 0o700 });
+    await created();
     await faults.afterFolder?.(entry);
     await writeNewFile(join(path, SKILL), bytes.skill);
     await faults.afterSkill?.(entry);
@@ -196,8 +202,9 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
       entries.push(entry); bytes.push(own);
     }
     fsyncDir(copies);
-    const journal = { schemaVersion: 2, kind: KIND, profileId: profileOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, mode: plan.mode, planFingerprint: fingerprint, targetHome: plan.targetHome, intended: entries, started: [], completed: [] };
-    await writeNewFile(journalPath, canonicalJson(journal) + "\n");
+    const journal = { schemaVersion: 2, kind: KIND, profileId: profileOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, mode: plan.mode, planFingerprint: fingerprint, targetHome: plan.targetHome, intended: entries, started: [], created: [], completed: [] };
+    // Every journal write is a temp file renamed into place, so a crash never leaves a torn journal.
+    await atomicReplace(journalPath, journalBytes(journal));
     for (const [i, entry] of entries.entries()) {
       assertWritable(roots, [...entryPaths(entry.path), journalPath], { targetHome: entry.root });
       if (entry.status === "remove") {
@@ -205,54 +212,76 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
         if (now.status !== "remove") throw new DevctxError("CONFLICT", "Installed skill changed before removal");
       }
       journal.started.push(i);
-      await atomicReplace(journalPath, canonicalJson(journal) + "\n");
-      await perform(pilot, entry, bytes[i], faults);
+      await atomicReplace(journalPath, journalBytes(journal));
+      await perform(pilot, entry, bytes[i], faults, async () => { journal.created.push(i); await atomicReplace(journalPath, journalBytes(journal)); });
       journal.completed.push(entry);
-      await atomicReplace(journalPath, canonicalJson(journal) + "\n");
+      await atomicReplace(journalPath, journalBytes(journal));
     }
     return { applied: true, runId, actions: plan.actions };
   }, { destinations: [runDir] });
 }
 // Recovery works from the journal and the run folder copies only, never from the current kit.
-function recoveryFor(entry, copies, index) {
+// A create may be undone only when the journal's created marker proves this run made the folder.
+function recoveryFor(entry, copies, index, created) {
   const dirSt = info(entry.path), base = { agent: entry.agent, skill: entry.skill, path: entry.path, root: entry.root };
   const hold = (reason, observed = {}) => ({ ...base, op: "hold", reason, observed });
   if (dirSt && (dirSt.isSymbolicLink() || !dirSt.isDirectory())) return hold("unmatched-entry");
+  if (entry.status === "create" && !created) return dirSt ? hold("uncreated-entry") : { ...base, op: "remove-create", present: false, observed: { [SKILL]: null, [RECEIPT]: null } };
   const names = dirSt ? readdirSync(entry.path).sort() : [];
   const observed = Object.fromEntries([SKILL, RECEIPT].map((name) => [name, dirSt ? hashOf(join(entry.path, name)) : null]));
   if (names.some((name) => name !== SKILL && name !== RECEIPT)) return hold("unmatched-file", observed);
   const matches = (allowed) => [SKILL, RECEIPT].every((name) => allowed(name).includes(observed[name]));
-  if (entry.status === "create") return matches((name) => [null, entry.new?.[name]]) ? { ...base, op: "remove-create", observed } : hold("unmatched-file", observed);
-  if (entry.status === "remove") return matches((name) => [null, entry.old?.[name]]) ? { ...base, op: "finish-remove", observed } : hold("unmatched-file", observed);
+  if (entry.status === "create") return matches((name) => [null, entry.new?.[name]]) ? { ...base, op: "remove-create", present: Boolean(dirSt), observed } : hold("unmatched-file", observed);
+  if (entry.status === "remove") return matches((name) => [null, entry.old?.[name]]) ? { ...base, op: "finish-remove", present: Boolean(dirSt), observed } : hold("unmatched-file", observed);
   if (!dirSt || !matches((name) => [entry.old?.[name], entry.new?.[name]])) return hold("unmatched-file", observed);
   for (const [name, kind] of [[SKILL, "skill"], [RECEIPT, "receipt"]]) if (hashOf(join(copies, index + "-new-" + kind)) !== entry.new[name]) return hold("copy-mismatch", observed);
   return { ...base, op: "complete-update", observed };
 }
-export async function planRecovery(roots, pilot) {
+const ourJournal = (pilot, id, journal) => journal !== null && bundledFor(pilot, journal) && wellFormed(id, journal);
+const recoveredIndexes = (journal) => new Set((Array.isArray(journal.recovered) ? journal.recovered : []).map((r) => r?.index));
+// release: true previews closing every incomplete run, held entries and unreadable journals included, leaving their files in place.
+export async function planRecovery(roots, pilot, { release = false } = {}) {
   assertWritable(roots, []);
   const actions = [], unstarted = [], runs = [];
   for (const { id, journal } of await incompleteRuns(pilot)) {
     runs.push(id);
-    if (journal === null || !bundledFor(pilot, journal) || !wellFormed(id, journal)) { actions.push({ runId: id, index: null, op: "hold", reason: "unreadable-journal" }); continue; }
-    const copies = join(roots.stateRoot, "runs", id, "copies");
+    if (!ourJournal(pilot, id, journal)) { actions.push({ runId: id, index: null, op: "hold", reason: "unreadable-journal", journalHash: hashOf(join(roots.stateRoot, "runs", id, "journal.json")) }); continue; }
+    const copies = join(roots.stateRoot, "runs", id, "copies"), recovered = recoveredIndexes(journal), created = Array.isArray(journal.created) ? journal.created : [];
     for (const [index, entry] of journal.intended.entries()) {
-      if (index < journal.completed.length) continue;
+      if (isCompleted(journal, entry) || recovered.has(index)) continue;
       if (!journal.started.includes(index)) { unstarted.push({ runId: id, index, skill: entry.skill, path: entry.path }); continue; }
-      actions.push({ runId: id, index, ...recoveryFor(entry, copies, index) });
+      actions.push({ runId: id, index, ...recoveryFor(entry, copies, index, created.includes(index)) });
     }
   }
-  return finalizePlan({ kind: "skill-install-recovery", profileId: profileOf(pilot), runs, actions, unstarted });
+  return finalizePlan({ kind: "skill-install-recovery", ...(release ? { release: true } : {}), profileId: profileOf(pilot), runs, actions, unstarted });
 }
-export async function applyRecovery(roots, pilot, { fingerprint }) {
-  assertFingerprint(await planRecovery(roots, pilot), fingerprint);
+// Closes a run. A journal this profile can read is marked closed; any other is kept beside the run as journal.released.json.
+async function closeRun(roots, pilot, id, journal, recovery) {
+  const path = join(roots.stateRoot, "runs", id, "journal.json");
+  assertWritable(roots, [path]);
+  if (!ourJournal(pilot, id, journal)) {
+    const kept = join(roots.stateRoot, "runs", id, "journal.released.json");
+    assertWritable(roots, [kept]);
+    if (info(kept)) throw new DevctxError("CONFLICT", "Released journal already exists", { runId: id });
+    await rename(path, kept);
+    fsyncDir(dirname(path));
+    return;
+  }
+  journal.closed = true;
+  journal.recovery = recovery;
+  await atomicReplace(path, journalBytes(journal));
+}
+export async function applyRecovery(roots, pilot, { fingerprint, release = false }) {
+  assertFingerprint(await planRecovery(roots, pilot, { release }), fingerprint);
   return withPilotLock(roots, lockPath(roots), { kind: "install-recovery" }, async () => {
-    const plan = await planRecovery(roots, pilot);
+    const plan = await planRecovery(roots, pilot, { release });
     assertFingerprint(plan, fingerprint);
     const journals = new Map((await readJournals(roots.stateRoot)).filter(({ id }) => plan.runs.includes(id)).map(({ id, journal }) => [id, journal]));
     for (const action of plan.actions) {
       if (action.op === "hold") continue;
       const journal = journals.get(action.runId), entry = journal.intended[action.index];
-      assertWritable(roots, entryPaths(entry.path), { targetHome: entry.root });
+      const journalPath = join(roots.stateRoot, "runs", action.runId, "journal.json");
+      assertWritable(roots, [...entryPaths(entry.path), journalPath], { targetHome: entry.root });
       if (action.op === "complete-update") {
         const copies = join(roots.stateRoot, "runs", action.runId, "copies");
         for (const [name, kind] of [[SKILL, "skill"], [RECEIPT, "receipt"]]) {
@@ -262,24 +291,25 @@ export async function applyRecovery(roots, pilot, { fingerprint }) {
           await atomicReplace(join(entry.path, name), body);
         }
         journal.completed.push(entry);
-      } else if (info(entry.path)) {
+      } else if (action.present && info(entry.path)) {
         for (const name of [SKILL, RECEIPT]) if (info(join(entry.path, name))) await unlink(join(entry.path, name));
         await rmdir(entry.path);
         fsyncDir(dirname(entry.path));
       }
+      // Each finished action is persisted at once, even while another entry of the run stays held.
+      journal.recovered = [...(Array.isArray(journal.recovered) ? journal.recovered : []), { index: action.index, op: action.op, planFingerprint: fingerprint }];
+      await atomicReplace(journalPath, journalBytes(journal));
     }
     const closed = [];
     for (const id of plan.runs) {
-      const journal = journals.get(id);
-      if (!journal || plan.actions.some((a) => a.runId === id && a.op === "hold")) continue;
-      const path = join(roots.stateRoot, "runs", id, "journal.json");
-      assertWritable(roots, [path]);
-      journal.closed = true;
-      journal.recovery = { planFingerprint: fingerprint, actions: plan.actions.filter((a) => a.runId === id).map((a) => ({ index: a.index, op: a.op })) };
-      await atomicReplace(path, canonicalJson(journal) + "\n");
+      const held = plan.actions.filter((a) => a.runId === id && a.op === "hold");
+      if (held.length && !release) continue;
+      const recovery = { planFingerprint: fingerprint, actions: plan.actions.filter((a) => a.runId === id).map((a) => ({ index: a.index, op: a.op })), ...(release ? { released: held.map((a) => ({ index: a.index, reason: a.reason })) } : {}) };
+      await closeRun(roots, pilot, id, journals.get(id) ?? null, recovery);
       closed.push(id);
     }
-    return { applied: true, closed, held: plan.actions.filter((a) => a.op === "hold"), actions: plan.actions };
+    const held = plan.actions.filter((a) => a.op === "hold");
+    return { applied: true, ...(release ? { release: true, released: held } : {}), closed, held: release ? [] : held, actions: plan.actions };
   }, { destinations: [join(roots.stateRoot, "runs")] });
 }
 function legacyEntries(home) {

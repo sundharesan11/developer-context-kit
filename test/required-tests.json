@@ -279,5 +279,13 @@
   "live kit tolerates stray files outside its code paths and refuses untracked, ignored or changed code",
   "live init crash after creating the store folders or recording the approval leaves a store that a retry initializes",
   "live init accepts a store holding only the empty layout and an orphan approval and refuses anything else",
-  "live add-repo or set-kit crash around the profile replace leaves a profile that loads and a change that re-applies"
+  "live add-repo or set-kit crash around the profile replace leaves a profile that loads and a change that re-applies",
+  "locks release: a stale install lock blocks recover until an approved release removes it",
+  "locks release refuses a running owner, another host and a lock changed after preview",
+  "live recovery persists a completed update in a run that also holds an entry, and an approved release closes the hold",
+  "live truncated journal is held as unreadable until an approved release closes it, and the preview writes nothing",
+  "live recovery holds a started create without a created marker and leaves a foreign folder untouched",
+  "live crash during uninstall finishes the remove through an approved recovery",
+  "live rollback check refuses an uninstall run, an inventory of another profile and a folder replaced by a file",
+  "help lists locks release"
 ]

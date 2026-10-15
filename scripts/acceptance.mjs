@@ -162,7 +162,7 @@ function gitOut(cwd, words) {
 }
 async function pinnedClone(dest) { gitOut(devctxDir, ["clone", "-q", "--no-hardlinks", kit, dest]); gitOut(dest, ["checkout", "-q", "--detach", liveHead]); return realpath(dest); }
 function liveCli(parts, kitRoot = liveKit) {
-  const r = spawnSync(process.execPath, [join(kitRoot, "bin/devctx.mjs"), ...parts], { cwd: liveRoot, encoding: "utf8", env: { PATH: process.env.PATH, HOME: liveHome } });
+  const r = spawnSync(process.execPath, [join(kitRoot, "bin/devctx.mjs"), ...parts], { cwd: liveRoot, encoding: "utf8", env: { PATH: process.env.PATH, HOME: liveHome }, timeout: 120000 });
   let json; try { json = JSON.parse(r.stdout); } catch { throw new Error("live CLI output unreadable: " + String(r.stderr).slice(0, 100)); }
   if (!json.ok) throw Object.assign(new Error(json.error?.code ?? "live CLI failed"), { code: json.error?.code + " " + JSON.stringify(json.error?.details ?? null) });
   return json.result;
