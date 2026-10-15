@@ -283,7 +283,7 @@ node "$KIT/bin/devctx.mjs" agents recover --pilot "$PROFILE" --apply --plan-fing
 
 Recovery removes an interrupted create, completes an interrupted update from the run folder's copies, and finishes an interrupted remove. It never rolls an update back. It always matches the journal's hashes. A file that matches neither is reported as `hold` and left alone, and the run stays blocked.
 
-To close a run that is stuck on a hold, or whose journal cannot be read, preview and apply a release. Release finishes every action it safely can, then closes the run and leaves the held files where they are. Those files then count as foreign: the kit never touches them again, so inspect and remove them by hand if they are leftovers.
+To close a run that is stuck on a hold, or whose journal cannot be read, preview and apply a release. Release finishes every action it safely can, then closes the run and leaves the held files where they are. Those files then count as foreign: the kit never touches them again, so inspect and remove them by hand if they are leftovers. A crash right after a skill folder was created can leave an empty `devctx-*` folder that blocks later installs for that agent; check that it is empty, then remove it with `rmdir`.
 
 ```sh
 node "$KIT/bin/devctx.mjs" agents recover --pilot "$PROFILE" --release
@@ -311,7 +311,7 @@ Cursor also reads `~/.agents/skills`, so it will see the bundled skills. They be
 
 ## What the approved digest does not do
 
-The approved digest catches accidental edits to `live.json`. It does not stop deliberate same-user tampering: the same user can rewrite the profile and the digest together. The kit is not a sandbox; see the [security model](SECURITY-MODEL.md).
+The approved digest catches accidental edits to `live.json`. It does not stop deliberate same-user tampering: the same user can rewrite the profile and the digest together. The kit is not a sandbox; see the [security model](SECURITY-MODEL.md). If a profile change was interrupted, the previous profile can stay approved alongside the new one until the next approved profile change; finish or redo the change to clear it.
 
 ## If the store is lost
 
@@ -332,7 +332,8 @@ There is no backup or sync in this stage. Losing `~/.devctx` loses the store: re
 | Error | Likely cause |
 | --- | --- |
 | `GATE_REQUIRED`, `live.kitRoot`, `running-kit` | The command ran from another checkout, not the profile's kit. |
-| `GATE_REQUIRED`, `live.kitCommit`, `dirty`, `attached` or `commit` | The kit has changes, is on a branch, or is at another commit. |
+| `GATE_REQUIRED`, `live.kitCommit`, `dirty`, `attached` or `commit` | The kit has changes, is on a branch, or is at another commit. A stray file such as a Finder `.DS_Store` under the kit's code folders also counts; list them with `git -C "$KIT" ls-files --others --ignored --exclude-standard -- bin src skills scripts schemas catalog` and remove them by hand. |
+| `BUSY` | A lock is held. If no devctx command is running, see [Stale locks](#stale-locks). |
 | `GATE_REQUIRED`, `live.approval` | `live.json` differs from the approved profile. Do not edit it by hand. |
 | `GATE_REQUIRED`, `live.home` | `$HOME` differs from the profile's home. |
 | `PATH_UNSAFE`, `profileDir` | `~/.devctx` is missing, not yours, or not mode 0700. |
