@@ -2,7 +2,7 @@
 // Usage: node scripts/repo-snapshot.mjs --repo <path> --out <file>   writes a new 0600 JSON snapshot
 //        node scripts/repo-snapshot.mjs --compare <a> <b>             exit 0 identical, 1 different
 // Tracked and untracked files and .git (outside objects, logs and FETCH_HEAD) are hashed; ignored files
-// are recorded by path, size and modification time only. Git runs only through gitQuery, which never
+// are recorded by path, size and modification time only, a wholly ignored folder as one entry. Git runs only through gitQuery, which never
 // refreshes the index or takes optional locks. The snapshot never writes inside the repository.
 import { createReadStream, lstatSync, readdirSync, readlinkSync, realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -53,9 +53,11 @@ export async function snapshotRepo(repo) {
   const entries = {};
   for (const rel of list(root, ["--cached"])) entries[rel] = await hashed(join(root, rel), "tracked");
   for (const rel of list(root, ["--others", "--exclude-standard"])) entries[rel] = await hashed(join(root, rel), "untracked");
-  for (const rel of list(root, ["--others", "--ignored", "--exclude-standard"])) {
+  // --directory collapses a wholly ignored folder (such as node_modules) to one entry, keeping
+  // the listing inside gitQuery's output limit on large repositories.
+  for (const rel of list(root, ["--others", "--ignored", "--exclude-standard", "--directory"])) {
     const st = lstatSync(join(root, rel), { throwIfNoEntry: false });
-    entries[rel] = st ? { class: "ignored", size: st.size, mtimeMs: st.mtimeMs } : { class: "ignored", type: "missing" };
+    entries[rel] = !st ? { class: "ignored", type: "missing" } : st.isDirectory() ? { class: "ignored", type: "dir", mtimeMs: st.mtimeMs } : { class: "ignored", size: st.size, mtimeMs: st.mtimeMs };
   }
   const dotGit = join(root, ".git");
   const prefix = commonDir === dotGit ? ".git" : "git-common-dir";

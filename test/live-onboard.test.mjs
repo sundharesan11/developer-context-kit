@@ -12,12 +12,15 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SNAPSHOT = join(REPO_ROOT, "scripts/repo-snapshot.mjs");
 // A client repository outside the store: feature branch, linked second worktree, untracked and ignored files.
 async function clientRepo(dir) {
-  const repo = await makeRepo(join(dir, "atlas"), { "README.md": "# Atlas\nBilling API.\n", "package.json": '{"name":"atlas","scripts":{"test":"node --test"}}', ".gitignore": "*.log\n" });
+  const repo = await makeRepo(join(dir, "atlas"), { "README.md": "# Atlas\nBilling API.\n", "package.json": '{"name":"atlas","scripts":{"test":"node --test"}}', ".gitignore": "*.log\nbuild/\n" });
   await fixtureGit(repo, ["checkout", "-q", "-b", "feature/login"]);
   const second = join(dir, "atlas-second");
   await fixtureGit(repo, ["worktree", "add", "-q", second, "main"]);
   await writeFile(join(repo, "notes.txt"), "untracked\n");
   await writeFile(join(repo, "debug.log"), "ignored\n");
+  await mkdir(join(repo, "build"));
+  await writeFile(join(repo, "build", "a.js"), "ignored\n");
+  await writeFile(join(repo, "build", "b.js"), "ignored\n");
   return { repo, second };
 }
 // Live profile around a pinned clone of the committed kit, so the CLI runs exactly as on the owner's machine.
@@ -99,6 +102,8 @@ test("repo snapshot detects tracked, untracked and .git changes, ignores logs an
   const ignored = base.entries["debug.log"];
   assert.deepEqual(Object.keys(ignored).sort(), ["class", "mtimeMs", "size"]);
   assert.equal(ignored.class, "ignored");
+  assert.deepEqual(base.entries["build/"], { class: "ignored", type: "dir", mtimeMs: base.entries["build/"].mtimeMs }, "a wholly ignored folder is one entry");
+  assert.ok(!("build/a.js" in base.entries));
   assert.ok(!Object.keys(base.entries).some((p) => p.startsWith(".git/objects/") || p.startsWith(".git/logs/") || p === ".git/FETCH_HEAD"));
   await appendFile(join(repo, ".git/logs/HEAD"), "noise\n");
   await writeFile(join(repo, ".git/FETCH_HEAD"), "0".repeat(40) + "\t\tbranch 'main'\n");
