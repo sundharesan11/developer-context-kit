@@ -124,6 +124,7 @@
   "test/helpers.mjs",
   "test/identity.test.mjs",
   "test/live-commands.test.mjs",
+  "test/live-install.test.mjs",
   "test/live-onboard.test.mjs",
   "test/live-profile.test.mjs",
   "test/lock-plan.test.mjs",

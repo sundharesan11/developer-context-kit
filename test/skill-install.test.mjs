@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdir, writeFile, readFile, stat, readdir, unlink, rename, symlink, link, chmod, rmdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { makePilot, runCli, stageSourceFixture } from "./helpers.mjs";
@@ -24,12 +25,13 @@ test("package receipt is not published when output changes before receipt", asyn
   assert.equal((await readdir(x.dir)).includes(".devctx-owned.json"), false);
 });
 
-test("personal Codex plan refuses a competing shared skills copy", async (t) => {
+test("personal Codex plan writes to .agents/skills and refuses a foreign same-name copy there", async (t) => {
   const x = await approvedInstall(t);
   const competing = join(x.home, ".agents/skills/summarize-note");
   await mkdir(competing, {recursive: true, mode: 0o700});
   await writeFile(join(competing, "SKILL.md"), "Foreign content", {mode: 0o600});
   const plan = await planPackageInstall(x.p.roots, selection, {revisionId: "rv_install01", contentDecisionId: "dc_content01", targetHome: x.home, agents: ["codex"], mode: "install"});
+  assert.equal(plan.actions[0].path, competing);
   assert.equal(plan.actions[0].status, "conflict");
   assert.equal(await readFile(join(competing, "SKILL.md"), "utf8"), "Foreign content");
 });
@@ -121,8 +123,9 @@ test("synthetic content and action approvals install pinned copies in a disposab
   assert.equal(approved.code, 0, JSON.stringify(approved.json));
   const applied = await cli(p, "local-apply", [...common, "--decision", "dc_local001", "--plan-fingerprint", plan.json.result.fingerprint, "--run-id", "run_package01"]);
   assert.equal(applied.code, 0, JSON.stringify(applied.json));
-  for (const agent of ["claude", "codex"]) {
-    const dir = join(home, `.${agent}/skills/summarize-note`);
+  assert.equal(existsSync(join(home, ".codex")), false);
+  for (const layout of [".claude/skills", ".agents/skills"]) {
+    const dir = join(home, layout, "summarize-note");
     assert.match(await readFile(join(dir, "SKILL.md"), "utf8"), /# Summary/);
     assert.equal((await stat(join(dir, "SKILL.md"))).mode & 0o777, 0o600);
     assert.equal((await stat(dir)).mode & 0o777, 0o700);

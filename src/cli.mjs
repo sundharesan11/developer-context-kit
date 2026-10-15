@@ -37,6 +37,7 @@ export const COMMANDS = {
   "agents install": { load: async () => (await import("./agents/commands.mjs")).agentsInstallCommand },
   "agents uninstall": { load: async () => (await import("./agents/commands.mjs")).agentsUninstallCommand },
   "agents status": { load: async () => (await import("./agents/commands.mjs")).agentsStatusCommand },
+  "agents recover": { load: async () => (await import("./agents/commands.mjs")).agentsRecoverCommand },
   "hub propose": { load: async () => (await import("./hubs/commands.mjs")).hubProposeCommand },
   "skill workspace-create": { load: async () => (await import("./skill-builder/commands.mjs")).workspaceCreateCommand },
   "skill requirements-record": { load: async () => (await import("./skill-builder/commands.mjs")).requirementsRecordCommand },
