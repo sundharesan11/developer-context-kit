@@ -237,5 +237,9 @@
   "U4 onboarding replay restores an empty or truncated run receipt left by a hard kill",
   "re-onboarding retires profiles from earlier path-less registry operations of the same worktree",
   "re-onboarding preview over a damaged bundle names the keep-previous remedy; keep-previous previews",
-  "Git remote whose URL query fails is GIT_QUERY_FAILED, not a silently dropped remote"
+  "Git remote whose URL query fails is GIT_QUERY_FAILED, not a silently dropped remote",
+  "live onboarding preview, apply and brief leave the client repository snapshot identical",
+  "live onboarding of a dirty worktree warns instead of refusing and the second worktree is not confirmed",
+  "repo snapshot detects tracked, untracked and .git changes, ignores logs and FETCH_HEAD, and never hashes ignored files",
+  "repo snapshot CLI writes a private file outside the repository and compares by path"
 ]

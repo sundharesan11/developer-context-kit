@@ -1,0 +1,147 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { join, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+import { mkdir, writeFile, readFile, appendFile, stat, utimes, chmod, rm } from "node:fs/promises";
+import { sandbox, makeRepo, fixtureGit, treeSnapshot } from "./helpers.mjs";
+import { loadPilot, rootsFromPilot, recordApprovedDigest } from "../src/config/pilot.mjs";
+import { ensureRoots } from "../src/config/roots.mjs";
+import { snapshotRepo, compareSnapshots, writeSnapshot } from "../scripts/repo-snapshot.mjs";
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const SNAPSHOT = join(REPO_ROOT, "scripts/repo-snapshot.mjs");
+// A client repository outside the store: feature branch, linked second worktree, untracked and ignored files.
+async function clientRepo(dir) {
+  const repo = await makeRepo(join(dir, "atlas"), { "README.md": "# Atlas\nBilling API.\n", "package.json": '{"name":"atlas","scripts":{"test":"node --test"}}', ".gitignore": "*.log\n" });
+  await fixtureGit(repo, ["checkout", "-q", "-b", "feature/login"]);
+  const second = join(dir, "atlas-second");
+  await fixtureGit(repo, ["worktree", "add", "-q", second, "main"]);
+  await writeFile(join(repo, "notes.txt"), "untracked\n");
+  await writeFile(join(repo, "debug.log"), "ignored\n");
+  return { repo, second };
+}
+// Live profile around a pinned clone of the committed kit, so the CLI runs exactly as on the owner's machine.
+async function liveKit(t) {
+  const sb = await sandbox(t), home = join(sb, "home"), devctx = join(home, ".devctx"), store = join(devctx, "store"), kit = join(devctx, "kit");
+  for (const rel of [".claude/skills", ".agents/skills"]) await mkdir(join(home, rel), { recursive: true });
+  await mkdir(store, { recursive: true, mode: 0o700 });
+  const head = (await fixtureGit(REPO_ROOT, ["rev-parse", "HEAD"])).trim();
+  await fixtureGit(devctx, ["clone", "-q", "--no-hardlinks", REPO_ROOT, kit]);
+  await fixtureGit(kit, ["checkout", "-q", "--detach", head]);
+  const client = await clientRepo(join(sb, "work"));
+  const obj = { schemaVersion: 1, pilotRoot: store, configRoot: join(store, "config"), dataRoot: join(store, "data"), stateRoot: join(store, "state"), inputsRoot: join(store, "inputs"), agentHomes: [], repos: [client.repo, client.second], forbidden: [], live: { profileId: "prof_0123456789abcdef", home, skillDirs: { claude: join(home, ".claude/skills"), codex: join(home, ".agents/skills") }, kitRoot: kit, kitCommit: head } };
+  const path = join(devctx, "live.json");
+  await writeFile(path, JSON.stringify(obj), { mode: 0o600 });
+  await chmod(path, 0o600);
+  const roots = rootsFromPilot(await loadPilot(path, { home, env: {}, kitRoot: kit, liveGate: { approval: false } }));
+  ensureRoots(roots);
+  await recordApprovedDigest(roots);
+  const cli = (args) => {
+    const r = spawnSync(process.execPath, [join(kit, "bin/devctx.mjs"), ...args, "--pilot", path], { cwd: sb, encoding: "utf8", env: { PATH: process.env.PATH, HOME: home } });
+    return { status: r.status, json: JSON.parse(r.stdout) };
+  };
+  return { sb, home, store, kit, path, cli, ...client };
+}
+const ok = (r) => { assert.equal(r.json.ok, true, JSON.stringify(r.json.error)); return r.json.result; };
+test("live onboarding preview, apply and brief leave the client repository snapshot identical", async (t) => {
+  const f = await liveKit(t);
+  const before = await snapshotRepo(f.repo), secondBefore = await snapshotRepo(f.second), treeBefore = await treeSnapshot(f.repo);
+  ok(f.cli(["init", "--actor", "email:owner@example.com"]));
+  ok(f.cli(["init", "--actor", "email:owner@example.com", "--apply"]));
+  ok(f.cli(["scope", "add", "--scope", "example"]));
+  ok(f.cli(["scope", "add", "--scope", "example", "--apply"]));
+  const onboard = ["project", "onboard", "--scope", "example", "--project", "example.atlas", "--repo", f.repo, "--environment", "staging", "--accept", "all", "--request-id", "req_live0001"];
+  const plan = ok(f.cli(onboard));
+  assert.equal(plan.root, f.repo);
+  assert.deepEqual(plan.repoWrites, []);
+  const receipt = ok(f.cli([...onboard, "--apply", "--plan-fingerprint", plan.fingerprint]));
+  assert.equal(receipt.project, "example.atlas");
+  const brief = ok(f.cli(["context", "brief", "--scope", "example", "--cwd", f.repo]));
+  assert.equal(brief.project, "example.atlas");
+  assert.equal(brief.worktree.branch, "feature/login");
+  const after = await snapshotRepo(f.repo);
+  assert.deepEqual(compareSnapshots(before, after), []);
+  assert.deepEqual(after, before);
+  assert.deepEqual(compareSnapshots(secondBefore, await snapshotRepo(f.second)), []);
+  assert.equal(await treeSnapshot(f.repo), treeBefore);
+});
+test("live onboarding of a dirty worktree warns instead of refusing and the second worktree is not confirmed", async (t) => {
+  const f = await liveKit(t);
+  await writeFile(join(f.repo, "README.md"), "# Atlas\nBilling API, edited.\n");
+  const before = await snapshotRepo(f.repo);
+  ok(f.cli(["init", "--actor", "email:owner@example.com", "--apply"]));
+  ok(f.cli(["scope", "add", "--scope", "example", "--apply"]));
+  const onboard = ["project", "onboard", "--scope", "example", "--project", "example.atlas", "--repo", f.repo, "--environment", "staging", "--accept", "all", "--request-id", "req_live0002"];
+  const plan = ok(f.cli(onboard));
+  ok(f.cli([...onboard, "--apply", "--plan-fingerprint", plan.fingerprint]));
+  const resolved = ok(f.cli(["context", "resolve", "--scope", "example", "--cwd", f.repo]));
+  assert.equal(resolved.worktree.dirty, true);
+  assert.deepEqual(resolved.warnings, [{ code: "DIRTY_WORKTREE" }]);
+  assert.deepEqual(ok(f.cli(["context", "brief", "--scope", "example", "--cwd", f.repo])).warnings, [{ code: "DIRTY_WORKTREE" }]);
+  const second = f.cli(["context", "resolve", "--scope", "example", "--cwd", f.second]);
+  assert.equal(second.json.ok, false);
+  assert.equal(second.json.error.code, "DEVCTX_PROJECT_UNBOUND");
+  assert.equal(second.json.error.details.reason, "worktree-not-confirmed");
+  assert.deepEqual(compareSnapshots(before, await snapshotRepo(f.repo)), []);
+});
+test("repo snapshot detects tracked, untracked and .git changes, ignores logs and FETCH_HEAD, and never hashes ignored files", async (t) => {
+  const sb = await sandbox(t);
+  const { repo } = await clientRepo(sb);
+  await utimes(join(repo, "debug.log"), 1_700_000_000, 1_700_000_000);
+  const tree = await treeSnapshot(repo);
+  const base = await snapshotRepo(repo);
+  assert.equal(await treeSnapshot(repo), tree, "snapshot must not write to the repository");
+  assert.equal(base.entries["README.md"].class, "tracked");
+  assert.match(base.entries["README.md"].sha256, /^[a-f0-9]{64}$/);
+  assert.equal(base.entries["notes.txt"].class, "untracked");
+  assert.equal(base.entries[".git/index"].class, "git");
+  assert.equal(base.entries[".git/HEAD"].class, "git");
+  const ignored = base.entries["debug.log"];
+  assert.deepEqual(Object.keys(ignored).sort(), ["class", "mtimeMs", "size"]);
+  assert.equal(ignored.class, "ignored");
+  assert.ok(!Object.keys(base.entries).some((p) => p.startsWith(".git/objects/") || p.startsWith(".git/logs/") || p === ".git/FETCH_HEAD"));
+  await appendFile(join(repo, ".git/logs/HEAD"), "noise\n");
+  await writeFile(join(repo, ".git/FETCH_HEAD"), "0".repeat(40) + "\t\tbranch 'main'\n");
+  await writeFile(join(repo, "debug.log"), "IGNORED\n");
+  await utimes(join(repo, "debug.log"), 1_700_000_000, 1_700_000_000);
+  assert.deepEqual(compareSnapshots(base, await snapshotRepo(repo)), []);
+  await writeFile(join(repo, "README.md"), "# Atlas\nchanged\n");
+  await writeFile(join(repo, "added.txt"), "new\n");
+  await fixtureGit(repo, ["config", "core.example", "true"]);
+  await writeFile(join(repo, "debug.log"), "ignored, now longer\n");
+  assert.deepEqual(compareSnapshots(base, await snapshotRepo(repo)), [
+    { path: ".git/config", change: "modified" },
+    { path: "README.md", change: "modified" },
+    { path: "added.txt", change: "added" },
+    { path: "debug.log", change: "modified" }
+  ]);
+  await rm(join(repo, "notes.txt"));
+  assert.ok(compareSnapshots(base, await snapshotRepo(repo)).some((d) => d.path === "notes.txt" && d.change === "removed"));
+});
+test("repo snapshot CLI writes a private file outside the repository and compares by path", async (t) => {
+  const sb = await sandbox(t);
+  const { repo } = await clientRepo(join(sb, "work"));
+  const run = (...args) => spawnSync(process.execPath, [SNAPSHOT, ...args], { cwd: sb, encoding: "utf8", env: { PATH: process.env.PATH } });
+  const a = join(sb, "a.json"), b = join(sb, "b.json");
+  const tree = await treeSnapshot(repo);
+  const first = run("--repo", repo, "--out", a);
+  assert.equal(first.status, 0, first.stdout + first.stderr);
+  assert.equal(JSON.parse(first.stdout).ok, true);
+  assert.equal((await stat(a)).mode & 0o777, 0o600);
+  assert.deepEqual(JSON.parse(await readFile(a, "utf8")), await snapshotRepo(repo));
+  assert.equal(await treeSnapshot(repo), tree);
+  assert.equal(run("--repo", repo, "--out", a).status, 1, "an existing output file is never overwritten");
+  assert.equal(run("--repo", repo, "--out", join(repo, "snap.json")).status, 1, "output inside the repository is refused");
+  assert.equal(run("--repo", repo, "--out", join(repo, ".git/snap.json")).status, 1, "output inside .git is refused");
+  assert.equal(await treeSnapshot(repo), tree);
+  const same = run("--compare", a, a);
+  assert.equal(same.status, 0);
+  assert.deepEqual(JSON.parse(same.stdout), { ok: true, identical: true, differences: [] });
+  await writeFile(join(repo, "README.md"), "changed\n");
+  await writeSnapshot(repo, b);
+  const diff = run("--compare", a, b);
+  assert.equal(diff.status, 1);
+  assert.deepEqual(JSON.parse(diff.stdout), { ok: true, identical: false, differences: [{ path: "README.md", change: "modified" }] });
+  assert.equal(run("--repo", repo).status, 2);
+  assert.equal(run("--compare", a).status, 2);
+});
