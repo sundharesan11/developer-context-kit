@@ -213,11 +213,13 @@ and the pilot path <home>/.devctx/live.json for this session. Run only read-only
 Never use --apply and never edit files.
 ```
 
-Claude, with read tools and only the shell commands the checks need:
+Claude, with read tools and only the exact shell commands the checks need. Never widen these to `node` or `git -C` prefixes: those would let the session run any script or Git command, including writes to the repository. A command outside the list is refused, which fails the check safely.
 
 ```sh
-claude -p --setting-sources user --allowedTools 'Read,Glob,Grep,Bash(realpath:*),Bash(git -C:*),Bash(node:*),Bash(printenv:*)' '<prompt>'
+claude -p --setting-sources user --allowedTools 'Read,Glob,Grep,Bash(printenv DEVCTX_KIT),Bash(realpath:*),Bash(git -C "$DEVCTX_KIT" rev-parse HEAD),Bash(node "$DEVCTX_KIT/bin/devctx.mjs" context resolve:*),Bash(node "$DEVCTX_KIT/bin/devctx.mjs" context brief:*)' '<prompt>'
 ```
+
+If a listed command is still refused because the skill wrote it differently, record the refusal, compare the command with the list, and rerun with that one exact command added. Do not add a broader rule.
 
 Codex, in its read-only sandbox:
 
@@ -279,7 +281,7 @@ node "$KIT/bin/devctx.mjs" agents recover --pilot "$PROFILE"
 node "$KIT/bin/devctx.mjs" agents recover --pilot "$PROFILE" --apply --plan-fingerprint '<fingerprint>'
 ```
 
-Recovery removes an interrupted create, completes or rolls back an interrupted update from the run folder's copies, and finishes an interrupted remove. It always matches the journal's hashes. A file that matches neither is reported as `hold` and left alone. Never edit or delete journals, receipts or locks by hand.
+Recovery removes an interrupted create, completes an interrupted update from the run folder's copies, and finishes an interrupted remove. It never rolls an update back. It always matches the journal's hashes. A file that matches neither is reported as `hold` and left alone. Never edit or delete journals, receipts or locks by hand.
 
 ## Leftover .codex/skills copies
 

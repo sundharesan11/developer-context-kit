@@ -90,6 +90,10 @@ test("docs state the candidate's limits in pinned phrases", async () => {
     const text = await read(file);
     for (const p of phrases) assert.ok(text.includes(p), `${file}: ${p}`);
   }
+  // The fresh-session allowlist must name exact commands; prefix rules would let a session write to the repository.
+  const live = await read("docs/LIVE.md");
+  for (const broad of ["Bash(node:*)", "Bash(git -C:*)", "Bash(git:*)", "Bash(printenv:*)"]) assert.ok(!live.includes(broad), `docs/LIVE.md allows ${broad}`);
+  assert.ok(!live.includes("rolls back an interrupted update"), "docs/LIVE.md claims update rollback");
 });
 
 const BUNDLED_SKILLS = ["devctx-onboard", "devctx-resume", "devctx-record"];
