@@ -324,7 +324,8 @@ test("live rollback check lists a foreign top-level file edited after install wi
   await foreignTrees(f);
   await install(p, input, "run_foreign001");
   await writeFile(join(f.claude, "README.txt"), "edited by the owner\n");
-  const later = new Date(Date.now() + 60000);
+  // Whole seconds: a millisecond time can read back a fraction off through utimes on some Node versions.
+  const later = new Date(Math.floor(Date.now() / 1000) * 1000 + 60000);
   await utimes(join(f.claude, "README.txt"), later, later);
   await install(p, { ...input, mode: "uninstall" }, "run_foreignun1");
   const result = await rollbackCheck(p.roots, p.pilot, { runId: "run_foreign001" });
