@@ -54,7 +54,7 @@ The real skill folders are not empty. The owner's Claude skill folder already ho
 
 - R8. Install never touches a foreign, modified, symlinked or same-named unowned entry. A conflict blocks only that agent, and the preview says why.
 - R9. At the start of apply, before the first write, DCK records an inventory of each target skill folder. A read-only rollback check then fails on any difference in `devctx-*` entries and lists any change to foreign entries for the owner to review.
-- R10. An incomplete install run for the profile blocks new applies until the owner approves a recovery plan. Each started journal entry records the action and its expected file hashes. Recovery removes an interrupted create, completes or rolls back an interrupted update, and finishes an interrupted remove, always matching the journal's hashes, never the current kit's. A file that matches neither is reported and left.
+- R10. An incomplete install run for the profile blocks new applies until the owner approves a recovery plan. Before the first write, the run folder keeps copies of the old and new file bytes, and each started journal entry records the action and its file hashes. Recovery removes an interrupted create, completes or rolls back an interrupted update from the run folder's copies, and finishes an interrupted remove, always matching the journal's hashes, never the current kit's. A file that matches neither is reported and left.
 - R11. An entry is removable only when its receipt matches a completed journal entry in the private store for the same profile. Uninstall works from those records alone and survives an approved kit change.
 - R12. Per-agent selection (`--agent`) keeps working in live mode.
 
@@ -193,7 +193,7 @@ Layout of `~/.devctx` after activation:
   - Never create a skill folder in live mode, and never check or change parent modes on the bundled path.
   - Record profile ID, run ID, kit commit and file hashes in `.devctx-owned.json`, and the same in the journal.
   - Treat an entry as owned only when its receipt matches a completed journal entry for the profile and holds exactly `SKILL.md` and `.devctx-owned.json`.
-  - Journal each action as started, with its expected file hashes, before its first write, and as completed after. Gate apply on incomplete bundled-install runs for the profile only. Add an approved recovery plan bounded by R10.
+  - Before the first write, copy the old and new file bytes into the run folder, and journal each action as started with its file hashes; journal it as completed after. Gate apply on incomplete bundled-install runs for the profile only. Add an approved recovery plan bounded by R10.
   - Status lists leftover bundled entries under the old `.codex/skills` path without acting on them.
 - **Execution note:** start from AE1 as a failing test.
 - **Patterns to follow:** `statusFor`, `finalizePlan`, `withPilotLock` and the package installer's `journals()` gate.
@@ -288,14 +288,14 @@ Layout of `~/.devctx` after activation:
 - **Approach:** follow `docs/LIVE.md`, with the owner present and the steps below in order.
   - Preflight, read-only: confirm the installed Claude and Codex versions read `~/.claude/skills` and `~/.agents/skills`, and `lstat` both folders. If one is missing or symlinked, stop; the owner creates or fixes it by hand as a separate decision.
   - Read-only Git check on example-repo that mirrors `locateWorktree`: repo-local `filter.*` and `diff.*` config, and a timed `status --porcelain`. Stop if either would be refused.
-  - Ask the owner to close editors and Git tools watching example-repo for the run.
+  - Ask the owner to close editors and Git tools watching example-repo for the run, then take the before snapshot of example-repo.
   - Clone the kit at the merged commit, then preview and apply `live init` with example-repo listed.
   - Add scope `example`, then show the example-repo onboarding preview before any skill install; stop if it is refused. Apply after approval.
   - Show the install preview for both agents and apply after owner approval.
   - Ask before editing the shell profile.
   - From a neutral working folder, run a fresh `claude -p --setting-sources user` session and `codex exec --sandbox read-only`, passing example-repo as `--cwd` to devctx and answering the kit confirmation in the prompt, to list `devctx-*` skills and resolve example-repo. The owner runs one interactive session per agent.
   - Uninstall, run the rollback check at once, reinstall after a fresh approval, and recheck discovery.
-  - Snapshot example-repo before and after. Keep evidence in `~/.devctx/store/state/evidence/`.
+  - Snapshot example-repo right after onboarding apply and after the last session, and compare both with the before snapshot. Keep evidence in `~/.devctx/store/state/evidence/`.
 - **Execution note:** operational, not code. Every write is a separate owner approval.
 - **Test expectation:** none -- this unit is a guarded manual run; the evidence files are its proof.
 - **Verification:** the evidence shows each R15 item. Any example-repo snapshot difference is listed by path, and the owner judges each one.
