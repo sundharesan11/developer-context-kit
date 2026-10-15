@@ -94,6 +94,8 @@ function validate(pilot, context, allowInternal = false) {
   for (let i = 0; i < spans.length; i++) for (let j = i + 1; j < spans.length; j++) if (touches(spans[i][1], spans[j][1])) fail(spans[j][0] === "live.kitRoot" ? spans[i][0] : spans[j][0]);
   return pilot;
 }
+// Kit paths whose files run or are installed; an untracked or ignored file under them makes the kit dirty.
+const KIT_CODE = ["bin", "src", "skills", "scripts", "schemas", "catalog", "package.json"];
 // Live Git checks run through the read-only, no-optional-locks gitQuery.
 const inWorktree = (path) => !gitQuery(deepestExisting(path), ["rev-parse", "--git-dir"], { notRepo: true }).notRepo;
 export function assertKit(kitRoot, kitCommit) {
@@ -102,7 +104,10 @@ export function assertKit(kitRoot, kitCommit) {
   const gitDir = realpathSync(gitQuery(kitRoot, ["rev-parse", "--absolute-git-dir"]).stdout.trim());
   if (comparable(gitDir) !== comparable(join(kitRoot, ".git"))) gate("live.kitRoot", "not-own-clone");
   if (inWorktree(dirname(kitRoot))) gate("live.kitRoot", "nested");
-  if (gitQuery(kitRoot, ["status", "--porcelain=v1", "-z", "--untracked-files=normal"]).stdout) gate("live.kitCommit", "dirty");
+  // Tracked changes count anywhere. Untracked or ignored files count only where the kit runs code from, so a
+  // stray file such as a Finder .DS_Store at the top level or under docs/ does not block live commands.
+  if (gitQuery(kitRoot, ["status", "--porcelain=v1", "-z", "--untracked-files=no"]).stdout) gate("live.kitCommit", "dirty");
+  for (const ignored of [[], ["--ignored"]]) if (gitQuery(kitRoot, ["ls-files", "-z", "--others", ...ignored, "--exclude-standard", "--", ...KIT_CODE]).stdout) gate("live.kitCommit", "dirty");
   if (gitQuery(kitRoot, ["symbolic-ref", "--quiet", "HEAD"], { allow: [0, 1] }).status !== 1) gate("live.kitCommit", "attached");
   if (gitQuery(kitRoot, ["rev-parse", "--verify", "HEAD"]).stdout.trim() !== kitCommit) gate("live.kitCommit", "commit");
 }
@@ -121,18 +126,20 @@ export async function readApprovedDigest(pilot) {
   catch (error) { if (error.code === "ENOENT" || error.code === "ENOTDIR") return null; throw error; }
 }
 // Callers hold the pilot lock. Profile commands pass the newly approved profile's ID and digest.
-export async function recordApprovedDigest(roots, { profileId = roots?.pilot?.live?.profileId, digest: value = roots?.pilot?.digest } = {}) {
+// A profile change first records the new digest with the current one as previousDigest, replaces the profile,
+// then records the new digest alone, so a crash between the two writes leaves whichever profile is on disk approved.
+export async function recordApprovedDigest(roots, { profileId = roots?.pilot?.live?.profileId, digest: value = roots?.pilot?.digest, previousDigest } = {}) {
   const pilot = roots?.pilot;
   if (!pilot?.live) fail("live");
   const path = approvedDigestPath(pilot);
   assertWritable(roots, [dirname(path), path]);
   ensurePrivatePath(pilot.stateRoot, ["live"]);
-  await atomicReplace(path, JSON.stringify({ schemaVersion: 1, profileId, digest: value }) + "\n");
+  await atomicReplace(path, JSON.stringify({ schemaVersion: 1, profileId, digest: value, ...(previousDigest === undefined ? {} : { previousDigest }) }) + "\n");
 }
 async function assertApproved(pilot) {
   const approved = await readApprovedDigest(pilot);
   if (!approved) gate("live.approval", "unapproved");
-  if (approved.schemaVersion !== 1 || approved.profileId !== pilot.live.profileId || approved.digest !== pilot.digest) gate("live.approval", "changed");
+  if (approved.schemaVersion !== 1 || approved.profileId !== pilot.live.profileId || (approved.digest !== pilot.digest && approved.previousDigest !== pilot.digest)) gate("live.approval", "changed");
 }
 async function readProfile(path) {
   let raw;

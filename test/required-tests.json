@@ -275,5 +275,9 @@
   "repo snapshot CLI writes a private file outside the repository and compares by path",
   "repo snapshot detects a rewrite and a nested new file inside a wholly ignored folder without writing to the repository",
   "repo snapshot records a symlink inside an ignored folder without following it",
-  "repo snapshot fails loudly when ignored folders exceed the node cap"
+  "repo snapshot fails loudly when ignored folders exceed the node cap",
+  "live kit tolerates stray files outside its code paths and refuses untracked, ignored or changed code",
+  "live init crash after creating the store folders or recording the approval leaves a store that a retry initializes",
+  "live init accepts a store holding only the empty layout and an orphan approval and refuses anything else",
+  "live add-repo or set-kit crash around the profile replace leaves a profile that loads and a change that re-applies"
 ]

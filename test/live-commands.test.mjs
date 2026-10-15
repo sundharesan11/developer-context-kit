@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { mkdir, writeFile, readFile, chmod, stat, readdir, rm } from "node:fs/promises";
 import { sandbox, makeRepo, fixtureGit, runCli, treeSnapshot } from "./helpers.mjs";
 import { loadPilot, readApprovedDigest } from "../src/config/pilot.mjs";
+import { applyLiveInit, applyLiveAddRepo, applyLiveSetKit } from "../src/config/live.mjs";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const mode = async (path) => (await stat(path)).mode & 0o777;
 async function pinnedKit(dir, files = { "README.md": "kit\n" }) {
@@ -80,7 +81,8 @@ test("live init refuses missing or stale fingerprints, unknown agents and a runn
   assert.equal((await h.cli(["live", "init", "--pilot", h.profile, "--config-root", h.store, "--agent", "claude"])).json.error.code, "DEVCTX_USAGE");
   failed(await h.cli(["live", "init", "--pilot", h.profile, "--agent", "claude"], REPO_ROOT), "DEVCTX_GATE_REQUIRED");
   assert.equal(await treeSnapshot(h.home), before);
-  await writeFile(join(h.kit, "dirty.txt"), "x");
+  await mkdir(join(h.kit, "src"));
+  await writeFile(join(h.kit, "src/dirty.mjs"), "x");
   const dirty = await h.cli(["live", "init", "--pilot", h.profile, "--agent", "claude"]);
   failed(dirty, "DEVCTX_GATE_REQUIRED", "live.kitCommit");
   assert.equal(dirty.json.error.details.reason, "dirty");
@@ -100,6 +102,7 @@ test("live init refuses an existing non-empty store without a profile and an exi
   const h = await liveHome(t);
   await mkdir(join(h.store, "config"), { recursive: true, mode: 0o700 });
   await chmod(h.store, 0o700);
+  await writeFile(join(h.store, "config/user.json"), "{}", { mode: 0o600 });
   failed(await h.cli(["live", "init", "--pilot", h.profile, "--agent", "claude"]), "DEVCTX_CONFLICT", "pilotRoot");
   await rm(join(h.store, "config"), { recursive: true });
   const { applied } = await h.init(["--agent", "claude"]);
@@ -240,4 +243,92 @@ test("live init from a pinned kit clone through bin/devctx.mjs leaves a store th
   assert.equal(scope.ok, true, JSON.stringify(scope.error));
   assert.equal(scope.result.created, true);
   assert.equal(await mode(join(devctx, "store/config/scopes/acme.json")), 0o600);
+});
+const crash = () => { throw new Error("injected crash"); };
+test("live init crash after creating the store folders or recording the approval leaves a store that a retry initializes", async (t) => {
+  for (const fault of ["afterRoots", "afterApproval"]) {
+    const h = await liveHome(t), args = ["--agent", "claude", "--repo", h.repo];
+    const preview = await h.cli(["live", "init", "--pilot", h.profile, ...args]);
+    const input = { profilePath: h.profile, agents: ["claude"], repos: [h.repo], fingerprint: preview.json.result.fingerprint };
+    await assert.rejects(applyLiveInit(input, h.context, { faults: { [fault]: crash } }), /injected crash/, fault);
+    assert.deepEqual((await readdir(h.devctx)).sort(), ["kit", "store"], fault);
+    assert.deepEqual((await readdir(h.store)).sort(), ["config", "data", "inputs", "state"], fault);
+    assert.deepEqual((await readdir(join(h.store, "state"))).sort(), fault === "afterApproval" ? ["live", "locks"] : ["locks"], fault);
+    const { applied } = await h.init(args);
+    const pilot = await loadPilot(h.profile, h.context);
+    assert.deepEqual(await readApprovedDigest(pilot), { schemaVersion: 1, profileId: applied.profileId, digest: pilot.digest }, fault);
+    assert.equal((await h.cli(["doctor", "--pilot", h.profile])).json.ok, true, fault);
+  }
+});
+test("live init accepts a store holding only the empty layout and an orphan approval and refuses anything else", async (t) => {
+  const layout = async (h) => {
+    for (const rel of ["config", "data", "inputs", "state/locks", "state/live"]) await mkdir(join(h.store, rel), { recursive: true, mode: 0o700 });
+    await chmod(h.store, 0o700);
+    await writeFile(join(h.store, "state/live/approved-profile.json"), JSON.stringify({ schemaVersion: 1, profileId: "prof_0123456789abcdef", digest: "sha256:" + "0".repeat(64) }) + "\n", { mode: 0o600 });
+  };
+  for (const extra of ["stray.txt", "config/user.json", "data/x", "inputs/x", "state/other", "state/locks/live.lock", "state/live/other.json"]) {
+    const h = await liveHome(t);
+    await layout(h);
+    await writeFile(join(h.store, extra), "x", { mode: 0o600 });
+    failed(await h.cli(["live", "init", "--pilot", h.profile, "--agent", "claude"]), "DEVCTX_CONFLICT", "pilotRoot");
+  }
+  for (const rel of ["data", "state/live/approved-profile.json"]) {
+    const h = await liveHome(t);
+    await layout(h);
+    await rm(join(h.store, rel), { recursive: true });
+    await (rel === "data" ? writeFile(join(h.store, rel), "x", { mode: 0o600 }) : mkdir(join(h.store, rel), { mode: 0o700 }));
+    failed(await h.cli(["live", "init", "--pilot", h.profile, "--agent", "claude"]), "DEVCTX_CONFLICT", "pilotRoot");
+  }
+  const h = await liveHome(t);
+  await layout(h);
+  const { applied } = await h.init(["--agent", "claude"]);
+  const pilot = await loadPilot(h.profile, h.context);
+  assert.deepEqual(await readApprovedDigest(pilot), { schemaVersion: 1, profileId: applied.profileId, digest: pilot.digest });
+});
+test("live add-repo or set-kit crash around the profile replace leaves a profile that loads and a change that re-applies", async (t) => {
+  const h = await liveHome(t);
+  const { applied } = await h.init();
+  const [beacon, comet, delta] = await Promise.all(["beacon", "comet", "delta"].map((name) => makeRepo(join(h.sb, "work", name), { "README.md": "# " + name + "\n" })));
+  const addRepo = async (repo, faults) => {
+    const preview = await h.cli(["live", "add-repo", "--pilot", h.profile, "--repo", repo]);
+    assert.equal(preview.json.ok, true, JSON.stringify(preview.json.error));
+    return applyLiveAddRepo({ profilePath: h.profile, repo, fingerprint: preview.json.result.fingerprint }, h.context, { faults });
+  };
+  const doctorOk = async (kit = h.kit) => { const r = await h.cli(["doctor", "--pilot", h.profile], kit); assert.equal(r.json.ok, true, JSON.stringify(r.json.error)); };
+  // Crash after the approval is written and before the profile is replaced: the old profile still loads.
+  await assert.rejects(addRepo(beacon, { afterApproval: crash }), /injected crash/);
+  assert.deepEqual((await profileOf(h.profile)).repos, [h.repo]);
+  await doctorOk();
+  const pending = await readApprovedDigest(await loadPilot(h.profile, h.context));
+  assert.equal(pending.previousDigest, applied.digest);
+  await addRepo(beacon);
+  assert.deepEqual((await profileOf(h.profile)).repos, [h.repo, beacon].sort());
+  let pilot = await loadPilot(h.profile, h.context);
+  assert.equal(pilot.digest, pending.digest);
+  assert.deepEqual(await readApprovedDigest(pilot), { schemaVersion: 1, profileId: applied.profileId, digest: pilot.digest });
+  const beaconText = await readFile(h.profile, "utf8"), beaconDigest = pilot.digest;
+  // Crash after the profile is replaced and before the approval is rewritten: the new profile loads.
+  await assert.rejects(addRepo(comet, { afterReplace: crash }), /injected crash/);
+  assert.deepEqual((await profileOf(h.profile)).repos, [h.repo, beacon, comet].sort());
+  await doctorOk();
+  pilot = await loadPilot(h.profile, h.context);
+  assert.deepEqual(await readApprovedDigest(pilot), { schemaVersion: 1, profileId: applied.profileId, digest: pilot.digest, previousDigest: beaconDigest });
+  // The next approved change clears the leftover previous digest.
+  await addRepo(delta);
+  pilot = await loadPilot(h.profile, h.context);
+  assert.deepEqual(await readApprovedDigest(pilot), { schemaVersion: 1, profileId: applied.profileId, digest: pilot.digest });
+  // set-kit: a crash after the approval leaves the old kit running and the same preview re-applies.
+  const next = await pinnedKit(join(h.devctx, "kit-next"), { "README.md": "kit next\n" });
+  const preview = await h.cli(["live", "set-kit", "--pilot", h.profile, "--commit", next.commit], next.kit);
+  assert.equal(preview.json.ok, true, JSON.stringify(preview.json.error));
+  await assert.rejects(applyLiveSetKit({ profilePath: h.profile, commit: next.commit, fingerprint: preview.json.result.fingerprint }, { ...h.context, kitRoot: next.kit }, { faults: { afterApproval: crash } }), /injected crash/);
+  await doctorOk(h.kit);
+  const done = await h.cli(["live", "set-kit", "--pilot", h.profile, "--commit", next.commit, "--apply", "--plan-fingerprint", preview.json.result.fingerprint], next.kit);
+  assert.equal(done.json.ok, true, JSON.stringify(done.json.error));
+  await doctorOk(next.kit);
+  // An earlier profile is no longer approved once a change completes.
+  await writeFile(h.profile, beaconText);
+  const stale = await h.cli(["doctor", "--pilot", h.profile], h.kit);
+  failed(stale, "DEVCTX_GATE_REQUIRED", "live.approval");
+  assert.equal(stale.json.error.details.reason, "changed");
 });

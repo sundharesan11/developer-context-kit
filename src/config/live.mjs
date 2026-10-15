@@ -41,11 +41,22 @@ function storeLayout(dir) {
   const pilotRoot = join(dir, "store");
   return { pilotRoot, configRoot: join(pilotRoot, "config"), dataRoot: join(pilotRoot, "data"), stateRoot: join(pilotRoot, "state"), inputsRoot: join(pilotRoot, "inputs") };
 }
+// What a failed live init can leave behind: the empty layout folders, the empty lock folder and an approval with
+// no profile, which a retry overwrites. null marks a file; an object lists the only entries a folder may hold.
+const RETRY_LAYOUT = { config: {}, data: {}, inputs: {}, state: { locks: {}, live: { "approved-profile.json": null } } };
+function assertLeftover(dir, allowed) {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name), node = info(path), want = Object.hasOwn(allowed, name) ? allowed[name] : undefined;
+    if (want === undefined || !node || (want === null ? !node.isFile() : !node.isDirectory())) throw new DevctxError("CONFLICT", "Live store exists without a profile", { field: "pilotRoot" });
+    checkNode(node, path, { directory: want !== null });
+    if (want) assertLeftover(path, want);
+  }
+}
 function assertFreshStore(pilotRoot) {
   const node = info(pilotRoot);
   if (!node) return;
   checkNode(node, pilotRoot, { directory: true });
-  if (readdirSync(pilotRoot).length) throw new DevctxError("CONFLICT", "Live store exists without a profile", { field: "pilotRoot" });
+  assertLeftover(pilotRoot, RETRY_LAYOUT);
 }
 export function planLiveInit(input, ctx) {
   const path = profilePath(input.profilePath), dir = dirname(path);
@@ -63,19 +74,23 @@ export function planLiveInit(input, ctx) {
   const checked = checkProfile(profile, path, gateContext(ctx));
   return finalizePlan({ kind: "live-init", profile: { ...profile, live: { ...profile.live, profileId: null } }, layout: { profile: path, ...layout, kitRoot }, warnings: [...checked.warnings, ...(kitRoot === join(dir, "kit") ? [] : [{ code: "KIT_NOT_SIBLING" }])] });
 }
-export async function applyLiveInit(input, ctx) {
+// faults.afterRoots and faults.afterApproval are test seams for a crash before the profile is written.
+export async function applyLiveInit(input, ctx, { faults = {} } = {}) {
   const plan = planLiveInit(input, ctx);
   assertFingerprint(plan, input.fingerprint);
   const path = plan.layout.profile;
   const profile = { ...plan.profile, live: { ...plan.profile.live, profileId: "prof_" + randomBytes(8).toString("hex") } };
   const pilot = checkProfile(profile, path, gateContext(ctx)), roots = rootsFromPilot(pilot);
+  // Only the store folder and the lock folder exist before the lock; a failure after either leaves a store a retry accepts.
   ensurePrivateDir(pilot.pilotRoot);
-  ensureRoots(roots);
-  ensurePrivateDir(pilot.inputsRoot);
   // The approval is recorded before the profile appears, so a profile on disk is always an approved one.
   return withPilotLock(roots, lockPath(roots), { kind: "live-init" }, async () => {
     if (info(path)) throw new DevctxError("CONFLICT", "Live profile already exists", { field: "pilot" });
+    ensureRoots(roots);
+    ensurePrivateDir(pilot.inputsRoot);
+    await faults.afterRoots?.();
     await recordApprovedDigest(roots, { profileId: profile.live.profileId, digest: pilot.digest });
+    await faults.afterApproval?.();
     await writeNewFile(path, profileText(profile));
     fsyncDir(dirname(path));
     return { applied: true, profile: path, profileId: profile.live.profileId, digest: pilot.digest };
@@ -90,15 +105,21 @@ async function planChange(kind, input, ctx, change, liveGate) {
   const next = checkProfile(after, path, gateContext(ctx));
   return { pilot, next, plan: finalizePlan({ kind, profile: path, profileId: pilot.live.profileId, digest: { from: pilot.digest, to: next.digest }, ...details }) };
 }
-async function applyChange(kind, input, ctx, change, liveGate) {
+// faults.afterApproval and faults.afterReplace are test seams for a crash on either side of the profile replace.
+async function applyChange(kind, input, ctx, change, liveGate, { faults = {} } = {}) {
   const first = await planChange(kind, input, ctx, change, liveGate);
   assertFingerprint(first.plan, input.fingerprint);
   const roots = rootsFromPilot(first.pilot);
   return withPilotLock(roots, lockPath(roots), { kind }, async () => {
-    const { next, plan } = await planChange(kind, input, ctx, change, liveGate);
+    const { pilot, next, plan } = await planChange(kind, input, ctx, change, liveGate);
     assertFingerprint(plan, input.fingerprint);
-    await recordApprovedDigest(rootsFromPilot(next), { profileId: next.live.profileId, digest: next.digest });
+    // Both profiles stay approved until the replace is done, so a crash between the writes never strands the profile.
+    const nextRoots = rootsFromPilot(next), approval = { profileId: next.live.profileId, digest: next.digest };
+    await recordApprovedDigest(nextRoots, { ...approval, previousDigest: pilot.digest });
+    await faults.afterApproval?.();
     await atomicReplace(next.path, profileText(rawOf(next)));
+    await faults.afterReplace?.();
+    await recordApprovedDigest(nextRoots, approval);
     return { applied: true, profile: next.path, profileId: next.live.profileId, digest: next.digest };
   }, { destinations: [approvedDigestPath(first.pilot)] });
 }
@@ -119,7 +140,7 @@ function setKit(input, ctx) {
 }
 const preview = async (promise) => ({ preview: true, ...(await promise) });
 export const planLiveAddRepo = (input, ctx) => preview(planChange("live-add-repo", input, ctx, addRepo(input.repo)).then((r) => r.plan));
-export const applyLiveAddRepo = (input, ctx) => applyChange("live-add-repo", input, ctx, addRepo(input.repo));
+export const applyLiveAddRepo = (input, ctx, options) => applyChange("live-add-repo", input, ctx, addRepo(input.repo), undefined, options);
 export const planLiveSetKit = (input, ctx) => preview(planChange("live-set-kit", input, ctx, ...setKit(input, ctx)).then((r) => r.plan));
-export const applyLiveSetKit = (input, ctx) => applyChange("live-set-kit", input, ctx, ...setKit(input, ctx));
+export const applyLiveSetKit = (input, ctx, options) => applyChange("live-set-kit", input, ctx, ...setKit(input, ctx), options);
 export const previewLiveInit = (input, ctx) => ({ preview: true, ...planLiveInit(input, ctx) });

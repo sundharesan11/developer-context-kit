@@ -144,7 +144,8 @@ test("live running kit at another path fails with GATE_REQUIRED naming the kit",
 test("live kit at another commit, attached to a branch, or with local changes fails with GATE_REQUIRED", async (t) => {
   const f = await liveFixture(t);
   const path = await f.approved();
-  await writeFile(join(f.kit, "untracked.txt"), "x");
+  await mkdir(join(f.kit, "src"));
+  await writeFile(join(f.kit, "src/untracked.mjs"), "x");
   await assert.rejects(loadPilot(path, f.context), (e) => refused("live.kitCommit")(e) && e.details.reason === "dirty");
   await fixtureGit(f.kit, ["add", "-A"]);
   await assert.rejects(loadPilot(path, f.context), (e) => refused("live.kitCommit")(e) && e.details.reason === "dirty");
@@ -207,4 +208,27 @@ test("live kit clone of the committed HEAD runs devctx from a pinned detached ch
   assert.equal(mismatch.ok, false);
   assert.equal(mismatch.error.code, "DEVCTX_GATE_REQUIRED");
   assert.equal(mismatch.error.details.field, "live.kitRoot");
+});
+test("live kit tolerates stray files outside its code paths and refuses untracked, ignored or changed code", async (t) => {
+  const sb = await sandbox(t);
+  const kit = await pinnedKit(join(sb, "home/.devctx/kit"), { "README.md": "kit\n", ".gitignore": "*.local.mjs\nnode_modules/\n", "src/a.mjs": "export {};\n", "docs/x.md": "doc\n" });
+  const f = await liveFixture(t, { kit });
+  const path = await f.approved();
+  const dirty = (e) => refused("live.kitCommit")(e) && e.details.reason === "dirty";
+  await writeFile(join(f.kit, ".DS_Store"), "x");
+  await writeFile(join(f.kit, "docs/.DS_Store"), "x");
+  await mkdir(join(f.kit, "node_modules/pkg"), { recursive: true });
+  await writeFile(join(f.kit, "node_modules/pkg/index.js"), "x");
+  assert.ok(await loadPilot(path, f.context));
+  for (const rel of ["src/new.mjs", "src/a.local.mjs", "src/sub/deep.local.mjs", "bin/extra.mjs", "skills/x/SKILL.md", "scripts/s.mjs", "schemas/s.json", "catalog/c.json", "package.json"]) {
+    await mkdir(dirname(join(f.kit, rel)), { recursive: true });
+    await writeFile(join(f.kit, rel), "x");
+    await assert.rejects(loadPilot(path, f.context), dirty, rel);
+    await rm(join(f.kit, rel));
+  }
+  assert.ok(await loadPilot(path, f.context));
+  await writeFile(join(f.kit, "docs/x.md"), "changed\n");
+  await assert.rejects(loadPilot(path, f.context), dirty);
+  await fixtureGit(f.kit, ["checkout", "-q", "--", "docs/x.md"]);
+  assert.ok(await loadPilot(path, f.context));
 });
