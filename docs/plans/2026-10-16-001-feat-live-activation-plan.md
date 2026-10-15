@@ -246,8 +246,8 @@ Layout of `~/.devctx` after activation:
 - **Goal:** prove onboarding a repository outside the store never writes to it.
 - **Requirements:** R13, R16; KTD11.
 - **Dependencies:** U1, U4.
-- **Files:** `test/live-onboard.test.mjs` (new), `test/helpers.mjs`, `src/onboarding/onboard.mjs` if a gap appears.
-- **Approach:** add a snapshot helper implementing the R16 snapshot. Run preview, apply and brief against a fixture repository outside `pilotRoot`, on a feature branch with a second worktree.
+- **Files:** `scripts/repo-snapshot.mjs` (new), `test/live-onboard.test.mjs` (new), `test/helpers.mjs`, `scripts/package-allowlist.json`, `src/onboarding/onboard.mjs` if a gap appears.
+- **Approach:** add a read-only `scripts/repo-snapshot.mjs` implementing the R16 snapshot, used by tests and by U8. Run preview, apply and brief against a fixture repository outside `pilotRoot`, on a feature branch with a second worktree.
 - **Execution note:** expected to be test work; change code only if a write is found.
 - **Test scenarios:**
   - Covers AE4. The snapshot is identical before and after onboarding.
@@ -288,8 +288,9 @@ Layout of `~/.devctx` after activation:
 - **Approach:** follow `docs/LIVE.md`, with the owner present and the steps below in order.
   - Preflight, read-only: confirm the installed Claude and Codex versions read `~/.claude/skills` and `~/.agents/skills`, and `lstat` both folders. If one is missing or symlinked, stop; the owner creates or fixes it by hand as a separate decision.
   - Read-only Git check on example-repo that mirrors `locateWorktree`: repo-local `filter.*` and `diff.*` config, and a timed `status --porcelain`. Stop if either would be refused.
-  - Ask the owner to close editors and Git tools watching example-repo for the run, then take the before snapshot of example-repo.
-  - Clone the kit at the merged commit, then preview and apply `live init` with example-repo listed.
+  - Ask the owner to close editors and Git tools watching example-repo for the run.
+  - Clone the kit at the merged commit, then take the before snapshot of example-repo with the clone's `scripts/repo-snapshot.mjs`, held in a 0600 file in a private temp folder.
+  - Preview and apply `live init` with example-repo listed, then move the before snapshot into `state/evidence/`.
   - Add scope `example`, then show the example-repo onboarding preview before any skill install; stop if it is refused. Apply after approval.
   - Show the install preview for both agents and apply after owner approval.
   - Ask before editing the shell profile.
