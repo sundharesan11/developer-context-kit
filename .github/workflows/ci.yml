@@ -67,9 +67,9 @@ jobs:
           import { readFileSync } from 'node:fs';
           const report = JSON.parse(readFileSync(process.argv[2], 'utf8'));
           assert.equal(report.ok, true);
-          assert.equal(new Set(report.checks.map(check => check.id)).size, 25);
-          assert.equal(report.checks.length, 25);
-          assert.equal(report.checks.filter(check => check.status === 'passed').length, 24);
+          assert.equal(new Set(report.checks.map(check => check.id)).size, 29);
+          assert.equal(report.checks.length, 29);
+          assert.equal(report.checks.filter(check => check.status === 'passed').length, 28);
           assert.deepEqual(report.checks.filter(check => check.status !== 'passed').map(({ id, status }) => ({ id, status })),
             [{ id: 'fresh-agent-smoke', status: 'deferred' }]);
           NODE
