@@ -281,7 +281,25 @@ node "$KIT/bin/devctx.mjs" agents recover --pilot "$PROFILE"
 node "$KIT/bin/devctx.mjs" agents recover --pilot "$PROFILE" --apply --plan-fingerprint '<fingerprint>'
 ```
 
-Recovery removes an interrupted create, completes an interrupted update from the run folder's copies, and finishes an interrupted remove. It never rolls an update back. It always matches the journal's hashes. A file that matches neither is reported as `hold` and left alone. Never edit or delete journals, receipts or locks by hand.
+Recovery removes an interrupted create, completes an interrupted update from the run folder's copies, and finishes an interrupted remove. It never rolls an update back. It always matches the journal's hashes. A file that matches neither is reported as `hold` and left alone, and the run stays blocked.
+
+To close a run that is stuck on a hold, or whose journal cannot be read, preview and apply a release. Release finishes every action it safely can, then closes the run and leaves the held files where they are. Those files then count as foreign: the kit never touches them again, so inspect and remove them by hand if they are leftovers.
+
+```sh
+node "$KIT/bin/devctx.mjs" agents recover --pilot "$PROFILE" --release
+node "$KIT/bin/devctx.mjs" agents recover --pilot "$PROFILE" --release --apply --plan-fingerprint '<fingerprint>'
+```
+
+## Stale locks
+
+A command that was killed can leave `state/locks/install.lock` or `state/locks/live.lock` behind, and later commands fail with `BUSY`. Preview the release first. It shows the recorded owner. Apply only removes the lock when it belongs to this machine, its owner process is no longer running, and the file has not changed since the preview.
+
+```sh
+node "$KIT/bin/devctx.mjs" locks release --pilot "$PROFILE" --lock install
+node "$KIT/bin/devctx.mjs" locks release --pilot "$PROFILE" --lock install --apply --plan-fingerprint '<fingerprint>'
+```
+
+An empty or unreadable lock file is refused. Make sure no devctx command is running, then remove that one file by hand. Never edit or delete journals or receipts by hand.
 
 ## Leftover .codex/skills copies
 
