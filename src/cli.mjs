@@ -23,6 +23,9 @@ export const COMMANDS = {
   doctor: { load: async () => ({ options: {}, run: ({}, ctx) => import("./config/doctor.mjs").then((m) => m.runDoctor(ctx.roots)) }) },
   init: { load: async () => (await import("./config/commands.mjs")).initCommand },
   "scope add": { load: async () => (await import("./config/commands.mjs")).scopeAddCommand },
+  "live init": { rootOptions: false, profile: true, load: async () => (await import("./config/commands.mjs")).liveInitCommand },
+  "live add-repo": { rootOptions: false, profile: true, load: async () => (await import("./config/commands.mjs")).liveAddRepoCommand },
+  "live set-kit": { rootOptions: false, profile: true, load: async () => (await import("./config/commands.mjs")).liveSetKitCommand },
   "record add": { load: async () => (await import("./records/commands.mjs")).recordAddCommand },
   "record supersede": { load: async () => (await import("./records/commands.mjs")).recordSupersedeCommand },
   "record propose": { load: async () => (await import("./records/commands.mjs")).recordProposeCommand },
@@ -59,7 +62,8 @@ function routeFor(argv) {
   throw new DevctxError("USAGE", "Unknown command");
 }
 export async function main(argv, options = {}) {
-  const { stdout = process.stdout, now = () => new Date(), home = homedir(), env = process.env } = options;
+  // kitRoot is a test seam for the running kit; production leaves it undefined.
+  const { stdout = process.stdout, now = () => new Date(), home = homedir(), env = process.env, kitRoot } = options;
   let command = argv.slice(0, 2).join(" ");
   try {
     const routed = routeFor(argv);
@@ -87,9 +91,10 @@ export async function main(argv, options = {}) {
       throw new DevctxError("USAGE", "Invalid command options");
     }
     let pilot, roots;
-    if (!isRootFree(command)) {
+    // Profile routes still require --pilot but load the profile themselves.
+    if (!isRootFree(command) && COMMANDS[command].profile !== true) {
       try {
-        pilot = await loadPilot(values.pilot, { home, env });
+        pilot = await loadPilot(values.pilot, { home, env, kitRoot });
         roots = rootsFromPilot(pilot);
       } catch (error) {
         if (command === "handoff export") throw (await import("./handoff/privacy.mjs")).handoffError(error);
@@ -100,7 +105,7 @@ export async function main(argv, options = {}) {
         if (values[flag] && values[flag] !== roots[key]) throw new DevctxError("GATE_REQUIRED", "Root does not match pilot");
       }
     }
-    const context = { roots, pilot, now, home, env };
+    const context = { roots, pilot, now, home, env, kitRoot };
     if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
     const result = await impl.run(values, context);
     stdout.write(JSON.stringify({ ok: true, command, result }) + "\n");

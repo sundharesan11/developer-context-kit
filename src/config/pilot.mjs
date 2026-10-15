@@ -139,8 +139,8 @@ async function readProfile(path) {
   try { raw = JSON.parse(readFileSync(path, "utf8")); } catch { fail("pilot"); }
   return isObject(raw) && Object.hasOwn(raw, "live") ? readPrivateJson(path) : raw;
 }
-export async function loadPilot(path, context = {}) {
-  const raw = await readProfile(path);
+// Every fence and live gate check except approval. Profile commands use it for a candidate profile not yet on disk.
+export function checkProfile(raw, path, context = {}) {
   validate(raw, context);
   const live = Object.hasOwn(raw, "live");
   if (live) {
@@ -149,9 +149,12 @@ export async function loadPilot(path, context = {}) {
     assertRunningKit(raw, context);
   }
   const warnings = live && (context.env ?? process.env).CODEX_HOME ? [{ code: "CODEX_HOME_IGNORED" }] : [];
-  const pilot = Object.freeze({ ...raw, path, _context: context, digest: pilotDigest(raw), warnings });
+  return Object.freeze({ ...raw, path, _context: context, digest: pilotDigest(raw), warnings });
+}
+export async function loadPilot(path, context = {}) {
+  const pilot = checkProfile(await readProfile(path), path, context);
   // context.liveGate.approval === false is for profile commands that approve a new profile themselves.
-  if (live && context.liveGate?.approval !== false) await assertApproved(pilot);
+  if (pilot.live && context.liveGate?.approval !== false) await assertApproved(pilot);
   return pilot;
 }
 export const pilotDigest = (pilot) => digest(Object.fromEntries(keys.map((key) => [key, pilot[key]])));
