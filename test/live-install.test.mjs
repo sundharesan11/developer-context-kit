@@ -24,11 +24,11 @@ async function liveInstall(t) {
   await mkdir(store, { recursive: true, mode: 0o700 });
   const kitA = await pinnedKit(join(devctx, "kit"), kitFiles("Kit A"));
   const repo = await makeRepo(join(sb, "work/atlas"), { "README.md": "# Atlas\n" });
-  const obj = { schemaVersion: 1, pilotRoot: store, configRoot: join(store, "config"), dataRoot: join(store, "data"), stateRoot: join(store, "state"), inputsRoot: join(store, "inputs"), agentHomes: [], repos: [repo], forbidden: [], live: { profileId: "prof_0123456789abcdef", home, skillDirs: { claude: join(home, ".claude/skills"), codex: join(home, ".agents/skills") }, kitRoot: kitA.kit, kitCommit: kitA.commit } };
+  const obj = { schemaVersion: 1, pilotRoot: store, configRoot: join(store, "config"), dataRoot: join(store, "data"), stateRoot: join(store, "state"), inputsRoot: join(store, "inputs"), agentHomes: [], repos: [repo], forbidden: [], live: { configId: "cfg_0123456789abcdef", home, skillDirs: { claude: join(home, ".claude/skills"), codex: join(home, ".agents/skills") }, kitRoot: kitA.kit, kitCommit: kitA.commit } };
   let n = 0;
   const f = {
     sb, home, devctx, kitA, claude: obj.live.skillDirs.claude, codex: obj.live.skillDirs.codex,
-    // Approves a profile for the given kit and returns its loaded pilot and roots, as a profile command would.
+    // Approves a live config for the given kit and returns its loaded pilot and roots, as a live config command would.
     async use({ kit, commit } = kitA) {
       const path = join(devctx, "live-" + ++n + ".json"), context = { home, env: {}, kitRoot: kit };
       await writeFile(path, JSON.stringify({ ...obj, live: { ...obj.live, kitRoot: kit, kitCommit: commit } }), { mode: 0o600 });
@@ -69,7 +69,7 @@ test("live install: a foreign same-named Claude entry conflicts for Claude only 
   assert.equal(await treeSnapshot(f.claude), before);
   assert.deepEqual((await readdir(f.codex)).sort(), [...SKILL_NAMES].sort());
   const receipt = JSON.parse(await readFile(join(f.codex, "devctx-record/.devctx-owned.json"), "utf8"));
-  assert.equal(receipt.profileId, "prof_0123456789abcdef");
+  assert.equal(receipt.configId, "cfg_0123456789abcdef");
   assert.equal(receipt.runId, "run_ae1install");
   assert.equal(receipt.kitCommit, f.kitA.commit);
   assert.equal(receipt.files["SKILL.md"], sha256(await readFile(join(f.codex, "devctx-record/SKILL.md"))));
@@ -104,7 +104,7 @@ test("live --agent codex alone installs only into .agents/skills", async (t) => 
   assert.equal(existsSync(join(f.home, ".codex")), false);
 });
 
-test("live install refuses a target other than the profile's skill folder and never creates one", async (t) => {
+test("live install refuses a target other than the live config's skill folder and never creates one", async (t) => {
   const f = await liveInstall(t), p = await f.use();
   for (const targetHome of [f.sb, join(f.home, ".claude"), f.claude]) await assert.rejects(planInstall(p.pilot, { targetHome, agents: ["claude"], mode: "install" }), { code: "DEVCTX_GATE_REQUIRED" });
   assert.equal((await planInstall(p.pilot, { targetHome: f.home, agents: ["claude"], mode: "install" })).actions.length, SKILL_NAMES.length);
@@ -190,7 +190,7 @@ test("live forged receipts without a matching journal or naming extra or travers
   const receipt = { ...extra, runId: "run_forgedjrnl1" };
   const action = { agent: "codex", skill: "devctx-resume", path: join(f.codex, "devctx-resume"), root: f.codex, status: "create", old: null, new: { "SKILL.md": genuine.files["SKILL.md"], ".devctx-owned.json": sha256(canonicalJson(receipt) + "\n") }, receipt };
   await writeFile(join(f.codex, "devctx-resume/.devctx-owned.json"), canonicalJson(receipt) + "\n");
-  await writeFile(join(run, "journal.json"), canonicalJson({ schemaVersion: 2, kind: "skill-bundled", profileId: "prof_0123456789abcdef", runId: "run_forgedjrnl1", kitCommit: f.kitA.commit, mode: "install", planFingerprint: "sha256:" + "0".repeat(64), targetHome: null, intended: [action], started: [0], completed: [action] }) + "\n", { mode: 0o600 });
+  await writeFile(join(run, "journal.json"), canonicalJson({ schemaVersion: 2, kind: "skill-bundled", configId: "cfg_0123456789abcdef", runId: "run_forgedjrnl1", kitCommit: f.kitA.commit, mode: "install", planFingerprint: "sha256:" + "0".repeat(64), targetHome: null, intended: [action], started: [0], completed: [action] }) + "\n", { mode: 0o600 });
   const plan = await planInstall(p.pilot, { agents: ["codex"], mode: "install" });
   assert.ok(plan.actions.every((x) => x.status === "conflict" && x.reason === "unowned-receipt"), JSON.stringify(plan.actions));
   const uninstall = await planInstall(p.pilot, { agents: ["codex"], mode: "uninstall" });
@@ -493,13 +493,13 @@ test("live crash during uninstall finishes the remove through an approved recove
   }
 });
 
-test("live rollback check refuses an uninstall run, an inventory of another profile and a folder replaced by a file", async (t) => {
+test("live rollback check refuses an uninstall run, an inventory of another live config and a folder replaced by a file", async (t) => {
   const f = await liveInstall(t), p = await f.use(), input = { agents: ["claude", "codex"], mode: "install" };
   await install(p, input, "run_guardins1");
   await install(p, { ...input, mode: "uninstall" }, "run_guardun01");
   await assert.rejects(rollbackCheck(p.roots, p.pilot, { runId: "run_guardun01" }), { code: "DEVCTX_INVALID_INPUT" });
   const path = join(p.roots.stateRoot, "runs/run_guardins1/inventory.json"), original = await readFile(path);
-  await writeFile(path, canonicalJson({ ...JSON.parse(original.toString("utf8")), profileId: "prof_fedcba9876543210" }) + "\n");
+  await writeFile(path, canonicalJson({ ...JSON.parse(original.toString("utf8")), configId: "cfg_fedcba9876543210" }) + "\n");
   await assert.rejects(rollbackCheck(p.roots, p.pilot, { runId: "run_guardins1" }), { code: "DEVCTX_GATE_REQUIRED" });
   await writeFile(path, original);
   assert.equal((await rollbackCheck(p.roots, p.pilot, { runId: "run_guardins1" })).status, "ok");

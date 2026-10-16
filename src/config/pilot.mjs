@@ -11,11 +11,11 @@ import { DevctxError } from "../errors.mjs";
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const members = ["configRoot", "dataRoot", "stateRoot", "inputsRoot"];
 const keys = ["schemaVersion", "pilotRoot", ...members, "agentHomes", "repos", "forbidden", "live"];
-const liveKeys = ["profileId", "home", "skillDirs", "kitRoot", "kitCommit"];
+const liveKeys = ["configId", "home", "skillDirs", "kitRoot", "kitCommit"];
 // Skill folders sit inside these protected homes; only the exact named folder is carved out, never the home.
 const SKILL_PARENTS = ["real-claude-home", "real-agents-home", "CLAUDE_CONFIG_DIR"];
 const fail = (field, protectedLabel) => { throw new DevctxError("GATE_REQUIRED", "Pilot fence refused path", { field, ...(protectedLabel ? { protected: protectedLabel } : {}) }); };
-const gate = (field, reason) => { throw new DevctxError("GATE_REQUIRED", "Live profile gate refused", { field, reason }); };
+const gate = (field, reason) => { throw new DevctxError("GATE_REQUIRED", "Live config gate refused", { field, reason }); };
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 function comparable(path) {
   const absolute = resolve(path);
@@ -47,7 +47,7 @@ export function skillDirsFor({ home = homedir(), env = process.env } = {}) {
 function validateLive(pilot, context) {
   const live = pilot.live;
   if (!isObject(live) || Object.keys(live).some((key) => !liveKeys.includes(key))) fail("live");
-  if (typeof live.profileId !== "string" || !/^[a-z0-9][a-z0-9_-]{7,63}$/.test(live.profileId)) fail("live");
+  if (typeof live.configId !== "string" || !/^[a-z0-9][a-z0-9_-]{7,63}$/.test(live.configId)) fail("live");
   if (typeof live.kitCommit !== "string" || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(live.kitCommit)) fail("live");
   if (typeof live.home !== "string" || typeof live.kitRoot !== "string") fail("live");
   if (!isObject(live.skillDirs) || !Object.keys(live.skillDirs).length) fail("live.skillDirs");
@@ -112,7 +112,7 @@ export function assertKit(kitRoot, kitCommit) {
   if (gitQuery(kitRoot, ["rev-parse", "--verify", "HEAD"]).stdout.trim() !== kitCommit) gate("live.kitCommit", "commit");
 }
 // context.liveGate.kit is the hook for a kit-change command: it runs from the new kit, which must match
-// the requested { kitRoot, kitCommit } instead of the profile's. The CLI never sets it from arguments.
+// the requested { kitRoot, kitCommit } instead of the live config's. The CLI never sets it from arguments.
 function assertRunningKit(pilot, context) {
   const expected = context.liveGate?.kit ?? pilot.live;
   let running;
@@ -120,34 +120,34 @@ function assertRunningKit(pilot, context) {
   if (typeof expected.kitRoot !== "string" || running !== comparable(expected.kitRoot)) gate("live.kitRoot", "running-kit");
   assertKit(expected.kitRoot, expected.kitCommit);
 }
-export const approvedDigestPath = (pilot) => join(pilot.stateRoot, "live", "approved-profile.json");
+export const approvedDigestPath = (pilot) => join(pilot.stateRoot, "live", "approved-config.json");
 export async function readApprovedDigest(pilot) {
   try { return await readPrivateJson(approvedDigestPath(pilot)); }
   catch (error) { if (error.code === "ENOENT" || error.code === "ENOTDIR") return null; throw error; }
 }
-// Callers hold the pilot lock. Profile commands pass the newly approved profile's ID and digest.
-// A profile change first records the new digest with the current one as previousDigest, replaces the profile,
-// then records the new digest alone, so a crash between the two writes leaves whichever profile is on disk approved.
-export async function recordApprovedDigest(roots, { profileId = roots?.pilot?.live?.profileId, digest: value = roots?.pilot?.digest, previousDigest } = {}) {
+// Callers hold the pilot lock. Live config commands pass the newly approved config's ID and digest.
+// A live config change first records the new digest with the current one as previousDigest, replaces the config,
+// then records the new digest alone, so a crash between the two writes leaves whichever config is on disk approved.
+export async function recordApprovedDigest(roots, { configId = roots?.pilot?.live?.configId, digest: value = roots?.pilot?.digest, previousDigest } = {}) {
   const pilot = roots?.pilot;
   if (!pilot?.live) fail("live");
   const path = approvedDigestPath(pilot);
   assertWritable(roots, [dirname(path), path]);
   ensurePrivatePath(pilot.stateRoot, ["live"]);
-  await atomicReplace(path, JSON.stringify({ schemaVersion: 1, profileId, digest: value, ...(previousDigest === undefined ? {} : { previousDigest }) }) + "\n");
+  await atomicReplace(path, JSON.stringify({ schemaVersion: 1, configId, digest: value, ...(previousDigest === undefined ? {} : { previousDigest }) }) + "\n");
 }
 async function assertApproved(pilot) {
   const approved = await readApprovedDigest(pilot);
   if (!approved) gate("live.approval", "unapproved");
-  if (approved.schemaVersion !== 1 || approved.profileId !== pilot.live.profileId || (approved.digest !== pilot.digest && approved.previousDigest !== pilot.digest)) gate("live.approval", "changed");
+  if (approved.schemaVersion !== 1 || approved.configId !== pilot.live.configId || (approved.digest !== pilot.digest && approved.previousDigest !== pilot.digest)) gate("live.approval", "changed");
 }
-async function readProfile(path) {
+async function readLiveConfig(path) {
   let raw;
   try { raw = JSON.parse(readFileSync(path, "utf8")); } catch { fail("pilot"); }
   return isObject(raw) && Object.hasOwn(raw, "live") ? readPrivateJson(path) : raw;
 }
-// Every fence and live gate check except approval. Profile commands use it for a candidate profile not yet on disk.
-export function checkProfile(raw, path, context = {}) {
+// Every fence and live gate check except approval. Live config commands use it for a candidate config not yet on disk.
+export function checkLiveConfig(raw, path, context = {}) {
   validate(raw, context);
   const live = Object.hasOwn(raw, "live");
   if (live) {
@@ -159,8 +159,8 @@ export function checkProfile(raw, path, context = {}) {
   return Object.freeze({ ...raw, path, _context: context, digest: pilotDigest(raw), warnings });
 }
 export async function loadPilot(path, context = {}) {
-  const pilot = checkProfile(await readProfile(path), path, context);
-  // context.liveGate.approval === false is for profile commands that approve a new profile themselves.
+  const pilot = checkLiveConfig(await readLiveConfig(path), path, context);
+  // context.liveGate.approval === false is for live config commands that approve a new config themselves.
   if (pilot.live && context.liveGate?.approval !== false) await assertApproved(pilot);
   return pilot;
 }

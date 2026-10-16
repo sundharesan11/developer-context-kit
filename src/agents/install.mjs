@@ -18,12 +18,12 @@ export const SKILL_NAMES = ["devctx-onboard", "devctx-resume", "devctx-record"];
 const SKILL = "SKILL.md", RECEIPT = ".devctx-owned.json", KIND = "skill-bundled", FILE_LIMIT = 1048576;
 const WRITES = ["create", "update", "remove"];
 const KIT = fileURLToPath(new URL("../..", import.meta.url));
-const profileOf = (pilot) => pilot.live?.profileId ?? null;
+const configIdOf = (pilot) => pilot.live?.configId ?? null;
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const lockPath = (roots) => join(roots.stateRoot, "locks", "install.lock");
 const entryPaths = (path) => [path, join(path, SKILL), join(path, RECEIPT)];
 const receiptBytes = (receipt) => canonicalJson(receipt) + "\n";
-// Live sources come from the profile's kit, which loadPilot has proven is the running kit at the pinned commit.
+// Live sources come from the live config's kit, which loadPilot has proven is the running kit at the pinned commit.
 function source(pilot, skill) {
   const path = join(pilot.live?.kitRoot ?? KIT, "skills", skill, SKILL), st = info(path);
   if (!st?.isFile()) throw new DevctxError("INTEGRITY", "Bundled skill source missing", { skill });
@@ -45,12 +45,12 @@ function skillRoots(pilot, targetHome, agents) {
     return chosen.map((agent) => ({ agent, dir: join(targetHome, AGENT_HOMES[agent]), root: targetHome }));
   }
   const home = pilot.live.home;
-  if (targetHome !== undefined && targetHome !== home) throw new DevctxError("GATE_REQUIRED", "Live target must be the profile home", { field: "targetHome" });
+  if (targetHome !== undefined && targetHome !== home) throw new DevctxError("GATE_REQUIRED", "Live target must be the live config home", { field: "targetHome" });
   return chosen.map((agent) => {
     const dir = Object.hasOwn(pilot.live.skillDirs, agent) ? pilot.live.skillDirs[agent] : undefined;
     const st = typeof dir === "string" ? info(dir) : null;
     if (!st?.isDirectory() || st.isSymbolicLink()) throw new DevctxError("GATE_REQUIRED", "Live skill folder unavailable", { field: "live.skillDirs." + agent });
-    if (isWithin(dir, home) && realpathSync.native(dir) !== join(realpathSync.native(home), relative(home, dir))) throw new DevctxError("GATE_REQUIRED", "Live skill folder does not resolve to the profile", { field: "live.skillDirs." + agent });
+    if (isWithin(dir, home) && realpathSync.native(dir) !== join(realpathSync.native(home), relative(home, dir))) throw new DevctxError("GATE_REQUIRED", "Live skill folder does not resolve to the live config", { field: "live.skillDirs." + agent });
     return { agent, dir, root: dir };
   });
 }
@@ -68,12 +68,12 @@ async function readJournals(stateRoot) {
   return found;
 }
 const wellFormed = (id, j) => j.schemaVersion === 2 && j.runId === id && Array.isArray(j.intended) && Array.isArray(j.started) && Array.isArray(j.completed) && j.intended.every((e) => isObject(e) && WRITES.includes(e.status) && typeof e.path === "string" && typeof e.root === "string" && SKILL_NAMES.includes(e.skill));
-const bundledFor = (pilot, j) => j?.kind === KIND && j.profileId === profileOf(pilot);
+const bundledFor = (pilot, j) => j?.kind === KIND && j.configId === configIdOf(pilot);
 // Completion is by entry, not position: recovery may complete a later entry while an earlier one is held.
 const isCompleted = (j, entry) => j.completed.some((e) => canonicalJson(e) === canonicalJson(entry));
 const finished = (j) => j.closed === true || j.intended.every((e) => isCompleted(j, e));
 const journalBytes = (journal) => canonicalJson(journal) + "\n";
-// Runs that block a new apply: this profile's unfinished bundled runs, unreadable journals, and in the pilot legacy unkinded ones.
+// Runs that block a new apply: this live config's unfinished bundled runs, unreadable journals, and in the pilot legacy unkinded ones.
 async function incompleteRuns(pilot) {
   const runs = [];
   for (const { id, journal } of await readJournals(pilot.stateRoot)) {
@@ -83,7 +83,7 @@ async function incompleteRuns(pilot) {
   }
   return runs;
 }
-// An entry is owned only when its receipt matches a completed journal entry for this profile at this path.
+// An entry is owned only when its receipt matches a completed journal entry for this live config at this path.
 function ledger(pilot, journals) {
   const byRun = new Map(journals.filter(({ id, journal }) => bundledFor(pilot, journal) && wellFormed(id, journal)).map(({ id, journal }) => [id, journal]));
   return (receipt, path) => {
@@ -92,8 +92,8 @@ function ledger(pilot, journals) {
   };
 }
 function receiptShape(pilot, receipt, skill) {
-  return isObject(receipt) && canonicalJson(Object.keys(receipt).sort()) === canonicalJson(["files", "kind", "kitCommit", "profileId", "runId", "schemaVersion", "skill"])
-    && receipt.schemaVersion === 2 && receipt.kind === KIND && receipt.skill === skill && receipt.profileId === profileOf(pilot) && RUN_ID.test(receipt.runId ?? "")
+  return isObject(receipt) && canonicalJson(Object.keys(receipt).sort()) === canonicalJson(["configId", "files", "kind", "kitCommit", "runId", "schemaVersion", "skill"])
+    && receipt.schemaVersion === 2 && receipt.kind === KIND && receipt.skill === skill && receipt.configId === configIdOf(pilot) && RUN_ID.test(receipt.runId ?? "")
     && (receipt.kitCommit === null || /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(receipt.kitCommit ?? ""))
     && isObject(receipt.files) && canonicalJson(Object.keys(receipt.files)) === canonicalJson([SKILL]) && /^sha256:[0-9a-f]{64}$/.test(receipt.files[SKILL]);
 }
@@ -129,7 +129,7 @@ export async function planInstall(pilot, { targetHome, agents, mode = "install" 
     if (!actions.some((a) => a.agent === agent && ["conflict", "modified"].includes(a.status))) continue;
     for (const a of actions) if (a.agent === agent && ["create", "update"].includes(a.status)) Object.assign(a, { status: "blocked", reason: "agent-conflict" });
   }
-  return finalizePlan({ kind: "skill-install", mode, targetHome: targetHome ?? null, profileId: profileOf(pilot), kitCommit: pilot.live?.kitCommit ?? null, agents: roots.map((r) => r.agent), actions });
+  return finalizePlan({ kind: "skill-install", mode, targetHome: targetHome ?? null, configId: configIdOf(pilot), kitCommit: pilot.live?.kitCommit ?? null, agents: roots.map((r) => r.agent), actions });
 }
 // faults.beforeFolder, afterFolder, afterSkill and afterReceipt are test seams that crash between the writes of one action.
 // created runs right after this call makes the folder, so the journal can prove the folder is ours.
@@ -176,7 +176,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
     catch (error) { if (error.code === "EEXIST") throw new DevctxError("CONFLICT", "Run ID already exists"); throw error; }
     // The inventory of every target skill folder comes first; faults.afterInventory is a test seam just after it.
     const folders = [...new Map(plan.actions.map((a) => [a.agent, { agent: a.agent, dir: dirname(a.path) }])).values()];
-    await recordInventory(runDir, { runId, profileId: profileOf(pilot), mode: plan.mode, folders });
+    await recordInventory(runDir, { runId, configId: configIdOf(pilot), mode: plan.mode, folders });
     await faults.afterInventory?.();
     const copies = ensurePrivatePath(roots.stateRoot, ["runs", runId, "copies"]);
     // Before the first target write, the run folder keeps the old and new bytes that the journal's hashes name.
@@ -193,7 +193,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
       if (a.status !== "remove") {
         own.skill = source(pilot, a.skill);
         if (sha256(own.skill) !== a.hash) throw new DevctxError("STALE_VERSION", "Bundled source changed during apply");
-        entry.receipt = { schemaVersion: 2, kind: KIND, skill: a.skill, profileId: profileOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, files: { [SKILL]: sha256(own.skill) } };
+        entry.receipt = { schemaVersion: 2, kind: KIND, skill: a.skill, configId: configIdOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, files: { [SKILL]: sha256(own.skill) } };
         own.receipt = receiptBytes(entry.receipt);
         await writeNewFile(join(copies, i + "-new-skill"), own.skill);
         await writeNewFile(join(copies, i + "-new-receipt"), own.receipt);
@@ -202,7 +202,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
       entries.push(entry); bytes.push(own);
     }
     fsyncDir(copies);
-    const journal = { schemaVersion: 2, kind: KIND, profileId: profileOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, mode: plan.mode, planFingerprint: fingerprint, targetHome: plan.targetHome, intended: entries, started: [], created: [], completed: [] };
+    const journal = { schemaVersion: 2, kind: KIND, configId: configIdOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, mode: plan.mode, planFingerprint: fingerprint, targetHome: plan.targetHome, intended: entries, started: [], created: [], completed: [] };
     // Every journal write is a temp file renamed into place, so a crash never leaves a torn journal.
     await atomicReplace(journalPath, journalBytes(journal));
     for (const [i, entry] of entries.entries()) {
@@ -253,9 +253,9 @@ export async function planRecovery(roots, pilot, { release = false } = {}) {
       actions.push({ runId: id, index, ...recoveryFor(entry, copies, index, created.includes(index)) });
     }
   }
-  return finalizePlan({ kind: "skill-install-recovery", ...(release ? { release: true } : {}), profileId: profileOf(pilot), runs, actions, unstarted });
+  return finalizePlan({ kind: "skill-install-recovery", ...(release ? { release: true } : {}), configId: configIdOf(pilot), runs, actions, unstarted });
 }
-// Closes a run. A journal this profile can read is marked closed; any other is kept beside the run as journal.released.json.
+// Closes a run. A journal this live config can read is marked closed; any other is kept beside the run as journal.released.json.
 async function closeRun(roots, pilot, id, journal, recovery) {
   const path = join(roots.stateRoot, "runs", id, "journal.json");
   assertWritable(roots, [path]);

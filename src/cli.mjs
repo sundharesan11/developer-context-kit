@@ -23,9 +23,9 @@ export const COMMANDS = {
   doctor: { load: async () => ({ options: {}, run: ({}, ctx) => import("./config/doctor.mjs").then((m) => m.runDoctor(ctx.roots)) }) },
   init: { load: async () => (await import("./config/commands.mjs")).initCommand },
   "scope add": { load: async () => (await import("./config/commands.mjs")).scopeAddCommand },
-  "live init": { rootOptions: false, profile: true, load: async () => (await import("./config/commands.mjs")).liveInitCommand },
-  "live add-repo": { rootOptions: false, profile: true, load: async () => (await import("./config/commands.mjs")).liveAddRepoCommand },
-  "live set-kit": { rootOptions: false, profile: true, load: async () => (await import("./config/commands.mjs")).liveSetKitCommand },
+  "live init": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveInitCommand },
+  "live add-repo": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveAddRepoCommand },
+  "live set-kit": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveSetKitCommand },
   "record add": { load: async () => (await import("./records/commands.mjs")).recordAddCommand },
   "record supersede": { load: async () => (await import("./records/commands.mjs")).recordSupersedeCommand },
   "record propose": { load: async () => (await import("./records/commands.mjs")).recordProposeCommand },
@@ -94,8 +94,8 @@ export async function main(argv, options = {}) {
       throw new DevctxError("USAGE", "Invalid command options");
     }
     let pilot, roots;
-    // Profile routes still require --pilot but load the profile themselves.
-    if (!isRootFree(command) && COMMANDS[command].profile !== true) {
+    // Live config routes still require --pilot but load the live config themselves.
+    if (!isRootFree(command) && COMMANDS[command].liveConfig !== true) {
       try {
         pilot = await loadPilot(values.pilot, { home, env, kitRoot });
         roots = rootsFromPilot(pilot);

@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DevctxError } from "../errors.mjs";
-import { checkProfile, loadPilot, rootsFromPilot, recordApprovedDigest, approvedDigestPath, skillDirsFor } from "./pilot.mjs";
+import { checkLiveConfig, loadPilot, rootsFromPilot, recordApprovedDigest, approvedDigestPath, skillDirsFor } from "./pilot.mjs";
 import { ensureRoots, validateRoot } from "./roots.mjs";
 import { info, checkNode, ensurePrivateDir, writeNewFile, atomicReplace, fsyncDir } from "../storage/fsx.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
@@ -14,40 +14,40 @@ const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const AGENTS = ["claude", "codex"];
 const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live"];
 const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
-// Stands in for the profile ID while a new profile is validated; apply draws the real ID once.
-const PENDING_ID = "prof_pending0000";
-const invalid = (field) => { throw new DevctxError("INVALID_INPUT", "Invalid live profile input", { field }); };
-const gate = (field, reason) => { throw new DevctxError("GATE_REQUIRED", "Live profile gate refused", { field, reason }); };
+// Stands in for the config ID while a new config is validated; apply draws the real ID once.
+const PENDING_ID = "cfg_pending0000";
+const invalid = (field) => { throw new DevctxError("INVALID_INPUT", "Invalid live config input", { field }); };
+const gate = (field, reason) => { throw new DevctxError("GATE_REQUIRED", "Live config gate refused", { field, reason }); };
 const sorted = (values) => [...new Set(values)].sort();
 const rawOf = (pilot) => Object.fromEntries(KEYS.map((key) => [key, pilot[key]]));
-const profileText = (raw) => JSON.stringify(raw, null, 2) + "\n";
+const configText = (raw) => JSON.stringify(raw, null, 2) + "\n";
 const lockPath = (roots) => join(roots.stateRoot, "locks", "live.lock");
 const gateContext = (ctx, liveGate) => ({ home: ctx.home, env: ctx.env, kitRoot: ctx.kitRoot, ...(liveGate ? { liveGate } : {}) });
-function profilePath(path) {
+function configPath(path) {
   if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path) gate("pilot", "path");
   return path;
 }
 function runningKit(ctx) {
   try { return realpathSync(ctx.kitRoot ?? KIT); } catch { return gate("live.kitRoot", "running-kit"); }
 }
-// The profile folder (~/.devctx) is created by the owner at 0700 and is never created or chmodded here.
-function assertProfileDir(dir) {
+// The live config folder (~/.devctx) is created by the owner at 0700 and is never created or chmodded here.
+function assertConfigDir(dir) {
   const node = info(dir);
-  if (!node) throw new DevctxError("PATH_UNSAFE", "Live profile folder must exist and be private", { field: "profileDir" });
-  validateRoot(dir, "profileDir");
-  if (!node.isDirectory() || node.uid !== process.getuid() || (node.mode & 0o077)) throw new DevctxError("PATH_UNSAFE", "Live profile folder must exist and be private", { field: "profileDir" });
+  if (!node) throw new DevctxError("PATH_UNSAFE", "Live config folder must exist and be private", { field: "configDir" });
+  validateRoot(dir, "configDir");
+  if (!node.isDirectory() || node.uid !== process.getuid() || (node.mode & 0o077)) throw new DevctxError("PATH_UNSAFE", "Live config folder must exist and be private", { field: "configDir" });
 }
 function storeLayout(dir) {
   const pilotRoot = join(dir, "store");
   return { pilotRoot, configRoot: join(pilotRoot, "config"), dataRoot: join(pilotRoot, "data"), stateRoot: join(pilotRoot, "state"), inputsRoot: join(pilotRoot, "inputs") };
 }
 // What a failed live init can leave behind: the empty layout folders, the empty lock folder and an approval with
-// no profile, which a retry overwrites. null marks a file; an object lists the only entries a folder may hold.
-const RETRY_LAYOUT = { config: {}, data: {}, inputs: {}, state: { locks: {}, live: { "approved-profile.json": null } } };
+// no live config, which a retry overwrites. null marks a file; an object lists the only entries a folder may hold.
+const RETRY_LAYOUT = { config: {}, data: {}, inputs: {}, state: { locks: {}, live: { "approved-config.json": null } } };
 function assertLeftover(dir, allowed) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name), node = info(path), want = Object.hasOwn(allowed, name) ? allowed[name] : undefined;
-    if (want === undefined || !node || (want === null ? !node.isFile() : !node.isDirectory())) throw new DevctxError("CONFLICT", "Live store exists without a profile", { field: "pilotRoot" });
+    if (want === undefined || !node || (want === null ? !node.isFile() : !node.isDirectory())) throw new DevctxError("CONFLICT", "Live store exists without a live config", { field: "pilotRoot" });
     checkNode(node, path, { directory: want !== null });
     if (want) assertLeftover(path, want);
   }
@@ -59,9 +59,9 @@ function assertFreshStore(pilotRoot) {
   assertLeftover(pilotRoot, RETRY_LAYOUT);
 }
 export function planLiveInit(input, ctx) {
-  const path = profilePath(input.profilePath), dir = dirname(path);
-  assertProfileDir(dir);
-  if (info(path)) throw new DevctxError("CONFLICT", "Live profile already exists", { field: "pilot" });
+  const path = configPath(input.configPath), dir = dirname(path);
+  assertConfigDir(dir);
+  if (info(path)) throw new DevctxError("CONFLICT", "Live config already exists", { field: "pilot" });
   const layout = storeLayout(dir);
   assertFreshStore(layout.pilotRoot);
   const agents = sorted(input.agents ?? []);
@@ -70,42 +70,42 @@ export function planLiveInit(input, ctx) {
   const kitRoot = runningKit(ctx);
   const head = gitQuery(kitRoot, ["rev-parse", "--verify", "HEAD"], { notRepo: true });
   if (head.notRepo) gate("live.kitRoot", "not-top-level");
-  const profile = { schemaVersion: 1, ...layout, agentHomes: [], repos: sorted(input.repos ?? []), forbidden: [], live: { profileId: PENDING_ID, home, skillDirs: Object.fromEntries(agents.map((agent) => [agent, all[agent]])), kitRoot, kitCommit: head.stdout.trim() } };
-  const checked = checkProfile(profile, path, gateContext(ctx));
-  return finalizePlan({ kind: "live-init", profile: { ...profile, live: { ...profile.live, profileId: null } }, layout: { profile: path, ...layout, kitRoot }, warnings: [...checked.warnings, ...(kitRoot === join(dir, "kit") ? [] : [{ code: "KIT_NOT_SIBLING" }])] });
+  const config = { schemaVersion: 1, ...layout, agentHomes: [], repos: sorted(input.repos ?? []), forbidden: [], live: { configId: PENDING_ID, home, skillDirs: Object.fromEntries(agents.map((agent) => [agent, all[agent]])), kitRoot, kitCommit: head.stdout.trim() } };
+  const checked = checkLiveConfig(config, path, gateContext(ctx));
+  return finalizePlan({ kind: "live-init", config: { ...config, live: { ...config.live, configId: null } }, layout: { config: path, ...layout, kitRoot }, warnings: [...checked.warnings, ...(kitRoot === join(dir, "kit") ? [] : [{ code: "KIT_NOT_SIBLING" }])] });
 }
-// faults.afterRoots and faults.afterApproval are test seams for a crash before the profile is written.
+// faults.afterRoots and faults.afterApproval are test seams for a crash before the config is written.
 export async function applyLiveInit(input, ctx, { faults = {} } = {}) {
   const plan = planLiveInit(input, ctx);
   assertFingerprint(plan, input.fingerprint);
-  const path = plan.layout.profile;
-  const profile = { ...plan.profile, live: { ...plan.profile.live, profileId: "prof_" + randomBytes(8).toString("hex") } };
-  const pilot = checkProfile(profile, path, gateContext(ctx)), roots = rootsFromPilot(pilot);
+  const path = plan.layout.config;
+  const config = { ...plan.config, live: { ...plan.config.live, configId: "cfg_" + randomBytes(8).toString("hex") } };
+  const pilot = checkLiveConfig(config, path, gateContext(ctx)), roots = rootsFromPilot(pilot);
   // Only the store folder and the lock folder exist before the lock; a failure after either leaves a store a retry accepts.
   ensurePrivateDir(pilot.pilotRoot);
-  // The approval is recorded before the profile appears, so a profile on disk is always an approved one.
+  // The approval is recorded before the config appears, so a config on disk is always an approved one.
   return withPilotLock(roots, lockPath(roots), { kind: "live-init" }, async () => {
-    if (info(path)) throw new DevctxError("CONFLICT", "Live profile already exists", { field: "pilot" });
+    if (info(path)) throw new DevctxError("CONFLICT", "Live config already exists", { field: "pilot" });
     ensureRoots(roots);
     ensurePrivateDir(pilot.inputsRoot);
     await faults.afterRoots?.();
-    await recordApprovedDigest(roots, { profileId: profile.live.profileId, digest: pilot.digest });
+    await recordApprovedDigest(roots, { configId: config.live.configId, digest: pilot.digest });
     await faults.afterApproval?.();
-    await writeNewFile(path, profileText(profile));
+    await writeNewFile(path, configText(config));
     fsyncDir(dirname(path));
-    return { applied: true, profile: path, profileId: profile.live.profileId, digest: pilot.digest };
+    return { applied: true, config: path, configId: config.live.configId, digest: pilot.digest };
   }, { destinations: [approvedDigestPath(pilot)] });
 }
-// Shared preview for a change to an approved profile. The current profile must load with its approval intact.
+// Shared preview for a change to an approved config. The current config must load with its approval intact.
 async function planChange(kind, input, ctx, change, liveGate) {
-  const path = profilePath(input.profilePath);
+  const path = configPath(input.configPath);
   const pilot = await loadPilot(path, gateContext(ctx, liveGate));
   if (!pilot.live) gate("live", "not-live");
   const before = rawOf(pilot), { after, details } = change(before, pilot);
-  const next = checkProfile(after, path, gateContext(ctx));
-  return { pilot, next, plan: finalizePlan({ kind, profile: path, profileId: pilot.live.profileId, digest: { from: pilot.digest, to: next.digest }, ...details }) };
+  const next = checkLiveConfig(after, path, gateContext(ctx));
+  return { pilot, next, plan: finalizePlan({ kind, config: path, configId: pilot.live.configId, digest: { from: pilot.digest, to: next.digest }, ...details }) };
 }
-// faults.afterApproval and faults.afterReplace are test seams for a crash on either side of the profile replace.
+// faults.afterApproval and faults.afterReplace are test seams for a crash on either side of the config replace.
 async function applyChange(kind, input, ctx, change, liveGate, { faults = {} } = {}) {
   const first = await planChange(kind, input, ctx, change, liveGate);
   assertFingerprint(first.plan, input.fingerprint);
@@ -113,14 +113,14 @@ async function applyChange(kind, input, ctx, change, liveGate, { faults = {} } =
   return withPilotLock(roots, lockPath(roots), { kind }, async () => {
     const { pilot, next, plan } = await planChange(kind, input, ctx, change, liveGate);
     assertFingerprint(plan, input.fingerprint);
-    // Both profiles stay approved until the replace is done, so a crash between the writes never strands the profile.
-    const nextRoots = rootsFromPilot(next), approval = { profileId: next.live.profileId, digest: next.digest };
+    // Both configs stay approved until the replace is done, so a crash between the writes never strands the config.
+    const nextRoots = rootsFromPilot(next), approval = { configId: next.live.configId, digest: next.digest };
     await recordApprovedDigest(nextRoots, { ...approval, previousDigest: pilot.digest });
     await faults.afterApproval?.();
-    await atomicReplace(next.path, profileText(rawOf(next)));
+    await atomicReplace(next.path, configText(rawOf(next)));
     await faults.afterReplace?.();
     await recordApprovedDigest(nextRoots, approval);
-    return { applied: true, profile: next.path, profileId: next.live.profileId, digest: next.digest };
+    return { applied: true, config: next.path, configId: next.live.configId, digest: next.digest };
   }, { destinations: [approvedDigestPath(first.pilot)] });
 }
 const addRepo = (repo) => (before) => {

@@ -132,7 +132,7 @@
   "test/live-commands.test.mjs",
   "test/live-install.test.mjs",
   "test/live-onboard.test.mjs",
-  "test/live-profile.test.mjs",
+  "test/live-config.test.mjs",
   "test/lock-plan.test.mjs",
   "test/onboard.test.mjs",
   "test/onboarding-scan.test.mjs",
