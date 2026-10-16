@@ -184,7 +184,7 @@ flowchart TB
   G -->|no| X3[GATE_REQUIRED]
   G -->|yes| S{"live: DEVCTX_SECRET_SCOPE__ID, then keychain; pilot: fake only"}
   S -->|none, or pilot without fake ref| X4[CREDENTIAL_UNAVAILABLE]
-  S -->|token in memory| W{"whoami with same token = binding?"}
+  S -->|token in memory| W{"whoami with same token matches binding?"}
   W -->|no| X5[AUTH_MISMATCH]
   W -->|yes| T{"target in workspace and project?"}
   T -->|no| X6[TARGET_MISMATCH]
