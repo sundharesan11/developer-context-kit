@@ -13,11 +13,11 @@ execution: code
 
 ## Goal Capsule
 
-- **Objective:** let the developer bind each scope (one organization's work) to its own GitHub and Slack accounts. Inside a bound project, DCK picks that scope's account automatically, resolves the credential outside records, verifies the live identity on every call, and refuses any mismatch. The first increment reads and drafts. Sending is a second increment behind a per-message approval.
+- **Objective:** let the developer bind each scope (one organization's work) to its own GitHub and Slack accounts. Inside a bound project, DCK picks that scope's account automatically, resolves the credential outside records, verifies the live identity on every call, and refuses any mismatch. The first increment reads and drafts. Sending is a second increment behind a per-message approval. Account applies, and later each send, also need a confirmation the owner types at an interactive terminal.
 - **Roadmap position:** new priority 3, "Organization identity routing", directly after priority 2 and before the personal harness stage and session hooks. It promotes the GitHub and Slack part of the old connector row (priority 5). Other providers stay in a later row.
 - **Authority:** the owner's decisions recorded as session-settled KTDs, then this plan, then `docs/ROADMAP.md`, `docs/SECURITY-MODEL.md`, `docs/LIVE.md` and `docs/AUTH.md`.
 - **Execution profile:** U1 (roadmap) can land now. U2 to U7 are test-first code and docs that use fake providers and an injected request function; no test reaches the network or a real keychain. U8 is an operational run on the owner's machine after merge and after priority 2's activation evidence. U9 and U10 are increment 2 (sending) and start only after U8 passes and a separate plan review of U9.
-- **Stop conditions:** stop and ask when a change would store a credential in any file, send anything outward in increment 1, read an ambient token such as `GH_TOKEN`, widen the live-mode exceptions beyond the two API hosts and the two credential sources named here, or weaken the exact-match identity gate.
+- **Stop conditions:** stop and ask when a change would store a credential in any file, send anything outward in increment 1, read an ambient token such as `GH_TOKEN`, widen the live-mode exceptions beyond the two API hosts and the two credential sources named here, weaken the exact-match identity gate, or let any account apply (or, in increment 2, any send apply) proceed without the owner's typed TTY confirmation.
 - **Tail ownership:** the implementer owns review fixes, CI, the fast-forward merge and U8. U10 belongs to increment 2.
 
 ---
@@ -37,7 +37,7 @@ DCK has the parts but no wiring. `docs/AUTH.md` says the auth code is a library 
 ### Actors
 
 - A1. **Owner:** the developer who binds accounts, approves bindings and, in increment 2, approves each message.
-- A2. **Agent session:** Claude or Codex running a bundled skill in a bound project. It may read and draft through DCK. It never applies a binding or a send. A plan fingerprint the agent can read and pass back is not owner consent, so the skill forbids `--apply` on `account` routes (see Open Questions for a confirmation the agent cannot supply).
+- A2. **Agent session:** Claude or Codex running a bundled skill in a bound project. It may read and draft through DCK. It never applies a binding or a send. A plan fingerprint the agent can read and pass back is not owner consent, so those applies also require a confirmation the owner types at an interactive terminal (KTD21), and the skill forbids running them.
 - A3. **Provider:** GitHub or Slack, reached only through their HTTPS APIs.
 
 ### Requirements
@@ -49,6 +49,7 @@ DCK has the parts but no wiring. `docs/AUTH.md` says the auth code is a library 
 - R3. A binding never contains a credential. Secret-named keys are refused, as `validateAccountConfig` does today, and U2 adds a scan of every value, including the body of a secret reference.
 - R4. Before binding, the owner can look up the identity a credential belongs to without writing anything, so they never type provider IDs by hand.
 - R5. Re-running `scope add` with the same inputs stays idempotent after accounts are added.
+- R5a. Applying an account binding or removal requires both the plan fingerprint and a confirmation the owner types at an interactive prompt. When standard input is not a TTY, apply fails with `CONFIRMATION_REQUIRED` before taking a lock or writing anything.
 
 **Credentials**
 
@@ -76,7 +77,7 @@ DCK has the parts but no wiring. `docs/AUTH.md` says the auth code is a library 
 
 **Sending (increment 2)**
 
-- R18. Sending a saved draft (a Slack message, or a GitHub comment on an issue or pull request) needs a fresh preview, an approval created with the existing approval contract, and an apply that verifies that approval against the recomputed request.
+- R18. Sending a saved draft (a Slack message, or a GitHub comment on an issue or pull request) needs a fresh preview, an approval created with the existing approval contract, the owner's typed TTY confirmation (as R5a), and an apply that verifies that approval against the recomputed request.
 - R19. An approval is single use and expires. Apply records it as used before the send, so a crash can never resend it.
 - R20. A send re-runs every check in R9 to R13, requires `policy.outbound`, and records a receipt without the message body or credential.
 
@@ -88,6 +89,7 @@ DCK has the parts but no wiring. `docs/AUTH.md` says the auth code is a library 
 - AE4. **Given** `GH_TOKEN` and `SLACK_TOKEN` are set and no `DEVCTX_SECRET_*` variable or keychain item exists, **when** a `connect` call runs, **then** it fails with `CREDENTIAL_UNAVAILABLE`.
 - AE5. **Given** a canary token, **when** the full read, draft and failure test matrix runs, **then** the canary appears in no file under the store and in no output.
 - AE6. **Given** scope `alpha` has no Slack account, **when** a Slack call runs, **then** it fails with `ACCOUNT_UNBOUND` and the fake request function records no call.
+- AE6a. **Given** a valid preview fingerprint, **when** `account add --apply` runs with standard input not a TTY (as from an agent's shell), **then** it fails with `CONFIRMATION_REQUIRED` and the scope file, digest and lock folder are unchanged.
 - AE7. (Increment 2) **Given** an approval used once, **when** apply is repeated with it, **then** it fails with `APPROVAL_INVALID` and nothing is sent.
 
 ### Scope Boundaries
@@ -100,15 +102,16 @@ DCK has the parts but no wiring. `docs/AUTH.md` says the auth code is a library 
 - No persistent cache of fetched messages, pull requests or identities.
 - No inference of the scope from a folder or remote. The scope stays explicit, as `docs/AGENT-PROTOCOL.md` requires.
 - No change to what a direct tool can do. A GitHub or Slack MCP server or CLI the agent also has bypasses this routing; the skill and docs say so. Routing protects against mistakes, not against a misbehaving agent with a shell (see Risks).
-- No routed launch of `gh`, Git or an MCP server with a scope's verified token in increment 1 (KTD20).
+- No routed launch of `gh`, Git or an MCP server with a scope's verified token in this build (KTD20).
+- GitHub targets are the bound project's own remotes only; no organization-wide reach (KTD22).
 
 #### Deferred to Follow-Up Work
 
-- Read-only doctor check that warns when a bound repository's effective Git `user.email` does not match the scope's expected identity.
+- **First follow-up after this plan ships:** a routed launcher, `devctx exec --scope --cwd -- gh ...`, that resolves and verifies the scope's token and passes it only to that child process (KTD20). (session-settled: user-directed.)
+- A read-only check that warns when a bound repository's effective Git commit email does not match the scope's expected identity. (session-settled: user-directed — later follow-up, not this build.)
 - `op://` (1Password) and Bitwarden secret references.
-- Slack Enterprise Grid, Slack Connect channel policy beyond the U9 refusal, and GitHub App tokens.
+- Slack Enterprise Grid and GitHub App tokens.
 - Per-project account overrides inside a scope.
-- A routed session launcher (`devctx exec --scope --cwd -- gh ...`) that resolves and verifies the scope's token and passes it only to that child process (KTD20; owner question).
 
 ---
 
@@ -135,7 +138,7 @@ DCK has the parts but no wiring. `docs/AUTH.md` says the auth code is a library 
 
   Numeric IDs survive renames; logins and workspace names do not. The binding stores no display names.
 - KTD10. **Accounts live in the scope config, behind an approved digest.** U3 fills the existing `accounts` array by atomic replace under the scope lock, with the fingerprint binding the file's current hash. Each apply follows `applyChange` in `src/config/live.mjs`: record the new accounts digest with `previousDigest`, replace the scope file, then record the new digest alone. `loadScopeAccounts` accepts either digest while both are recorded, so a crash at any point leaves the file on disk approved. The digest catches accidental edits, not deliberate same-user tampering, and the docs say so. `applyScopeAdd` compares configs without `accounts`. (Chosen over a separate accounts file: the field already exists and is reserved for this.)
-- KTD11. **The provider decides the workspace; the binding only names which one to check.** Slack's comes from `auth.test`'s `team_id`, and a response carrying `enterprise_id` is unverified. GitHub's `whoami(token, { expectedWorkspaceId })` returns the expected organization ID only when the user's active memberships include it, or when it equals the user's own ID; otherwise it returns the user's own ID, so the gate reports `AUTH_MISMATCH`. The token therefore needs organization-membership read access, and `account discover` says so when the call is refused. Confirm the membership endpoint works with fine-grained tokens before U5 starts; if it does not, stop and revise this KTD. **Limit:** when one GitHub user belongs to both scopes' organizations, the identity gate proves the user, not which organization's token it is. For GitHub, the organization boundary is the KTD12 owner check plus fine-grained tokens limited to one resource owner, which `docs/CONNECT.md` recommends.
+- KTD11. **The provider decides the workspace; the binding only names which one to check.** (Membership endpoint check and fallback: see KTD24.) Slack's comes from `auth.test`'s `team_id`, and a response carrying `enterprise_id` is unverified. GitHub's `whoami(token, { expectedWorkspaceId })` returns the expected organization ID only when the user's active memberships include it, or when it equals the user's own ID; otherwise it returns the user's own ID, so the gate reports `AUTH_MISMATCH`. The token therefore needs organization-membership read access, and `account discover` says so when the call is refused. **Limit:** when one GitHub user belongs to both scopes' organizations, the identity gate proves the user, not which organization's token it is. For GitHub, the organization boundary is the KTD12 owner check plus fine-grained tokens limited to one resource owner, which `docs/CONNECT.md` recommends.
 - KTD12. **Target checks run after identity and before the operation.** A GitHub target must be one of the bound project's remotes on `github.com`, and `GET /repos/{owner}/{repo}` with the account's credential must return an owner ID equal to `workspaceId`. A Slack channel must answer `conversations.info` with the account's credential, and its owning team must equal `workspaceId`. Both failures are `TARGET_MISMATCH`.
 - KTD13. **DCK makes the API calls; it does not configure MCP servers.** (Chosen over writing per-project `.mcp.json` entries with per-organization tokens: an MCP server would hold the token in its own config and would not run the per-call identity gate or the target check. Writing agent config is also outside the live allowlist.) The skill tells the agent to use the `connect` routes for bound projects and to say when it is using a direct tool instead.
 - KTD14. **Network calls reuse the bounded request pattern of `src/skill-sources/github.mjs`.** Injected `request`, per-request timeout, body and total byte caps, no redirects, a fixed user agent, typed errors, rate-limit hints. The credential goes only in an `Authorization` header to its own provider host. Slack's `ok: false` bodies map to typed errors (`invalid_auth`, `token_revoked`, `ratelimited`, `channel_not_found`).
@@ -144,7 +147,11 @@ DCK has the parts but no wiring. `docs/AUTH.md` says the auth code is a library 
 - KTD17. **`policy.outbound` must be `false` until U9 ships.** `account add` refuses `outbound` in increment 1, so no binding can claim a send permission that nothing enforces yet.
 - KTD18. **Routing is not a daily-use blocker for the freeze.** It is sequenced ahead of the blockers by owner direction, but the skill-builder and skill-source freeze still lifts when backup, live activation, session hooks and migration ship. The freeze sentence names those four by name.
 - KTD19. **Sends use the approval contract unchanged, plus a used-approval ledger.** (Increment 2.) The ten approval fields stay as they are; `recipient` is the channel ID or `owner/repo#number`, `payloadHash` is the draft's body hash, and the expiry is short. Preview writes the approval to `state/connect/pending/<approvalId>.json`, so apply can load it by ID with its `expiresAt` and verify it against the recomputed request. A draft records that it was sent, and a sent draft cannot be previewed again, so one draft is posted at most once. Apply creates `state/connect/approvals/<approvalId>.json` exclusively after every check passes and before sending, so a replay or a crash cannot send twice. A crash after that file but before the receipt is reported as "unknown, check the channel"; it is never retried automatically.
-- KTD20. **Increment 1 routes only DCK's own calls; a routed launcher is a separate decision.** The owner's goal is that "the corresponding credentials, everything" follow the project. The `connect` routes cover a small read and draft set; `gh`, Git and the agent's MCP tools still use whatever account they are logged into. A routed launcher (`devctx exec --scope --cwd -- gh ...`) could resolve and verify the scope's token and pass it to that one child process as `GH_TOKEN`, without writing any config. It is deferred, not rejected: it widens the live-mode exceptions to launching other programs with a credential, and it needs the owner's call (Open Questions). Increment 1's evidence therefore proves routing for DCK calls only, and `docs/CONNECT.md` says so.
+- KTD20. **This build routes only DCK's own calls; the routed launcher follows next.** The owner's goal is that "the corresponding credentials, everything" follow the project. The `connect` routes cover a small read and draft set; `gh`, Git and the agent's MCP tools still use whatever account they are logged into. A routed launcher (`devctx exec --scope --cwd -- gh ...`) could resolve and verify the scope's token and pass it to that one child process as `GH_TOKEN`, without writing any config. (session-settled: user-directed — not in this build; it is the first follow-up after this plan ships.) It widens the live-mode exceptions to launching other programs with a credential, so it gets its own plan and review. This build's evidence therefore proves routing for DCK calls only, and `docs/CONNECT.md` says so.
+- KTD21. **Owner-typed TTY confirmation on account applies and sends.** (session-settled: user-directed — chosen over the skill rule alone: a fingerprint the agent can read is not consent.) A shared `confirmOwner` step runs after the fingerprint check and before the lock. It refuses with `CONFIRMATION_REQUIRED` when standard input is not a TTY. Otherwise it prints the change summary and a six-character code taken from the plan fingerprint to standard error, and the owner must type that code. The code is not a secret: the terminal is the boundary, and the code makes the owner confirm this exact plan rather than press Enter; a wrong code, empty line, end of input or a 120-second timeout refuses. Standard output keeps carrying only the JSON result. Apply then takes the lock, rechecks the fingerprint and writes. The fingerprint binding stays. It covers `account add` and `account remove` in increment 1, and `connect send` in increment 2, where the prompt also shows the recipient, exact text and any Slack Connect flag. Limit: a same-user process that allocates a pseudo-terminal (`script`, `expect`, a terminal multiplexer) can type the code; the docs say so, and the skill never runs these applies. The owner runs them in their own terminal, not through an agent's shell.
+- KTD22. **GitHub reach is the bound project's own remotes.** (session-settled: user-directed.) No organization-wide target rule.
+- KTD23. **Slack Connect channels need an explicit per-call flag shown in the preview.** (session-settled: user-directed.) Increment 1 reads and drafts in them without a flag; in increment 2 a send to a channel shared with another organization is refused unless the call carries the flag, and the preview and the TTY prompt both show it.
+- KTD24. **The membership endpoint is checked from GitHub's docs before U5, with a decided fallback.** Before any U5 code, the implementer reads the REST reference pages for "List organization memberships for the authenticated user" (`GET /user/memberships/orgs`) and "Get an organization membership for the authenticated user", and their "Fine-grained access tokens" section, which states whether fine-grained tokens can call the endpoint and which permission they need. The result is recorded with the page URL and date in `docs/AUTH.md` and in this plan's Review record. If fine-grained tokens are supported, `docs/CONNECT.md` names the permission and U5 proceeds as written. If they are not, the fallback is: GitHub bindings in this build accept only classic tokens (`ghp_`) with the `read:org` scope, U4's prefix check refuses `github_pat_` with a message saying why, `docs/CONNECT.md` says so, KTD11's limit notes that one user in two organizations is then separated only by the owner check, and fine-grained support becomes a follow-up. U8 then confirms the recorded answer with the owner's real token through `account discover`.
 
 ### High-Level Technical Design
 
@@ -175,7 +182,9 @@ sequenceDiagram
   participant P as Provider
   D->>D: connect send --draft ID (preview): all checks, request fields, approvalId
   D-->>O: account, workspace, recipient, exact text, expiry
-  O->>D: connect send --draft ID --apply --approval ID
+  O->>D: connect send --draft ID --apply --approval ID (own terminal)
+  D-->>O: TTY prompt: recipient, exact text, Slack Connect flag, code
+  O->>D: types the code
   D->>D: load pending approval, recompute request, verifyApproval, all checks again
   D->>D: create used-approval file exclusively
   D->>P: post
@@ -184,7 +193,7 @@ sequenceDiagram
 
 ### Review record
 
-A headless `ce-doc-review` (coherence, feasibility, security, scope and adversarial lenses) on 2026-10-17 changed R3, R6, R12, R16, R17, AE2, KTD5, KTD6, KTD10, KTD11, KTD12, KTD15, KTD16 and KTD19, added KTD20 and three risk rows, and tightened U1 to U9. No session-settled decision changed.
+A headless `ce-doc-review` (coherence, feasibility, security, scope and adversarial lenses) on 2026-10-17 changed R3, R6, R12, R16, R17, AE2, KTD5, KTD6, KTD10, KTD11, KTD12, KTD15, KTD16 and KTD19, added KTD20 and three risk rows, and tightened U1 to U9. No session-settled decision changed. The owner's answers of 2026-10-17 then added KTD21 to KTD24 and R5a, AE6a, settled KTD20 and moved the routed launcher and the commit-email check to follow-ups; no earlier requirement was dropped.
 
 ### Assumptions
 
@@ -202,7 +211,7 @@ A headless `ce-doc-review` (coherence, feasibility, security, scope and adversar
 | Credential leak through errors or output | Errors carry codes and provider error names only; canary test over every file and output (AE5) |
 | GitHub token lacks membership read | `account discover` and `account whoami` report the missing permission by name |
 | An agent with a shell reads any organization's keychain item or `DEVCTX_SECRET_*` variable and calls the API directly | Routing protects against mistakes, not a misbehaving agent; documented next to "direct tools bypass routing". The empty trusted-application option makes each keychain read ask the owner |
-| Owner-approved steps applied by the agent itself (rebinding an account, or a send in increment 2) | The skill forbids `--apply` on `account` routes; a confirmation the agent cannot supply is an owner question that must be settled before U9 |
+| Owner-approved steps applied by the agent itself (rebinding an account, or a send in increment 2) | Fingerprint plus owner-typed TTY confirmation (KTD21); non-TTY apply is refused; the skill never runs these applies. A same-user process that fakes a terminal remains a documented limit |
 | Content from one scope flows into another scope's draft in one agent session | The skill keeps one scope per session and never carries read output into another scope's draft; U9's preview shows the draft's scope and workspace next to the text |
 | Slack rate limits | Typed `RATE_LIMITED` with the retry hint; small default limits |
 | Client text exposure | Reads are not stored; drafts are the owner's text; the agent host still sends read output to its model provider, and the docs say so |
@@ -266,13 +275,18 @@ flowchart LR
 ### U3. Account commands
 
 - **Goal:** bind, change and remove accounts only through preview and approval.
-- **Requirements:** R2, R4; KTD10.
+- **Requirements:** R2, R4, R5a; KTD10, KTD21; AE6a.
 - **Dependencies:** U2.
-- **Files:** `src/auth/account-commands.mjs` (new), `src/cli.mjs`, `test/account-commands.test.mjs` (new), `scripts/package-allowlist.json`, `test/required-tests.json`.
-- **Approach:** `account add --scope --provider --id --account-id --workspace --actor --secret --allow read,draft` previews the scope's accounts before and after, the scope file hash and a fingerprint; `--apply --plan-fingerprint` replaces the scope file atomically under the scope lock, rechecks the hash, and records the approved digest. `account remove --scope --id` is the same in reverse. `account list --scope` prints bindings and approval state, offline. The preview prints IDs and the secret reference, never a credential.
+- **Files:** `src/auth/account-commands.mjs` (new), `src/auth/owner-confirm.mjs` (new), `src/cli.mjs` (passes standard input and standard error to the confirmation step; tests inject them), `test/account-commands.test.mjs` (new), `test/owner-confirm.test.mjs` (new), `scripts/package-allowlist.json`, `test/required-tests.json`.
+- **Approach:** `account add --scope --provider --id --account-id --workspace --actor --secret --allow read,draft` previews the scope's accounts before and after, the scope file hash and a fingerprint; `--apply --plan-fingerprint` checks the fingerprint, runs `confirmOwner` (KTD21), then replaces the scope file atomically under the scope lock, rechecks the fingerprint and hash, and records the approved digest. `account remove --scope --id` is the same in reverse, including the confirmation. `account list --scope` prints bindings and approval state, offline. The preview prints IDs and the secret reference, never a credential.
 - **Patterns to follow:** `planChange` and `applyChange` in `src/config/live.mjs`; `finalizePlan`, `assertFingerprint`, `withPilotLock`, `atomicReplace`.
 - **Test scenarios:**
-  - Preview writes nothing; apply with the fingerprint adds the account and records the digest.
+  - Preview writes nothing; apply with the fingerprint and the correct typed code on a TTY adds the account and records the digest.
+  - Covers AE6a. Apply with a valid fingerprint and standard input not a TTY fails with `CONFIRMATION_REQUIRED`; the scope file, digest and lock folder are unchanged, and nothing was prompted.
+  - On a TTY, a wrong code, an empty line, end of input and a timeout each refuse with `CONFIRMATION_REQUIRED` and write nothing.
+  - A correct code with a stale fingerprint still fails with `PLAN_MISMATCH`; the confirmation never replaces the fingerprint.
+  - The prompt and code go to standard error; standard output holds only the JSON result.
+  - `account remove --apply` has the same non-TTY refusal.
   - A stale fingerprint, or a scope file changed between preview and apply, writes nothing and fails with `PLAN_MISMATCH` or `STALE_VERSION`.
   - A second Slack account for the same scope is refused at preview.
   - Remove then add round-trips, and the digest follows each apply.
@@ -302,7 +316,7 @@ flowchart LR
 
 - **Goal:** real GitHub and Slack providers for `whoami`, read and target checks, testable without the network.
 - **Requirements:** R11, R12, R14, R15; KTD11, KTD12, KTD14.
-- **Dependencies:** U2.
+- **Dependencies:** U2, and the KTD24 docs check recorded, with the fallback applied if it fails.
 - **Files:** `src/connect/http.mjs` (new), `src/connect/github.mjs` (new), `src/connect/slack.mjs` (new), `src/connect/render.mjs` (new), `test/connect-providers.test.mjs` (new), `test/fixtures/connect/` (new, synthetic JSON), `scripts/package-allowlist.json`, `test/required-tests.json`.
 - **Approach:**
   - `http.mjs` takes an injected `request`, sends only to `https://api.github.com` or `https://slack.com/api/`, refuses redirects, never follows pagination URLs from response headers (it builds each page request itself), caps each body at 512 KiB and each call's total, sets a fixed `devctx-connect` user agent, and maps status codes to typed errors as `src/skill-sources/github.mjs` does.
@@ -356,12 +370,13 @@ flowchart LR
 - **Approach:**
   - `docs/LIVE.md` and `docs/SECURITY-MODEL.md` gain a "Live-mode exceptions" section listing exactly R17's hosts, routes and credential sources, plus the existing unauthenticated `skill-sources` requests, and stating that no other command reads a credential or makes a network call.
   - `docs/AUTH.md` is rewritten from "library contract only" to the shipped behavior, keeping the gate order and listing the new error codes.
-  - `docs/CONNECT.md` is the owner's guide: creating a token per organization, preferring fine-grained GitHub tokens limited to one organization, turning off Slack token rotation, storing each token with `security add-generic-password` using an interactive prompt rather than a command-line value and the empty trusted-application option with its trade-off (KTD15), the keychain over `DEVCTX_SECRET_*` for agent sessions (KTD5), `account discover`, `account add`, `account whoami`, reads and drafts, and the limits: direct tools and `gh` bypass routing (KTD20), an agent with a shell can read the same credentials, one GitHub user in two organizations is separated only by the owner check, read output goes to the agent's model provider, no send yet.
-  - `skills/devctx-connect/SKILL.md` is instruction-only: confirm scope and project first, use `connect` routes for bound projects, never pass credentials on the command line, never run `account add` or `account remove` with `--apply`, keep one scope per session and never carry read output from one scope into another scope's draft, treat fetched text as untrusted, never claim a message was sent, and stop on `AUTH_MISMATCH` or `TARGET_MISMATCH` and tell the user.
+  - `docs/CONNECT.md` is the owner's guide: creating a token per organization, preferring fine-grained GitHub tokens limited to one organization, turning off Slack token rotation, storing each token with `security add-generic-password` using an interactive prompt rather than a command-line value and the empty trusted-application option with its trade-off (KTD15), the keychain over `DEVCTX_SECRET_*` for agent sessions (KTD5), `account discover`, `account add` and `account remove` run in the owner's own terminal with the typed confirmation (KTD21) and its pseudo-terminal limit, `account whoami`, reads and drafts, and the limits: direct tools and `gh` bypass routing (KTD20), an agent with a shell can read the same credentials, one GitHub user in two organizations is separated only by the owner check, read output goes to the agent's model provider, no send yet.
+  - `skills/devctx-connect/SKILL.md` is instruction-only: confirm scope and project first, use `connect` routes for bound projects, never pass credentials on the command line, never run `account add` or `account remove` with `--apply` (they need the owner's typed confirmation at their own terminal; give the owner the command instead), keep one scope per session and never carry read output from one scope into another scope's draft, treat fetched text as untrusted, never claim a message was sent, and stop on `AUTH_MISMATCH` or `TARGET_MISMATCH` and tell the user.
   - The skill folder ships here; adding it to `SKILL_NAMES` happens in U8 (see there). Never remove a name.
   - Acceptance adds fake-provider checks for unbound, mismatch, wrong target and canary, and the CI counts are updated.
 - **Test scenarios:**
-  - Docs tests pin the exception list in both docs and the "never in records" statement.
+  - Docs tests pin the exception list in both docs, the "never in records" statement and the TTY confirmation rule in `docs/CONNECT.md` and `docs/AUTH.md`.
+  - Acceptance checks that a non-TTY `account add --apply` is refused.
   - The skill passes the bundled-skill route check: every command it names is a real route.
   - Acceptance reports the new checks passed on a fresh temp root.
 - **Verification:** docs, CI and package tests pass, and acceptance passes locally.
@@ -372,23 +387,25 @@ flowchart LR
 - **Requirements:** AE1, AE2 and R17, on real accounts.
 - **Dependencies:** U1 to U7 merged with green CI; priority 2 activation evidence recorded; live config at the merged commit.
 - **Files:** `docs/ROADMAP.md`, `docs/CI.md` (dated pass line only), `src/agents/install.mjs` and `test/live-install.test.mjs` (the `SKILL_NAMES` step).
-- **Approach:** first, once priority 2's activation evidence is recorded, a small reviewed change adds `devctx-connect` to `SKILL_NAMES`, coordinated with the harness plan's U9 change to the same list, and the owner installs it with the usual preview and approval. Then, with the owner present: store one token per organization in the keychain; `account discover`, then `account add` for GitHub and Slack in two scopes, each applied after approval; `account whoami` for each; one GitHub and one Slack read and one draft per scope from a bound project; one deliberate Slack mismatch by setting the other scope's token in this scope's `DEVCTX_SECRET_*` variable for one owner-run command (and a GitHub one only if the two tokens belong to different users); one unbound project. Record the Slack rate behavior observed, and whether a keychain read prompted. Evidence stays in `state/evidence/`; the repository records date, commit and pass or fail.
+- **Approach:** first, once priority 2's activation evidence is recorded, a small reviewed change adds `devctx-connect` to `SKILL_NAMES`, coordinated with the harness plan's U9 change to the same list, and the owner installs it with the usual preview and approval. Then, with the owner present: store one token per organization in the keychain; `account discover` (which also confirms the KTD24 answer for the owner's GitHub token), then `account add` for GitHub and Slack in two scopes, each applied by the owner in their own terminal with the typed confirmation; one `account add --apply` attempted from the agent's shell to record the non-TTY refusal; `account whoami` for each; one GitHub and one Slack read and one draft per scope from a bound project; one deliberate Slack mismatch by setting the other scope's token in this scope's `DEVCTX_SECRET_*` variable for one owner-run command (and a GitHub one only if the two tokens belong to different users); one unbound project. Record the Slack rate behavior observed, and whether a keychain read prompted. Evidence stays in `state/evidence/`; the repository records date, commit and pass or fail.
 - **Test expectation:** none -- operational run; the private evidence files are its proof.
 - **Verification:** every item above passes, and the mismatch call made no read.
 
 ### U9. Send with per-message approval (increment 2)
 
 - **Goal:** post a saved draft as a Slack message or a GitHub comment, one approval per message.
-- **Requirements:** R18 to R20; KTD17, KTD19; AE7.
+- **Requirements:** R18 to R20; KTD17, KTD19, KTD21, KTD23; AE7.
 - **Dependencies:** U8 passed; an independent plan review of this unit before code.
 - **Files:** `src/connect/send.mjs` (new), `src/connect/github.mjs`, `src/connect/slack.mjs`, `src/connect/commands.mjs`, `src/auth/approval.mjs` (consumer only), `src/auth/accounts.mjs` (allow `outbound`), `src/cli.mjs`, `skills/devctx-connect/SKILL.md`, `docs/CONNECT.md`, `docs/AUTH.md`, `docs/LIVE.md`, `docs/SECURITY-MODEL.md`, `test/connect-send.test.mjs` (new), `test/required-tests.json`.
-- **Approach:** `connect send --scope --cwd --draft ID` previews the account, workspace, recipient, exact text, expiry and an approval created with `createApproval`. Preview also stores the approval under `state/connect/pending/` (KTD19) and shows the draft's scope and workspace next to the text. `--apply --approval ID` loads that approval, recomputes the request from the draft and current routing with its `expiresAt`, runs `verifyApproval`, requires `policy.outbound`, reruns policy, credential, identity and target checks, exclusively creates the used-approval file, marks the draft sent, posts with `chat.postMessage` (user token, no `as_user` trick) or `POST /repos/{owner}/{repo}/issues/{number}/comments`, and writes a receipt with the provider's message ID or URL and no body. Slack Connect channels shared with another organization are refused unless the owner passes an explicit flag shown in the preview.
+- **Approach:** `connect send --scope --cwd --draft ID` previews the account, workspace, recipient, exact text, expiry and an approval created with `createApproval`. Preview also stores the approval under `state/connect/pending/` (KTD19) and shows the draft's scope and workspace next to the text. `--apply --approval ID` refuses without a TTY, loads that approval, recomputes the request from the draft and current routing with its `expiresAt`, runs `verifyApproval`, requires `policy.outbound`, reruns policy, credential, identity and target checks, runs `confirmOwner` with the recipient, exact text and any Slack Connect flag in the prompt, rechecks the approval, exclusively creates the used-approval file, marks the draft sent, posts with `chat.postMessage` (user token, no `as_user` trick) or `POST /repos/{owner}/{repo}/issues/{number}/comments`, and writes a receipt with the provider's message ID or URL and no body. Slack Connect channels shared with another organization are refused unless the call carries an explicit per-call flag, shown in the preview and the prompt (KTD23).
 - **Test scenarios:**
   - A valid approval sends once and writes a receipt; a second preview of the sent draft is refused.
   - Covers AE7. A reused approval, an expired approval, a draft edited after preview, a changed recipient and an account rebound after preview each fail with `APPROVAL_INVALID` and no post.
   - `policy.outbound: false` fails with `GATE_REQUIRED` before credential resolution.
   - A crash after the used-approval file and before the post leaves "unknown" status and no retry.
   - An identity mismatch at apply fails after the approval check and before the post, and the approval stays unused.
+  - Apply with standard input not a TTY fails with `CONFIRMATION_REQUIRED`, posts nothing and leaves the approval unused; a wrong typed code does the same.
+  - A Slack Connect channel without the flag is refused at preview; with the flag, the preview and the prompt show it.
 - **Verification:** tests pass; the plan review's findings are fixed.
 
 ### U10. Owner-machine send run (increment 2)
@@ -396,7 +413,7 @@ flowchart LR
 - **Goal:** prove one approved send per provider in a test channel and a test repository the owner chooses.
 - **Dependencies:** U9 merged.
 - **Test expectation:** none -- operational run with owner approval for each message.
-- **Verification:** each message appears once from the right identity; a replayed approval is refused.
+- **Verification:** each message appears once from the right identity after the owner typed the code; a replayed approval and a non-TTY apply are refused.
 
 ---
 
@@ -416,7 +433,7 @@ flowchart LR
 
 ## Definition of Done
 
-- Increment 1: U1 to U7 merged by fast-forward after all four CI lanes pass; `devctx-connect` added to `SKILL_NAMES` and installed; U8 evidence shows both providers bound in two scopes, reads and drafts using the right account, and the mismatch and unbound cases refused with no read.
+- Increment 1: the KTD24 docs check recorded; U1 to U7 merged by fast-forward after all four CI lanes pass; `devctx-connect` added to `SKILL_NAMES` and installed; U8 evidence shows both providers bound in two scopes, reads and drafts using the right account, the mismatch and unbound cases refused with no read, each account apply confirmed by the owner's typed code, and a non-TTY apply refused.
 - `docs/LIVE.md` and `docs/SECURITY-MODEL.md` list the live-mode exceptions exactly as R17 states them, and `docs/AUTH.md` no longer says no connector exists.
 - No credential, real account identifier, real client name or real email is in the repository.
 - Increment 2 is done when U9 passes its own review and U10's evidence shows one approved send per provider and a refused replay.
@@ -425,17 +442,10 @@ flowchart LR
 
 ## Open Questions
 
-Deferred (none blocks increment 1):
-
-- **Routed launcher (owner decision, KTD20).** Should a later unit let `gh` (and possibly an MCP server) run with the scope's verified token for one child process, so "the corresponding credentials, everything" also covers tools outside DCK? Recommended: yes, as the first follow-up after U8, because without it the agent's everyday GitHub work still uses the globally logged-in account.
-- **Owner-only confirmation (must be settled before U9).** Should `account add`/`remove --apply` and `connect send --apply` require a confirmation the agent cannot supply itself, such as a terminal prompt for the approval ID, rather than the agent passing a fingerprint or `--approval` after the owner says yes in chat? Increment 1 relies on the skill rule alone. The same applies to U9's Slack Connect flag.
-- **Git identity.** Should a later unit check, read-only, that a bound repository's commit email matches the scope's identity?
-- **Slack Connect.** Is the explicit-flag rule in U9 right for channels shared with another organization, or should they be refused outright?
-- **GitHub reach.** Is "remotes of the bound project only" too narrow? Reading other repositories in the same organization would need a workspace-wide target rule.
+The owner answered the five earlier questions on 2026-10-17; they are now KTD20 to KTD23 and the follow-ups under Scope Boundaries. No product question is open.
 
 Deferred to implementation:
 
-- The exact GitHub membership endpoint and the token permission it needs for fine-grained tokens (KTD11), confirmed against current GitHub docs before U5 starts.
 - Whether Slack's `conversations.info` is enough as a target check for private channels the user is not in, or whether `channel_not_found` should be reported differently.
 
 ---
