@@ -80,6 +80,19 @@ async function assertCurrentPlan(roots, plan, profile, fingerprint) {
   }
   assertFingerprint(plan, fingerprint);
 }
+// For callers that derive the profile from its base (CLI flags over the current profile): finds the earlier
+// base whose derived plan has this fingerprint, so a moved base reports STALE_VERSION instead of a mismatch.
+export async function findStaleBase(roots, derive, fingerprint) {
+  const { generation: current } = await readPointer(roots);
+  for (let generation = 0; generation < current; generation++) {
+    let profile = null, revisionHash = null;
+    if (generation) { const text = await revisionText(roots, generation); revisionHash = sha256(text); profile = parseRevision(text, generation).profile; }
+    let candidate;
+    try { candidate = derive(profile); } catch { continue; }
+    if (buildPlan(roots, candidate, { generation, revisionHash }).fingerprint === fingerprint) return { base: generation, current };
+  }
+  return null;
+}
 // faults.afterRevision is a test seam for a crash after the revision is written and before the pointer is published.
 export async function applyProfile(roots, { profile, fingerprint } = {}, { now = () => new Date(), faults = {} } = {}) {
   validateProfile(profile);

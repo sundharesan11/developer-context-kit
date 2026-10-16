@@ -299,5 +299,19 @@
   "profile apply with a fingerprint computed against revision 1 when revision 2 is current is stale",
   "profile apply without a fingerprint or with a mismatched one writes nothing",
   "profile refuses a config root that is a Git worktree with the copy-or-export remedy",
-  "profile interrupted apply keeps the previous revision current and requires recovery"
+  "profile interrupted apply keeps the previous revision current and requires recovery",
+  "profile plan shows the full proposed profile, relative destination, size and fingerprint, and apply with that fingerprint succeeds",
+  "profile plan builds on the current profile: given scalars replace, given lists replace whole, empty values clear",
+  "profile export returns paste-ready markdown with every set field and writes nothing",
+  "profile suggest-stack proposes runtimes cited by record and ecosystems cited by project, and only accepted entries are written",
+  "profile suggest-stack still suggests ecosystems for a project onboarded with accept none",
+  "profile suggest-stack with no onboarded projects returns an empty list",
+  "profile suggest-stack ignores superseded and proposed records",
+  "profile stack-current parses a scoped package with version and care",
+  "profile plan made with proposed-by agent shows the agent label in the preview",
+  "profile seed-from-init copies user.json preferences into the preview only",
+  "profile apply without a plan fingerprint fails with PLAN_REQUIRED",
+  "profile malformed stack-current fails with INVALID_INPUT",
+  "profile apply after another change landed since the preview fails with STALE_VERSION",
+  "help lists the profile routes"
 ]
