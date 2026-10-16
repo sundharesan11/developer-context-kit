@@ -67,9 +67,7 @@ export async function planPackageInstall(roots, selection, { revisionId, content
     validateRoot(path, "target");
     const prior = await observed(path, manifest, selection.workspace, mode);
     const { receipt } = prior;
-    if (agent === "codex") checkAgentParents(targetHome, agent, {codex: ".agents/skills"});
-    const competing = agent === "codex" && info(join(targetHome, ".agents/skills", manifest.name));
-    const status = competing || prior.status === "update" && roleConflict(receipt.files, hashes) ? "conflict" : prior.status;
+    const status = prior.status === "update" && roleConflict(receipt.files, hashes) ? "conflict" : prior.status;
     actions.push({ agent, skill: manifest.name, path, status, priorReceiptDigest: receipt ? digest(receipt) : null, files: hashes });
   }
   return finalizePlan({ kind: "skill-package-local", mode, audience: "personal", workspace: selection.workspace, revision: revisionId, packageDigest: manifest.packageDigest, contentDecision: contentDecisionId ?? null, validatorVersion: validation?.validatorVersion ?? null, validationDigest: validation ? digest(validation) : null, helpers: validation?.helpers ?? null, targetHome, agents: chosen, actions });
@@ -123,9 +121,7 @@ export async function packageInstallStatus(roots, selection, input) {
     for (const agent of agents) {
       const path = join(input.targetHome, AGENT_HOMES[agent], manifest.name);
       checkAgentParents(input.targetHome, agent);
-      if (agent === "codex") checkAgentParents(input.targetHome, agent, {codex: ".agents/skills"});
-      const competing = agent === "codex" && info(join(input.targetHome, ".agents/skills", manifest.name));
-      actions.push({ agent, skill: manifest.name, path, status: competing ? "conflict" : (await observed(path, manifest, selection.workspace, input.mode ?? "install")).status });
+      actions.push({ agent, skill: manifest.name, path, status: (await observed(path, manifest, selection.workspace, input.mode ?? "install")).status });
     }
     const markers = join(roots.stateRoot, "skill-installs", "consumed", selection.workspace);
     let consumed = []; try { consumed = (await readdir(markers)).filter((x) => /^dc_[a-z0-9_-]{8,64}\.json$/.test(x)).map((x) => x.slice(0, -5)).sort(); } catch (e) { if (e.code !== "ENOENT") throw e; }

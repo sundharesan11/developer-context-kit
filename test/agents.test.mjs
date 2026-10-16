@@ -37,13 +37,15 @@ test("envelope rejects outputs outside worktree and publish operations; notice p
 });
 test("install: preview, apply, idempotent, conflict preserved, modified preserved on uninstall", async (t) => {
   const p = await makePilot(t); const home = p.agentHomes[0];
-  await mkdir(join(home, ".codex/skills/devctx-record"), { recursive: true }); await writeFile(join(home, ".codex/skills/devctx-record/SKILL.md"), "foreign");
+  await mkdir(join(home, ".agents/skills/devctx-record"), { recursive: true }); await writeFile(join(home, ".agents/skills/devctx-record/SKILL.md"), "foreign");
   const plan = await planInstall(p.pilot, { targetHome: home, agents: ["claude", "codex"], mode: "install" });
   assert.equal(plan.actions.find((a) => a.agent === "codex" && a.skill === "devctx-record").status, "conflict");
   await applyInstall(p.roots, p.pilot, { targetHome: home, agents: ["claude", "codex"], mode: "install" }, { fingerprint: plan.fingerprint, runId: "run_install01" });
   const again = await planInstall(p.pilot, { targetHome: home, agents: ["claude"], mode: "install" });
   assert.ok(again.actions.every((a) => a.status === "installed"));
-  assert.equal(await readFile(join(home, ".codex/skills/devctx-record/SKILL.md"), "utf8"), "foreign");
+  assert.equal(await readFile(join(home, ".agents/skills/devctx-record/SKILL.md"), "utf8"), "foreign");
+  assert.ok(existsSync(join(home, ".agents/skills/devctx-resume/.devctx-owned.json")));
+  assert.equal(existsSync(join(home, ".codex")), false);
   const edited = join(home, ".claude/skills/devctx-record/SKILL.md");
   await writeFile(edited, "user edited");
   const uninstall = await planInstall(p.pilot, { targetHome: home, agents: ["claude"], mode: "uninstall" });

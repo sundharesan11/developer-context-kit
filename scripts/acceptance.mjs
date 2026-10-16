@@ -111,7 +111,7 @@ await check("stale-hash-rejected", async () => { await expectCliCode([...onboard
 await check("crash-recovery-onboard", async () => { const input = { ...aInput, requestId: "req_accafterreg01" }; const plan = await planOnboard(roots, pilot, input); await assert.rejects(applyOnboard(roots, pilot, input, { fingerprint: plan.fingerprint, now, faults: { afterRegistry: () => { throw new Error("crash"); } } })); const generation = (await readRegistry(roots)).value.generation; const replay = await applyOnboard(roots, pilot, input, { fingerprint: plan.fingerprint, now }); assert.equal(replay.replayed, true); assert.equal((await readRegistry(roots)).value.generation, generation); });
 await check("lock-busy-not-broken", async () => { const lock = scopeLockPath(roots, "lockcase"); const holder = JSON.stringify({ pid: 999999, host: "elsewhere" }); await writeFile(lock, holder, { flag: "wx", mode: 0o600 }); await assert.rejects(withPilotLock(roots, lock, {}, async () => 1, { destinations: [roots.dataRoot], waitMs: 100 }), { code: "DEVCTX_BUSY" }); assert.equal(await readFile(lock, "utf8"), holder); });
 await check("no-cross-scope-canary", async () => { await addRecord(roots, noDraft("globex", "globex.beacon", "req_accanary001", "CANARY-GLOBEX-7731"), { now }); const brief = await buildBrief(roots, pilot, { scope: "acme", cwd: atlas }); assert.ok(!JSON.stringify(brief).includes("CANARY-GLOBEX")); });
-await check("install-preview-apply-idempotent-conflict-uninstall", async () => { const home = pilot.agentHomes[0], foreign = join(home, ".codex/skills/devctx-record/SKILL.md"); await mkdir(dirname(foreign), { recursive: true, mode: 0o700 }); await writeFile(foreign, "foreign"); const plan = await planInstall(pilot, { targetHome: home, agents: ["claude", "codex"], mode: "install" }); assert.equal(plan.actions.find((a) => a.agent === "codex" && a.skill === "devctx-record").status, "conflict"); await applyInstall(roots, pilot, { targetHome: home, agents: ["claude", "codex"], mode: "install" }, { fingerprint: plan.fingerprint, runId: "run_accinstall01" }); assert.equal(await readFile(foreign, "utf8"), "foreign"); assert.ok((await planInstall(pilot, { targetHome: home, agents: ["claude"], mode: "install" })).actions.every((a) => a.status === "installed")); const file = join(home, ".claude/skills/devctx-record/SKILL.md"); await writeFile(file, "user edited"); const uninstall = await planInstall(pilot, { targetHome: home, agents: ["claude"], mode: "uninstall" }); assert.equal(uninstall.actions.find((a) => a.skill === "devctx-record").status, "modified"); await applyInstall(roots, pilot, { targetHome: home, agents: ["claude"], mode: "uninstall" }, { fingerprint: uninstall.fingerprint, runId: "run_accuninstall01" }); assert.equal(await readFile(file, "utf8"), "user edited"); assert.equal(await readFile(foreign, "utf8"), "foreign"); });
+await check("install-preview-apply-idempotent-conflict-uninstall", async () => { const home = pilot.agentHomes[0], foreign = join(home, ".agents/skills/devctx-record/SKILL.md"); await mkdir(dirname(foreign), { recursive: true, mode: 0o700 }); await writeFile(foreign, "foreign"); const plan = await planInstall(pilot, { targetHome: home, agents: ["claude", "codex"], mode: "install" }); assert.equal(plan.actions.find((a) => a.agent === "codex" && a.skill === "devctx-record").status, "conflict"); await applyInstall(roots, pilot, { targetHome: home, agents: ["claude", "codex"], mode: "install" }, { fingerprint: plan.fingerprint, runId: "run_accinstall01" }); assert.equal(await readFile(foreign, "utf8"), "foreign"); assert.ok((await planInstall(pilot, { targetHome: home, agents: ["claude"], mode: "install" })).actions.every((a) => a.status === "installed")); const file = join(home, ".claude/skills/devctx-record/SKILL.md"); await writeFile(file, "user edited"); const uninstall = await planInstall(pilot, { targetHome: home, agents: ["claude"], mode: "uninstall" }); assert.equal(uninstall.actions.find((a) => a.skill === "devctx-record").status, "modified"); await applyInstall(roots, pilot, { targetHome: home, agents: ["claude"], mode: "uninstall" }, { fingerprint: uninstall.fingerprint, runId: "run_accuninstall01" }); assert.equal(await readFile(file, "utf8"), "user edited"); assert.equal(await readFile(foreign, "utf8"), "foreign"); });
 await check("real-home-refused", async () => { await expectCliCode(["agents", "install", "--pilot", pilotFile, "--home", homedir(), "--agent", "claude"], "DEVCTX_GATE_REQUIRED"); });
 await check("fake-auth-wrong-actor", async () => { const provider = createFakeProvider({ accountId: "a", workspaceId: "w", actorRef: "email:wrong@example.com" }); const c = createConnector({ account: { id: "a", provider: "fake", accountId: "a", workspaceId: "w", actorRef: "email:right@example.com", secretRef: "fake:a", policy: { read: true, draft: false, outbound: false } }, provider, ["resolve" + "Secret"]: fakeSecretResolver({}) }); await assert.rejects(c.read({}), { code: "DEVCTX_AUTH_MISMATCH" }); assert.deepEqual(provider.calls.map((x) => x[0]), ["whoami"]); });
 await check("hub-proposal-no-write", async () => { const hub = join(pilot.inputsRoot, "hub"); await mkdir(hub); await writeFile(join(hub, "README.md"), "Hub\n"); const scopeFile = join(roots.configRoot, "scopes/acme.json"); const config = JSON.parse(await readFile(scopeFile, "utf8")); await writeFile(scopeFile, JSON.stringify({ ...config, hubs: [{ id: "eng", kind: "local-dir", path: hub, purposes: ["learning"] }] })); const r = await addRecord(roots, noDraft("acme", "acme.atlas", "req_acchubfact01", "Small reviewed change", true), { now }); const before = await treeHash(hub); const proposal = await proposeHubLearning(roots, { scope: "acme", project: "acme.atlas", recordIds: [r.recordId], hubId: "eng" }, { now, apply: true }); assert.equal(await treeHash(hub), before); assert.equal(JSON.parse(await readFile(proposal.path, "utf8")).publicExport, "not-approved"); });
@@ -147,8 +147,91 @@ await check("handoff-export-portable", async () => {
   return { output: first.output, fileHash: first.fileHash, packetHash: first.packetHash, bytes: first.bytes, publication: first.publication };
 });
 await check("package-allowlist", async () => { const r = spawnSync(process.execPath, [join(kit, "scripts/check-package.mjs")], { cwd: kit, encoding: "utf8", env: { PATH: process.env.PATH } }); const out = JSON.parse(r.stdout); assert.equal(r.status, 0); assert.equal(out.pack, "run"); });
+// Live mode against a fake home inside the acceptance root. The CLI runs from a detached clone of the committed kit,
+// so the running kit is clean and pinned as on the owner's machine. Uncommitted changes are not exercised here.
+const liveRoot = join(await realpath(pilotRoot), "live"), liveHome = join(liveRoot, "home"), devctxDir = join(liveHome, ".devctx");
+const liveKit = join(devctxDir, "kit"), liveProfile = join(devctxDir, "live.json"), liveInstallRun = "run_acclive0001";
+const liveDirs = { claude: join(liveHome, ".claude/skills"), codex: join(liveHome, ".agents/skills") };
+const liveForeign = join(liveDirs.codex, "devctx-record/SKILL.md"), liveOther = join(liveDirs.claude, "someone-else/SKILL.md");
+let liveHead = null, bareKit = null;
+function gitOut(cwd, words) {
+  const env = { PATH: process.env.PATH, HOME: liveRoot, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", LC_ALL: "C", GIT_TERMINAL_PROMPT: "0" };
+  const result = spawnSync("git", ["--no-optional-locks", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-C", cwd, ...words], { env, encoding: "utf8" });
+  if (result.status !== 0) throw new Error("live fixture Git failed: " + words[0] + ": " + String(result.stderr).trim().slice(0, 100));
+  return result.stdout.trim();
+}
+async function pinnedClone(dest) { gitOut(devctxDir, ["clone", "-q", "--no-hardlinks", kit, dest]); gitOut(dest, ["checkout", "-q", "--detach", liveHead]); return realpath(dest); }
+function liveCli(parts, kitRoot = liveKit) {
+  const r = spawnSync(process.execPath, [join(kitRoot, "bin/devctx.mjs"), ...parts], { cwd: liveRoot, encoding: "utf8", env: { PATH: process.env.PATH, HOME: liveHome }, timeout: 120000 });
+  let json; try { json = JSON.parse(r.stdout); } catch { throw new Error("live CLI output unreadable: " + String(r.stderr).slice(0, 100)); }
+  if (!json.ok) throw Object.assign(new Error(json.error?.code ?? "live CLI failed"), { code: json.error?.code + " " + JSON.stringify(json.error?.details ?? null) });
+  return json.result;
+}
+const devctxEntries = async (dir) => (await readdir(dir)).filter((name) => name.startsWith("devctx-")).sort();
+await check("live-init-preview-apply", async () => {
+  for (const dir of Object.values(liveDirs)) await mkdir(dir, { recursive: true, mode: 0o700 });
+  await mkdir(devctxDir, { mode: 0o700 }); await chmod(devctxDir, 0o700);
+  liveHead = gitOut(kit, ["rev-parse", "--verify", "HEAD"]);
+  await pinnedClone(liveKit);
+  const before = await treeHash(liveHome), parts = ["live", "init", "--pilot", liveProfile, "--agent", "claude", "--agent", "codex"];
+  const preview = liveCli(parts);
+  assert.equal(await treeHash(liveHome), before);
+  assert.equal(preview.preview, true);
+  assert.equal(preview.profile.live.kitCommit, liveHead);
+  assert.deepEqual(preview.profile.live.skillDirs, liveDirs);
+  const applied = liveCli([...parts, "--apply", "--plan-fingerprint", preview.fingerprint]);
+  assert.match(applied.profileId, /^prof_[0-9a-f]{16}$/);
+  assert.equal((await lstat(liveProfile)).mode & 0o777, 0o600);
+  assert.equal((await lstat(devctxDir)).mode & 0o777, 0o700);
+  for (const dir of ["store", "store/config", "store/data", "store/state", "store/inputs"]) assert.equal((await lstat(join(devctxDir, dir))).mode & 0o777, 0o700, dir);
+  liveCli(["doctor", "--pilot", liveProfile]);
+  return { kitCommit: liveHead, profileId: applied.profileId };
+});
+await check("live-install-foreign-conflict-blocks-one-agent", async () => {
+  await mkdir(dirname(liveForeign), { recursive: true }); await writeFile(liveForeign, "foreign codex record\n");
+  await mkdir(dirname(liveOther), { recursive: true }); await writeFile(liveOther, "someone else\n");
+  const foreignBefore = await treeHash(dirname(liveForeign)), foreignBytes = await readFile(liveForeign);
+  const parts = ["agents", "install", "--pilot", liveProfile, "--agent", "claude", "--agent", "codex"];
+  const plan = liveCli(parts), codex = plan.actions.filter((a) => a.agent === "codex"), claude = plan.actions.filter((a) => a.agent === "claude");
+  assert.equal(codex.find((a) => a.skill === "devctx-record").status, "conflict");
+  assert.ok(codex.filter((a) => a.skill !== "devctx-record").every((a) => a.status === "blocked" && a.reason === "agent-conflict"));
+  assert.ok(claude.length > 0 && claude.every((a) => a.status === "create"));
+  const applied = liveCli([...parts, "--apply", "--plan-fingerprint", plan.fingerprint, "--run-id", liveInstallRun]);
+  assert.equal(applied.runId, liveInstallRun);
+  assert.deepEqual(await devctxEntries(liveDirs.claude), claude.map((a) => a.skill).sort());
+  assert.deepEqual(await devctxEntries(liveDirs.codex), ["devctx-record"]);
+  assert.deepEqual(await readFile(liveForeign), foreignBytes);
+  assert.equal(await treeHash(dirname(liveForeign)), foreignBefore);
+  assert.equal(await readFile(liveOther, "utf8"), "someone else\n");
+  return { runId: liveInstallRun, installed: claude.length, blocked: codex.length };
+});
+await check("live-uninstall-from-receipts", async () => {
+  // A second pinned kit with no skills/ folder, so uninstall can rely only on receipts and journals.
+  bareKit = await pinnedClone(join(devctxDir, "kit-bare"));
+  gitOut(bareKit, ["rm", "-r", "-q", "skills"]); gitOut(bareKit, ["commit", "-q", "-m", "acceptance: drop bundled skills"]);
+  const bareCommit = gitOut(bareKit, ["rev-parse", "--verify", "HEAD"]), setKit = ["live", "set-kit", "--pilot", liveProfile, "--commit", bareCommit];
+  assert.equal(existsSync(join(bareKit, "skills")), false);
+  liveCli([...setKit, "--apply", "--plan-fingerprint", liveCli(setKit, bareKit).fingerprint], bareKit);
+  const foreignBytes = await readFile(liveForeign), parts = ["agents", "uninstall", "--pilot", liveProfile, "--agent", "claude", "--agent", "codex"];
+  const plan = liveCli(parts, bareKit), removed = plan.actions.filter((a) => a.status === "remove");
+  assert.ok(plan.actions.filter((a) => a.agent === "claude").every((a) => a.status === "remove"));
+  assert.ok(removed.every((a) => a.agent === "claude") && removed.length > 0);
+  liveCli([...parts, "--apply", "--plan-fingerprint", plan.fingerprint, "--run-id", "run_accliveun01"], bareKit);
+  assert.deepEqual(await devctxEntries(liveDirs.claude), []);
+  assert.deepEqual(await devctxEntries(liveDirs.codex), ["devctx-record"]);
+  assert.deepEqual(await readFile(liveForeign), foreignBytes);
+  assert.equal(await readFile(liveOther, "utf8"), "someone else\n");
+  return { kitCommit: bareCommit, removed: removed.length };
+});
+await check("live-rollback-check-after-uninstall", async () => {
+  const result = liveCli(["agents", "rollback-check", "--pilot", liveProfile, "--run-id", liveInstallRun], bareKit);
+  assert.equal(result.status, "ok");
+  assert.deepEqual(result.folders.map((f) => f.agent).sort(), ["claude", "codex"]);
+  assert.ok(result.folders.every((f) => f.devctx.length === 0 && f.foreign.length === 0));
+  return { runId: liveInstallRun, folders: result.folders.length };
+});
 checks.push({ id: "fresh-agent-smoke", status: "deferred", detail: "needs real-home activation, P3" });
-const required = ["onboard-acme-zero-diff", "onboard-globex-zero-diff", "scripts-hooks-fsmonitor-not-run", "resolve-exact", "wrong-scope-rejected", "symlink-cwd-rejected", "unconfirmed-worktree-rejected", "duplicate-binding-rejected", "source-change-stale-plan", "provenance-and-supersession", "handoff-claude-to-codex", "idempotent-retry", "reused-request-conflict", "stale-hash-rejected", "crash-recovery-onboard", "lock-busy-not-broken", "no-cross-scope-canary", "install-preview-apply-idempotent-conflict-uninstall", "real-home-refused", "fake-auth-wrong-actor", "hub-proposal-no-write", "doctor-readonly", "handoff-export-portable", "package-allowlist", "fresh-agent-smoke"];
+const required = ["onboard-acme-zero-diff", "onboard-globex-zero-diff", "scripts-hooks-fsmonitor-not-run", "resolve-exact", "wrong-scope-rejected", "symlink-cwd-rejected", "unconfirmed-worktree-rejected", "duplicate-binding-rejected", "source-change-stale-plan", "provenance-and-supersession", "handoff-claude-to-codex", "idempotent-retry", "reused-request-conflict", "stale-hash-rejected", "crash-recovery-onboard", "lock-busy-not-broken", "no-cross-scope-canary", "install-preview-apply-idempotent-conflict-uninstall", "real-home-refused", "fake-auth-wrong-actor", "hub-proposal-no-write", "doctor-readonly", "handoff-export-portable", "package-allowlist", "live-init-preview-apply", "live-install-foreign-conflict-blocks-one-agent", "live-uninstall-from-receipts", "live-rollback-check-after-uninstall", "fresh-agent-smoke"];
 const ids = new Set(checks.map((c) => c.id));
 const ok = required.every((id) => ids.has(id)) && checks.every((c) => c.status === "passed" || c.id === "fresh-agent-smoke" && c.status === "deferred");
 const report = { schemaVersion: 1, ok, pilotRoot, forbidden: pilotSpec.forbidden, checks };

@@ -1,6 +1,6 @@
 # Guided onboarding
 
-This walkthrough onboards a **synthetic project**, not a real client repository. It uses the same preview and apply commands as the pilot. Real-project activation is not implemented.
+This walkthrough onboards a **synthetic project**, not a real client repository. It uses the same preview and apply commands as the pilot. To onboard a real repository, use a live profile and follow [Live activation](LIVE.md).
 
 Run the shell blocks below in order, in the same macOS shell, from the toolkit checkout. Stop if a command fails. All example context is fictional.
 
@@ -181,4 +181,4 @@ This manual evaluation is not proof of native skill discovery. For a bounded Mar
 
 Before real-project use is supported, collect an approved scope and repository binding, selected source documents, objectives, environments, known commands, owners, decisions, unknowns and sharing rules. Store secrets separately and record references only when the relevant adapter supports them.
 
-The remaining work follows the [roadmap](ROADMAP.md) order: private backup and restore, real activation with rollback and fresh-agent discovery, session start and end hooks, then selective migration. Account selection comes later with live connectors. Do not move client context into this public repository while waiting for those features.
+The remaining work follows the [roadmap](ROADMAP.md) order: private backup and restore, live activation evidence on a real machine, session start and end hooks, then selective migration. Account selection comes later with live connectors. Do not move client context into this public repository while waiting for those features.

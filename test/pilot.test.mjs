@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { mkdir, symlink, readdir } from "node:fs/promises";
+import { mkdir, symlink, readdir, chmod } from "node:fs/promises";
 import { makePilot, runCli } from "./helpers.mjs";
-import { loadPilot, assertWritable } from "../src/config/pilot.mjs";
+import { loadPilot, assertWritable, pilotDigest } from "../src/config/pilot.mjs";
+import { digest as digestOf } from "../src/storage/canonical.mjs";
 import { toJson } from "../src/errors.mjs";
 import { withPilotLock, registryLockPath, scopeLockPath } from "../src/storage/lock.mjs";
 import { listCommands, isRootFree } from "../src/cli.mjs";
@@ -53,6 +54,19 @@ test("assertWritable installer target permits only its own listed agent home", a
   await assert.rejects(withPilotLock(p.roots, join(p.stateRoot, "locks/install.lock"), { kind: "install" }, async () => { called = true; }, { destinations: [b], targetHome: a }), { code: "DEVCTX_GATE_REQUIRED" });
   assert.equal(called, false);
   assert.equal(await withPilotLock(p.roots, join(p.stateRoot, "locks/install.lock"), { kind: "install" }, async () => "ok", { destinations: [a], targetHome: a }), "ok");
+});
+test("disposable pilot digest and fence are unchanged by the optional live block", async (t) => {
+  const p = await makePilot(t);
+  const { path, digest: value, _context, warnings, ...raw } = p.pilot;
+  assert.equal(value, digestOf(Object.fromEntries(["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden"].map((key) => [key, raw[key]]))));
+  assert.equal(pilotDigest(raw), value);
+  assert.deepEqual(warnings, []);
+  assert.equal(raw.live, undefined);
+  const nullLive = await p.with({ live: null });
+  await assert.rejects(loadPilot(nullLive, { home: p.fakeHome, kitRoot: "/nonexistent-kit", env: {} }), { code: "DEVCTX_PATH_UNSAFE" });
+  await chmod(nullLive, 0o600);
+  await assert.rejects(loadPilot(nullLive, { home: p.fakeHome, kitRoot: "/nonexistent-kit", env: {} }), (e) => e.code === "DEVCTX_GATE_REQUIRED" && e.details.field === "live");
+  await assert.rejects(Promise.resolve().then(() => assertWritable(p.roots, [join(p.agentHomes[0], ".claude/skills/devctx-x")], { targetHome: join(p.agentHomes[0], ".claude/skills") })), (e) => e.code === "DEVCTX_GATE_REQUIRED" && e.details.field === "targetHome");
 });
 test("CLI: only version, help, and skill source reads are root-free; every other route requires --pilot", async () => {
   const routes = listCommands();

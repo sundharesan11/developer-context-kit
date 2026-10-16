@@ -71,6 +71,8 @@ export async function journals(roots, targetHome) {
     try {
       const j = await readPrivateJson(path);
       if (j.targetHome && j.targetHome !== targetHome) continue;
+      // A bundled run closed by an approved recovery plan is finished even though some intended actions never completed.
+      if (j.kind === "skill-bundled" && j.closed === true) continue;
       if (j.kind === "skill-source-local" && (JSON.stringify(Object.keys(j).sort()) !== JSON.stringify(["schemaVersion", "kind", "decision", "contentDecision", "planFingerprint", "targetHome", "intended", "completed"].sort()) || j.schemaVersion !== 1 || !/^dc_[a-z0-9_-]{8,64}$/.test(j.decision ?? "") || !/^dc_[a-z0-9_-]{8,64}$/.test(j.contentDecision ?? "") || !/^sha256:[0-9a-f]{64}$/.test(j.planFingerprint ?? "") || typeof j.targetHome !== "string" || !Array.isArray(j.intended) || !j.intended.length || j.intended.length > 2)) { incomplete.push(id); continue; }
       if (!Array.isArray(j.intended) || !Array.isArray(j.completed) || j.completed.length > j.intended.length || j.completed.length < j.intended.length || j.completed.some((action, i) => canonicalJson(action) !== canonicalJson(j.intended[i])) || (j.kind === "skill-package-local" && (j.schemaVersion !== 1 || !/^ws_[a-z0-9_-]{8,64}$/.test(j.workspace ?? "") || !/^dc_[a-z0-9_-]{8,64}$/.test(j.decision ?? "")))) incomplete.push(id);
     } catch { incomplete.push(id); }

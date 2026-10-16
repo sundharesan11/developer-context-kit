@@ -1,8 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { mkdir, symlink, readdir, lstat, writeFile, readFile } from "node:fs/promises";
-import { lockFile, sleep, makePilot, onboardFixture, now } from "./helpers.mjs";
+import { mkdir, symlink, readdir, lstat, writeFile, readFile, rm } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { hostname } from "node:os";
+import { lockFile, sleep, makePilot, onboardFixture, now, runCli } from "./helpers.mjs";
+import { sha256 } from "../src/storage/canonical.mjs";
+import { planRecovery, applyRecovery } from "../src/agents/install.mjs";
 import { withLock, withPilotLock, describeLock } from "../src/storage/lock.mjs";
 import { applyOnboard } from "../src/onboarding/onboard.mjs";
 import { readRegistry } from "../src/config/registry.mjs";
@@ -94,4 +98,63 @@ test("U4 onboarding replay restores an empty or truncated run receipt left by a 
     assert.deepEqual(JSON.parse(await readFile(receiptPath, "utf8")), receipt);
     assert.equal((await lstat(receiptPath)).mode & 0o777, 0o600);
   }
+});
+// A pid that was alive a moment ago and has been reaped, as a killed devctx process leaves behind.
+const deadPid = () => { const r = spawnSync(process.execPath, ["-e", ""]); assert.equal(r.status, 0); return r.pid; };
+const lockRecord = (pid, host = hostname()) => JSON.stringify({ pid, host, owner: { kind: "install", runId: "run_killed0001" }, startedAt: "2026-10-07T00:00:00.000Z" });
+async function plantLock(p, name, record) {
+  await mkdir(join(p.stateRoot, "locks"), { recursive: true, mode: 0o700 });
+  const path = join(p.stateRoot, "locks", name + ".lock");
+  await writeFile(path, record, { flag: "wx", mode: 0o600 });
+  return path;
+}
+const release = (p, lock, extra = []) => runCli(["locks", "release", "--pilot", p.path, "--lock", lock, ...extra]);
+test("locks release: a stale install lock blocks recover until an approved release removes it", async (t) => {
+  const p = await makePilot(t), record = lockRecord(deadPid()), path = await plantLock(p, "install", record);
+  const recovery = await planRecovery(p.roots, p.pilot);
+  await assert.rejects(applyRecovery(p.roots, p.pilot, { fingerprint: recovery.fingerprint }), { code: "DEVCTX_BUSY" });
+  const preview = await release(p, "install");
+  assert.equal(preview.code, 0, JSON.stringify(preview.json));
+  const plan = preview.json.result;
+  assert.equal(plan.kind, "lock-release");
+  assert.equal(plan.lock, "install");
+  assert.equal(plan.release, true);
+  assert.equal(plan.reason, "owner-not-running");
+  assert.deepEqual([plan.holder.pid, plan.holder.alive, plan.holder.owner.runId], [JSON.parse(record).pid, false, "run_killed0001"]);
+  assert.equal(plan.lockHash, sha256(Buffer.from(record)));
+  assert.equal(await readFile(path, "utf8"), record);
+  const missing = await release(p, "install", ["--apply"]);
+  assert.equal(missing.json.error.code, "DEVCTX_PLAN_REQUIRED");
+  const applied = await release(p, "install", ["--apply", "--plan-fingerprint", plan.fingerprint]);
+  assert.equal(applied.code, 0, JSON.stringify(applied.json));
+  assert.deepEqual([applied.json.result.released, applied.json.result.lock], [true, "install"]);
+  await assert.rejects(lstat(path), { code: "ENOENT" });
+  assert.equal((await applyRecovery(p.roots, p.pilot, { fingerprint: recovery.fingerprint })).applied, true);
+  const none = await release(p, "install");
+  assert.deepEqual([none.json.result.release, none.json.result.reason, none.json.result.holder], [false, "no-lock", null]);
+  assert.equal((await release(p, "install", ["--apply", "--plan-fingerprint", none.json.result.fingerprint])).json.error.code, "DEVCTX_NOT_FOUND");
+});
+test("locks release refuses a running owner, another host and a lock changed after preview", async (t) => {
+  const p = await makePilot(t);
+  const live = await plantLock(p, "live", lockRecord(process.pid));
+  const alive = (await release(p, "live")).json.result;
+  assert.deepEqual([alive.release, alive.reason, alive.holder.alive], [false, "owner-running", true]);
+  assert.equal((await release(p, "live", ["--apply", "--plan-fingerprint", alive.fingerprint])).json.error.code, "DEVCTX_BUSY");
+  assert.equal(await readFile(live, "utf8"), lockRecord(process.pid));
+  await rm(live);
+  const other = await plantLock(p, "live", lockRecord(deadPid(), "another-host.invalid"));
+  const foreign = (await release(p, "live")).json.result;
+  assert.deepEqual([foreign.release, foreign.reason], [false, "other-host"]);
+  assert.equal((await release(p, "live", ["--apply", "--plan-fingerprint", foreign.fingerprint])).json.error.code, "DEVCTX_GATE_REQUIRED");
+  assert.ok((await lstat(other)).isFile());
+  await rm(other);
+  const stale = await plantLock(p, "install", lockRecord(deadPid()));
+  const before = (await release(p, "install")).json.result;
+  assert.equal(before.release, true);
+  await writeFile(stale, lockRecord(deadPid()).replace("2026-10-07", "2026-10-08"), { mode: 0o600 });
+  const changed = await release(p, "install", ["--apply", "--plan-fingerprint", before.fingerprint]);
+  assert.equal(changed.json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.ok((await lstat(stale)).isFile());
+  assert.equal((await release(p, "nope")).json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.ok((await runCli(["help"])).json.result.commands.includes("locks release"));
 });

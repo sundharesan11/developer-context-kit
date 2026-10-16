@@ -57,11 +57,23 @@ SHA-256 of the exact bytes is the authority for source identity. A bound source 
 
 - A failed new-file write removes its own partial file, but only while the path still names the file that call created. A failed atomic replace removes its temporary file.
 - Directory fsync opens the directory without following symlinks.
-- Lock files are created exclusively without following symlinks. Release always closes the handle and removes the lock only if it is still the same file; a cleanup error never hides the action's error. Lock holder details are read from at most 4,096 bytes of a regular file. Locks are still never broken automatically.
+- Lock files are created exclusively without following symlinks. Release always closes the handle and removes the lock only if it is still the same file; a cleanup error never hides the action's error. Lock holder details are read from at most 4,096 bytes of a regular file. Locks are still never broken automatically; `locks release` removes a lock only after an approved preview shows its owner process on this machine is gone.
 - Run receipts are fsynced with their directories. If a published onboarding lost its receipt in a crash, a replay writes it again; an existing receipt that differs fails with `RECOVERY_REQUIRED`.
 - Git queries time out after 30 seconds and fail with `GIT_QUERY_FAILED`. Output over 16 MiB, more than 16 remotes or a remote URL over 2,048 bytes fails with `LIMIT`.
 
-Agent-home paths are writable only by an installer, and only the one target home it names. That home must be listed in `pilot.agentHomes`.
+Agent-home paths are writable only by an installer, and only the one target home it names. That home must be listed in `pilot.agentHomes`. In live mode only the bundled installer writes outside the store, and only `devctx-*` entries in the profile's named skill folders.
+
+## Live store
+
+A live profile keeps its private state under `~/.devctx`, at mode 0700. The profile is `~/.devctx/live.json`. The store is `~/.devctx/store`, with `config`, `data`, `state` and `inputs` inside it. The kit clone is `~/.devctx/kit`. See [Live activation](LIVE.md).
+
+- `state/live/approved-profile.json` holds the profile ID and the digest of the last approved profile. Profile commands update it under `state/locks/live.lock`.
+- Each bundled install, update or uninstall writes `state/runs/<run-id>/journal.json`, with the profile ID, kit commit, plan fingerprint and intended, started and completed actions. Before the first write the run folder keeps copies of the old and new file bytes under `copies/`. The run also records an inventory of each target skill folder for the rollback check.
+- An installed entry holds `SKILL.md` and a `.devctx-owned.json` receipt (schema 2, kind `skill-bundled`) with the skill, profile ID, run ID, kit commit and file hash. Ownership needs a matching completed journal in this store. The kit commit is provenance only.
+- An incomplete run blocks new applies until `agents recover` applies an approved recovery plan. Journals are written atomically. `agents recover --release` closes a run stuck on held entries or an unreadable journal and leaves the held files in place as foreign entries; an unreadable journal is kept as `journal.released.json`. Nothing is repaired automatically.
+- Activation evidence stays in `state/evidence/`, created by the owner.
+
+There is no backup. A lost store leaves installed entries unowned; [Live activation](LIVE.md) gives the manual removal steps.
 
 ## Portable handoff files
 

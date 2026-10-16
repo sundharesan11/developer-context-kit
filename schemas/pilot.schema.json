@@ -41,6 +41,46 @@
     },
     "forbidden": {
       "type": "array"
+    },
+    "live": {
+      "type": "object",
+      "required": [
+        "profileId",
+        "home",
+        "skillDirs",
+        "kitRoot",
+        "kitCommit"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{7,63}$"
+        },
+        "home": {
+          "type": "string"
+        },
+        "skillDirs": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "claude": {
+              "type": "string"
+            },
+            "codex": {
+              "type": "string"
+            }
+          }
+        },
+        "kitRoot": {
+          "type": "string"
+        },
+        "kitCommit": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        }
+      }
     }
   }
 }

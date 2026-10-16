@@ -33,7 +33,7 @@ test("public alpha license metadata matches the canonical Apache text", async ()
 
 test("public alpha guides exist and relative documentation links resolve", async () => {
   const root = join(import.meta.dirname, "..");
-  for (const file of ["CONTRIBUTING.md", "docs/README.md", "docs/GETTING-STARTED.md",
+  for (const file of ["CONTRIBUTING.md", "docs/README.md", "docs/GETTING-STARTED.md", "docs/LIVE.md",
     "docs/ONBOARDING.md", "docs/ARCHITECTURE.md", "docs/SKILL-SOURCES.md", "docs/RELEASING.md"]) {
     assert.ok(existsSync(join(root, file)), file);
   }
@@ -83,12 +83,17 @@ test("docs state the candidate's limits in pinned phrases", async () => {
   const want = {
     "README.md": ["local package candidate", "NOT currently installed", "no automatic private-to-public synchronization", "not a sandbox"],
     "docs/SECURITY-MODEL.md": ["residual race", "same-user"],
-    "docs/LIMITATIONS.md": ["Linux support is not claimed", "Windows is unsupported", "migration is not implemented", "no backup or sync", "lost laptop", "multi-record onboarding"],
+    "docs/LIMITATIONS.md": ["Linux support is not claimed", "Windows is unsupported", "migration is not implemented", "no backup or sync", "lost laptop", "multi-record onboarding", "no backup of the live store", "client repository text"],
+    "docs/LIVE.md": ["mkdir -m 700 ~/.devctx", "--setting-sources user", "--sandbox read-only", "rollback-check", "live set-kit", "agents recover", "legacy", "Cursor", "same-user tampering", "If the store is lost", "No backup"],
   };
   for (const [file, phrases] of Object.entries(want)) {
     const text = await read(file);
     for (const p of phrases) assert.ok(text.includes(p), `${file}: ${p}`);
   }
+  // The fresh-session allowlist must name exact commands; prefix rules would let a session write to the repository.
+  const live = await read("docs/LIVE.md");
+  for (const broad of ["Bash(node:*)", "Bash(git -C:*)", "Bash(git:*)", "Bash(printenv:*)"]) assert.ok(!live.includes(broad), `docs/LIVE.md allows ${broad}`);
+  assert.ok(!live.includes("rolls back an interrupted update"), "docs/LIVE.md claims update rollback");
 });
 
 const BUNDLED_SKILLS = ["devctx-onboard", "devctx-resume", "devctx-record"];
@@ -133,6 +138,10 @@ test("bundled skills state the DEVCTX_KIT validation and pilot-path rules", asyn
   for (const name of BUNDLED_SKILLS) {
     const text = await readBundledSkill(name);
     for (const phrase of phrases) assert.ok(text.includes(phrase), name + ": " + phrase);
+  }
+  for (const name of BUNDLED_SKILLS) {
+    const text = await readBundledSkill(name);
+    for (const phrase of ["live profile", "~/.devctx/live.json", "confirm the pilot path once per session", "kit commit", ".devctx-owned.json", 'rev-parse HEAD', "warn the user"]) assert.ok(text.includes(phrase), name + ": " + phrase);
   }
   assert.match(await readBundledSkill("devctx-record"), /attributed to "human"/);
   assert.match(await readBundledSkill("devctx-resume"), /freshness/);
