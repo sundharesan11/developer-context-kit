@@ -91,7 +91,7 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 - Anthropic's `internal-comms` skill keeps one short guideline per message type and asks when the type is unclear; `doc-coauthoring` adds a reader test ([internal-comms](https://github.com/anthropics/skills/blob/main/skills/internal-comms/SKILL.md), [doc-coauthoring](https://github.com/anthropics/skills/blob/main/skills/doc-coauthoring/SKILL.md)).
 - Gmail's "Help me write" shows which emails and files a draft used ([Google help](https://support.google.com/mail/answer/13955415)).
 - Heavy AI assistance lowered perceived sincerity of manager emails from 83% to 40–52% ([University of Florida](https://news.ufl.edu/2025/08/writing-ai-work/)); assistants have invented email threads and stale facts ([example](https://aipressroom.beehiiv.com/p/googles-new-gmail-tool-is-hallucinating-emails-that-dont-exist)).
-- **DCK position:** draft only, show the context used, mark unverified facts, ask when audience or purpose is unclear.
+- **DCK position:** keep the writing skill thin: add the profile, user-selected records and the safety rules (draft only, show the context used, mark unverified facts, ask when audience or purpose is unclear). Leave per-message-type formats to optional companion skill packs such as these.
 
 ### Key Decisions
 
@@ -100,6 +100,12 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 - **Stack checks use a source plan approved once.** The user approves the exact hosts and item list once. Later runs reuse that approval until the stack or source list changes. No account or token is needed; an optional GitHub token comes from an environment variable, never from records. (session-settled: user-directed — chosen over approving every run and over offline-only bulk data: it honours "nothing sent outward without approval" while keeping later unattended runs possible.)
 - **Keep the DCK name and add a harness layer.** The repository, package and CLI keep their names; docs describe a personal-harness template built on DCK. Release naming stays with priority 9. (session-settled: user-directed — chosen over renaming now or a separate template repository: it avoids churn while priority 2 activation is in flight.)
 - **Versioned profile, not a write-once preference file.** Every profile edit is a previewed, hash-bound revision; earlier revisions stay readable. (session-settled: user-approved — chosen over extending the existing write-once preferences and over generating a private instance repository: it reuses DCK's preview, approval and immutability rules without taking on backup or migration work.)
+- **Full starter scope stays.** Draft save, the optional `DEVCTX_GITHUB_TOKEN` and all six default data hosts remain in this stage. (session-settled: user-directed — chosen over deferring draft save, dropping the token and starting with three hosts: the owner wants the complete starter set in one stage.)
+- **Sequencing reconfirmed.** After document review challenged it, the owner kept this stage after priority 2 and before session hooks. (session-settled: user-directed — chosen over moving it behind session hooks and migration: the template shape should settle first.)
+- **Thin writing skill with companions.** The writing skill adds only the profile, user-selected records and the safety rules. It ships no per-message-type guidance; optional writing skill packs supply formats as companions. (session-settled: user-directed — chosen over built-in guidance for email, status updates, PR descriptions, announcements and incident notes: avoids rebuilding what companion packs already do.)
+- **`init` preferences stay; the profile wins.** No migration and no deprecation of `init` in this stage (R35). (session-settled: user-directed — chosen over migrating or retiring `init` preferences: keeps existing pilots working unchanged.)
+- **Exact versions go to advisory and registry hosts.** Declared versions are sent to OSV and the package registries and shown in the approval preview. Only item names and versions leave the machine. (session-settled: user-directed — chosen over sending names only: version-specific advisories need the version.)
+- **Source-plan approval does not expire.** It resets only when the stack or host list changes; expiry is revisited when scheduling is enabled. (session-settled: user-directed — chosen over a time-limited approval: manual runs need no expiry yet.)
 - **Two starter skills plus a setup skill, all instruction-only.** The starter skills are writing and stack check; a third skill conducts first-run setup. No bundled scripts. Engineering-process skills are recommended companions, not rebuilt. Research shows script-bearing skills carry more risk and large skill packs bloat context.
 - **Scheduling stays with the scheduler priority** (8 before this stage is inserted, 9 after). This stage delivers manual runs and a documented, disabled scheduling recipe. Enabling a schedule needs that priority's gate.
 - **The profile is preference data, not authority.** Agents may follow it for style and workflow choices. It cannot grant permissions, waive stop rules, or override repository instructions or the user.
@@ -123,8 +129,8 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
   - **Steps:** Show the old and new values, the resulting size, and whether the change was proposed by the agent. Apply only with approval bound to that exact change. Keep the earlier revision readable.
   - **Covered by:** R8–R10.
 - F3. Draft a message
-  - **Trigger:** A1 asks A2 to draft an email, status update, PR description, announcement or similar.
-  - **Steps:** Identify message type, audience and purpose, asking if any is unclear. Read the profile and only the project context A1 selects. Produce a draft with a list of context used and every unverified name, date, number or commitment marked.
+  - **Trigger:** A1 asks A2 to draft any message, such as an email, status update or PR description.
+  - **Steps:** Establish audience and purpose, asking one question if either is unclear. Read the profile and only the project context A1 selects. Use a companion writing skill for format if one is installed; the starter skill supplies no format of its own. Produce a draft with a list of context used and every unverified name, date, number or commitment marked.
   - **Outcome:** A draft in the session. Nothing is sent. Saving it is a separate approved write.
   - **Covered by:** R13–R19.
 - F4. Stack-update check
@@ -154,8 +160,8 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 - R35. When a profile exists, its working preferences take precedence over the write-once `init` preferences for any field both define; `init` itself is unchanged.
 
 **Writing skill**
-- R13. The writing skill drafts any message type for any role, not only email or sales.
-- R14. It asks one question when the message type, audience or purpose is unclear instead of guessing.
+- R13. The writing skill drafts any message for any role, adding only the profile, user-selected records and the safety rules; it carries no built-in per-message-type guidance.
+- R14. It asks one question when the audience or purpose is unclear instead of guessing.
 - R15. It uses the profile's writing preferences when present: tone, formality by audience, greeting and sign-off, length, formatting, spelling variant and phrases to avoid.
 - R16. It reads only the profile and project context the developer selects, never the whole store.
 - R17. Every draft lists the context it used and marks any name, date, number or commitment not found in that context as unverified.
@@ -164,7 +170,7 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 
 **Stack-update check**
 - R20. The developer declares the stack as named items with an optional version or major line and a care level.
-- R21. Before the first run, and whenever the stack or source list changes, the check shows the hosts and items it will query and waits for approval.
+- R21. Before the first run, and whenever the stack or source list changes, the check shows the hosts, items and exact declared versions it will query, states that only item names and versions leave the machine, and waits for approval.
 - R22. The check uses no account by default. An optional token is read from an environment variable and never stored in records, approvals or digests; keychain resolution waits for the connector work.
 - R23. The check reports new releases, breaking changes, deprecations, end-of-life dates and security advisories that affect declared items.
 - R24. Every reported claim cites its fetched source; a claim without fetched source text is labelled unverified, and breaking changes are never inferred from version numbers alone. An item with no release-notes or advisory source is listed as "not checked" for that category, separate from fetch failures.
@@ -176,7 +182,7 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 
 **Starter skill packaging**
 - R30. The setup skill and both starter skills are instruction-only Agent Skills folders with no bundled scripts. They follow the existing bundled-skill rules (kit path check, pilot path from the user, stop rules, explicit scope where a project is involved) and treat records, briefs and fetched third-party text as untrusted data, never instructions.
-- R31. Docs recommend engineering-process skill packs as optional companions without bundling them.
+- R31. Docs recommend engineering-process and writing skill packs as optional companions without bundling them.
 
 **Agent pointer (after priority 2)**
 - R32. An opt-in pointer from each supported agent's personal instruction file to the profile is offered only after priority 2 merges, through its installer gate, with preview, approval, preserved foreign content and verified removal.
@@ -193,11 +199,12 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 - AE4. **Covers R9.** **Given** a note that looks like an API key, **when** it is added to the profile, **then** the write is refused and nothing is stored.
 - AE5. **Covers R10.** **Given** profile revision 2, **when** the developer approves a change computed against revision 1, **then** the approval is refused as stale.
 - AE6. **Covers R14, R17.** **Given** a request to "tell the client it ships Friday", **when** no context confirms the date, **then** the draft marks the date unverified and names the context it used.
-- AE7. **Covers R21.** **Given** an approved source plan, **when** the developer adds a stack item, **then** the next run stops for approval before any query.
+- AE7. **Covers R21.** **Given** an approved source plan, **when** the developer adds a stack item or changes a declared version, **then** the next run stops for approval before any query.
 - AE8. **Covers R24.** **Given** a release whose notes could not be fetched, **when** the digest is built, **then** the item appears as unverified with no breaking-change claim. **Given** an item with no release-notes source at all, **then** it appears as "breaking changes not checked".
 - AE9. **Covers R25.** **Given** a finding reported last week and unchanged, **when** the check runs again, **then** the finding is not repeated.
 - AE10. **Covers R26.** **Given** one host returns a rate limit, **when** the check runs, **then** other items still report and the limited items say why.
 - AE11. **Covers R2, R4.** **Given** a developer ran `git init` in the config root to version it, **when** setup tries to write the profile, **then** the write is refused and the message points to the documented copy-or-export recipe.
+- AE12. **Covers R21.** **Given** a stack with `next=15.2.1`, **when** the source plan is previewed, **then** it lists each host with the exact names and versions it will receive and states that nothing else leaves the machine.
 
 ### Success Criteria
 
@@ -234,7 +241,7 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 
 ### Outstanding Questions
 
-No product question blocks planning. The planning questions this contract deferred are answered in the Planning Contract (KTD1–KTD9). Implementation-time unknowns are listed under Deferred to Implementation.
+No product question blocks planning. The planning questions this contract deferred are answered in the Planning Contract (KTD1–KTD15). Implementation-time unknowns are listed under Deferred to Implementation.
 
 ### Sources / Research
 
@@ -247,7 +254,7 @@ Full cited reports, public sources only, dated 2026-10-16:
 
 ## Planning Contract
 
-Product Contract preservation: changed R22 — narrowed "environment or keychain" to "environment variable" because nothing in DCK resolves keychain references yet ([AUTH.md](../AUTH.md)); keychain support moves with the connector priority. Document review then clarified R4, R24 and R30, added R35 (profile precedence over `init` preferences), AE11, the setup prerequisite step in F1, a profile-authority Key Decision and an owner-checkable success criterion. No product decision was reversed.
+Product Contract preservation: changed R22 — narrowed "environment or keychain" to "environment variable" because nothing in DCK resolves keychain references yet ([AUTH.md](../AUTH.md)); keychain support moves with the connector priority. Document review then clarified R4, R24 and R30, added R35 (profile precedence over `init` preferences), AE11, the setup prerequisite step in F1, a profile-authority Key Decision and an owner-checkable success criterion. No product decision was reversed. The owner's answers on 2026-10-16 then changed R13, R14, R21, R31, F3 and AE7, added AE12, and added six session-settled Key Decisions (full scope, sequencing, thin writing skill, `init` kept, exact versions, no approval expiry).
 
 ### Key Technical Decisions
 
@@ -262,6 +269,10 @@ Product Contract preservation: changed R22 — narrowed "environment or keychain
 - KTD9. **Starter skills are instruction-only bundled skills; installer wiring waits for priority 2.** New skills live under `skills/` beside the existing three and follow the same preconditions and stop rules. `src/agents/install.mjs` `SKILL_NAMES` is not touched until priority 2 merges (U9). (session-settled: user-directed — chosen over rendering the full profile into agent files: agents pull the profile, and a pointer comes only through the priority 2 installer gate.)
 - KTD10. **Keep the name; reposition in docs.** No package, CLI or repository rename. README and a new harness guide describe the personal-harness layer. (session-settled: user-directed — chosen over renaming now or a separate template repository: avoids churn during priority 2.)
 - KTD11. **Roadmap renumbers.** The new stage becomes priority 3; later rows shift by one. The freeze sentence names the daily-use blockers by name rather than by number so the renumber does not change its meaning. The new row's exit evidence is the owner-checkable success criterion plus green synthetic acceptance. (session-settled: user-directed — chosen over waiting for priorities 1–4, a parallel track, or folding into release: lets the template shape stabilize before hooks and migration.)
+- KTD12. **Requests carry only item names and exact versions.** OSV and registry queries include the declared version; the item-list hash covers names, versions and care, so a version change stales the approval. `stack plan` lists, per host, the exact names and versions it will send and states that nothing else leaves the machine. No profile text, record, path or account identifier is sent. (session-settled: user-directed — chosen over sending names only: version-specific advisories need the version.)
+- KTD13. **Approvals have no expiry in this stage.** An approval stays valid until the stack or host list changes; time-based expiry is revisited when scheduling is enabled. (session-settled: user-directed — chosen over a time-limited approval: manual runs need no expiry yet.)
+- KTD14. **The writing skill is thin and relies on companions for format.** `devctx-write` adds the profile, user-selected records and the safety rules only; there is no per-message-type reference file. `docs/HARNESS.md` points to optional writing skill packs, for example Anthropic's `internal-comms` and `doc-coauthoring`. (session-settled: user-directed — chosen over built-in per-type guidance: avoids rebuilding companion packs.)
+- KTD15. **Full starter scope stays.** Draft save (U7), the optional token and all six default hosts ship in this stage. (session-settled: user-directed — chosen over deferring draft save, dropping the token and starting with three hosts: the owner wants the complete starter set.)
 
 ### High-Level Technical Design
 
@@ -405,13 +416,16 @@ flowchart TB
 ### U4. Stack source catalog and source-plan approval
 
 - **Goal:** Turn the declared stack into an approved list of hosts and identifiers before any query.
-- **Requirements:** R20, R21, R22; KTD7, KTD8; F4.
+- **Requirements:** R20, R21, R22; KTD7, KTD8, KTD12, KTD13; F4; AE7, AE12.
 - **Dependencies:** U1.
 - **Files:** create `catalog/stack-sources.json`, `src/stack/catalog.mjs`, `src/stack/plan.mjs`, `src/stack/commands.mjs`; modify `src/cli.mjs`; test `test/stack-plan.test.mjs`.
-- **Approach:** The catalog maps lowercase names and aliases to `{endoflife?, package: {ecosystem, name}?, github?}` for a starter set. `stack plan` reads `stackCurrent` from the current profile, resolves each item through the catalog and repeatable `--map name=kind:id` overrides (kinds limited to `endoflife`, `npm`, `pypi`, `crates`, `github`), lists unmapped items, lists exact hosts, states whether GitHub requests will be authenticated, and returns a fingerprint. `stack approve --plan-fingerprint` writes the approval (item-list hash, resolved identifiers and overrides, hosts, and the profile revision hash for provenance only) under `stateRoot/stack/`. A helper reports whether the current approval still matches by item-list hash, identifiers and hosts.
+- **Approach:** The catalog maps lowercase names and aliases to `{endoflife?, package: {ecosystem, name}?, github?}` for a starter set. `stack plan` reads `stackCurrent` from the current profile, resolves each item through the catalog and repeatable `--map name=kind:id` overrides (kinds limited to `endoflife`, `npm`, `pypi`, `crates`, `github`), lists unmapped items, lists each host with the exact names and versions it will receive, states that only names and versions leave the machine, states whether GitHub requests will be authenticated, and returns a fingerprint. `stack approve --plan-fingerprint` writes the approval (item-list hash, resolved identifiers and overrides, hosts, and the profile revision hash for provenance only) under `stateRoot/stack/`. A helper reports whether the current approval still matches by item-list hash, identifiers and hosts.
 - **Patterns to follow:** `validateCatalog` and `loadBundledCatalog` in `src/skill-sources/catalog.mjs`; approval files in `src/skill-sources/installation.mjs`.
 - **Test scenarios:**
   - Happy path: Node, Postgres and Next.js resolve to their catalog entries; the plan lists hosts and the fingerprint is deterministic.
+  - Happy path: with `next=15.2.1`, the plan lists `registry.npmjs.org` and `api.osv.dev` with name `next` and version `15.2.1`, and contains the statement that only names and versions leave the machine. Covers AE12.
+  - Error: changing a declared version in a new profile revision makes the approval stale. Covers AE7.
+  - Edge: an approval stays valid with no time limit while the stack and host list are unchanged (KTD13).
   - Happy path: approve with the fingerprint stores an approval that matches the current profile.
   - Edge: an unknown item is listed as unmapped and excluded from hosts; `--map` makes it mapped.
   - Edge: an empty `stackCurrent` produces an empty plan that cannot be approved.
@@ -426,7 +440,7 @@ flowchart TB
 ### U5. Bounded stack check
 
 - **Goal:** Fetch release, lifecycle, deprecation and advisory data from approved hosts and return sourced, severity-grouped findings without writing anything.
-- **Requirements:** R22, R23, R24, R25, R26, R28; KTD6, KTD8.
+- **Requirements:** R22, R23, R24, R25, R26, R28; KTD6, KTD8, KTD12.
 - **Dependencies:** U4.
 - **Files:** create `src/stack/fetch.mjs`, `src/stack/check.mjs`, synthetic fixtures under `test/fixtures/stack/`; modify `src/stack/commands.mjs`, `src/cli.mjs` (pass the injected `request` to `stack check` and `stack digest` as it does for skill-source routes); test `test/stack-check.test.mjs`.
 - **Approach:** `stack check` refuses with `APPROVAL_REQUIRED` unless the approval matches. Per item, call only approved hosts: endoflife for lifecycle and latest, the package registry for latest and deprecation, OSV for advisories when a version and package mapping exist, GitHub releases for notes. Each finding carries item, kind, severity, source URL and fetch time. Release-note lines matching breaking, deprecation or removal terms are quoted with the release URL as inert, length-capped excerpts (KTD6); nothing else claims a breaking change. Major-version bumps are reported as "new major version", not "breaking". Items with no GitHub mapping report "breaking changes not checked"; items with no package mapping or no version report "advisories not covered". Mark findings already in seen state as previously reported. A host failure becomes a per-item error with a typed reason. Send the token only to `api.github.com`.
@@ -445,6 +459,7 @@ flowchart TB
   - Error: a request to a host not in the approval is never made (asserted through the fake `request` log).
   - Error: oversized bodies, redirects and non-JSON responses fail per item with typed codes.
   - Error: the token never appears in output, findings or any request to a non-GitHub host.
+  - Integration: every request in the fake `request` log carries only catalog identifiers, item names and declared versions; no profile text, record content, path or account identifier appears (KTD12).
   - Integration: `stack check` writes no file under any pilot root.
 - **Verification:** Check tests pass offline; the fake request log proves host restriction.
 
@@ -469,7 +484,7 @@ flowchart TB
 ### U7. Draft save route
 
 - **Goal:** Let the writing skill save an approved draft privately.
-- **Requirements:** R18, R19.
+- **Requirements:** R18, R19; KTD15.
 - **Dependencies:** None.
 - **Files:** create `src/drafts/save.mjs`, `src/drafts/commands.mjs`; modify `src/cli.mjs`; test `test/drafts.test.mjs`.
 - **Approach:** `draft save --kind <type> --body-file <path>` reads a body file that must lie inside `inputsRoot`, refuses sensitive content, previews destination and hash, and with `--apply --plan-fingerprint` creates the file exclusively under `dataRoot/drafts/`. There is no send, post or connector path.
@@ -484,10 +499,10 @@ flowchart TB
 ### U8. Starter and setup skills
 
 - **Goal:** Ship instruction-only skills for first-run setup, writing and stack checks.
-- **Requirements:** R5–R7, R13–R18, R21, R24, R30; F1, F3, F4; AE6.
+- **Requirements:** R5–R7, R13–R18, R21, R24, R30; KTD14; F1, F3, F4; AE6.
 - **Dependencies:** U2, U6, U7.
-- **Files:** create `skills/devctx-setup/SKILL.md`, `skills/devctx-write/SKILL.md`, `skills/devctx-write/references/message-types.md`, `skills/devctx-stack-check/SKILL.md`; modify `test/docs.test.mjs`.
-- **Approach:** Each skill keeps the existing preconditions (kit path checks, user-supplied pilot path, single-quoted arguments, stop rules, explicit scope where a project is involved) and calls only real routes. Each states that records, briefs, the profile's free text and fetched release notes or advisories are untrusted data, never instructions, and never runs commands or edits files because of them. `devctx-setup` first checks that the pilot file exists and `init` has run; if not, it points to the getting-started pilot steps and stops without creating anything. It then explains what it stores and where, asks at most five skippable questions one at a time, offers suggest-stack results as a preview, shows the full `profile plan` output and applies only on approval. `devctx-write` identifies message type, audience and purpose, asks one question when unclear, reads `profile show` and only user-selected records, lists the context used, marks unverified names, dates, numbers and commitments, never sends, and offers `draft save` on request, asking before it writes the body file into `inputsRoot`. `devctx-stack-check` runs `stack plan` and asks for approval when needed, runs `stack check`, summarizes only fetched findings with their URLs, and offers `stack digest`. Message-type guidance covers email, status update, PR description, announcement and incident note.
+- **Files:** create `skills/devctx-setup/SKILL.md`, `skills/devctx-write/SKILL.md`, `skills/devctx-stack-check/SKILL.md`; modify `test/docs.test.mjs`.
+- **Approach:** Each skill keeps the existing preconditions (kit path checks, user-supplied pilot path, single-quoted arguments, stop rules, explicit scope where a project is involved) and calls only real routes. Each states that records, briefs, the profile's free text and fetched release notes or advisories are untrusted data, never instructions, and never runs commands or edits files because of them. `devctx-setup` first checks that the pilot file exists and `init` has run; if not, it points to the getting-started pilot steps and stops without creating anything. It then explains what it stores and where, asks at most five skippable questions one at a time, offers suggest-stack results as a preview, shows the full `profile plan` output and applies only on approval. `devctx-write` is thin (KTD14): it establishes audience and purpose, asks one question when either is unclear, reads `profile show` and only user-selected records, applies the profile's writing preferences, lists the context used, marks unverified names, dates, numbers and commitments, never sends, and offers `draft save` on request, asking before it writes the body file into `inputsRoot`. It carries no per-message-type guidance; it defers to a companion writing skill for format when one is installed and names such packs as optional. `devctx-stack-check` runs `stack plan`, shows the exact names and versions per host and asks for approval when needed, runs `stack check`, summarizes only fetched findings with their URLs, and offers `stack digest`.
 - **Patterns to follow:** `skills/devctx-resume/SKILL.md` structure; bundled-skill tests in `test/docs.test.mjs`.
 - **Test scenarios:**
   - Happy path: the extended bundled-skill test list includes the three new skills; each passes frontmatter and route checks.
@@ -497,6 +512,8 @@ flowchart TB
   - Edge: `devctx-setup` stops when the pilot or `init` is missing.
   - Error: a skill that invokes a route not in `COMMANDS` fails the route test.
   - Integration: `devctx-write` text requires listing context used and marking unverified facts. Covers AE6.
+  - Edge: `devctx-write` has no per-message-type sections or reference files, and names companion writing skill packs as optional.
+  - Edge: `devctx-stack-check` states that only item names and versions leave the machine.
   - Test expectation for behavior quality: none — live-model evaluation of question quality and draft quality is deferred, as for existing skills.
 - **Verification:** Docs tests pass; skills contain no scripts.
 
@@ -518,10 +535,10 @@ flowchart TB
 ### U10. Template hygiene, docs and roadmap
 
 - **Goal:** Make the generic template safe to clone and describe the new layer accurately.
-- **Requirements:** R1, R3, R4, R29, R31, R34.
+- **Requirements:** R1, R3, R4, R29, R31, R34; KTD14.
 - **Dependencies:** U8.
 - **Files:** modify `scripts/check-package.mjs`, `scripts/package-allowlist.json` (including new source, skill and `test/fixtures/stack/` paths), `scripts/acceptance.mjs`, `docs/ARCHITECTURE.md`, `docs/LIMITATIONS.md`, `docs/SECURITY-MODEL.md`, `docs/README.md`, `README.md`; create `docs/HARNESS.md`; test `test/package.test.mjs`, `test/docs.test.mjs`.
-- **Approach:** Add a tracked-file private-state check that applies the existing anchored pack pattern, extended with `profile/`, `digests/`, `drafts/` and `stack/` at the root or under `data`, `state`, `config` or `private`, to the `git ls-files` list as well as to pack entries. Keep the home-path, email and out-of-tree denylist scans as the personal-identifier gate. `docs/HARNESS.md` covers first-run prerequisites, the profile, its cap and its authority limits, the writing and stack-check skills, network hosts, approval and token guidance, versioning the private instance by copy or export into a separate private repository or dotfiles manager (never `git init` in the roots), recommended companions (Superpowers, compound-engineering, ruler or rulesync for rules fan-out), and a scheduling recipe for local cron or launchd that ships commented out. `docs/SECURITY-MODEL.md` names the profile's same-user trust limit and the untrusted status of fetched release notes. Add acceptance checks for profile plan/apply, stale approval refusal and offline stack check with fixtures.
+- **Approach:** Add a tracked-file private-state check that applies the existing anchored pack pattern, extended with `profile/`, `digests/`, `drafts/` and `stack/` at the root or under `data`, `state`, `config` or `private`, to the `git ls-files` list as well as to pack entries. Keep the home-path, email and out-of-tree denylist scans as the personal-identifier gate. `docs/HARNESS.md` covers first-run prerequisites, the profile, its cap and its authority limits, the writing and stack-check skills, network hosts, approval and token guidance, versioning the private instance by copy or export into a separate private repository or dotfiles manager (never `git init` in the roots), recommended companions (Superpowers, compound-engineering, ruler or rulesync for rules fan-out, and writing skill packs such as Anthropic's `internal-comms` and `doc-coauthoring` for message formats), exactly what the stack check sends (item names and versions only), and a scheduling recipe for local cron or launchd that ships commented out. `docs/SECURITY-MODEL.md` names the profile's same-user trust limit and the untrusted status of fetched release notes. Add acceptance checks for profile plan/apply, stale approval refusal and offline stack check with fixtures.
 - **Patterns to follow:** existing pinned-phrase doc tests; `test/package.test.mjs` cases for `check-package`.
 - **Test scenarios:**
   - Happy path: package check passes on the clean tree with the new files allowlisted.
@@ -529,7 +546,7 @@ flowchart TB
   - Edge: `src/profile/store.mjs`, `src/stack/check.mjs` and `schemas/profile.schema.json` are not flagged as private state.
   - Error: a tracked file containing a home-directory path, a non-example email or a denylisted term fails.
   - Integration: acceptance report includes the new checks and they pass on a fresh disposable pilot.
-  - Docs: `docs/HARNESS.md` contains pinned phrases for "draft only", "approved hosts", "disabled by default", "outside the clone" and "never `git init`".
+  - Docs: `docs/HARNESS.md` contains pinned phrases for "draft only", "approved hosts", "disabled by default", "outside the clone", "never `git init`", "only item names and versions" and "optional companions".
 - **Verification:** `npm test`, acceptance and both package-audit runs pass; docs links resolve.
 
 ### U11. Roadmap renumbering (after priority 2 merges)
@@ -580,7 +597,7 @@ No test may reach the live network. Live-model behavior of the skills is not eva
 | Profile in the brief crowds out project records | 4,096-byte cap; records fill the remainder and omissions are counted. |
 | Public data hosts change shape (endoflife.date API is beta) | Typed per-item failures; fixture tests per host; a broken host degrades one item, not the run. |
 | Agents add unquoted "breaking change" claims | Digest renders only CLI findings; skill instructs chat summaries to cite finding URLs. |
-| Stack names leak to public hosts | Hosts listed and approved before any query; no third-party accounts by default. |
+| Stack names and versions reach public hosts | Hosts, names and exact versions are listed and approved before any query; nothing else is sent; no third-party accounts by default. |
 | Setup grows into a questionnaire | Five-question ceiling enforced in the skill text and doc tests. |
 
 ### Deferred to Follow-Up Work
@@ -589,3 +606,4 @@ No test may reach the live network. Live-model behavior of the skills is not eva
 - Offline bulk-data mode for OSV and endoflife.date.
 - Keychain token resolution (connector priority).
 - Live-model evaluation of the setup and writing skills.
+- Source-plan approval expiry for unattended runs, revisited when scheduling is enabled (KTD13).
