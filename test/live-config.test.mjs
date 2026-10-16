@@ -22,7 +22,7 @@ async function liveFixture(t, { env = {}, kit } = {}) {
   const pinned = kit ?? await pinnedKit(join(devctx, "kit"));
   const repo = await makeRepo(join(sb, "work/atlas"), { "README.md": "# Atlas\n" });
   const storeAt = (root) => ({ pilotRoot: root, configRoot: join(root, "config"), dataRoot: join(root, "data"), stateRoot: join(root, "state"), inputsRoot: join(root, "inputs") });
-  const obj = { schemaVersion: 1, ...storeAt(store), agentHomes: [], repos: [repo], forbidden: [], live: { profileId: "prof_0123456789abcdef", home, skillDirs: { claude: join(home, ".claude/skills"), codex: join(home, ".agents/skills") }, kitRoot: pinned.kit, kitCommit: pinned.commit } };
+  const obj = { schemaVersion: 1, ...storeAt(store), agentHomes: [], repos: [repo], forbidden: [], live: { configId: "cfg_0123456789abcdef", home, skillDirs: { claude: join(home, ".claude/skills"), codex: join(home, ".agents/skills") }, kitRoot: pinned.kit, kitCommit: pinned.commit } };
   const context = { home, env, kitRoot: pinned.kit };
   let n = 0;
   const f = {
@@ -45,7 +45,7 @@ async function liveFixture(t, { env = {}, kit } = {}) {
   };
   return f;
 }
-test("live profile validates a real store, existing skill folders and a repository outside the store", async (t) => {
+test("live config validates a real store, existing skill folders and a repository outside the store", async (t) => {
   const f = await liveFixture(t);
   const pilot = await loadPilot(await f.approved(), f.context);
   assert.deepEqual(pilot.live.skillDirs, { claude: f.claudeSkills, codex: f.codexSkills });
@@ -54,12 +54,12 @@ test("live profile validates a real store, existing skill folders and a reposito
   assert.equal(pilot.digest, pilotDigest(f.obj));
   assert.notEqual(pilotDigest(f.obj), pilotDigest({ ...f.obj, live: undefined }));
 });
-test("live profile paths without a live block are refused exactly as a disposable pilot", async (t) => {
+test("live config paths without a live block are refused exactly as a disposable pilot", async (t) => {
   const f = await liveFixture(t);
   await assert.rejects(loadPilot(await f.write({}, null), f.context), refused("repos"));
   await assert.rejects(loadPilot(await f.write({ repos: [], agentHomes: [f.home] }, null), f.context), refused("agentHomes"));
 });
-test("live profile refuses unlisted, parent, codex-home and missing skill folders", async (t) => {
+test("live config refuses unlisted, parent, codex-home and missing skill folders", async (t) => {
   const f = await liveFixture(t);
   await mkdir(join(f.home, "other/skills"), { recursive: true });
   await mkdir(join(f.home, ".codex/skills"), { recursive: true });
@@ -77,7 +77,7 @@ test("live profile refuses unlisted, parent, codex-home and missing skill folder
   await assert.rejects(loadPilot(path, f.context), refused("live.skillDirs.codex"));
   assert.equal((await loadPilot(await f.approved({}, { skillDirs: { claude: f.claudeSkills } }), f.context)).live.skillDirs.codex, undefined);
 });
-test("live profile refuses a store or profile in a Git worktree, a nested or in-store kit, and repositories inside the store or kit", async (t) => {
+test("live config refuses a store or live config in a Git worktree, a nested or in-store kit, and repositories inside the store or kit", async (t) => {
   const f = await liveFixture(t);
   const outer = await makeRepo(join(f.sb, "outer"), { "README.md": "outer\n" });
   await mkdir(join(outer, "store"), { mode: 0o700 });
@@ -107,7 +107,7 @@ test("live kit at the top level of its own clone validates", async (t) => {
   await fixtureGit(clone, ["worktree", "add", "-q", "--detach", worktree, commit]);
   await assert.rejects(loadPilot(await f.write({}, { kitRoot: worktree }), { ...f.context, kitRoot: worktree }), refused("live.kitRoot"));
 });
-test("live profile refuses a symlinked .claude ancestor with PATH_UNSAFE", async (t) => {
+test("live config refuses a symlinked .claude ancestor with PATH_UNSAFE", async (t) => {
   const f = await liveFixture(t);
   const real = join(f.sb, "real-claude");
   await mkdir(join(real, "skills"), { recursive: true });
@@ -160,14 +160,14 @@ test("live kit at another commit, attached to a branch, or with local changes fa
   assert.ok(await loadPilot(path, { ...f.context, liveGate: { kit: { kitRoot: f.kit, kitCommit: drift } } }));
   await assert.rejects(loadPilot(path, { ...f.context, liveGate: { kit: { kitRoot: f.kit, kitCommit: f.kitCommit } } }), refused("live.kitCommit"));
 });
-test("live profile edited after approval, unapproved, or not private fails", async (t) => {
+test("live config edited after approval, unapproved, or not private fails", async (t) => {
   const f = await liveFixture(t);
   await assert.rejects(loadPilot(await f.write(), f.context), (e) => refused("live.approval")(e) && e.details.reason === "unapproved");
   const path = await f.approved();
   assert.ok(await loadPilot(path, f.context));
   await writeFile(path, JSON.stringify({ ...f.obj, forbidden: [join(f.sb, "work/other")] }), { mode: 0o600 });
   await assert.rejects(loadPilot(path, f.context), (e) => refused("live.approval")(e) && e.details.reason === "changed");
-  await writeFile(path, JSON.stringify({ ...f.obj, live: { ...f.obj.live, profileId: "prof_fedcba9876543210" } }), { mode: 0o600 });
+  await writeFile(path, JSON.stringify({ ...f.obj, live: { ...f.obj.live, configId: "cfg_fedcba9876543210" } }), { mode: 0o600 });
   await assert.rejects(loadPilot(path, f.context), refused("live.approval"));
   await writeFile(path, JSON.stringify(f.obj), { mode: 0o600 });
   assert.ok(await loadPilot(path, f.context));

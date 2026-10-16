@@ -141,7 +141,7 @@ test("bundled skills state the DEVCTX_KIT validation and pilot-path rules", asyn
   }
   for (const name of BUNDLED_SKILLS) {
     const text = await readBundledSkill(name);
-    for (const phrase of ["live profile", "~/.devctx/live.json", "confirm the pilot path once per session", "kit commit", ".devctx-owned.json", 'rev-parse HEAD', "warn the user"]) assert.ok(text.includes(phrase), name + ": " + phrase);
+    for (const phrase of ["live config", "~/.devctx/live.json", "confirm the pilot path once per session", "kit commit", ".devctx-owned.json", 'rev-parse HEAD', "warn the user"]) assert.ok(text.includes(phrase), name + ": " + phrase);
   }
   assert.match(await readBundledSkill("devctx-record"), /attributed to "human"/);
   assert.match(await readBundledSkill("devctx-resume"), /freshness/);

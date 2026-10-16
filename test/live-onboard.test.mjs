@@ -23,7 +23,7 @@ async function clientRepo(dir) {
   await writeFile(join(repo, "build", "b.js"), "ignored\n");
   return { repo, second };
 }
-// Live profile around a pinned clone of the committed kit, so the CLI runs exactly as on the owner's machine.
+// Live config around a pinned clone of the committed kit, so the CLI runs exactly as on the owner's machine.
 async function liveKit(t) {
   const sb = await sandbox(t), home = join(sb, "home"), devctx = join(home, ".devctx"), store = join(devctx, "store"), kit = join(devctx, "kit");
   for (const rel of [".claude/skills", ".agents/skills"]) await mkdir(join(home, rel), { recursive: true });
@@ -32,7 +32,7 @@ async function liveKit(t) {
   await fixtureGit(devctx, ["clone", "-q", "--no-hardlinks", REPO_ROOT, kit]);
   await fixtureGit(kit, ["checkout", "-q", "--detach", head]);
   const client = await clientRepo(join(sb, "work"));
-  const obj = { schemaVersion: 1, pilotRoot: store, configRoot: join(store, "config"), dataRoot: join(store, "data"), stateRoot: join(store, "state"), inputsRoot: join(store, "inputs"), agentHomes: [], repos: [client.repo, client.second], forbidden: [], live: { profileId: "prof_0123456789abcdef", home, skillDirs: { claude: join(home, ".claude/skills"), codex: join(home, ".agents/skills") }, kitRoot: kit, kitCommit: head } };
+  const obj = { schemaVersion: 1, pilotRoot: store, configRoot: join(store, "config"), dataRoot: join(store, "data"), stateRoot: join(store, "state"), inputsRoot: join(store, "inputs"), agentHomes: [], repos: [client.repo, client.second], forbidden: [], live: { configId: "cfg_0123456789abcdef", home, skillDirs: { claude: join(home, ".claude/skills"), codex: join(home, ".agents/skills") }, kitRoot: kit, kitCommit: head } };
   const path = join(devctx, "live.json");
   await writeFile(path, JSON.stringify(obj), { mode: 0o600 });
   await chmod(path, 0o600);

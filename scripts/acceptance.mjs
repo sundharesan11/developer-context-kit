@@ -150,7 +150,7 @@ await check("package-allowlist", async () => { const r = spawnSync(process.execP
 // Live mode against a fake home inside the acceptance root. The CLI runs from a detached clone of the committed kit,
 // so the running kit is clean and pinned as on the owner's machine. Uncommitted changes are not exercised here.
 const liveRoot = join(await realpath(pilotRoot), "live"), liveHome = join(liveRoot, "home"), devctxDir = join(liveHome, ".devctx");
-const liveKit = join(devctxDir, "kit"), liveProfile = join(devctxDir, "live.json"), liveInstallRun = "run_acclive0001";
+const liveKit = join(devctxDir, "kit"), liveConfig = join(devctxDir, "live.json"), liveInstallRun = "run_acclive0001";
 const liveDirs = { claude: join(liveHome, ".claude/skills"), codex: join(liveHome, ".agents/skills") };
 const liveForeign = join(liveDirs.codex, "devctx-record/SKILL.md"), liveOther = join(liveDirs.claude, "someone-else/SKILL.md");
 let liveHead = null, bareKit = null;
@@ -173,25 +173,25 @@ await check("live-init-preview-apply", async () => {
   await mkdir(devctxDir, { mode: 0o700 }); await chmod(devctxDir, 0o700);
   liveHead = gitOut(kit, ["rev-parse", "--verify", "HEAD"]);
   await pinnedClone(liveKit);
-  const before = await treeHash(liveHome), parts = ["live", "init", "--pilot", liveProfile, "--agent", "claude", "--agent", "codex"];
+  const before = await treeHash(liveHome), parts = ["live", "init", "--pilot", liveConfig, "--agent", "claude", "--agent", "codex"];
   const preview = liveCli(parts);
   assert.equal(await treeHash(liveHome), before);
   assert.equal(preview.preview, true);
-  assert.equal(preview.profile.live.kitCommit, liveHead);
-  assert.deepEqual(preview.profile.live.skillDirs, liveDirs);
+  assert.equal(preview.config.live.kitCommit, liveHead);
+  assert.deepEqual(preview.config.live.skillDirs, liveDirs);
   const applied = liveCli([...parts, "--apply", "--plan-fingerprint", preview.fingerprint]);
-  assert.match(applied.profileId, /^prof_[0-9a-f]{16}$/);
-  assert.equal((await lstat(liveProfile)).mode & 0o777, 0o600);
+  assert.match(applied.configId, /^cfg_[0-9a-f]{16}$/);
+  assert.equal((await lstat(liveConfig)).mode & 0o777, 0o600);
   assert.equal((await lstat(devctxDir)).mode & 0o777, 0o700);
   for (const dir of ["store", "store/config", "store/data", "store/state", "store/inputs"]) assert.equal((await lstat(join(devctxDir, dir))).mode & 0o777, 0o700, dir);
-  liveCli(["doctor", "--pilot", liveProfile]);
-  return { kitCommit: liveHead, profileId: applied.profileId };
+  liveCli(["doctor", "--pilot", liveConfig]);
+  return { kitCommit: liveHead, configId: applied.configId };
 });
 await check("live-install-foreign-conflict-blocks-one-agent", async () => {
   await mkdir(dirname(liveForeign), { recursive: true }); await writeFile(liveForeign, "foreign codex record\n");
   await mkdir(dirname(liveOther), { recursive: true }); await writeFile(liveOther, "someone else\n");
   const foreignBefore = await treeHash(dirname(liveForeign)), foreignBytes = await readFile(liveForeign);
-  const parts = ["agents", "install", "--pilot", liveProfile, "--agent", "claude", "--agent", "codex"];
+  const parts = ["agents", "install", "--pilot", liveConfig, "--agent", "claude", "--agent", "codex"];
   const plan = liveCli(parts), codex = plan.actions.filter((a) => a.agent === "codex"), claude = plan.actions.filter((a) => a.agent === "claude");
   assert.equal(codex.find((a) => a.skill === "devctx-record").status, "conflict");
   assert.ok(codex.filter((a) => a.skill !== "devctx-record").every((a) => a.status === "blocked" && a.reason === "agent-conflict"));
@@ -209,10 +209,10 @@ await check("live-uninstall-from-receipts", async () => {
   // A second pinned kit with no skills/ folder, so uninstall can rely only on receipts and journals.
   bareKit = await pinnedClone(join(devctxDir, "kit-bare"));
   gitOut(bareKit, ["rm", "-r", "-q", "skills"]); gitOut(bareKit, ["commit", "-q", "-m", "acceptance: drop bundled skills"]);
-  const bareCommit = gitOut(bareKit, ["rev-parse", "--verify", "HEAD"]), setKit = ["live", "set-kit", "--pilot", liveProfile, "--commit", bareCommit];
+  const bareCommit = gitOut(bareKit, ["rev-parse", "--verify", "HEAD"]), setKit = ["live", "set-kit", "--pilot", liveConfig, "--commit", bareCommit];
   assert.equal(existsSync(join(bareKit, "skills")), false);
   liveCli([...setKit, "--apply", "--plan-fingerprint", liveCli(setKit, bareKit).fingerprint], bareKit);
-  const foreignBytes = await readFile(liveForeign), parts = ["agents", "uninstall", "--pilot", liveProfile, "--agent", "claude", "--agent", "codex"];
+  const foreignBytes = await readFile(liveForeign), parts = ["agents", "uninstall", "--pilot", liveConfig, "--agent", "claude", "--agent", "codex"];
   const plan = liveCli(parts, bareKit), removed = plan.actions.filter((a) => a.status === "remove");
   assert.ok(plan.actions.filter((a) => a.agent === "claude").every((a) => a.status === "remove"));
   assert.ok(removed.every((a) => a.agent === "claude") && removed.length > 0);
@@ -224,7 +224,7 @@ await check("live-uninstall-from-receipts", async () => {
   return { kitCommit: bareCommit, removed: removed.length };
 });
 await check("live-rollback-check-after-uninstall", async () => {
-  const result = liveCli(["agents", "rollback-check", "--pilot", liveProfile, "--run-id", liveInstallRun], bareKit);
+  const result = liveCli(["agents", "rollback-check", "--pilot", liveConfig, "--run-id", liveInstallRun], bareKit);
   assert.equal(result.status, "ok");
   assert.deepEqual(result.folders.map((f) => f.agent).sort(), ["claude", "codex"]);
   assert.ok(result.folders.every((f) => f.devctx.length === 0 && f.foreign.length === 0));

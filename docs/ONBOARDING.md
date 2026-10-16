@@ -1,6 +1,6 @@
 # Guided onboarding
 
-This walkthrough onboards a **synthetic project**, not a real client repository. It uses the same preview and apply commands as the pilot. To onboard a real repository, use a live profile and follow [Live activation](LIVE.md).
+This walkthrough onboards a **synthetic project**, not a real client repository. It uses the same preview and apply commands as the pilot. To onboard a real repository, use a live config and follow [Live activation](LIVE.md).
 
 Run the shell blocks below in order, in the same macOS shell, from the toolkit checkout. Stop if a command fails. All example context is fictional.
 

@@ -15,10 +15,10 @@ export const scopeAddCommand = {
     return values.apply ? applyScopeAdd(ctx.roots, input) : planScopeAdd(ctx.roots, input);
   }
 };
-// Live profile commands name the profile with --pilot and load it themselves (route flag `profile`):
-// live init has no profile yet, and set-kit must pass the new kit through the running-kit gate.
+// Live config commands name the live config with --pilot and load it themselves (route flag `liveConfig`):
+// live init has no live config yet, and set-kit must pass the new kit through the running-kit gate.
 const liveOptions = { pilot: { type: "string" }, apply: { type: "boolean" }, "plan-fingerprint": { type: "string" } };
-const liveInput = (values, extra = {}) => ({ profilePath: values.pilot, fingerprint: values["plan-fingerprint"], ...extra });
+const liveInput = (values, extra = {}) => ({ configPath: values.pilot, fingerprint: values["plan-fingerprint"], ...extra });
 const live = () => import("./live.mjs");
 export const liveInitCommand = {
   options: { ...liveOptions, agent: { type: "string", multiple: true }, repo: { type: "string", multiple: true } },

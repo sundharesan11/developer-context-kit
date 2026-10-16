@@ -51,8 +51,8 @@ export function inventoryFolder(agent, dir) {
   return { agent, dir, existed: true, type: "dir", entries, devctx };
 }
 // Called by apply after the run folder exists and before the first copy or target write.
-export async function recordInventory(runDir, { runId, profileId, mode, folders }) {
-  const inventory = { schemaVersion: 1, kind: "skill-inventory", runId, profileId, mode, recordedAt: new Date().toISOString(), folders: folders.map(({ agent, dir }) => inventoryFolder(agent, dir)) };
+export async function recordInventory(runDir, { runId, configId, mode, folders }) {
+  const inventory = { schemaVersion: 1, kind: "skill-inventory", runId, configId, mode, recordedAt: new Date().toISOString(), folders: folders.map(({ agent, dir }) => inventoryFolder(agent, dir)) };
   await writeNewFile(join(runDir, INVENTORY), canonicalJson(inventory) + "\n");
   return inventory;
 }
@@ -70,7 +70,7 @@ const wellFormed = (inv, runId) => inv?.schemaVersion === 1 && inv.kind === "ski
 // A folder the inventory names must still be one this pilot may install into.
 function assertTarget(pilot, { agent, dir }) {
   const allowed = pilot.live ? Object.hasOwn(pilot.live.skillDirs, agent) && pilot.live.skillDirs[agent] === dir : (pilot.agentHomes ?? []).some((home) => isWithin(dir, home));
-  if (!allowed) throw new DevctxError("GATE_REQUIRED", "Inventory names a folder outside this profile", { agent });
+  if (!allowed) throw new DevctxError("GATE_REQUIRED", "Inventory names a folder outside this live config", { agent });
 }
 // Read-only: compares each skill folder now with an install run's inventory. Fails on any devctx-* difference; lists foreign changes.
 export async function rollbackCheck(roots, pilot, { runId }) {
@@ -79,7 +79,7 @@ export async function rollbackCheck(roots, pilot, { runId }) {
   if (!info(path)) throw new DevctxError("NOT_FOUND", "Install inventory unavailable", { runId });
   const inventory = await readPrivateJson(path, INVENTORY_LIMIT);
   if (!wellFormed(inventory, runId)) throw new DevctxError("INTEGRITY", "Invalid install inventory", { runId });
-  if (inventory.profileId !== (pilot.live?.profileId ?? null)) throw new DevctxError("GATE_REQUIRED", "Inventory belongs to another profile", { runId });
+  if (inventory.configId !== (pilot.live?.configId ?? null)) throw new DevctxError("GATE_REQUIRED", "Inventory belongs to another live config", { runId });
   if (inventory.mode !== "install") throw new DevctxError("INVALID_INPUT", "Rollback check needs an install run", { runId });
   const folders = inventory.folders.map((before) => {
     assertTarget(pilot, before);
