@@ -287,5 +287,17 @@
   "live recovery holds a started create without a created marker and leaves a foreign folder untouched",
   "live crash during uninstall finishes the remove through an approved recovery",
   "live rollback check refuses an uninstall run, an inventory of another live config and a folder replaced by a file",
-  "help lists locks release"
+  "help lists locks release",
+  "profile plan then apply of an empty profile creates revision 1 and a current pointer",
+  "profile read before any apply reports no profile",
+  "profile second change creates revision 2 and leaves revision 1 unchanged",
+  "profile cap accepts exactly 4096 canonical bytes and refuses 4097 with the size",
+  "profile with every field skipped is a valid empty profile",
+  "profile refuses unknown keys and invalid field values",
+  "profile note matching the GitHub-token pattern is refused and nothing is written",
+  "profile refuses a key named api_key anywhere",
+  "profile apply with a fingerprint computed against revision 1 when revision 2 is current is stale",
+  "profile apply without a fingerprint or with a mismatched one writes nothing",
+  "profile refuses a config root that is a Git worktree with the copy-or-export remedy",
+  "profile interrupted apply keeps the previous revision current and requires recovery"
 ]

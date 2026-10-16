@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devctx personal profile revision v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "generation",
+    "baseRevisionHash",
+    "profile",
+    "createdAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "baseRevisionHash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "profile": {
+      "$ref": "#/$defs/profile"
+    }
+  },
+  "$defs": {
+    "line": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\r\\n]*$"
+    },
+    "profile": {
+      "description": "At most 4096 bytes of canonical JSON. Every field is optional.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workingPreferences": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "explanationStyle": {
+              "enum": [
+                "concise",
+                "detailed"
+              ]
+            },
+            "diagrams": {
+              "enum": [
+                "prefer",
+                "avoid",
+                "neutral"
+              ]
+            },
+            "autonomy": {
+              "enum": [
+                "ask-first",
+                "balanced",
+                "autonomous"
+              ]
+            },
+            "notes": {
+              "type": "array",
+              "maxItems": 10,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/line",
+                "maxLength": 200
+              }
+            }
+          }
+        },
+        "workKind": {
+          "$ref": "#/$defs/line",
+          "maxLength": 200
+        },
+        "stackCurrent": {
+          "type": "array",
+          "maxItems": 40,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/line",
+            "maxLength": 80
+          }
+        },
+        "stackKnown": {
+          "type": "array",
+          "maxItems": 40,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/line",
+            "maxLength": 80
+          }
+        },
+        "writing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tone": {
+              "$ref": "#/$defs/line",
+              "maxLength": 120
+            },
+            "formality": {
+              "type": "object",
+              "maxProperties": 10,
+              "propertyNames": {
+                "pattern": "^[a-z][a-z0-9-]{0,39}$"
+              },
+              "additionalProperties": {
+                "enum": [
+                  "formal",
+                  "neutral",
+                  "casual"
+                ]
+              }
+            },
+            "greeting": {
+              "$ref": "#/$defs/line",
+              "maxLength": 80
+            },
+            "signOff": {
+              "$ref": "#/$defs/line",
+              "maxLength": 80
+            },
+            "length": {
+              "enum": [
+                "short",
+                "medium",
+                "long"
+              ]
+            },
+            "spelling": {
+              "type": "string",
+              "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+            },
+            "avoidPhrases": {
+              "type": "array",
+              "maxItems": 20,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/line",
+                "maxLength": 80
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
