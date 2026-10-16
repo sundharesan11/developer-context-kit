@@ -6,6 +6,7 @@ import { readFile, stat, mkdir, writeFile, symlink, link, chmod } from "node:fs/
 import { seedCommittedProject, committedProject, draftFor, runCli, now, fixtureGit, treeSnapshot } from "./helpers.mjs";
 import { addRecord, supersedeRecord } from "../src/records/store.mjs";
 import { sha256 } from "../src/storage/canonical.mjs";
+import { planProfile, applyProfile } from "../src/profile/store.mjs";
 
 const asOf = "2026-10-09T00:00:00.000Z";
 const input = (s, ids, filename = "packet") => ({ scope: "acme", cwd: s.repo, recordIds: ids, asOf, out: join(s.dataRoot, "exports/handoffs/acme/acme.atlas", filename + ".handoff.md") });
@@ -132,4 +133,16 @@ test("handoff CLI errors do not echo private paths or unsafe content", async (t)
     const text = JSON.stringify(result.json);
     assert.ok(!text.includes(s.sandbox) && !text.includes("PRIVATE-CONTENT-CANARY") && !text.includes("ENOENT"));
   }
+});
+
+test("handoff export from a pilot with a profile carries no profile text and lists the profile as excluded", async (t) => {
+  const s = await seedCommittedProject(t), a = await addRecord(s.roots, draftFor("acme", "acme.atlas"), { now });
+  const profile = { workKind: "PROFILE-CANARY-WORK", stackCurrent: ["PROFILE-CANARY-STACK"], writing: { signOff: "PROFILE-CANARY-SIGNOFF" } };
+  const plan = await planProfile(s.roots, { profile });
+  await applyProfile(s.roots, { profile, fingerprint: plan.fingerprint }, { now });
+  const value = input(s, [a.recordId]);
+  const result = await invoke(s, value);
+  const markdown = await readFile(value.out, "utf8");
+  assert.ok(!markdown.includes("PROFILE-CANARY") && !JSON.stringify(result).includes("PROFILE-CANARY"));
+  assert.match(markdown, /^Excluded fields\/content: preferences; personal profile; /m);
 });

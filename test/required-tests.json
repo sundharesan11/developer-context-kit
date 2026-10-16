@@ -313,5 +313,12 @@
   "profile apply without a plan fingerprint fails with PLAN_REQUIRED",
   "profile malformed stack-current fails with INVALID_INPUT",
   "profile apply after another change landed since the preview fails with STALE_VERSION",
-  "help lists the profile routes"
+  "help lists the profile routes",
+  "brief with a profile includes it, its notice and its hash in the receipt",
+  "brief without a profile is unchanged apart from profile null",
+  "brief keeps a 4096-byte profile and omits records over budget",
+  "brief profile working preferences supersede the same init preferences",
+  "brief fails with LIMIT and reports profile bytes when required policies plus the profile exceed the budget",
+  "brief fails with RECOVERY_REQUIRED on a corrupt profile and keeps the committed revision after an interrupted apply",
+  "handoff export from a pilot with a profile carries no profile text and lists the profile as excluded"
 ]
