@@ -109,3 +109,19 @@ test("U5 handoff export refuses a corrupt snapshot naming the record id", async 
   await plant(s.roots, bad.recordId, (r) => { r.supersedes = [bad.recordId]; });
   await assert.rejects(buildPortableHandoff(s.roots, s.pilot, { scope: "acme", cwd: s.repo, recordIds: [good.recordId], asOf: "2026-10-09T00:00:00.000Z" }), (e) => e.code === "DEVCTX_INTEGRITY" && e.message.includes(bad.recordId) && e.details.records.includes(bad.recordId));
 });
+
+test("record add reads a valid body file inside inputsRoot", async (t) => {
+  const { roots, pilot, scope, project } = await committedProject(t);
+  const file = join(pilot.inputsRoot, "record-body.md");
+  await writeFile(file, "The billing API retries failed webhooks twice.\n");
+  const args = ["record", "add", "--pilot", pilot.path, "--scope", scope, "--project", project, "--kind", "fact", "--title", "Webhook retries", "--request-id", "req_bodyfile01", "--body-file", file];
+  const preview = await runCli(args);
+  assert.equal(preview.code, 0, JSON.stringify(preview.json));
+  const applied = await runCli([...args, "--apply"]);
+  assert.equal(applied.code, 0, JSON.stringify(applied.json));
+  const stored = (await readSnapshot(roots, scope, project)).records.find((r) => r.requestId === "req_bodyfile01");
+  assert.ok(JSON.stringify(stored).includes("retries failed webhooks"), JSON.stringify(stored));
+  // A body file outside inputsRoot is still refused.
+  const outside = await runCli([...args.slice(0, -1), join(pilot.pilotRoot, "..", "outside-forbidden", "body.md")]);
+  assert.equal(outside.json.error.code, "DEVCTX_GATE_REQUIRED");
+});

@@ -429,5 +429,21 @@
   "skill discover and the bundled installer list none of the skill templates",
   "package audit flags tracked private state at the root, under a private root or under a scope",
   "package audit does not flag kit source, schemas or skill templates as private state",
-  "harness guide states the template's limits in pinned phrases"
+  "harness guide states the template's limits in pinned phrases",
+  "skill template-seed refuses a description the skill validator would reject, such as an unquoted colon",
+  "a v-prefixed version matches its lifecycle cycle and OSV receives the bare version",
+  "a range version reports lifecycle version not exact and makes no lifecycle request",
+  "an apply that lands while a preview is fetching makes that preview stale with PLAN_MISMATCH",
+  "a digest apply retried after a crash between the digest write and the seen update completes once",
+  "a digest apply keeps CONFLICT when the existing digest has the planned bytes but a wider mode",
+  "stack digest apply after the stack approval changed since preview fails with PLAN_MISMATCH and writes neither digest nor seen state",
+  "stack fetch refuses a request over the per-run call cap without a lookup or request",
+  "stack fetch refuses a response that takes the run over the total byte cap",
+  "stack fetch fails a request past its per-request timeout and a call after the run deadline makes no request",
+  "stack fetch refuses a declared content-length over the body cap before reading the body",
+  "stack fetch maps HTTP statuses and rate-limit headers to typed codes",
+  "stack fetch refuses userinfo, an explicit port, a non-https scheme and an unresolvable host",
+  "the stack plan and profile suggestions take stack entry parsing from profile validation, not a command module",
+  "a --map override without a kind:identifier colon fails with INVALID_INPUT naming map",
+  "record add reads a valid body file inside inputsRoot"
 ]

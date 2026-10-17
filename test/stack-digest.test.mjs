@@ -13,7 +13,7 @@ import { operationIdFor } from "../src/identity/ids.mjs";
 import { addRecord } from "../src/records/store.mjs";
 import { planProfile, applyProfile } from "../src/profile/store.mjs";
 import { seenStatePath, readSeenState } from "../src/stack/check.mjs";
-import { fence } from "../src/stack/digest.mjs";
+import { fence, applyDigest } from "../src/stack/digest.mjs";
 
 const fixture = (name) => readFileSync(new URL("./fixtures/stack/" + name, import.meta.url));
 const RSS = "https://changelog.example.com/feed.xml", ATOM = "https://updates.example.com/atom.xml", JSONF = "https://news.example.com/feed.json";
@@ -336,4 +336,67 @@ test("with a live config stack digest preview and apply fail with GATE_REQUIRED 
   }
   assert.equal(net.log.length + net.lookups.length, 0);
   assert.equal(await treeSnapshot(devctx), before);
+});
+
+test("an apply that lands while a preview is fetching makes that preview stale with PLAN_MISMATCH", async (t) => {
+  const p = await ready(t);
+  const first = await preview(p, fakeNet());
+  // The second preview's check reads seen state, then its first request applies the first preview.
+  const base = fakeNet({ [ATOM]: { status: 503 } });
+  let applied = null;
+  const request = async (options) => { if (!applied) applied = await apply(p, first.fingerprint); return base.request(options); };
+  const second = await cli(p, ["stack", "digest"], { request, lookup: base.lookup });
+  assert.equal(second.code, 0, second.text);
+  assert.equal(applied.code, 0, applied.text);
+  const seenBefore = readFileSync(seenStatePath(p.roots, null));
+  const digestsBefore = await list(join(p.dataRoot, "digests", "stack"));
+  const stale = await apply(p, second.json.result.fingerprint);
+  assert.equal(stale.json.error?.code, "DEVCTX_PLAN_MISMATCH", stale.text);
+  assert.deepEqual(readFileSync(seenStatePath(p.roots, null)), seenBefore);
+  assert.deepEqual(await list(join(p.dataRoot, "digests", "stack")), digestsBefore);
+});
+
+test("a digest apply retried after a crash between the digest write and the seen update completes once", async (t) => {
+  const p = await ready(t);
+  const plan = await preview(p, fakeNet());
+  const crash = new Error("simulated crash after digest");
+  await assert.rejects(applyDigest(p.roots, { scope: null, fingerprint: plan.fingerprint }, { faults: { afterDigest: async () => { throw crash; } } }), (error) => error === crash);
+  const target = join(p.dataRoot, plan.destination.path);
+  assert.equal(await readFile(target, "utf8"), plan.markdown);
+  assert.equal((await readSeenState(p.roots, null)).size, 0);
+  assert.deepEqual(await list(pendingDir(p)), [plan.fingerprint.slice(7) + ".json"]);
+  const retried = await apply(p, plan.fingerprint);
+  assert.equal(retried.code, 0, retried.text);
+  assert.equal(retried.json.result.seen.added, plan.seen.add.length);
+  assert.equal((await readSeenState(p.roots, null)).size, plan.seen.add.length);
+  assert.deepEqual(await list(pendingDir(p)), []);
+  assert.deepEqual(await list(join(p.dataRoot, "digests", "stack")), [plan.destination.path.split("/").pop()]);
+});
+
+test("a digest apply keeps CONFLICT when the existing digest has the planned bytes but a wider mode", async (t) => {
+  const p = await ready(t);
+  const plan = await preview(p, fakeNet());
+  const target = join(p.dataRoot, plan.destination.path);
+  await mkdir(join(p.dataRoot, "digests", "stack"), { recursive: true, mode: 0o700 });
+  await writeFile(target, plan.markdown, { mode: 0o644 });
+  await chmod(target, 0o644);
+  const out = await apply(p, plan.fingerprint);
+  assert.equal(out.json.error?.code, "DEVCTX_CONFLICT", out.text);
+  assert.equal((await readSeenState(p.roots, null)).size, 0);
+  assert.deepEqual(await list(pendingDir(p)), [plan.fingerprint.slice(7) + ".json"]);
+});
+
+test("stack digest apply after the stack approval changed since preview fails with PLAN_MISMATCH and writes neither digest nor seen state", async (t) => {
+  const p = await ready(t);
+  const plan = await preview(p, fakeNet());
+  const changed = await cli(p, ["stack", "plan", "--with", "advisories"]);
+  assert.equal(changed.code, 0, changed.text);
+  const approved = await cli(p, ["stack", "approve", "--with", "advisories", "--plan-fingerprint", changed.json.result.fingerprint]);
+  assert.equal(approved.code, 0, approved.text);
+  const out = await apply(p, plan.fingerprint);
+  assert.equal(out.json.error?.code, "DEVCTX_PLAN_MISMATCH", out.text);
+  assert.match(out.json.error.message, /approval changed/);
+  assert.deepEqual(await list(join(p.dataRoot, "digests", "stack")), []);
+  assert.equal((await readSeenState(p.roots, null)).size, 0);
+  assert.deepEqual(await list(join(p.stateRoot, "stack", "seen")), []);
 });

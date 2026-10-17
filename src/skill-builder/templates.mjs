@@ -135,7 +135,8 @@ function render({ meta, files }, filled) {
   const name = JSON.parse(out.find((f) => f.path === "design.json").content).name;
   if (typeof name !== "string" || !SKILL_NAME.test(name) || name.length > 64) invalid("Invalid skill name", { template: meta.name });
   if (name.startsWith("devctx-") || bundledNames().includes(name)) invalid("Reserved skill name", { name });
-  if (parseFrontmatter(out.find((f) => f.path === "candidate/SKILL.md").content, { nameOnly: true }).meta.name !== name) invalid("Candidate name differs from design name", { template: meta.name });
+  // Same frontmatter rules as validatePackage, so a value that would fail draft-validate fails here.
+  if (parseFrontmatter(out.find((f) => f.path === "candidate/SKILL.md").content).meta.name !== name) invalid("Candidate name differs from design name", { template: meta.name });
   return out;
 }
 async function renderFor(roots, root, selection, template, values) {

@@ -3,23 +3,18 @@ import { DevctxError } from "../errors.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
 import { canonicalJson } from "../storage/canonical.mjs";
 import { planProfile, applyProfile, readProfile, readProfileRevision, findStaleBase } from "./store.mjs";
+import { parseStackEntry, formatStackEntry } from "./validate.mjs";
 const list = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
 const invalid = (field) => { throw new DevctxError("INVALID_INPUT", "Invalid profile input", { field }); };
 const clone = (value) => JSON.parse(JSON.stringify(value ?? {}));
 const DESTINATION = { root: "configRoot", path: "profile" };
-const STACK = /^((?:@[A-Za-z0-9][A-Za-z0-9._-]*\/)?[A-Za-z0-9][A-Za-z0-9._-]*)(?:=([^\s:=][^\s:]*))?(?::(low|normal|high))?$/;
 const PREFERENCE_KEYS = ["explanationStyle", "diagrams", "autonomy", "notes"];
 const WRITING_KEYS = ["tone", "greeting", "signOff", "length", "spelling", "avoidPhrases"];
 const WRITING_FIELDS = ["tone", "formality", "greeting", "signOff", "length", "spelling", "avoidPhrases"];
 const LIST_KEYS = ["notes", "avoidPhrases"];
 const SEED_KEYS = ["explanationStyle", "diagrams", "notes"];
-// name[=version][:care], for example @scope/pkg=1.2.0:high or node=>=22.
-export function parseStackEntry(text) {
-  const match = typeof text === "string" ? STACK.exec(text) : null;
-  if (!match) invalid("stack");
-  return { name: match[1], ...(match[2] ? { version: match[2] } : {}), ...(match[3] ? { care: match[3] } : {}) };
-}
-export const formatStackEntry = ({ name, version, care }) => name + (version ? "=" + version : "") + (care ? ":" + care : "");
+// Re-exported for callers that imported the stack entry helpers from here.
+export { parseStackEntry, formatStackEntry };
 function pairs(values, field) {
   return list(values).map((item) => {
     const at = item.indexOf("=");

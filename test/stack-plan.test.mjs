@@ -7,7 +7,7 @@ import { main } from "../src/cli.mjs";
 import { makePilot, now } from "./helpers.mjs";
 import { planProfile, applyProfile } from "../src/profile/store.mjs";
 import { loadStackCatalog, validateStackCatalog } from "../src/stack/catalog.mjs";
-import { planStack, assertStackApproved, readStackApproval } from "../src/stack/plan.mjs";
+import { planStack, assertStackApproved, readStackApproval, parseMapOverride } from "../src/stack/plan.mjs";
 
 const FEED = "https://changelog.example.com/feed.xml";
 const CATALOG = { version: 1, items: [
@@ -309,4 +309,23 @@ test("stack plan and stack approve are listed in help", async () => {
   await main(["help"], { stdout: { write(v) { chunks.push(v); return true; } }, home: tmpdir(), env: {} });
   const routes = JSON.parse(chunks.join("")).result.commands;
   assert.ok(routes.includes("stack plan") && routes.includes("stack approve"));
+});
+
+test("the stack plan and profile suggestions take stack entry parsing from profile validation, not a command module", async () => {
+  for (const rel of ["../src/stack/plan.mjs", "../src/profile/suggest.mjs"]) {
+    const source = await readFile(new URL(rel, import.meta.url), "utf8");
+    assert.ok(!/from "[^"]*\/commands\.mjs"|from "\.\/commands\.mjs"/.test(source), rel);
+  }
+  const validate = await import("../src/profile/validate.mjs"), commands = await import("../src/profile/commands.mjs");
+  assert.equal(commands.parseStackEntry, validate.parseStackEntry);
+  assert.equal(commands.formatStackEntry, validate.formatStackEntry);
+  assert.deepEqual(validate.parseStackEntry("node=>=22:high"), { name: "node", version: ">=22", care: "high" });
+  assert.throws(() => validate.parseStackEntry("bad entry"), (e) => e.code === "DEVCTX_INVALID_INPUT" && e.details.field === "stack");
+});
+
+test("a --map override without a kind:identifier colon fails with INVALID_INPUT naming map", () => {
+  for (const text of ["acme-sdk=npm", "acme-sdk=github", "acme-sdk=endoflife"]) {
+    assert.throws(() => parseMapOverride(text), (e) => e.code === "DEVCTX_INVALID_INPUT" && e.details.field === "map", text);
+  }
+  assert.deepEqual(parseMapOverride("acme-sdk=npm:acme-sdk"), { name: "acme-sdk", kind: "npm", id: "acme-sdk" });
 });

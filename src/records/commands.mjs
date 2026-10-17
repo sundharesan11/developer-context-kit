@@ -1,4 +1,4 @@
-import { relative } from "node:path";
+import { dirname, relative } from "node:path";
 import { DevctxError } from "../errors.mjs";
 import { assertInPilot } from "../config/pilot.mjs";
 import { readApprovedSource } from "../storage/source-read.mjs";
@@ -9,7 +9,8 @@ async function inputFrom(values, ctx) {
   if (values.body !== undefined && values["body-file"] !== undefined) throw new DevctxError("USAGE", "Choose one body input");
   let body = values.body ?? "";
   if (values["body-file"]) {
-    assertInPilot(ctx.pilot, values["body-file"], "inputsRoot");
+    // The fence check runs on the parent directory: validateRoot refuses an existing file as a pilot root.
+    assertInPilot(ctx.pilot, dirname(values["body-file"]), "inputsRoot");
     const rel = relative(ctx.pilot.inputsRoot, values["body-file"]);
     const read = await readApprovedSource(ctx.pilot.inputsRoot, rel);
     if (read.skipped || Buffer.byteLength(read.text) > 32768) throw new DevctxError("INVALID_INPUT", "Body file unavailable");

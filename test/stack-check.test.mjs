@@ -476,3 +476,27 @@ test("with a live config and before the watch's live-mode entry lands, stack che
   assert.equal(out.json.error.details.reason, "no-live-exception");
   assert.equal(net.log.length + net.lookups.length, 0);
 });
+
+test("a v-prefixed version matches its lifecycle cycle and OSV receives the bare version", async (t) => {
+  const p = await ready(t, { stack: ["acme-sdk=v4.1.0"], args: ["--with", "advisories", "--with", "lifecycle"] });
+  const net = fakeNet();
+  const result = await check(p, net);
+  const item = result.items.find((i) => i.name === "acme-sdk");
+  assert.ok(!item.notes.some((n) => n.group === "lifecycle"), JSON.stringify(item.notes));
+  assert.deepEqual(result.findings.filter((f) => f.group === "lifecycle").map((f) => [f.cycle, f.severity]), [["4", "high"]]);
+  const osv = net.log.filter((r) => r.url === OSV);
+  assert.equal(osv.length, 1);
+  assert.equal(JSON.parse(osv[0].body).version, "4.1.0");
+  const plan = await cli(p, ["stack", "plan", "--with", "advisories", "--with", "lifecycle"]);
+  assert.deepEqual(plan.json.result.hosts.find((h) => h.host === "api.osv.dev").versions, [{ identifier: "npm/acme-sdk", version: "4.1.0" }]);
+});
+
+test("a range version reports lifecycle version not exact and makes no lifecycle request", async (t) => {
+  const p = await ready(t, { stack: ["acme-sdk=>=4"], args: ["--with", "lifecycle"] });
+  const net = fakeNet();
+  const result = await check(p, net);
+  const item = result.items.find((i) => i.name === "acme-sdk");
+  assert.ok(item.notes.some((n) => n.group === "lifecycle" && n.note === "version not exact"), JSON.stringify(item.notes));
+  assert.ok(!net.log.some((r) => r.url === EOL));
+  assert.equal(result.findings.filter((f) => f.group === "lifecycle").length, 0);
+});

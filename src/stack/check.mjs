@@ -26,6 +26,8 @@ function json(bytes) {
 }
 const isObject = (v) => Boolean(v) && typeof v === "object" && !Array.isArray(v);
 const major = (version) => { const m = /^v?(\d{1,9})(?:\.|$)/.exec(String(version ?? "")); return m ? Number(m[1]) : null; };
+// "v20.11.0" names the same release as "20.11.0"; a range such as ">=22" stays as given and is not exact.
+const bareVersion = (version) => version.replace(/^v(?=\d)/, "");
 const VERSION_TEXT = /^v?[0-9A-Za-z.+-]{1,64}$/;
 
 // Seen state is kept per scope, keyed by entry and finding hash (KTD18). Unscoped runs use seen/none.json; a scope's
@@ -35,6 +37,8 @@ export function seenStateBody(scope, hashes) {
   const body = { schemaVersion: 1, kind: "stack-seen", scope: scope ?? null, hashes: [...new Set(hashes)].sort() };
   return { ...body, recordHash: digest(body) };
 }
+// The seen base a digest preview binds: the seen state the check read before fetching.
+export const seenBase = (hashes) => digest({ hashes: [...hashes].sort() });
 export async function readSeenState(roots, scope) {
   let value;
   try { value = await readPrivateJson(seenStatePath(roots, scope), 4194304); }
@@ -184,7 +188,7 @@ export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
       else {
         const url = "https://" + OSV_HOST + "/v1/query";
         // The only request that carries a version, and only an exact one (KTD12).
-        const body = JSON.stringify({ package: { name: pkg.name, ecosystem: OSV_ECOSYSTEMS[pkg.ecosystem] }, version });
+        const body = JSON.stringify({ package: { name: pkg.name, ecosystem: OSV_ECOSYSTEMS[pkg.ecosystem] }, version: bareVersion(version) });
         await attempt("advisories", url, async () => {
           const { bytes } = await fetcher.fetchResource(url, { method: "POST", body, accept: "application/json", types: JSON_TYPES });
           const found = osvFindings(name, bytes, fetchedAt, url);
@@ -196,11 +200,12 @@ export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
     if (groups.includes("lifecycle")) {
       if (!sources.endoflife) record.notes.push({ group: "lifecycle", note: "lifecycle not covered" });
       else if (version === null) record.notes.push({ group: "lifecycle", note: "version unknown" });
+      else if (!/^\d/.test(bareVersion(version))) record.notes.push({ group: "lifecycle", note: "version not exact" });
       else {
         const url = "https://" + EOL_HOST + "/api/" + encodeURIComponent(sources.endoflife) + ".json";
         await attempt("lifecycle", url, async () => {
           const { bytes } = await fetcher.fetchResource(url, { accept: "application/json", types: JSON_TYPES });
-          const out = lifecycleFindings(name, version, sources.endoflife, bytes, clock, fetchedAt, url);
+          const out = lifecycleFindings(name, bareVersion(version), sources.endoflife, bytes, clock, fetchedAt, url);
           findings.push(...out.findings); record.notes.push(...out.notes);
           return out.findings.length;
         });
@@ -237,6 +242,6 @@ export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
     items, entries: classified, findings: marked, notWatched: plan.notWatched, failures,
     counts: { entries: classified.length, project: count("project"), stack: count("stack"), background: count("background"),
       previouslyReported: classified.filter((e) => e.previouslyReported).length + marked.filter((f) => f.previouslyReported).length, findings: marked.length, failures: failures.length },
-    requests: fetcher.calls
+    requests: fetcher.calls, seenBase: seenBase(seen)
   };
 }

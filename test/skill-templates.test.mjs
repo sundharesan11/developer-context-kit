@@ -252,3 +252,16 @@ test("skill discover and the bundled installer list none of the skill templates"
     assert.ok(paths.every((path) => !path.startsWith("templates/")), template);
   }
 });
+
+test("skill template-seed refuses a description the skill validator would reject, such as an unquoted colon", async (t) => {
+  const p = await initPilot(t);
+  const sel = ["--audience", "personal", "--workspace", "ws_colon0001"];
+  const kit = (route, args) => runCli(["skill", route, "--pilot", p.path, ...args]);
+  assert.equal((await kit("workspace-create", sel)).code, 0);
+  for (const description of ["Use when: x", "true", "2026-01-01 notes"]) {
+    const seed = await kit("template-seed", [...sel, "--template", "writing", "--set", "skill-name=message-drafts", "--set", "skill-description=" + description]);
+    assert.equal(seed.json.error?.code, "DEVCTX_INVALID_INPUT", description + JSON.stringify(seed.json));
+  }
+  const plain = await kit("template-seed", [...sel, "--template", "writing", "--set", "skill-name=message-drafts", "--set", "skill-description=Use when drafting a note, email or PR text (short)."]);
+  assert.equal(plain.code, 0, JSON.stringify(plain.json));
+});

@@ -6,7 +6,7 @@ import { atomicReplace, ensurePrivatePath, readPrivateJson } from "../storage/fs
 import { withPilotLock } from "../storage/lock.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { readProfile } from "../profile/store.mjs";
-import { parseStackEntry } from "../profile/commands.mjs";
+import { parseStackEntry } from "../profile/validate.mjs";
 import { checkFeedUrl, checkIdentifier, findCatalogItem } from "./catalog.mjs";
 
 export const GROUPS = Object.freeze(["advisories", "lifecycle", "versions"]);
@@ -42,7 +42,8 @@ export function parseFeedOverride(text) {
 export function parseMapOverride(text) {
   const [name, rest] = parsePair(text, "map");
   const at = rest.indexOf(":");
-  const kind = at < 0 ? rest : rest.slice(0, at);
+  if (at < 0) invalid("map", "Map overrides use name=kind:identifier");
+  const kind = rest.slice(0, at);
   if (!MAP_KINDS.includes(kind)) throw new DevctxError("INVALID_INPUT", "Unknown map kind", { field: "map", allowed: MAP_KINDS });
   return { name, kind, id: checkIdentifier(kind, rest.slice(at + 1), "map") };
 }
@@ -98,7 +99,7 @@ function resolveItem(entry, catalog, overrides, groups) {
   for (const id of sources.github) fetches.push({ host: GITHUB_HOST, group: "announcements", identifier: id });
   if (groups.includes("advisories")) {
     item.advisories = !pkg ? "advisories not covered" : exact ? "exact" : "version not exact";
-    if (pkg) fetches.push({ host: OSV_HOST, group: "advisories", identifier: OSV_ECOSYSTEMS[pkg.ecosystem] + "/" + pkg.name, ...(exact ? { version: entry.version } : {}) });
+    if (pkg) fetches.push({ host: OSV_HOST, group: "advisories", identifier: OSV_ECOSYSTEMS[pkg.ecosystem] + "/" + pkg.name, ...(exact ? { version: entry.version.replace(/^v(?=\d)/, "") } : {}) });
   }
   if (groups.includes("lifecycle")) {
     item.lifecycle = endoflife ? "covered" : "lifecycle not covered";

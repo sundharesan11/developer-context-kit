@@ -2,7 +2,7 @@ import { DevctxError } from "../errors.mjs";
 import { loadScope } from "../config/store.mjs";
 import { readRegistry } from "../config/registry.mjs";
 import { requireCommittedProject, readSnapshot } from "../records/store.mjs";
-import { parseStackEntry, formatStackEntry } from "./commands.mjs";
+import { parseStackEntry, formatStackEntry } from "./validate.mjs";
 // KTD5: suggestions come only from private onboarding data, never from a repository read.
 const ECOSYSTEMS = { "package.json": "node", ".nvmrc": "node", ".node-version": "node", "go.mod": "go", "pyproject.toml": "python", "Cargo.toml": "rust" };
 const NOTICE = "Suggestions only; nothing was written. Pass the entries you accept to profile plan with --stack-current.";

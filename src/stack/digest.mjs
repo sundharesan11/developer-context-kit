@@ -3,12 +3,12 @@ import { unlinkSync } from "node:fs";
 import { DevctxError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
 import { assertScopeId } from "../identity/ids.mjs";
-import { digest, sha256, canonicalJson } from "../storage/canonical.mjs";
+import { sha256, canonicalJson } from "../storage/canonical.mjs";
 import { atomicReplace, checkNode, ensurePrivatePath, fsyncDir, info, readPrivateBytes, readPrivateJson, writeNewFile } from "../storage/fsx.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { finalizePlan } from "../storage/plan.mjs";
 import { plainText } from "./feed.mjs";
-import { runStackCheck, readSeenState, seenStatePath, seenStateBody } from "./check.mjs";
+import { runStackCheck, readSeenState, seenStatePath, seenStateBody, seenBase } from "./check.mjs";
 import { readStackApproval } from "./plan.mjs";
 
 // U6: the digest. Preview runs the watch, renders Markdown and writes only a pending file named by its fingerprint.
@@ -111,18 +111,16 @@ export function renderDigest(check, { date }) {
   return { markdown, counts, add: [...new Set([...fresh.map((e) => e.hash), ...freshFindings.map((f) => f.hash)])].sort(), previously };
 }
 
-const seenBase = (hashes) => digest({ hashes: [...hashes].sort() });
-
 export async function planDigest(roots, { scope = null } = {}, deps = {}) {
   liveRefusal(roots);
+  // The seen base is the one the check marked entries against; an apply landing during the fetch makes this preview stale.
   const check = await runStackCheck(roots, { scope }, deps);
-  const existing = await readSeenState(roots, scope);
   const date = check.fetchedAt.slice(0, 10);
   const { markdown, counts, add, previously } = renderDigest(check, { date });
   const markdownHash = sha256(markdown);
   const destination = { root: "dataRoot", path: [...digestSegments(scope), "stack-" + date + "-" + markdownHash.slice(7, 19) + ".md"].join("/") };
   const plan = finalizePlan({ schemaVersion: 1, kind: "stack-digest", scope, fetchedAt: check.fetchedAt, date, approval: check.approval, destination, markdown, markdownHash,
-    bytes: Buffer.byteLength(markdown), seen: { base: seenBase(existing), add }, counts: { new: counts, previouslyReported: previously, failures: check.failures.length, notWatched: check.notWatched.length } });
+    bytes: Buffer.byteLength(markdown), seen: { base: check.seenBase, add }, counts: { new: counts, previouslyReported: previously, failures: check.failures.length, notWatched: check.notWatched.length } });
   const path = pendingPath(roots, plan.fingerprint), dir = join(roots.stateRoot, "stack", "pending");
   const content = canonicalJson(plan) + "\n";
   await withPilotLock(roots, digestLockPath(roots), { kind: "stack-digest-preview" }, async () => {
@@ -150,7 +148,13 @@ async function readPending(roots, fingerprint) {
   return value;
 }
 
-export async function applyDigest(roots, { scope = null, fingerprint } = {}) {
+async function ownDigest(path, markdownHash) {
+  const node = info(path);
+  if (!node || node.isSymbolicLink() || !node.isFile() || node.nlink !== 1 || (node.mode & 0o777) !== 0o600) return false;
+  return sha256(await readPrivateBytes(path, PENDING_LIMIT)) === markdownHash;
+}
+// faults.afterDigest is a test seam for a crash after the digest is written and before seen state is updated.
+export async function applyDigest(roots, { scope = null, fingerprint } = {}, { faults = {} } = {}) {
   liveRefusal(roots);
   if (!fingerprint) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
   if (!FINGERPRINT.test(fingerprint)) throw new DevctxError("PLAN_MISMATCH", "Unknown or stale digest plan");
@@ -165,11 +169,16 @@ export async function applyDigest(roots, { scope = null, fingerprint } = {}) {
     const existing = await readSeenState(roots, scope);
     if (seenBase(existing) !== plan.seen.base) throw new DevctxError("PLAN_MISMATCH", "Seen state changed since preview");
     const out = join(roots.dataRoot, ...plan.destination.path.split("/"));
-    if (info(out)) throw new DevctxError("CONFLICT", "Digest already exists", { destination: plan.destination });
     ensurePrivatePath(roots.dataRoot, segments);
-    await writeNewFile(out, plan.markdown);
-    fsyncDir(dir);
+    // A retry after a crash between the digest write and the seen update finds this plan's own 0600 bytes and
+    // finishes the seen update; any other existing file is a conflict.
+    if (!(await ownDigest(out, plan.markdownHash))) {
+      if (info(out)) throw new DevctxError("CONFLICT", "Digest already exists", { destination: plan.destination });
+      await writeNewFile(out, plan.markdown);
+      fsyncDir(dir);
+    }
     if ((checkNode(info(out), out).mode & 0o777) !== 0o600 || sha256(await readPrivateBytes(out, PENDING_LIMIT)) !== plan.markdownHash) throw new DevctxError("INTEGRITY", "Written digest failed verification");
+    await faults.afterDigest?.();
     ensurePrivatePath(roots.stateRoot, scope ? ["stack", "seen", "scopes"] : ["stack", "seen"]);
     await atomicReplace(seenPath, canonicalJson(seenStateBody(scope, [...existing, ...plan.seen.add])) + "\n");
     unlinkSync(pending);

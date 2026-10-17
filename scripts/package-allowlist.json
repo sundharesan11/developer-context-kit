@@ -206,5 +206,6 @@
   "test/stack-check.test.mjs",
   "test/stack-digest.test.mjs",
   "test/stack-feed.test.mjs",
+  "test/stack-fetch.test.mjs",
   "test/stack-plan.test.mjs"
 ]

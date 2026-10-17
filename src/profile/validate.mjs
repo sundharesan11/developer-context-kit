@@ -3,6 +3,14 @@ import { canonicalJson } from "../storage/canonical.mjs";
 import { assertNoSensitive, findForbiddenFields } from "../records/redact.mjs";
 export const PROFILE_CAP = 4096;
 const invalid = (field) => { throw new DevctxError("INVALID_INPUT", "Invalid profile", { field }); };
+const STACK = /^((?:@[A-Za-z0-9][A-Za-z0-9._-]*\/)?[A-Za-z0-9][A-Za-z0-9._-]*)(?:=([^\s:=][^\s:]*))?(?::(low|normal|high))?$/;
+// name[=version][:care], for example @scope/pkg=1.2.0:high or node=>=22.
+export function parseStackEntry(text) {
+  const match = typeof text === "string" ? STACK.exec(text) : null;
+  if (!match) throw new DevctxError("INVALID_INPUT", "Invalid profile input", { field: "stack" });
+  return { name: match[1], ...(match[2] ? { version: match[2] } : {}), ...(match[3] ? { care: match[3] } : {}) };
+}
+export const formatStackEntry = ({ name, version, care }) => name + (version ? "=" + version : "") + (care ? ":" + care : "");
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const LINE = /^[^\r\n]*$/;
 const AUDIENCE = /^[a-z][a-z0-9-]{0,39}$/;
