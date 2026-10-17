@@ -36,6 +36,8 @@ export const COMMANDS = {
   "profile apply": { load: async () => (await import("./profile/commands.mjs")).profileApplyCommand },
   "profile export": { load: async () => (await import("./profile/commands.mjs")).profileExportCommand },
   "profile suggest-stack": { load: async () => (await import("./profile/commands.mjs")).profileSuggestStackCommand },
+  "stack plan": { load: async () => (await import("./stack/commands.mjs")).stackPlanCommand },
+  "stack approve": { load: async () => (await import("./stack/commands.mjs")).stackApproveCommand },
   "draft save": { load: async () => (await import("./drafts/commands.mjs")).draftSaveCommand },
   "context resolve": { load: async () => (await import("./context/commands.mjs")).contextResolveCommand },
   "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand },
@@ -75,6 +77,7 @@ function routeFor(argv) {
 }
 export async function main(argv, options = {}) {
   // kitRoot and templateRoot are test seams for the running kit; production leaves them undefined.
+  // stackCatalog and resolvePublicRead are seams for the stack routes; routing will supply the real resolver.
   const { stdout = process.stdout, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot } = options;
   let command = argv.slice(0, 2).join(" ");
   try {
@@ -119,6 +122,7 @@ export async function main(argv, options = {}) {
     }
     const context = { roots, pilot, now, home, env, kitRoot, templateRoot };
     if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
+    if (command.startsWith("stack ")) Object.assign(context, { stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead });
     const result = await impl.run(values, context);
     stdout.write(JSON.stringify({ ok: true, command, result }) + "\n");
     return 0;

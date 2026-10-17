@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "items": [
+    { "name": "django", "terms": ["Django"], "endoflife": "django", "package": { "ecosystem": "pypi", "name": "django" } },
+    { "name": "next", "aliases": ["nextjs", "next.js"], "terms": ["Next.js"], "github": ["vercel/next.js"], "package": { "ecosystem": "npm", "name": "next" } },
+    { "name": "node", "aliases": ["nodejs", "node.js"], "terms": ["Node.js"], "github": ["nodejs/node"], "endoflife": "nodejs" },
+    { "name": "postgres", "aliases": ["postgresql"], "terms": ["PostgreSQL", "Postgres"], "endoflife": "postgresql" },
+    { "name": "python", "aliases": ["cpython"], "terms": ["Python"], "endoflife": "python" },
+    { "name": "react", "terms": ["React"], "github": ["facebook/react"], "package": { "ecosystem": "npm", "name": "react" } },
+    { "name": "typescript", "aliases": ["ts"], "terms": ["TypeScript"], "github": ["microsoft/TypeScript"], "package": { "ecosystem": "npm", "name": "typescript" } },
+    { "name": "vite", "terms": ["Vite"], "github": ["vitejs/vite"], "package": { "ecosystem": "npm", "name": "vite" } }
+  ]
+}

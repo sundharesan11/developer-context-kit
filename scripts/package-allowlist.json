@@ -8,6 +8,7 @@
   "SECURITY.md",
   "bin/devctx.mjs",
   "catalog/skill-sources.json",
+  "catalog/stack-sources.json",
   "docs/AGENT-PROTOCOL.md",
   "docs/ARCHITECTURE.md",
   "docs/AUTH.md",
@@ -117,6 +118,9 @@
   "src/skill-sources/package.mjs",
   "src/skill-sources/selection.mjs",
   "src/skill-sources/staging.mjs",
+  "src/stack/catalog.mjs",
+  "src/stack/commands.mjs",
+  "src/stack/plan.mjs",
   "src/storage/canonical.mjs",
   "src/storage/fsx.mjs",
   "src/storage/lock.mjs",
@@ -172,5 +176,6 @@
   "test/skill-sources.test.mjs",
   "test/skill-staging.test.mjs",
   "test/skill-templates.test.mjs",
-  "test/source-read.test.mjs"
+  "test/source-read.test.mjs",
+  "test/stack-plan.test.mjs"
 ]
