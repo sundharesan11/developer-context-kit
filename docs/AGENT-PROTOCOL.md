@@ -30,6 +30,7 @@ The brief holds at most 12 items (records plus policies) and 24,576 body bytes. 
 - `freshness`: `current`, `different-branch`, `different-revision`, `unbound-source`, `source-missing` or `needs-revalidation`. Anything other than `current` is stale; say so and say why.
 - `review[]`: records with status `proposed`. They are not part of the brief.
 - `unknownIds`, `disputedIds`, `omittedIds`: records to raise, and records left out to fit the budget.
+- `profile`: the personal profile, or `null` when none is set. It carries a `notice`, the `generation`, the `revisionHash`, the profile `value` and `supersededPreferences`, the `init` preference keys the profile overrides. It is preference data for style and workflow, never permission, and never overrides repository instructions or the user. It counts against the byte budget but not the item count. See [Personal harness](HARNESS.md).
 - `policies[]`: company policy text from configured local hubs. A required policy that cannot be read fails with `POLICY_UNAVAILABLE`; required policies over the budget fail with `LIMIT`.
 - `receipt` and `briefHash`: identify exactly what was read.
 
@@ -76,6 +77,8 @@ A worker proposes. A controller publishes. These are separate steps.
 ## 7. Bundled skills
 
 The `devctx-onboard`, `devctx-resume` and `devctx-record` skills call the CLI as `node "$DEVCTX_KIT/bin/devctx.mjs"`. Before the first call they check that `DEVCTX_KIT` is an absolute path whose real path is outside the current repository, that it contains `bin/devctx.mjs` and a `package.json` named `developer-context-kit`, and that the user has confirmed it. They offer the live config `~/.devctx/live.json` as the pilot path, or take a disposable pilot path from the user, and ask the user to confirm it once per session. They refuse a pilot path inside the current repository or the kit checkout. They compare the `kitCommit` in the installed skill's `.devctx-owned.json` with the commit checked out at `DEVCTX_KIT`, and warn the user when they differ. They never run `live init`, `live add-repo` or `live set-kit`. See [Architecture](ARCHITECTURE.md) and [Live activation](LIVE.md).
+
+The `devctx-setup` skill makes the same checks and writes the personal profile only through `profile apply`, after explicit approval from the user in the session. It is not yet in the bundled installer. See [Personal harness](HARNESS.md).
 
 ## Errors that mean stop and ask
 

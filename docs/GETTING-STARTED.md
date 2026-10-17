@@ -42,9 +42,9 @@ node scripts/acceptance.mjs \
 
 The pilot path and report file must not already exist. The canonical path from `pwd -P` avoids the macOS `/tmp` symlink.
 
-The harness creates two synthetic Git repositories, isolated configuration/data/state roots and fake agent homes. It runs local checks for onboarding, scope isolation, record history, handoffs, installation conflicts, fake identity checks and packaging. It does not send network requests or execute acquired skills.
+The harness creates two synthetic Git repositories, isolated configuration/data/state roots and fake agent homes. It runs local checks for onboarding, scope isolation, record history, handoffs, installation conflicts, fake identity checks, the personal profile, the announcement watch against offline fixtures, skill-template render and verify, and packaging. It does not send network requests or execute acquired skills.
 
-Expected result: `ok: true`, 24 checks marked `passed`, and `fresh-agent-smoke` marked `deferred`. A deferred check is not a pass. The harness deliberately leaves failure fixtures, modified sources and a lock case for testing. Do not use this fixture tree as your normal workspace.
+Expected result: `ok: true`, 32 checks marked `passed`, and `fresh-agent-smoke` marked `deferred`. A deferred check is not a pass. The harness deliberately leaves failure fixtures, modified sources and a lock case for testing. Do not use this fixture tree as your normal workspace.
 
 The report is private. Do not paste its paths or contents into a public issue without reviewing them.
 

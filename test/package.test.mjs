@@ -45,3 +45,17 @@ test("package audit refuses generated handoff packets even when allowlisted", as
     assert.ok(!result.stdout.includes("PRIVATE-PACKET-CANARY"));
   }
 });
+test("package audit flags tracked private state at the root, under a private root or under a scope", async (t) => {
+  for (const name of ["profile/current.json", "data/digests/x.md", "data/scopes/alpha/drafts/x.md", "inputs/skill-templates/x/SKILL.md", "state/stack/approval.json", "config/profile/v1.json"]) {
+    const f = await pkgFixture(t, { [name]: "{}\n", "ok.md": "fine\n" });
+    const r = checkPkg(["--root", f.dir, "--allowlist", f.allow, "--no-pack"]);
+    assert.equal(r.status, 1, name);
+    assert.deepEqual(JSON.parse(r.stdout).findings, [{ file: name, type: "private-state" }], name);
+  }
+});
+test("package audit does not flag kit source, schemas or skill templates as private state", async (t) => {
+  const f = await pkgFixture(t, { "src/profile/store.mjs": "export {};\n", "src/stack/check.mjs": "export {};\n", "src/drafts/save.mjs": "export {};\n", "schemas/profile.schema.json": "{}\n",
+    "templates/skills/stack-watch/candidate/SKILL.md": "# Fixture\n", "test/fixtures/stack/rss.xml": "<rss/>\n", "test/fixtures/skill-templates/fixture-notes/template.json": "{}\n" });
+  const r = checkPkg(["--root", f.dir, "--allowlist", f.allow, "--no-pack"]);
+  assert.equal(r.status, 0, r.stdout);
+});

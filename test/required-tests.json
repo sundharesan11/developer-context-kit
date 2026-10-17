@@ -426,5 +426,8 @@
   "the stack-watch template limits request content and treats fetched text as untrusted",
   "skill template-list on the kit lists the stack-watch, slack-update and writing templates",
   "each shipped skill template renders with test values and passes skill draft-validate",
-  "skill discover and the bundled installer list none of the skill templates"
+  "skill discover and the bundled installer list none of the skill templates",
+  "package audit flags tracked private state at the root, under a private root or under a scope",
+  "package audit does not flag kit source, schemas or skill templates as private state",
+  "harness guide states the template's limits in pinned phrases"
 ]

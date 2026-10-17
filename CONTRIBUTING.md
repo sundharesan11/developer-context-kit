@@ -30,7 +30,7 @@ node scripts/acceptance.mjs \
   --report "$ACCEPTANCE_PARENT/report.json"
 ```
 
-Expected: 24 passed checks and one explicitly deferred fresh-agent smoke check. This is not evidence of real-agent discovery or production readiness.
+Expected: 32 passed checks and one explicitly deferred fresh-agent smoke check. This is not evidence of real-agent discovery or production readiness.
 
 ## Keep changes reviewable
 

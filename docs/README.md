@@ -11,6 +11,7 @@ Start with a disposable synthetic project. Live mode for one real machine is imp
 | How do preview, approval and context work? | [Guided onboarding](ONBOARDING.md) |
 | Where does each part fit? | [Architecture](ARCHITECTURE.md) |
 | How do I activate it on my machine? | [Live activation](LIVE.md) |
+| How do I set up my personal profile, skill templates and announcement watch? | [Personal harness](HARNESS.md) |
 | What works and what remains? | [Roadmap](ROADMAP.md) and [Limitations](LIMITATIONS.md) |
 
 ## Workflow and data contracts
@@ -18,6 +19,7 @@ Start with a disposable synthetic project. Live mode for one real machine is imp
 - [Storage](STORAGE.md): roots, immutable records, journals and failure recovery.
 - [Handoff export](HANDOFF.md): selected private Markdown packets and disclosure limits.
 - [Agent protocol](AGENT-PROTOCOL.md): task context, proposals and advisory boundaries.
+- [Personal harness](HARNESS.md): personal profile, skill templates, announcement watch, drafts and what each sends.
 - [Skill builder](SKILL-BUILDER.md): requirements, approvals, drafts and disposable installation.
 - [Skill sources](SKILL-SOURCES.md): catalog, acquisition, provenance and installation limits.
 - [Auth boundary](AUTH.md): secret references, connector gate and approval contract; fake providers only, no live connectors.

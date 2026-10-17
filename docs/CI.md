@@ -26,7 +26,7 @@ Last verified run: run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. Al
 3. Audit the exact source/package allowlist before running tests.
 4. Run the full required-test suite.
 5. Create a fresh canonical pilot under the runner's temporary directory, outside the checkout.
-6. Run acceptance and verify 24 passed checks plus exactly one deferred `fresh-agent-smoke`. The harness also checks the required IDs.
+6. Run acceptance and verify 32 passed checks plus exactly one deferred `fresh-agent-smoke`. The harness also checks the required IDs.
 7. Check the whole committed tree for whitespace errors and require a clean checkout, including untracked files.
 
 The workflow's GitHub token has only `contents: read`. It uses no repository secrets, package-manager cache or artifact upload. It never runs untrusted pull-request code through `pull_request_target` or on a self-hosted runner. Source acquisition and live connectors are not exercised.

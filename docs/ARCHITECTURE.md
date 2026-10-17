@@ -22,7 +22,7 @@ These are logical responsibilities, not isolated services. The CLI's pilot fence
 2. **Inspect.** Read bounded source files. Onboarding automatically considers README, agent instruction files and supported manifests. Extra approved documents can be read and hashed; arbitrary documents are not automatically summarized into facts.
 3. **Preview.** Present candidates, unknowns, conflicts, intended record bundles and source hashes.
 4. **Apply.** Require the reviewed fingerprint for onboarding. Publish the registry reference after record bundles and manifests are written.
-5. **Read.** Resolve the project and build a deterministic brief. A brief can contain at most 12 items and 24,576 body bytes, including selected policies.
+5. **Read.** Resolve the project and build a deterministic brief. A brief can contain at most 12 items and 24,576 body bytes, including selected policies. The personal profile, when set, counts against the bytes but not the items.
 6. **Learn.** Add a record, supersede it with expected hashes, or use the proposal workflow. These operations have distinct approval contracts; not every command uses an onboarding fingerprint.
 
 This is source-linked context, not a verified model of the entire codebase. A freshness check can detect changed evidence; it cannot establish that a claim is true.
@@ -33,11 +33,11 @@ All current roots are explicitly configured inside a pilot. In live mode the pil
 
 | Root | Contents | Belongs in the reusable repository? |
 | --- | --- | --- |
-| `configRoot` | User preferences, scopes, project bindings and registry | No |
-| `dataRoot` | Record bodies/metadata, private skill drafts, staged source files and handoff exports | No |
-| `stateRoot` | Locks, run receipts, journals and consumed approvals | No |
-| `inputsRoot` | Explicitly supplied pilot inputs and optional local hub fixtures | No |
-| Toolkit checkout | CLI code, schemas, generic skills/templates, tests and docs | Yes, after privacy and rights review |
+| `configRoot` | User preferences, the personal profile and its revisions, scopes, project bindings and registry | No |
+| `dataRoot` | Record bodies/metadata, private skill drafts, staged source files, handoff exports, stack digests and saved message drafts | No |
+| `stateRoot` | Locks, run receipts, journals, consumed approvals, and the stack approval, pending digests and seen state | No |
+| `inputsRoot` | Explicitly supplied pilot inputs, draft body files, seeded template files and optional local hub fixtures | No |
+| Toolkit checkout | CLI code, schemas, generic skills and skill templates, catalogs, tests and docs | Yes, after privacy and rights review |
 
 New private files use mode 0600; directories use 0700. The stores are not encrypted by this kit. File permissions do not protect against a malicious process running as the same user.
 
@@ -49,7 +49,13 @@ The kit does not require a particular personal assistant setup, editor or orches
 
 The three bundled skills (`devctx-onboard`, `devctx-resume` and `devctx-record`) route onboard, resume and record actions to this CLI. They locate the kit through the `DEVCTX_KIT` environment variable and call `node "$DEVCTX_KIT/bin/devctx.mjs"`. Before the first call in a session, each skill checks that `DEVCTX_KIT` is an absolute path whose real path is not inside the current repository or worktree, that it contains `bin/devctx.mjs` and a `package.json` named `developer-context-kit`, and that the user confirms the path. The skills offer the live config `~/.devctx/live.json` as the pilot path, or take a disposable pilot path from the user, and the user confirms it once per session. They refuse one inside the current repository or the kit checkout, because the pilot fence protects pilot roots, not the pilot file. They warn when an installed skill's receipt names a different kit commit from the one at `DEVCTX_KIT`. The skills never run `record publish --apply`. Tests check that skills use only real command routes; they do not check each command's flags. Copies into disposable agent-home layouts are testable. Live mode installs into the real skill folders ([Live activation](LIVE.md)); fresh-session discovery there is not yet verified. An agent envelope is an advisory task contract, not an enforced permission system.
 
-A separate personal setup can eventually provide preferences, scheduling and approved integrations around this kit. It is not automatically migrated, installed or synchronized. See [Agent protocol](AGENT-PROTOCOL.md).
+A fourth bundled skill, `devctx-setup`, conducts first-run personal profile setup with the same checks. It is not yet in the bundled installer, so `agents install` still installs the three skills above.
+
+A separate personal setup can eventually provide scheduling and approved integrations around this kit. It is not automatically migrated, installed or synchronized. See [Agent protocol](AGENT-PROTOCOL.md).
+
+## Personal harness layer
+
+The [personal harness layer](HARNESS.md) makes the kit a clonable personal-harness template. A capped, versioned personal profile lives in `configRoot`. Three skill templates under `templates/skills/` become private skills through the skill builder's read-only `skill template-seed` and `skill template-verify` routes. A manual announcement watch (`stack plan`, `stack approve`, `stack check`, `stack digest`) fetches only from approved hosts and writes dated digests to `dataRoot`. `draft save` stores message drafts privately and never sends them. The clone itself holds none of this data; the package audit fails on tracked private state.
 
 ## Optional company knowledge
 
@@ -69,9 +75,9 @@ The [auth boundary](AUTH.md) has fake-provider tests for exact actor/account/wor
 bin/            CLI entry point
 src/            Identity, onboarding, records, context, skills and storage
 schemas/        Data contracts
-templates/      Generic context and handoff templates
+templates/      Generic client-profile template and skill templates (templates/skills/)
 skills/         Bundled skills and skill-creation template
-catalog/        Public skill-source metadata
+catalog/        Public skill-source and stack-source metadata
 test/           Synthetic behavior and boundary checks
 scripts/        Acceptance harness, test runner and package audit
 docs/           User guides, implementation contracts and design history

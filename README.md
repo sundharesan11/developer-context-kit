@@ -4,6 +4,8 @@ Keep project context between coding-agent sessions.
 
 Developer Context Kit is a local CLI for recording project facts, decisions and handoffs outside the project repository. It builds bounded, source-linked briefs so you can carry reviewed context into the next session.
 
+It is also a personal-harness template: clone it, set up a small private personal profile, and turn generic skill templates into your own private skills. Your data stays outside the clone. See the [personal harness guide](docs/HARNESS.md).
+
 **Status: experimental pilot.** This is a **local package candidate**, not a daily-use agent installer. The `devctx` command is **NOT currently installed** globally by this checkout. All stateful commands require an explicit pilot file: a disposable pilot, or a live config for one real machine. Start with synthetic data. Live mode is implemented; its activation evidence on a real machine is pending. See the [live activation runbook](docs/LIVE.md).
 
 [Start here](docs/GETTING-STARTED.md) · [Guided onboarding](docs/ONBOARDING.md) · [Documentation](docs/README.md) · [Roadmap](docs/ROADMAP.md)
@@ -58,7 +60,8 @@ For checkout instructions, expected results and troubleshooting, use [Getting st
 | --- | --- | --- |
 | Project context | Onboarding preview/apply with re-onboard retirement, scoped records, source hashes, bounded briefs | Backup and restore, migration |
 | Continuity | Advisory handoffs and [selected-record Markdown export](docs/HANDOFF.md) | Session start and end hooks, packet import or sharing |
-| Skill creation | [Requirements, design approval, drafts and validation](docs/SKILL-BUILDER.md) (frozen: bug fixes only) | Conversational creator, live behavior evaluation and export |
+| Skill creation | [Requirements, design approval, drafts and validation](docs/SKILL-BUILDER.md) (frozen: bug fixes only, except the create-from-template path) | Conversational creator, live behavior evaluation and export |
+| Personal harness | [Personal profile, setup skill, three skill templates, a manual announcement watch and private drafts](docs/HARNESS.md) | Real-home install of template-made skills or `devctx-setup`, schedules, Slack sending, authenticated GitHub requests, the watch in live mode |
 | Skill sources | [12-source catalog, release checks, pinned acquisition and reviewed disposable installation](docs/SKILL-SOURCES.md) (frozen: bug fixes only) | Universal agent compatibility or weekly automatic updates |
 | Live mode | [Live config](docs/LIVE.md) with a pinned kit clone, bundled-skill install and uninstall beside foreign skills, rollback check, read-only onboarding of a real repository | Activation evidence on a real machine, a global `devctx` command |
 | Identity and learning | Fake-provider identity checks and private hub proposals | Live Slack/email/issue connectors, sends or company-hub writes |
@@ -82,6 +85,7 @@ A personal assistant setup, an agent host and a company knowledge hub are option
 - [Security reporting](SECURITY.md): keep vulnerabilities and private data out of public issues.
 - [Release checklist](docs/RELEASING.md): what must pass before publication.
 - [Live activation](docs/LIVE.md): the runbook for one real machine and one real repository.
+- [Personal harness](docs/HARNESS.md): the personal profile, skill templates and announcement watch.
 - [Roadmap](docs/ROADMAP.md): remaining work toward daily use, starting with backup and restore.
 
 ## License

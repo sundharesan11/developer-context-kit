@@ -47,13 +47,13 @@ async function check(id, fn) {
   try { const detail = await fn(); checks.push({ id, status: "passed", detail: detail ?? "verified" }); }
   catch (error) { checks.push({ id, status: "failed", detail: String(error.code ?? error.message).slice(0, 160) }); }
 }
-async function rawCli(parts) {
+async function rawCli(parts, extra = {}) {
   const chunks = [];
-  const code = await main(parts, { stdout: { write(text) { chunks.push(text); return true; } }, now, home: homedir(), env: process.env });
+  const code = await main(parts, { stdout: { write(text) { chunks.push(text); return true; } }, now, home: homedir(), env: process.env, ...extra });
   return { code, json: JSON.parse(chunks.join("")) };
 }
-async function cli(parts) {
-  const result = await rawCli(parts);
+async function cli(parts, extra) {
+  const result = await rawCli(parts, extra);
   if (result.code !== 0) throw Object.assign(new Error(result.json.error.code), { code: result.json.error.code });
   return result.json.result;
 }
@@ -83,7 +83,7 @@ async function treeHash(path) {
   await walk(path);
   return createHash("sha256").update(JSON.stringify(rows)).digest("hex");
 }
-async function expectCliCode(parts, code) { const r = await rawCli(parts); assert.equal(r.json.error?.code, code); return r; }
+async function expectCliCode(parts, code, extra) { const r = await rawCli(parts, extra); assert.equal(r.json.error?.code, code); return r; }
 await cli(["init", "--apply", "--pilot", pilotFile]);
 await cli(["scope", "add", "--apply", "--pilot", pilotFile, "--scope", "acme"]);
 await cli(["scope", "add", "--apply", "--pilot", pilotFile, "--scope", "globex"]);
@@ -145,6 +145,98 @@ await check("handoff-export-portable", async () => {
   assert.equal(existsSync(overflow), false);
   assert.equal(await treeHash(atlas), before);
   return { output: first.output, fileHash: first.fileHash, packetHash: first.packetHash, bytes: first.bytes, publication: first.publication };
+});
+// Personal harness layer: profile plan/apply, stale approvals, the offline watch against fixtures and template render plus verify.
+// The watch runs only through injected request and lookup functions that serve synthetic fixtures; no network is used.
+const stackFixture = (name) => readFile(join(kit, "test/fixtures/stack", name));
+const STACK_RSS = "https://changelog.example.com/feed.xml", STACK_ATOM = "https://updates.example.com/atom.xml", STACK_RELEASES = "https://api.github.com/repos/example/acme-sdk/releases?per_page=10";
+const stackCatalog = { version: 1, items: [{ name: "acme-sdk", terms: ["Acme SDK"], feeds: [STACK_RSS], github: ["example/acme-sdk"] }, { name: "widget", terms: ["Widget"], feeds: [STACK_ATOM] }] };
+const stackRequests = [];
+async function fixtureNet() {
+  const routes = { [STACK_RSS]: ["application/rss+xml", await stackFixture("rss.xml")], [STACK_ATOM]: ["application/atom+xml", await stackFixture("atom.xml")], [STACK_RELEASES]: ["application/json", await stackFixture("releases.json")] };
+  return {
+    stackCatalog,
+    lookup: async () => [{ address: "93.184.216.34", family: 4 }],
+    request: async (options) => {
+      stackRequests.push({ url: options.url, headers: options.headers });
+      const route = routes[options.url];
+      return route ? { status: 200, headers: { "content-type": route[0] }, body: route[1] } : { status: 404, headers: { "content-type": "application/json" }, body: Buffer.from("{}") };
+    }
+  };
+}
+const offline = { stackCatalog, lookup: async () => { throw new Error("no lookup expected"); }, request: async () => { throw new Error("no request expected"); } };
+const profileFlags = ["--work", "Synthetic platform work", "--preference", "explanationStyle=concise", "--stack-current", "acme-sdk=4.1.0:high", "--stack-current", "widget"];
+await check("profile-plan-apply", async () => {
+  const shown = await cli(["profile", "show", "--pilot", pilotFile]);
+  assert.equal(shown.generation, 0); assert.equal(shown.profile, null);
+  const before = await treeHash(pilotRoot);
+  const plan = await cli(["profile", "plan", "--pilot", pilotFile, ...profileFlags]);
+  assert.equal(await treeHash(pilotRoot), before);
+  assert.equal(plan.preview, true); assert.deepEqual(plan.destination, { root: "configRoot", path: "profile" }); assert.ok(plan.size <= plan.cap);
+  await expectCliCode(["profile", "apply", "--pilot", pilotFile, ...profileFlags], "DEVCTX_PLAN_REQUIRED");
+  const applied = await cli(["profile", "apply", "--pilot", pilotFile, ...profileFlags, "--plan-fingerprint", plan.fingerprint]);
+  assert.equal(applied.generation, 1);
+  assert.equal((await lstat(join(roots.configRoot, "profile", "v1.json"))).mode & 0o777, 0o600);
+  assert.deepEqual((await cli(["profile", "show", "--pilot", pilotFile])).profile.stackCurrent, ["acme-sdk=4.1.0:high", "widget"]);
+  const brief = await buildBrief(roots, pilot, { scope: "acme", cwd: atlas });
+  assert.equal(brief.profile.generation, 1);
+  return { generation: applied.generation, size: plan.size, cap: plan.cap };
+});
+await check("stack-watch-offline-fixtures", async () => {
+  const net = await fixtureNet();
+  const plan = await cli(["stack", "plan", "--pilot", pilotFile], net);
+  assert.equal(plan.authentication.github, "unauthenticated");
+  assert.deepEqual(plan.hosts.map((h) => h.host), ["api.github.com", "changelog.example.com", "updates.example.com"]);
+  assert.deepEqual(plan.groups, ["announcements"]);
+  await expectCliCode(["stack", "check", "--pilot", pilotFile], "DEVCTX_APPROVAL_REQUIRED", offline);
+  await cli(["stack", "approve", "--pilot", pilotFile, "--plan-fingerprint", plan.fingerprint], net);
+  const checked = await cli(["stack", "check", "--pilot", pilotFile, "--scope", "acme"], net);
+  assert.ok(checked.entries.length > 0);
+  const preview = await cli(["stack", "digest", "--pilot", pilotFile, "--scope", "acme"], net);
+  assert.match(preview.destination.path, /^scopes\/acme\/digests\/stack\/stack-2026-10-07-[0-9a-f]{12}\.md$/);
+  const applied = await cli(["stack", "digest", "--pilot", pilotFile, "--scope", "acme", "--apply", "--plan-fingerprint", preview.fingerprint], offline);
+  const out = join(roots.dataRoot, ...applied.destination.path.split("/"));
+  assert.equal((await lstat(out)).mode & 0o777, 0o600);
+  assert.ok((await readFile(out, "utf8")).includes("untrusted"));
+  assert.ok(stackRequests.length > 0);
+  for (const r of stackRequests) {
+    assert.ok(plan.hosts.some((h) => h.host === new URL(r.url).hostname), r.url);
+    assert.equal(r.headers["User-Agent"], "devctx-stack-check");
+    assert.ok(!Object.keys(r.headers).some((k) => k.toLowerCase() === "authorization"));
+  }
+  return { requests: stackRequests.length, entries: checked.entries.length, digest: applied.destination.path };
+});
+await check("profile-and-stack-stale-approval-refused", async () => {
+  const older = ["--preference", "autonomy=ask-first"], newer = ["--preference", "diagrams=prefer"];
+  const stalePlan = await cli(["profile", "plan", "--pilot", pilotFile, ...older]);
+  const nextPlan = await cli(["profile", "plan", "--pilot", pilotFile, ...newer]);
+  await cli(["profile", "apply", "--pilot", pilotFile, ...newer, "--plan-fingerprint", nextPlan.fingerprint]);
+  await expectCliCode(["profile", "apply", "--pilot", pilotFile, ...older, "--plan-fingerprint", stalePlan.fingerprint], "DEVCTX_STALE_VERSION");
+  assert.equal((await cli(["profile", "show", "--pilot", pilotFile])).generation, 2);
+  const changed = ["--stack-current", "acme-sdk=4.2.0:high", "--stack-current", "widget"];
+  await cli(["profile", "apply", "--pilot", pilotFile, ...changed, "--plan-fingerprint", (await cli(["profile", "plan", "--pilot", pilotFile, ...changed])).fingerprint]);
+  const before = stackRequests.length;
+  const refused = await expectCliCode(["stack", "check", "--pilot", pilotFile], "DEVCTX_APPROVAL_REQUIRED", offline);
+  assert.ok(refused.json.error.details.differences.includes("itemListHash"));
+  assert.equal(stackRequests.length, before);
+  return { profileGeneration: 3, differences: refused.json.error.details.differences };
+});
+await check("skill-template-render-verify", async () => {
+  const listed = await cli(["skill", "template-list"]);
+  assert.deepEqual(listed.templates.map((t) => t.name), ["slack-update", "stack-watch", "writing"]);
+  const selection = ["--pilot", pilotFile, "--audience", "personal", "--workspace", "ws_accepttemplate01"];
+  await cli(["skill", "workspace-create", ...selection]);
+  const flags = [...selection, "--template", "writing", "--set", "skill-name=draft-my-notes"];
+  const before = await treeHash(pilotRoot);
+  const seed = await cli(["skill", "template-seed", ...flags]);
+  assert.equal(await treeHash(pilotRoot), before);
+  const dir = join(pilot.inputsRoot, "seeded-writing");
+  for (const file of seed.files) { await mkdir(dirname(join(dir, file.path)), { recursive: true, mode: 0o700 }); await writeFile(join(dir, file.path), file.content, { mode: 0o600 }); }
+  const verified = await cli(["skill", "template-verify", ...flags, "--dir", dir, "--render-digest", seed.renderDigest]);
+  assert.equal(verified.verified, true);
+  await writeFile(join(dir, "candidate", "SKILL.md"), seed.files.find((f) => f.path === "candidate/SKILL.md").content + "\nEdited.\n");
+  await expectCliCode(["skill", "template-verify", ...flags, "--dir", dir, "--render-digest", seed.renderDigest], "DEVCTX_INTEGRITY");
+  return { template: "writing", renderDigest: seed.renderDigest, files: seed.layout };
 });
 await check("package-allowlist", async () => { const r = spawnSync(process.execPath, [join(kit, "scripts/check-package.mjs")], { cwd: kit, encoding: "utf8", env: { PATH: process.env.PATH } }); const out = JSON.parse(r.stdout); assert.equal(r.status, 0); assert.equal(out.pack, "run"); });
 // Live mode against a fake home inside the acceptance root. The CLI runs from a detached clone of the committed kit,
@@ -231,7 +323,7 @@ await check("live-rollback-check-after-uninstall", async () => {
   return { runId: liveInstallRun, folders: result.folders.length };
 });
 checks.push({ id: "fresh-agent-smoke", status: "deferred", detail: "needs real-home activation, P3" });
-const required = ["onboard-acme-zero-diff", "onboard-globex-zero-diff", "scripts-hooks-fsmonitor-not-run", "resolve-exact", "wrong-scope-rejected", "symlink-cwd-rejected", "unconfirmed-worktree-rejected", "duplicate-binding-rejected", "source-change-stale-plan", "provenance-and-supersession", "handoff-claude-to-codex", "idempotent-retry", "reused-request-conflict", "stale-hash-rejected", "crash-recovery-onboard", "lock-busy-not-broken", "no-cross-scope-canary", "install-preview-apply-idempotent-conflict-uninstall", "real-home-refused", "fake-auth-wrong-actor", "hub-proposal-no-write", "doctor-readonly", "handoff-export-portable", "package-allowlist", "live-init-preview-apply", "live-install-foreign-conflict-blocks-one-agent", "live-uninstall-from-receipts", "live-rollback-check-after-uninstall", "fresh-agent-smoke"];
+const required = ["onboard-acme-zero-diff", "onboard-globex-zero-diff", "scripts-hooks-fsmonitor-not-run", "resolve-exact", "wrong-scope-rejected", "symlink-cwd-rejected", "unconfirmed-worktree-rejected", "duplicate-binding-rejected", "source-change-stale-plan", "provenance-and-supersession", "handoff-claude-to-codex", "idempotent-retry", "reused-request-conflict", "stale-hash-rejected", "crash-recovery-onboard", "lock-busy-not-broken", "no-cross-scope-canary", "install-preview-apply-idempotent-conflict-uninstall", "real-home-refused", "fake-auth-wrong-actor", "hub-proposal-no-write", "doctor-readonly", "handoff-export-portable", "profile-plan-apply", "stack-watch-offline-fixtures", "profile-and-stack-stale-approval-refused", "skill-template-render-verify", "package-allowlist", "live-init-preview-apply", "live-install-foreign-conflict-blocks-one-agent", "live-uninstall-from-receipts", "live-rollback-check-after-uninstall", "fresh-agent-smoke"];
 const ids = new Set(checks.map((c) => c.id));
 const ok = required.every((id) => ids.has(id)) && checks.every((c) => c.status === "passed" || c.id === "fresh-agent-smoke" && c.status === "deferred");
 const report = { schemaVersion: 1, ok, pilotRoot, forbidden: pilotSpec.forbidden, checks };

@@ -11,6 +11,10 @@ const allowlist = resolve(value("--allowlist", join(root, "scripts/package-allow
 const denylist = args.includes("--denylist") ? resolve(value("--denylist")) : null;
 const noPack = args.includes("--no-pack");
 const findings = [];
+// Instance data at the root or under a private root, optionally below scopes/<scope>/. Applied to the tracked and
+// untracked-but-not-ignored file list and to pack entries. Kit source such as src/profile/ and templates/skills/ is not
+// anchored here and stays allowed; the home-path, email and denylist scans remain the personal-identifier gate.
+const PRIVATE_STATE = /^(?:(?:data|state|config|inputs|\.local|private)\/)?(?:scopes\/[^/]+\/)?(?:records|operations|proposals|staging|runs|locks|profile|digests|drafts|stack|skill-templates)(\/|$)|(^|\/)registry\.json$|\.lock$/;
 const gitEnv = { PATH: process.env.PATH, HOME: tmpdir(), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0" };
 const listed = spawnSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-C", root, "ls-files", "--cached", "--others", "--exclude-standard", "-z"], { env: gitEnv, encoding: "utf8" });
 const files = listed.status === 0 ? [...new Set(listed.stdout.split("\0").filter(Boolean))].sort() : [];
@@ -27,6 +31,7 @@ if (denylist) {
 }
 for (const file of files) {
   if (/\.handoff\.md$/i.test(file)) findings.push({ file, type: "generated-handoff-packet" });
+  if (PRIVATE_STATE.test(file)) findings.push({ file, type: "private-state" });
   let body;
   try { body = readFileSync(join(root, file), "utf8"); } catch { findings.push({ file, type: "unreadable" }); continue; }
   for (const hit of scanSensitive(body)) findings.push({ file, type: "sensitive:" + hit.type });
@@ -46,7 +51,7 @@ if (!noPack && listed.status === 0) {
       for (const file of entries) {
         if (/\.handoff\.md$/i.test(file)) findings.push({ file, type: "generated-handoff-packet-in-pack" });
         if (!allow.has(file)) findings.push({ file, type: "pack-extra" });
-        if (/^(?:(?:data|state|config|\.local|private)\/)?(?:records|operations|proposals|staging|runs|locks)(\/|$)|(^|\/)registry\.json$|\.lock$/.test(file)) findings.push({ file, type: "private-state-in-pack" });
+        if (PRIVATE_STATE.test(file)) findings.push({ file, type: "private-state-in-pack" });
       }
     } catch { findings.push({ file: ".", type: "pack-json-invalid" }); }
   }
