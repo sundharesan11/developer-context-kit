@@ -396,5 +396,20 @@
   "stack check refuses with APPROVAL_REQUIRED when there is no approval and makes no request",
   "stack check writes no file under any pilot root",
   "stack check is listed in help",
-  "with a live config and before the watch's live-mode entry lands, stack check fails with GATE_REQUIRED and makes no request"
+  "with a live config and before the watch's live-mode entry lands, stack check fails with GATE_REQUIRED and makes no request",
+  "stack digest preview writes only the pending file and apply writes one 0600 digest and updates seen state",
+  "a --scope alpha digest apply writes under scopes/alpha/digests/stack and updates only alpha's seen state, and an unscoped apply writes under digests/stack",
+  "a title and summary containing backtick and tilde fences stay inside a longer backtick fence",
+  "a --scope alpha digest lists alpha.web first with the record ID, then your stack, then the background count",
+  "a second digest run with unchanged entries says no new announcements",
+  "a changed entry is reported again and an advisory whose severity changes is reported again",
+  "the digest contains no record text, only record IDs",
+  "stack digest apply with an unknown or stale fingerprint writes neither digest nor seen state",
+  "stack digest apply never overwrites an existing digest",
+  "stack digest apply makes no request through the injected request",
+  "stack digest apply refuses a pending file whose bytes no longer match its hash with INTEGRITY",
+  "every digest entry and finding line carries an https source URL",
+  "an entry reported in a --scope alpha digest is reported as new in a --scope beta digest that links it to a beta project",
+  "stack digest is listed in help",
+  "with a live config stack digest preview and apply fail with GATE_REQUIRED and make no request"
 ]

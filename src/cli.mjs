@@ -39,6 +39,7 @@ export const COMMANDS = {
   "stack plan": { load: async () => (await import("./stack/commands.mjs")).stackPlanCommand },
   "stack approve": { load: async () => (await import("./stack/commands.mjs")).stackApproveCommand },
   "stack check": { load: async () => (await import("./stack/commands.mjs")).stackCheckCommand },
+  "stack digest": { load: async () => (await import("./stack/commands.mjs")).stackDigestCommand },
   "draft save": { load: async () => (await import("./drafts/commands.mjs")).draftSaveCommand },
   "context resolve": { load: async () => (await import("./context/commands.mjs")).contextResolveCommand },
   "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand },

@@ -121,6 +121,7 @@
   "src/stack/catalog.mjs",
   "src/stack/check.mjs",
   "src/stack/commands.mjs",
+  "src/stack/digest.mjs",
   "src/stack/feed.mjs",
   "src/stack/fetch.mjs",
   "src/stack/match.mjs",
@@ -189,6 +190,7 @@
   "test/skill-templates.test.mjs",
   "test/source-read.test.mjs",
   "test/stack-check.test.mjs",
+  "test/stack-digest.test.mjs",
   "test/stack-feed.test.mjs",
   "test/stack-plan.test.mjs"
 ]
