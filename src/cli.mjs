@@ -36,6 +36,7 @@ export const COMMANDS = {
   "profile apply": { load: async () => (await import("./profile/commands.mjs")).profileApplyCommand },
   "profile export": { load: async () => (await import("./profile/commands.mjs")).profileExportCommand },
   "profile suggest-stack": { load: async () => (await import("./profile/commands.mjs")).profileSuggestStackCommand },
+  "draft save": { load: async () => (await import("./drafts/commands.mjs")).draftSaveCommand },
   "context resolve": { load: async () => (await import("./context/commands.mjs")).contextResolveCommand },
   "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand },
   "handoff export": { rootOptions: false, load: async () => (await import("./handoff/commands.mjs")).handoffExportCommand },

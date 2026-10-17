@@ -320,5 +320,12 @@
   "brief profile working preferences supersede the same init preferences",
   "brief fails with LIMIT and reports profile bytes when required policies plus the profile exceed the budget",
   "brief fails with RECOVERY_REQUIRED on a corrupt profile and keeps the committed revision after an interrupted apply",
-  "handoff export from a pilot with a profile carries no profile text and lists the profile as excluded"
+  "handoff export from a pilot with a profile carries no profile text and lists the profile as excluded",
+  "draft save previews the destination and hash, and apply writes the draft under dataRoot/drafts with mode 0600",
+  "draft save with --scope writes under dataRoot/scopes/<scope>/drafts and an unknown scope fails",
+  "draft save preview states that a draft saved here cannot be sent by routing later",
+  "draft save refuses a body file outside inputsRoot with GATE_REQUIRED",
+  "draft save refuses a body containing a JWT with SENSITIVE_CONTENT and writes nothing",
+  "draft save apply with a mismatched or missing fingerprint writes nothing",
+  "draft save is listed in help and takes no message-type or send option"
 ]
