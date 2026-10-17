@@ -58,6 +58,7 @@
   "skills/devctx-onboard/SKILL.md",
   "skills/devctx-record/SKILL.md",
   "skills/devctx-resume/SKILL.md",
+  "skills/devctx-setup/SKILL.md",
   "src/agents/commands.mjs",
   "src/agents/envelope.mjs",
   "src/agents/install.mjs",

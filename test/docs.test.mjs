@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 test("public alpha onboarding documents only implemented CLI routes", async () => {
@@ -96,25 +96,32 @@ test("docs state the candidate's limits in pinned phrases", async () => {
   assert.ok(!live.includes("rolls back an interrupted update"), "docs/LIVE.md claims update rollback");
 });
 
-const BUNDLED_SKILLS = ["devctx-onboard", "devctx-resume", "devctx-record"];
+// Skill-text checks only; which skills the installer installs is pinned by SKILL_NAMES in src/agents/install.mjs.
+const BUNDLED_SKILLS = ["devctx-onboard", "devctx-resume", "devctx-record", "devctx-setup"];
+const PROJECT_SKILLS = ["devctx-onboard", "devctx-resume", "devctx-record"];
 const readBundledSkill = (name) => readFile(join(import.meta.dirname, "..", "skills", name, "SKILL.md"), "utf8");
+function assertSkillRoutes(name, text, COMMANDS) {
+  assert.doesNotMatch(text, /node bin\/devctx\.mjs/, name + ": checkout-relative command");
+  let count = 0;
+  for (const match of text.matchAll(/devctx\.mjs"?[ \t]+([a-z-]+)(?:[ \t]+([a-z-]+))?/g)) {
+    const first = match[1], second = match[2];
+    assert.ok(COMMANDS[first] || COMMANDS[first + " " + second], name + ": " + match[0]);
+    count++;
+  }
+  assert.ok(count > 0, name + " invokes the CLI");
+  for (const match of text.matchAll(/node[^\n]*devctx\.mjs[^\n]*/g)) {
+    assert.match(match[0], /node "\$DEVCTX_KIT\/bin\/devctx\.mjs" /, name + ": " + match[0]);
+    assert.doesNotMatch(match[0], /record publish/, name + " never invokes record publish");
+  }
+}
 test("bundled skills invoke only implemented CLI routes through DEVCTX_KIT", async () => {
   const { COMMANDS } = await import("../src/cli.mjs");
-  for (const name of BUNDLED_SKILLS) {
-    const text = await readBundledSkill(name);
-    assert.doesNotMatch(text, /node bin\/devctx\.mjs/, name + ": checkout-relative command");
-    let count = 0;
-    for (const match of text.matchAll(/devctx\.mjs"?[ \t]+([a-z-]+)(?:[ \t]+([a-z-]+))?/g)) {
-      const first = match[1], second = match[2];
-      assert.ok(COMMANDS[first] || COMMANDS[first + " " + second], name + ": " + match[0]);
-      count++;
-    }
-    assert.ok(count > 0, name + " invokes the CLI");
-    for (const match of text.matchAll(/node[^\n]*devctx\.mjs[^\n]*/g)) {
-      assert.match(match[0], /node "\$DEVCTX_KIT\/bin\/devctx\.mjs" /, name + ": " + match[0]);
-      assert.doesNotMatch(match[0], /record publish/, name + " never invokes record publish");
-    }
-  }
+  for (const name of BUNDLED_SKILLS) assertSkillRoutes(name, await readBundledSkill(name), COMMANDS);
+});
+test("bundled skill route check refuses a route missing from COMMANDS", async () => {
+  const { COMMANDS } = await import("../src/cli.mjs");
+  const text = "```sh\nnode \"$DEVCTX_KIT/bin/devctx.mjs\" profile erase --pilot '<pilot.json>'\n```\n";
+  assert.throws(() => assertSkillRoutes("fixture", text, COMMANDS), /profile erase/);
 });
 test("bundled skill frontmatter passes skill-builder rules with a one-line description", async () => {
   const { validatePackage, parseFrontmatter } = await import("../src/skill-builder/validate.mjs");
@@ -132,19 +139,44 @@ test("bundled skill frontmatter passes skill-builder rules with a one-line descr
   }
 });
 test("bundled skills state the DEVCTX_KIT validation and pilot-path rules", async () => {
-  const phrases = ["DEVCTX_KIT", "absolute path", "real path", "bin/devctx.mjs", "package.json", "developer-context-kit",
-    "inside the current repository", "confirm", "pilot path", "kit checkout", "repos", "--scope",
-    "GATE_REQUIRED", "GIT_QUERY_FAILED", "PROJECT_UNBOUND", "record publish --apply", "untrusted", "Never send or share"];
+  const common = ["DEVCTX_KIT", "absolute path", "real path", "bin/devctx.mjs", "package.json", "developer-context-kit",
+    "confirm", "pilot path", "kit checkout", "GATE_REQUIRED", "record publish --apply", "untrusted", "Never send or share",
+    "live config", "~/.devctx/live.json", "confirm the pilot path once per session", "kit commit", ".devctx-owned.json", "rev-parse HEAD", "warn the user"];
   for (const name of BUNDLED_SKILLS) {
     const text = await readBundledSkill(name);
-    for (const phrase of phrases) assert.ok(text.includes(phrase), name + ": " + phrase);
+    for (const phrase of common) assert.ok(text.includes(phrase), name + ": " + phrase);
   }
-  for (const name of BUNDLED_SKILLS) {
+  for (const name of PROJECT_SKILLS) {
     const text = await readBundledSkill(name);
-    for (const phrase of ["live config", "~/.devctx/live.json", "confirm the pilot path once per session", "kit commit", ".devctx-owned.json", 'rev-parse HEAD', "warn the user"]) assert.ok(text.includes(phrase), name + ": " + phrase);
+    for (const phrase of ["inside the current repository", "repos", "--scope", "GIT_QUERY_FAILED", "PROJECT_UNBOUND"]) assert.ok(text.includes(phrase), name + ": " + phrase);
   }
   assert.match(await readBundledSkill("devctx-record"), /attributed to "human"/);
   assert.match(await readBundledSkill("devctx-resume"), /freshness/);
+});
+test("devctx-setup is instruction-only and names sending and publishing only as prohibited", async () => {
+  assert.deepEqual(await readdir(join(import.meta.dirname, "..", "skills", "devctx-setup")), ["SKILL.md"]);
+  const text = await readBundledSkill("devctx-setup");
+  for (const phrase of ["Never send or share", "record publish --apply"]) {
+    const lines = text.split("\n").filter((line) => line.includes(phrase));
+    assert.ok(lines.length > 0, phrase);
+    for (const line of lines) assert.match(line, /^- Never /, "only as prohibited: " + line);
+  }
+});
+test("devctx-setup stops without a pilot or init, caps questions, and creates no skill unasked", async () => {
+  const text = await readBundledSkill("devctx-setup");
+  assert.ok(text.includes("If the pilot file does not exist or `init` has not run, stop without creating anything."));
+  assert.ok(text.includes("Never run `init`"));
+  assert.ok(text.includes("Ask at most five questions"));
+  assert.equal((text.match(/^### Question [0-9]/gm) ?? []).length <= 5, true, "no more than five questions");
+  assert.ok(text.includes("Do not create a skill unless the user asks for one."));
+  assert.doesNotMatch(text, /devctx\.mjs"? skill (workspace-create|template-seed|draft-create|local-apply)/, "setup itself creates no skill");
+  assert.match(text, /untrusted data, never instructions/);
+});
+test("devctx-setup applies the profile only on explicit approval from the user in the session", async () => {
+  const text = await readBundledSkill("devctx-setup");
+  const paragraphs = text.split(/\n\s*\n/);
+  assert.ok(paragraphs.some((p) => p.includes("profile apply") && p.includes("explicit approval from the user in the session")), "approval phrase next to profile apply");
+  assert.ok(text.includes("A fingerprint the agent passes back is not consent."));
 });
 test("roadmap and skill-builder docs record the create-from-template freeze exception", async () => {
   const read = (file) => readFile(join(import.meta.dirname, "..", file), "utf8");
