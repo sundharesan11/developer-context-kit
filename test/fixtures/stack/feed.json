@@ -1,0 +1,8 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "Gadget news",
+  "items": [
+    { "id": "gadget-0001", "url": "https://news.example.com/gadget-5", "title": "Gadget 5 preview", "content_text": "A preview of the next Gadget line.", "date_published": "2026-10-03T08:00:00Z" },
+    { "id": "gadget-0002", "url": "https://news.example.com/gadget-tips", "title": "Tips and tricks", "summary": "General tips.", "date_published": "2026-10-02T08:00:00Z" }
+  ]
+}

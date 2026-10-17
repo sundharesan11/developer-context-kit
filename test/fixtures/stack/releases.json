@@ -1,0 +1,5 @@
+[
+  { "id": 9001, "tag_name": "v4.1.0", "name": "acme-sdk v4.1.0", "html_url": "https://github.com/example/acme-sdk/releases/tag/v4.1.0", "published_at": "2026-10-06T10:00:00Z", "draft": false, "prerelease": false, "body": "## Changes\n- Streaming helpers\n- BREAKING: the legacy upload method was removed\n" },
+  { "id": 9000, "tag_name": "v4.0.0", "name": "acme-sdk v4.0.0", "html_url": "https://github.com/example/acme-sdk/releases/tag/v4.0.0", "published_at": "2026-09-01T10:00:00Z", "draft": false, "prerelease": false, "body": "First release of the 4 line." },
+  { "id": 8999, "tag_name": "v4.2.0-draft", "name": "draft", "html_url": "https://github.com/example/acme-sdk/releases/tag/v4.2.0-draft", "published_at": null, "draft": true, "prerelease": false, "body": "" }
+]

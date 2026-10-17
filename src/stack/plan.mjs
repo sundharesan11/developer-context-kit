@@ -12,10 +12,10 @@ import { checkFeedUrl, checkIdentifier, findCatalogItem } from "./catalog.mjs";
 export const GROUPS = Object.freeze(["advisories", "lifecycle", "versions"]);
 export const MAP_KINDS = Object.freeze(["github", "endoflife", "npm", "pypi", "crates"]);
 export const MODE = "manual";
-const GITHUB_HOST = "api.github.com", OSV_HOST = "api.osv.dev", EOL_HOST = "endoflife.date";
-const REGISTRY_HOSTS = Object.freeze({ npm: "registry.npmjs.org", pypi: "pypi.org", crates: "crates.io" });
-const OSV_ECOSYSTEMS = Object.freeze({ npm: "npm", pypi: "PyPI", crates: "crates.io" });
-const EXACT_VERSION = /^v?[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.+-]+)?$/;
+export const GITHUB_HOST = "api.github.com", OSV_HOST = "api.osv.dev", EOL_HOST = "endoflife.date";
+export const REGISTRY_HOSTS = Object.freeze({ npm: "registry.npmjs.org", pypi: "pypi.org", crates: "crates.io" });
+export const OSV_ECOSYSTEMS = Object.freeze({ npm: "npm", pypi: "PyPI", crates: "crates.io" });
+export const EXACT_VERSION = /^v?[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.+-]+)?$/;
 export const USER_AGENT = "devctx-stack-check";
 export const REQUEST_CONTENT = "Request content is limited to the feed URLs, identifiers and versions listed for each host. No profile text, record, path, scope, project name or local identifier is sent.";
 export const FOLLOW_NOTE = "The set of fetched feed URLs, tied to your IP address, shows which vendors you follow.";
@@ -139,7 +139,12 @@ export async function planStack(roots, input = {}, { catalog, resolvePublicRead 
   const resolved = entries.map((entry) => resolveItem(entry, catalog, overrides, groups));
   const hosts = hostsFrom(resolved.flatMap((r) => r.fetches));
   // Only whether the binding exists is asked; any other field the resolver returns is ignored and never stored.
-  const bound = hosts.some((h) => h.host === GITHUB_HOST) && (await resolvePublicRead({ purpose: "public-read", host: GITHUB_HOST }))?.bound === true;
+  // A typed refusal from the resolver (for example TOKEN_TOO_BROAD) means GitHub requests stay unauthenticated.
+  let bound = false, refused = null;
+  if (hosts.some((h) => h.host === GITHUB_HOST)) {
+    try { bound = (await resolvePublicRead({ purpose: "public-read", host: GITHUB_HOST }))?.bound === true; }
+    catch (error) { if (!(error instanceof DevctxError)) throw error; refused = error.code; }
+  }
   const authentication = bound ? "routed-public-read" : "unauthenticated";
   const items = resolved.map((r) => r.item);
   return finalizePlan({
@@ -147,7 +152,7 @@ export async function planStack(roots, input = {}, { catalog, resolvePublicRead 
     profile: { generation: current.generation, revisionHash: current.revisionHash },
     itemListHash: itemListHash(entries), items, notWatched: items.filter((i) => !i.watched).map((i) => i.name),
     groups, overrides, hosts,
-    authentication: { github: authentication, note: bound ? "GitHub requests are authenticated as the GitHub account of the routed public-read binding; that account is visible to GitHub." : "GitHub requests are unauthenticated." },
+    authentication: { github: authentication, ...(refused ? { refused } : {}), note: bound ? "GitHub requests are authenticated as the GitHub account of the routed public-read binding; that account is visible to GitHub." : refused ? "The routed public-read binding was refused; GitHub requests are unauthenticated." : "GitHub requests are unauthenticated." },
     requestContent: REQUEST_CONTENT,
     hostsStillSee: ["IP address", "request time", "fixed user agent " + USER_AGENT, ...(bound ? ["the GitHub account of the routed public-read binding (" + GITHUB_HOST + " only)"] : [])],
     followNote: FOLLOW_NOTE,

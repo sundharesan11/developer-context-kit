@@ -1,0 +1,1 @@
+{ "vulns": [ { "id": "GHSA-exam-ple0-0001", "summary": "Synthetic advisory for acme-sdk uploads", "database_specific": { "severity": "HIGH" } } ] }

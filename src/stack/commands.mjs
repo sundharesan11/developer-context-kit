@@ -1,6 +1,7 @@
 import { DevctxError } from "../errors.mjs";
 import { loadStackCatalog, validateStackCatalog } from "./catalog.mjs";
 import { planStack, approveStack, readStackApproval, approvalDifferences, noPublicReadBinding } from "./plan.mjs";
+import { runStackCheck } from "./check.mjs";
 // ctx.stackCatalog and ctx.resolvePublicRead are seams: tests pass a fixture catalog, and routing will supply the
 // public-read binding resolver. The default resolver reports no binding and reads no environment variable.
 const deps = (ctx) => ({ catalog: ctx.stackCatalog ? validateStackCatalog(ctx.stackCatalog) : loadStackCatalog(), resolvePublicRead: ctx.resolvePublicRead ?? noPublicReadBinding });
@@ -20,5 +21,12 @@ export const stackApproveCommand = {
   async run(values, ctx) {
     if (!values["plan-fingerprint"]) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
     return approveStack(ctx.roots, input(values), deps(ctx), { fingerprint: values["plan-fingerprint"], now: ctx.now });
+  }
+};
+// Read-only: fetches from the approved hosts and returns structured findings; it writes no file (U6 owns the digest).
+export const stackCheckCommand = {
+  options: { scope: { type: "string" } },
+  async run(values, ctx) {
+    return runStackCheck(ctx.roots, { scope: values.scope ?? null }, { ...deps(ctx), request: ctx.request, lookup: ctx.lookup, now: ctx.now });
   }
 };
