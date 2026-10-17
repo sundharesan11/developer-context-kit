@@ -1,0 +1,11 @@
+{
+  "name": "{{dck:skill-name}}",
+  "description": "{{dck:skill-description}}",
+  "workflow": ["Check the kit and pilot preconditions", "Preview the source plan with stack plan", "Approve it with stack approve only after explicit approval from the user in the session", "Fetch with stack check", "Summarize fetched entries with their source URLs", "Offer stack digest"],
+  "outputs": ["Chat summary of fetched entries with source URLs", "Optional dated digest written by stack digest --apply"],
+  "dependencies": ["developer-context-kit stack routes"],
+  "tests": ["approval is asked before the first fetch", "only fetched entries are summarized, each with its URL"],
+  "tree": ["SKILL.md"],
+  "destinations": ["private"],
+  "reuse": "Seeded from the stack-watch template; it wraps the deterministic stack routes and adds no fetching of its own."
+}

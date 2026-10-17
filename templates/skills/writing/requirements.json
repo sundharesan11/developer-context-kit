@@ -1,0 +1,16 @@
+{
+  "goal": "Draft any message for any role in the user's own style from the personal profile and the records the user selects",
+  "success": "A draft that applies the profile's writing preferences, lists the context used and marks every unverified name, date, number or commitment",
+  "examples": ["Draft an email telling the client it ships Friday", "Write a PR description for this change"],
+  "negativeExample": "Send the email to the client",
+  "inputs": ["personal profile", "records the user selects", "the user's request"],
+  "permittedTools": ["devctx profile show", "devctx context resolve", "devctx context brief", "devctx draft save"],
+  "forbiddenTools": ["any send, post or schedule action", "record publish --apply"],
+  "permittedContext": ["profile writing preferences", "records the user selects"],
+  "forbiddenContext": ["the whole record store", "repository files the user did not select"],
+  "supportedAgents": ["claude", "codex"],
+  "output": "Draft in the session with a Context used list and unverified markers, optionally saved privately",
+  "failure": "Ask one question when the audience or purpose is unclear",
+  "destination": "private",
+  "unknowns": []
+}

@@ -201,3 +201,54 @@ test("template routes are listed in help and take no apply option", async (t) =>
   assert.equal((await skill(p, "template-seed", [...personal, ...notes(), "--apply"])).code, 2);
   assert.equal((await skill(p, "template-seed", [...personal, "--template", "missing-template", "--set", "skill-name=x-y"])).json.error.code, "DEVCTX_NOT_FOUND");
 });
+
+// U13: the real templates shipped under templates/skills/ (no templateRoot override).
+const SHIPPED = { "stack-watch": { audience: personal, values: ["skill-name=release-watch", "digest-cadence=every Monday"] },
+  writing: { audience: personal, values: ["skill-name=message-drafts"] },
+  "slack-update": { audience: company, values: ["skill-name=team-status", "default-scope=acme", "channel-audience=acme.platform-team"] } };
+test("skill template-list on the kit lists the stack-watch, slack-update and writing templates", async () => {
+  const listed = await runCli(["skill", "template-list"]);
+  assert.equal(listed.code, 0, JSON.stringify(listed.json));
+  assert.deepEqual(listed.json.result.templates.map((x) => x.name), ["slack-update", "stack-watch", "writing"]);
+  const slack = listed.json.result.templates[0];
+  assert.deepEqual(slack.placeholders.filter((p) => p.kind === "scope").map((p) => p.key), ["default-scope", "channel-audience"]);
+  for (const t of listed.json.result.templates.slice(1)) assert.ok(t.placeholders.every((p) => p.kind === "generic"), t.name);
+});
+test("each shipped skill template renders with test values and passes skill draft-validate", async (t) => {
+  const p = await initPilot(t);
+  await applyScopeAdd(p.roots, { scope: "acme" });
+  const kit = (route, args) => runCli(["skill", route, "--pilot", p.path, ...args]);
+  let n = 0;
+  for (const [template, { audience, values }] of Object.entries(SHIPPED)) {
+    const ws = "ws_shipped0" + ++n, sel = [...audience.slice(0, -1), ws], id = (prefix) => prefix + "_shipped0" + n;
+    assert.equal((await kit("workspace-create", sel)).code, 0, template);
+    const args = [...sel, "--template", template, ...values.flatMap((v) => ["--set", v])];
+    const seed = await kit("template-seed", args);
+    assert.equal(seed.code, 0, template + JSON.stringify(seed.json));
+    for (const file of seed.json.result.files) assert.ok(!file.content.includes("{{dck:"), template + "/" + file.path);
+    const dir = join(p.inputsRoot, "seeded-" + template);
+    await writeRender(dir, seed.json.result);
+    const verified = await kit("template-verify", [...args, "--dir", dir, "--render-digest", seed.json.result.renderDigest]);
+    assert.equal(verified.code, 0, template + JSON.stringify(verified.json));
+    assert.equal((await kit("requirements-record", [...sel, "--requirements", id("rq"), "--input", join(dir, "requirements.json")])).code, 0, template);
+    const ds = await kit("design-record", [...sel, "--requirements", id("rq"), "--design", id("ds"), "--input", join(dir, "design.json")]);
+    assert.equal(ds.code, 0, template + JSON.stringify(ds.json));
+    assert.equal((await kit("design-approve", [...sel, "--design", id("ds"), "--decision", id("dc"), "--interaction-ref", "user:shipped-" + n, "--response", "Approved " + ds.json.result.digest])).code, 0, template);
+    const draft = await kit("draft-create", [...sel, "--requirements", id("rq"), "--design", id("ds"), "--decision", id("dc"), "--revision", id("rv"), "--candidate", join(dir, "candidate")]);
+    assert.equal(draft.code, 0, template + JSON.stringify(draft.json));
+    const validated = await kit("draft-validate", [...sel, "--revision", id("rv")]);
+    assert.equal(validated.code, 0, template + JSON.stringify(validated.json));
+    assert.equal(validated.json.result.valid, true, template + JSON.stringify(validated.json));
+  }
+});
+test("skill discover and the bundled installer list none of the skill templates", async (t) => {
+  const { SKILL_NAMES } = await import("../src/agents/install.mjs");
+  const p = await makePilot(t);
+  const found = await runCli(["skill", "discover", "--pilot", p.path]);
+  assert.equal(found.code, 0, JSON.stringify(found.json));
+  const names = found.json.result.sources.map((s) => s.name), paths = found.json.result.sources.map((s) => s.path);
+  for (const template of Object.keys(SHIPPED)) {
+    assert.ok(!names.includes(template) && !SKILL_NAMES.includes(template), template);
+    assert.ok(paths.every((path) => !path.startsWith("templates/")), template);
+  }
+});

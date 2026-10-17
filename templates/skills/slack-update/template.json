@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "name": "slack-update",
+  "description": "Draft a team status update for a channel from your personal profile and the records you select. Draft only: it reads nothing from Slack and posts nothing.",
+  "placeholders": [
+    { "key": "skill-name", "description": "Name of your new skill, lowercase words joined by hyphens. It cannot use the reserved kit prefix or match a bundled skill.", "kind": "generic", "required": true, "default": null },
+    { "key": "skill-description", "description": "One-line description that tells an agent when to use the skill. Letters, digits, spaces and basic punctuation only.", "kind": "generic", "required": false, "default": "Use when the user wants a draft status update for their team channel from their profile and the records they select. Draft only." },
+    { "key": "default-scope", "description": "The scope the updates usually belong to. It must be the workspace scope.", "kind": "scope", "required": true, "default": null },
+    { "key": "channel-audience", "description": "Who reads the channel: the scope or a team inside it, such as the scope followed by a dot and a team name.", "kind": "scope", "required": true, "default": null }
+  ]
+}

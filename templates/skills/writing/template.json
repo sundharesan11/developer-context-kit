@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "writing",
+  "description": "Draft any message from your personal profile and the records you select, list the context used and mark unverified facts. It never sends.",
+  "placeholders": [
+    { "key": "skill-name", "description": "Name of your new skill, lowercase words joined by hyphens. It cannot use the reserved kit prefix or match a bundled skill.", "kind": "generic", "required": true, "default": null },
+    { "key": "skill-description", "description": "One-line description that tells an agent when to use the skill. Letters, digits, spaces and basic punctuation only.", "kind": "generic", "required": false, "default": "Use when the user wants a message drafted in their own style from their profile and the project context they select, such as an email, status note or PR description." }
+  ]
+}

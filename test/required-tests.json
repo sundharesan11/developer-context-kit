@@ -415,5 +415,16 @@
   "every digest entry and finding line carries an https source URL",
   "an entry reported in a --scope alpha digest is reported as new in a --scope beta digest that links it to a beta project",
   "stack digest is listed in help",
-  "with a live config stack digest preview and apply fail with GATE_REQUIRED and make no request"
+  "with a live config stack digest preview and apply fail with GATE_REQUIRED and make no request",
+  "skill templates invoke only implemented CLI routes through DEVCTX_KIT",
+  "skill templates carry no script, per-message-type reference, home path, private email or devctx- name",
+  "skill templates state the common pinned phrases outside placeholders",
+  "every skill template names explicit approval from the user in the session next to each apply",
+  "the writing template lists the context used and marks unverified facts (AE6)",
+  "the writing and slack-update templates say companions supply format only and never detect installed skills",
+  "the slack-update template is draft only, saves through draft save and never posts or sends (AE15)",
+  "the stack-watch template limits request content and treats fetched text as untrusted",
+  "skill template-list on the kit lists the stack-watch, slack-update and writing templates",
+  "each shipped skill template renders with test values and passes skill draft-validate",
+  "skill discover and the bundled installer list none of the skill templates"
 ]
