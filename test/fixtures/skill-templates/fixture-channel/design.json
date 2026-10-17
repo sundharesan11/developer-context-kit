@@ -1,0 +1,11 @@
+{
+  "name": "{{dck:skill-name}}",
+  "description": "Draft a status update for {{dck:channel}}.",
+  "workflow": ["Read selected records", "Draft the update"],
+  "outputs": ["Markdown draft"],
+  "dependencies": [],
+  "tests": ["fixture records"],
+  "tree": ["SKILL.md"],
+  "destinations": ["private"],
+  "reuse": "No bundled skill covers this fixture."
+}

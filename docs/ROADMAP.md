@@ -30,7 +30,7 @@ The order favors daily use: protect private state first, then prove one real pro
 
 The owner deferred priority 1 on 2026-10-16, so priority 2 was built first. Until backup ships, the live store has no backup; see [Limitations](LIMITATIONS.md). Priorities 5–8 need not block an offline daily-use pilot. The open-source release comes last. Do not build every connector before validating the core with one real project. None of these rows authorizes an account connection, publication, installation, migration or outbound action on its own.
 
-**Frozen:** skill-builder and skill-source feature work is frozen until the daily-use blockers (priorities 1–4) ship. Bug fixes and safety fixes continue. Skill export and the weekly updater resume at priorities 7 and 8.
+**Frozen:** skill-builder and skill-source feature work is frozen until the daily-use blockers (priorities 1–4) ship. The create-from-template path (`skill template-list`, `skill template-seed`, `skill template-verify` and the templates under `templates/skills/`) may be built as part of the personal harness layer; it adds no install, export, validation or pilot-fence behavior; all other skill-builder and skill-source feature work stays frozen. Bug fixes and safety fixes continue. Skill export and the weekly updater resume at priorities 7 and 8.
 
 ## Skill-builder milestones
 

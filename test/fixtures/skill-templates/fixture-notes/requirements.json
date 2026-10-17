@@ -1,0 +1,16 @@
+{
+  "goal": "Summarize {{dck:topic}} into a dated report",
+  "success": "Produces a dated Markdown summary of {{dck:topic}}",
+  "examples": ["Summarize today's {{dck:topic}}"],
+  "negativeExample": "Write new {{dck:topic}}",
+  "inputs": ["note text"],
+  "permittedTools": [],
+  "forbiddenTools": ["network"],
+  "permittedContext": [],
+  "forbiddenContext": [],
+  "supportedAgents": ["codex"],
+  "output": "Markdown summary",
+  "failure": "Explain that no notes were given",
+  "destination": "private",
+  "unknowns": []
+}

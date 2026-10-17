@@ -59,7 +59,10 @@ export const COMMANDS = {
   "skill local-apply": { load: async () => (await import("./skill-builder/commands.mjs")).localApplyCommand },
   "skill local-status": { load: async () => (await import("./skill-builder/commands.mjs")).localStatusCommand },
   "skill workspace-show": { load: async () => (await import("./skill-builder/commands.mjs")).workspaceShowCommand },
-  "skill discover": { load: async () => (await import("./skill-builder/commands.mjs")).discoverCommand }
+  "skill discover": { load: async () => (await import("./skill-builder/commands.mjs")).discoverCommand },
+  "skill template-list": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-builder/template-commands.mjs")).templateListCommand },
+  "skill template-seed": { load: async () => (await import("./skill-builder/template-commands.mjs")).templateSeedCommand },
+  "skill template-verify": { load: async () => (await import("./skill-builder/template-commands.mjs")).templateVerifyCommand }
 };
 export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;
@@ -71,8 +74,8 @@ function routeFor(argv) {
   throw new DevctxError("USAGE", "Unknown command");
 }
 export async function main(argv, options = {}) {
-  // kitRoot is a test seam for the running kit; production leaves it undefined.
-  const { stdout = process.stdout, now = () => new Date(), home = homedir(), env = process.env, kitRoot } = options;
+  // kitRoot and templateRoot are test seams for the running kit; production leaves them undefined.
+  const { stdout = process.stdout, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot } = options;
   let command = argv.slice(0, 2).join(" ");
   try {
     const routed = routeFor(argv);
@@ -114,7 +117,7 @@ export async function main(argv, options = {}) {
         if (values[flag] && values[flag] !== roots[key]) throw new DevctxError("GATE_REQUIRED", "Root does not match pilot");
       }
     }
-    const context = { roots, pilot, now, home, env, kitRoot };
+    const context = { roots, pilot, now, home, env, kitRoot, templateRoot };
     if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
     const result = await impl.run(values, context);
     stdout.write(JSON.stringify({ ok: true, command, result }) + "\n");

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "fixture-notes",
+  "description": "Synthetic template that summarizes notes on a chosen topic.",
+  "placeholders": [
+    { "key": "skill-name", "description": "Name of the new skill.", "kind": "generic", "required": true, "default": null },
+    { "key": "topic", "description": "What the notes are about.", "kind": "generic", "required": false, "default": "daily notes" }
+  ]
+}

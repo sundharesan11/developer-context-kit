@@ -1,0 +1,16 @@
+{
+  "goal": "Draft a status update for {{dck:channel}}",
+  "success": "Produces a short update draft",
+  "examples": ["Draft this week's update"],
+  "negativeExample": "Post the update",
+  "inputs": ["selected records"],
+  "permittedTools": [],
+  "forbiddenTools": ["network"],
+  "permittedContext": [],
+  "forbiddenContext": [],
+  "supportedAgents": ["codex"],
+  "output": "Markdown draft",
+  "failure": "Explain what is missing",
+  "destination": "private",
+  "unknowns": []
+}

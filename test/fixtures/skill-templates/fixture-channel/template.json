@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "fixture-channel",
+  "description": "Synthetic template whose audience is a company channel.",
+  "placeholders": [
+    { "key": "skill-name", "description": "Name of the new skill.", "kind": "generic", "required": true, "default": null },
+    { "key": "channel", "description": "The scope or a team inside it.", "kind": "scope", "required": true, "default": null }
+  ]
+}

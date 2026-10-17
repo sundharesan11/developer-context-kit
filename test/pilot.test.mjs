@@ -70,7 +70,7 @@ test("disposable pilot digest and fence are unchanged by the optional live block
 });
 test("CLI: only version, help, and skill source reads are root-free; every other route requires --pilot", async () => {
   const routes = listCommands();
-  assert.deepEqual(routes.filter((r) => isRootFree(r)).sort(), ["help", "skill-sources catalog", "skill-sources check", "skill-sources preview", "version"]);
+  assert.deepEqual(routes.filter((r) => isRootFree(r)).sort(), ["help", "skill template-list", "skill-sources catalog", "skill-sources check", "skill-sources preview", "version"]);
   for (const route of routes.filter((r) => !isRootFree(r))) {
     const { code, json } = await runCli(route.split(" "));
     assert.equal(code, 1, route);

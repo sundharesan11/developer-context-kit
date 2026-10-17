@@ -146,3 +146,13 @@ test("bundled skills state the DEVCTX_KIT validation and pilot-path rules", asyn
   assert.match(await readBundledSkill("devctx-record"), /attributed to "human"/);
   assert.match(await readBundledSkill("devctx-resume"), /freshness/);
 });
+test("roadmap and skill-builder docs record the create-from-template freeze exception", async () => {
+  const read = (file) => readFile(join(import.meta.dirname, "..", file), "utf8");
+  const roadmap = await read("docs/ROADMAP.md"), builder = await read("docs/SKILL-BUILDER.md");
+  const freeze = "**Frozen:** skill-builder and skill-source feature work is frozen until the daily-use blockers (priorities 1–4) ship.";
+  const exception = "The create-from-template path (`skill template-list`, `skill template-seed`, `skill template-verify` and the templates under `templates/skills/`) may be built as part of the personal harness layer; it adds no install, export, validation or pilot-fence behavior; all other skill-builder and skill-source feature work stays frozen.";
+  assert.ok(roadmap.includes(freeze + " " + exception), "exception sentence directly follows the freeze sentence");
+  assert.equal(roadmap.split(exception).length, 2, "roadmap records the exception once");
+  assert.ok(builder.includes(exception), "skill-builder doc carries the same note");
+  assert.ok(builder.includes("`skills/devctx-create-skill/assets/skill-template.md` stays the blank starter for skills built from scratch; `templates/skills/` holds guided templates that do not use it."));
+});

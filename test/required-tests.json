@@ -327,5 +327,19 @@
   "draft save refuses a body file outside inputsRoot with GATE_REQUIRED",
   "draft save refuses a body containing a JWT with SENSITIVE_CONTENT and writes nothing",
   "draft save apply with a mismatched or missing fingerprint writes nothing",
-  "draft save is listed in help and takes no message-type or send option"
+  "draft save is listed in help and takes no message-type or send option",
+  "skill template-list is root-free and returns fixture templates with their placeholders",
+  "skill template-list reads templates/skills from the kit and is empty when that folder is absent or empty",
+  "skill template-seed returns filled files, per-file hashes and a render digest and writes nothing",
+  "template seeding feeds the unchanged skill-builder steps from workspace-create to draft-validate",
+  "skill template-seed for a workspace that does not exist fails with NOT_FOUND",
+  "skill template-verify fails with INTEGRITY naming an edited, removed or extra file",
+  "skill template-verify refuses a directory outside inputsRoot with GATE_REQUIRED and a symlinked file with PATH_UNSAFE",
+  "a scope placeholder renders only for a company workspace in an existing scope with a value inside that scope",
+  "skill template-seed refuses a missing required placeholder with INVALID_INPUT naming the key",
+  "skill template-seed refuses reserved, bundled and invalid skill names",
+  "skill template-seed refuses a value with a newline, the placeholder marker or a token-like string",
+  "template validation refuses an undeclared placeholder, an unused declared key, an extra file or a symlink",
+  "template routes are listed in help and take no apply option",
+  "roadmap and skill-builder docs record the create-from-template freeze exception"
 ]

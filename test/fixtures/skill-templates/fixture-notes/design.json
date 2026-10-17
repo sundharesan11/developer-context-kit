@@ -1,0 +1,11 @@
+{
+  "name": "{{dck:skill-name}}",
+  "description": "Summarize {{dck:topic}} into a dated Markdown report.",
+  "workflow": ["Read the notes", "Summarize them"],
+  "outputs": ["Markdown summary"],
+  "dependencies": [],
+  "tests": ["fixture note"],
+  "tree": ["SKILL.md"],
+  "destinations": ["private"],
+  "reuse": "No bundled skill covers this fixture."
+}
