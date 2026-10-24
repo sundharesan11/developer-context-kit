@@ -1,8 +1,18 @@
 ---
 import { GITHUB_URL, DOCS } from '../../site';
+
+// Floating capsule nav. A progress line along its bottom edge fills with scroll
+// and the link for the section in view is marked with an orange dot.
+const sections = [
+  { id: 'context', label: 'Context' },
+  { id: 'agents', label: 'Agents' },
+  { id: 'accounts', label: 'Accounts' },
+  { id: 'harness', label: 'Harness' },
+  { id: 'open-source', label: 'Open source' },
+];
 ---
 <header class="nav">
-  <div class="wrap">
+  <div class="wrap nav-capsule">
     <a class="brand" href="#top" aria-label="devctx home">
       <span class="brand-mark" aria-hidden="true">
         <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="2.6" fill="#ff8a3d"/><circle cx="7" cy="7" r="5.6" fill="none" stroke="#ff8a3d" stroke-opacity=".45" stroke-width="1.2"/></svg>
@@ -10,19 +20,59 @@ import { GITHUB_URL, DOCS } from '../../site';
       devctx
     </a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="#context">Context</a>
-      <a href="#agents">Agents</a>
-      <a href="#accounts">Accounts</a>
-      <a href="#harness">Harness</a>
-      <a href="#open-source">Open source</a>
+      {sections.map((s) => <a href={`#${s.id}`} data-nav-section={s.id}>{s.label}<i class="nav-dot" aria-hidden="true"></i></a>)}
     </nav>
     <div class="nav-cta">
-      <a class="btn btn-ghost btn-sm" href={DOCS.home}>Docs</a>
+      <a class="btn btn-ghost btn-sm nav-docs" href={DOCS.home}>Docs</a>
       <!-- TODO: confirm the GitHub org/user (sundharesan11) at release -->
-      <a class="btn btn-ghost btn-sm" href={GITHUB_URL}>
+      <a class="btn btn-ghost btn-sm nav-gh" href={GITHUB_URL} aria-label="GitHub">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-        GitHub
+        <span class="nav-gh-label">GitHub</span>
       </a>
+      <a class="btn btn-primary btn-sm nav-start" href={DOCS.installation}>Get started</a>
     </div>
+    <span class="nav-progress" aria-hidden="true"></span>
   </div>
 </header>
+
+<script>
+  const nav = document.querySelector<HTMLElement>('.nav');
+  const bar = nav?.querySelector<HTMLElement>('.nav-progress');
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('[data-nav-section]')];
+
+  // Scroll progress along the capsule's bottom edge.
+  let queued = false;
+  const update = () => {
+    queued = false;
+    const max = document.documentElement.scrollHeight - innerHeight;
+    const p = max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0;
+    bar?.style.setProperty('--p', p.toFixed(4));
+    nav?.classList.toggle('is-scrolled', scrollY > 8);
+  };
+  addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
+  addEventListener('resize', update);
+  update();
+
+  // Active section: the last section whose top has crossed a line 35% down the viewport.
+  const targets = links
+    .map((a) => document.getElementById(a.dataset.navSection!))
+    .filter((el): el is HTMLElement => !!el);
+  const setActive = () => {
+    const line = innerHeight * 0.35;
+    let current: string | null = null;
+    for (const el of targets) {
+      const r = el.getBoundingClientRect();
+      if (r.top <= line && r.bottom > 0) current = el.id;
+    }
+    for (const a of links) {
+      const on = a.dataset.navSection === current;
+      a.classList.toggle('is-active', on);
+      if (on) a.setAttribute('aria-current', 'location');
+      else a.removeAttribute('aria-current');
+    }
+  };
+  let activeQueued = false;
+  addEventListener('scroll', () => { if (!activeQueued) { activeQueued = true; requestAnimationFrame(() => { activeQueued = false; setActive(); }); } }, { passive: true });
+  addEventListener('resize', setActive);
+  setActive();
+</script>
