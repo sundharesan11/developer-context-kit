@@ -1,0 +1,246 @@
+---
+import { GITHUB_URL, DOCS } from '../../site';
+import HeroGrid from './HeroGrid.astro';
+import CrtGlass from './CrtGlass.astro';
+---
+<section class="hero" id="top" aria-labelledby="hero-title">
+  <HeroGrid />
+  <div class="wrap">
+    <div class="hero-copy">
+      <a class="eyebrow" href="#open-source"><b>Open source</b> Apache-2.0 · local-first CLI + harness</a>
+      <h1 id="hero-title" data-decode data-decode-delay="360">Clone the <em>developer.</em></h1>
+      <p class="lede">devctx carries everything that makes you effective on a project — <strong>decisions, constraints, commands, handoffs and the right accounts</strong> — into every coding-agent session. On your disk. In every org you work for.</p>
+      <div class="hero-actions">
+        <!-- TODO: confirm install command at release -->
+        <div class="install" role="group" aria-label="Install command">
+          <span><span class="prompt" aria-hidden="true">$ </span><span class="install-text">npx devctx init</span></span>
+          <button class="copy" type="button" data-copy="npx devctx init">Copy</button>
+        </div>
+        <!-- TODO: confirm the GitHub org/user (sundharesan11) at release -->
+        <a class="btn btn-primary" href={DOCS.installation}>Get started <span aria-hidden="true">→</span></a>
+        <a class="btn btn-ghost" href={GITHUB_URL}>View on GitHub <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="works">
+        <span>Works with</span>
+        <span class="wm"><i aria-hidden="true"></i>Claude Code</span>
+        <span class="wm cx"><i aria-hidden="true"></i>Codex</span>
+      </div>
+    </div>
+
+    <figure class="stage reveal" aria-labelledby="stage-cap">
+      <div class="stage-inner">
+        <div class="stage-bar" aria-hidden="true">
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="t">devctx · session start</span>
+          <span class="live">context flowing</span>
+        </div>
+
+        <!-- Desktop diagram -->
+        <svg class="diagram diagram-d" viewBox="0 0 1120 600" role="img" aria-labelledby="dd-title dd-desc">
+          <title id="dd-title">How context flows through devctx</title>
+          <desc id="dd-desc">Six kinds of record — decision, fact, constraint, command, unknown and handoff — stream into a bounded brief beside the developer. The brief fans out to Claude Code and Codex. Below, two organisation lanes, acme and globex, each light up their own GitHub and Slack identity when that org's project is active.</desc>
+
+          <text class="d-label" x="40" y="62">RECORDS</text>
+          <text class="d-label" x="470" y="62">YOU</text>
+          <text class="d-label" x="850" y="62">AGENTS</text>
+          <text class="d-label" x="40" y="474">ACCOUNTS</text>
+
+          <!-- wires: records -> brief -->
+          <g>
+            <path id="w1" class="d-wire" d="M262 100 C 360 100, 380 300, 460 318" pathLength="100"/>
+            <path id="w2" class="d-wire" d="M262 152 C 360 152, 380 310, 460 326" pathLength="100"/>
+            <path id="w3" class="d-wire" d="M262 204 C 350 204, 380 320, 460 334" pathLength="100"/>
+            <path id="w4" class="d-wire" d="M262 256 C 350 256, 390 330, 460 342" pathLength="100"/>
+            <path id="w5" class="d-wire" d="M262 308 C 350 308, 390 345, 460 350" pathLength="100"/>
+            <path id="w6" class="d-wire" d="M262 360 C 350 360, 390 360, 460 358" pathLength="100"/>
+            <!-- brief -> agents -->
+            <path id="w7" class="d-wire" d="M680 320 C 760 320, 770 168, 850 168" pathLength="100"/>
+            <path id="w8" class="d-wire" d="M680 350 C 760 350, 770 352, 850 352" pathLength="100"/>
+            <!-- dev -> brief -->
+            <path class="d-wire" d="M570 196 L 570 262" />
+            <!-- brief -> lanes -->
+            <path class="d-wire" d="M570 420 C 570 450, 300 450, 300 488"/>
+            <path class="d-wire" d="M570 420 C 570 450, 830 450, 830 488"/>
+            <path class="lit-wire-a" d="M570 420 C 570 450, 300 450, 300 488"/>
+            <path class="lit-wire-b" d="M570 420 C 570 450, 830 450, 830 488"/>
+          </g>
+          <g aria-hidden="true">
+            <path class="d-pulse" d="M262 100 C 360 100, 380 300, 460 318" pathLength="100" style="animation-delay:0s"/>
+            <path class="d-pulse" d="M262 152 C 360 152, 380 310, 460 326" pathLength="100" style="animation-delay:-.8s"/>
+            <path class="d-pulse" d="M262 204 C 350 204, 380 320, 460 334" pathLength="100" style="animation-delay:-1.6s"/>
+            <path class="d-pulse" d="M262 256 C 350 256, 390 330, 460 342" pathLength="100" style="animation-delay:-2.4s"/>
+            <path class="d-pulse" d="M262 308 C 350 308, 390 345, 460 350" pathLength="100" style="animation-delay:-3.2s"/>
+            <path class="d-pulse" d="M262 360 C 350 360, 390 360, 460 358" pathLength="100" style="animation-delay:-4s"/>
+            <path class="d-pulse c" d="M680 320 C 760 320, 770 168, 850 168" pathLength="100" style="animation-delay:-1.2s;animation-duration:3.6s"/>
+            <path class="d-pulse c" d="M680 350 C 760 350, 770 352, 850 352" pathLength="100" style="animation-delay:-3s;animation-duration:3.6s"/>
+          </g>
+
+          <!-- record chips -->
+          <g class="d-chip"><rect x="40" y="82" width="222" height="36" rx="9"/><text class="k" x="54" y="104">decision</text><text class="v" x="126" y="104">cursor pagination</text></g>
+          <g class="d-chip"><rect x="40" y="134" width="222" height="36" rx="9"/><text class="k" x="54" y="156">fact</text><text class="v" x="126" y="156">jobs run on SQS</text></g>
+          <g class="d-chip"><rect x="40" y="186" width="222" height="36" rx="9"/><text class="k" x="54" y="208">constraint</text><text class="v" x="130" y="208">no billing writes</text></g>
+          <g class="d-chip"><rect x="40" y="238" width="222" height="36" rx="9"/><text class="k" x="54" y="260">command</text><text class="v" x="126" y="260">npm test</text></g>
+          <g class="d-chip"><rect x="40" y="290" width="222" height="36" rx="9"/><text class="k" x="54" y="312">unknown</text><text class="v" x="126" y="312">v1 webhook callers?</text></g>
+          <g class="d-chip"><rect x="40" y="342" width="222" height="36" rx="9"/><text class="k" x="54" y="364">handoff</text><text class="v" x="126" y="364">backoff ½ done</text></g>
+
+          <!-- developer node -->
+          <g>
+            <circle class="d-node-ring" cx="570" cy="154" r="40"/>
+            <circle class="d-node" cx="570" cy="154" r="40" stroke-width="1.5"/>
+            <circle cx="570" cy="144" r="11" fill="none" stroke="#edf0f7" stroke-width="1.6"/>
+            <path d="M548 178 C 552 162, 588 162, 592 178" fill="none" stroke="#edf0f7" stroke-width="1.6" stroke-linecap="round"/>
+            <text class="d-you" x="622" y="150">you</text>
+            <text class="d-txt proj-a" x="622" y="168" style="font-size:11px">~/work/acme/atlas</text>
+            <text class="d-txt proj-b" x="622" y="168" style="font-size:11px">~/work/globex/ledger</text>
+          </g>
+
+          <!-- brief card -->
+          <g>
+            <rect class="d-card" x="460" y="262" width="220" height="158" rx="12" stroke-width="1.2"/>
+            <text class="d-card-h" x="476" y="288">brief ·</text>
+            <text class="d-acc proj-a" x="538" y="288" style="font-size:13px">acme.atlas</text>
+            <text class="d-acc proj-b" x="538" y="288" style="font-size:13px;fill:#74e0cc">globex.ledger</text>
+            <rect class="d-line a" x="476" y="304" width="8" height="8" rx="2"/><rect class="d-line" x="492" y="305" width="150" height="6" rx="3"/>
+            <rect class="d-line a" x="476" y="322" width="8" height="8" rx="2"/><rect class="d-line" x="492" y="323" width="120" height="6" rx="3"/>
+            <rect class="d-line a" x="476" y="340" width="8" height="8" rx="2"/><rect class="d-line" x="492" y="341" width="168" height="6" rx="3"/>
+            <rect class="d-line a" x="476" y="358" width="8" height="8" rx="2"/><rect class="d-line" x="492" y="359" width="100" height="6" rx="3"/>
+            <rect class="d-line a" x="476" y="376" width="8" height="8" rx="2"/><rect class="d-line" x="492" y="377" width="136" height="6" rx="3"/>
+            <text class="d-txt" x="476" y="406" style="font-size:11px">14 records · reviewed</text>
+          </g>
+
+          <!-- agent windows -->
+          <g>
+            <rect class="d-win" x="850" y="104" width="232" height="128" rx="11"/>
+            <path class="d-win-bar" d="M861 104 H1071 A11 11 0 0 1 1082 115 V132 H850 V115 A11 11 0 0 1 861 104Z"/>
+            <circle cx="866" cy="118" r="3.5" fill="#2a3349"/><circle cx="878" cy="118" r="3.5" fill="#2a3349"/><circle cx="890" cy="118" r="3.5" fill="#2a3349"/>
+            <text class="d-win-t" x="904" y="122">Claude Code</text>
+            <text class="d-acc" x="864" y="156">›</text><text class="d-txt" x="878" y="156">/devctx-resume</text>
+            <text class="d-ok" x="864" y="180">✓</text><text class="d-txt" x="878" y="180">brief loaded · 14 records</text>
+            <text class="d-txt" x="864" y="204" style="fill:#808aa2">picking up retry backoff…</text>
+
+            <rect class="d-win" x="850" y="288" width="232" height="128" rx="11"/>
+            <path class="d-win-bar" d="M861 288 H1071 A11 11 0 0 1 1082 299 V316 H850 V299 A11 11 0 0 1 861 288Z"/>
+            <circle cx="866" cy="302" r="3.5" fill="#2a3349"/><circle cx="878" cy="302" r="3.5" fill="#2a3349"/><circle cx="890" cy="302" r="3.5" fill="#2a3349"/>
+            <text class="d-win-t" x="904" y="306">Codex</text>
+            <text class="d-acc" x="864" y="340">›</text><text class="d-txt" x="878" y="340">devctx-resume</text>
+            <text class="d-ok" x="864" y="364">✓</text><text class="d-txt" x="878" y="364">same brief · 14 records</text>
+            <text class="d-txt" x="864" y="388" style="fill:#808aa2">constraint noted: no billing…</text>
+          </g>
+
+          <!-- org lanes -->
+          <g class="lane lane-acme">
+            <rect class="lane-bg" x="40" y="488" width="520" height="84" rx="13"/>
+            <rect class="lit" x="40" y="488" width="520" height="84" rx="13" fill="rgba(255,138,61,.07)" stroke="rgba(255,138,61,.5)"/>
+            <circle cx="64" cy="512" r="5" fill="#ff8a3d"/>
+            <text class="lane-name" x="78" y="517">acme</text>
+            <text class="lane-cwd" x="64" y="548">scope · acme.*</text>
+            <g class="id">
+              <rect x="210" y="502" width="164" height="56" rx="10"/>
+              <text x="226" y="525" class="dim">GitHub</text><text x="226" y="545" class="dim">@sam-acme</text>
+              <text x="226" y="525" class="lit" style="fill:#edf0f7">GitHub</text><text x="226" y="545" class="lit" style="fill:#ff8a3d">@sam-acme ✓</text>
+            </g>
+            <g class="id">
+              <rect x="384" y="502" width="164" height="56" rx="10"/>
+              <text x="400" y="525" class="dim">Slack</text><text x="400" y="545" class="dim">acme · Sam R.</text>
+              <text x="400" y="525" class="lit" style="fill:#edf0f7">Slack</text><text x="400" y="545" class="lit" style="fill:#ff8a3d">acme · Sam R. ✓</text>
+            </g>
+          </g>
+          <g class="lane lane-globex">
+            <rect class="lane-bg" x="570" y="488" width="512" height="84" rx="13"/>
+            <rect class="lit" x="570" y="488" width="512" height="84" rx="13" fill="rgba(116,224,204,.07)" stroke="rgba(116,224,204,.5)"/>
+            <circle cx="594" cy="512" r="5" fill="#74e0cc"/>
+            <text class="lane-name" x="608" y="517">globex</text>
+            <text class="lane-cwd" x="594" y="548">scope · globex.*</text>
+            <g class="id">
+              <rect x="740" y="502" width="164" height="56" rx="10"/>
+              <text x="756" y="525" class="dim">GitHub</text><text x="756" y="545" class="dim">@sam-gx</text>
+              <text x="756" y="525" class="lit" style="fill:#edf0f7">GitHub</text><text x="756" y="545" class="lit" style="fill:#74e0cc">@sam-gx ✓</text>
+            </g>
+            <g class="id">
+              <rect x="912" y="502" width="160" height="56" rx="10"/>
+              <text x="928" y="525" class="dim">Slack</text><text x="928" y="545" class="dim">globex · Sam</text>
+              <text x="928" y="525" class="lit" style="fill:#edf0f7">Slack</text><text x="928" y="545" class="lit" style="fill:#74e0cc">globex · Sam ✓</text>
+            </g>
+          </g>
+        </svg>
+
+        <!-- Mobile diagram -->
+        <svg class="diagram diagram-m" viewBox="0 0 360 640" role="img" aria-labelledby="dm-title">
+          <title id="dm-title">Records stream into a brief, the brief reaches Claude Code and Codex, and each org lights up its own GitHub and Slack identity.</title>
+          <text class="d-label" x="20" y="30">RECORDS</text>
+          <g class="d-chip"><rect x="20" y="42" width="102" height="30" rx="8"/><text class="k" x="32" y="61">decision</text></g>
+          <g class="d-chip"><rect x="129" y="42" width="102" height="30" rx="8"/><text class="k" x="141" y="61">fact</text></g>
+          <g class="d-chip"><rect x="238" y="42" width="102" height="30" rx="8"/><text class="k" x="250" y="61">constraint</text></g>
+          <g class="d-chip"><rect x="20" y="80" width="102" height="30" rx="8"/><text class="k" x="32" y="99">command</text></g>
+          <g class="d-chip"><rect x="129" y="80" width="102" height="30" rx="8"/><text class="k" x="141" y="99">unknown</text></g>
+          <g class="d-chip"><rect x="238" y="80" width="102" height="30" rx="8"/><text class="k" x="250" y="99">handoff</text></g>
+
+          <path class="d-wire" d="M71 110 C 71 140, 180 140, 180 200" pathLength="100"/>
+          <path class="d-wire" d="M180 110 L 180 200" pathLength="100"/>
+          <path class="d-wire" d="M289 110 C 289 140, 180 140, 180 200" pathLength="100"/>
+          <path class="d-pulse" d="M71 110 C 71 140, 180 140, 180 200" pathLength="100"/>
+          <path class="d-pulse" d="M180 110 L 180 200" pathLength="100" style="animation-delay:-1.6s"/>
+          <path class="d-pulse" d="M289 110 C 289 140, 180 140, 180 200" pathLength="100" style="animation-delay:-3.2s"/>
+
+          <circle class="d-node-ring" cx="78" cy="250" r="26"/>
+          <circle class="d-node" cx="78" cy="250" r="26" stroke-width="1.4"/>
+          <circle cx="78" cy="244" r="7" fill="none" stroke="#edf0f7" stroke-width="1.4"/>
+          <path d="M64 264 C 67 254, 89 254, 92 264" fill="none" stroke="#edf0f7" stroke-width="1.4" stroke-linecap="round"/>
+          <text class="d-you" x="62" y="296">you</text>
+          <path class="d-wire" d="M104 250 L 120 250"/>
+
+          <rect class="d-card" x="120" y="200" width="220" height="104" rx="12"/>
+          <text class="d-card-h" x="134" y="224">brief ·</text>
+          <text class="d-acc proj-a" x="194" y="224" style="font-size:13px">acme.atlas</text>
+          <text class="d-acc proj-b" x="194" y="224" style="font-size:13px;fill:#74e0cc">globex.ledger</text>
+          <rect class="d-line a" x="134" y="238" width="7" height="7" rx="2"/><rect class="d-line" x="148" y="239" width="150" height="5" rx="2.5"/>
+          <rect class="d-line a" x="134" y="254" width="7" height="7" rx="2"/><rect class="d-line" x="148" y="255" width="120" height="5" rx="2.5"/>
+          <rect class="d-line a" x="134" y="270" width="7" height="7" rx="2"/><rect class="d-line" x="148" y="271" width="170" height="5" rx="2.5"/>
+          <text class="d-txt" x="134" y="294" style="font-size:10.5px">14 records · reviewed</text>
+
+          <path class="d-wire" d="M230 304 C 230 330, 95 330, 95 352" pathLength="100"/>
+          <path class="d-wire" d="M230 304 C 230 330, 265 330, 265 352" pathLength="100"/>
+          <path class="d-pulse c" d="M230 304 C 230 330, 95 330, 95 352" pathLength="100" style="animation-duration:3.6s"/>
+          <path class="d-pulse c" d="M230 304 C 230 330, 265 330, 265 352" pathLength="100" style="animation-duration:3.6s;animation-delay:-1.8s"/>
+
+          <rect class="d-win" x="20" y="352" width="152" height="84" rx="10"/>
+          <text class="d-win-t" x="34" y="376">Claude Code</text>
+          <text class="d-ok" x="34" y="402">✓</text><text class="d-txt" x="48" y="402" style="font-size:11px">brief loaded</text>
+          <text class="d-txt" x="34" y="422" style="font-size:11px;fill:#808aa2">/devctx-resume</text>
+          <rect class="d-win" x="188" y="352" width="152" height="84" rx="10"/>
+          <text class="d-win-t" x="202" y="376">Codex</text>
+          <text class="d-ok" x="202" y="402">✓</text><text class="d-txt" x="216" y="402" style="font-size:11px">same brief</text>
+          <text class="d-txt" x="202" y="422" style="font-size:11px;fill:#808aa2">devctx-resume</text>
+
+          <text class="d-label" x="20" y="474">ACCOUNTS</text>
+          <g class="lane lane-acme">
+            <rect class="lane-bg" x="20" y="486" width="152" height="134" rx="12"/>
+            <rect class="lit" x="20" y="486" width="152" height="134" rx="12" fill="rgba(255,138,61,.07)" stroke="rgba(255,138,61,.5)"/>
+            <circle cx="38" cy="506" r="4.5" fill="#ff8a3d"/><text class="lane-name" x="50" y="511">acme</text>
+            <g class="id"><rect x="32" y="524" width="128" height="40" rx="8"/>
+              <text x="44" y="549" class="dim">GH @sam-acme</text><text x="44" y="549" class="lit" style="fill:#ff8a3d">GH @sam-acme</text></g>
+            <g class="id"><rect x="32" y="570" width="128" height="40" rx="8"/>
+              <text x="44" y="595" class="dim">Slack · acme</text><text x="44" y="595" class="lit" style="fill:#ff8a3d">Slack · acme ✓</text></g>
+          </g>
+          <g class="lane lane-globex">
+            <rect class="lane-bg" x="188" y="486" width="152" height="134" rx="12"/>
+            <rect class="lit" x="188" y="486" width="152" height="134" rx="12" fill="rgba(116,224,204,.07)" stroke="rgba(116,224,204,.5)"/>
+            <circle cx="206" cy="506" r="4.5" fill="#74e0cc"/><text class="lane-name" x="218" y="511">globex</text>
+            <g class="id"><rect x="200" y="524" width="128" height="40" rx="8"/>
+              <text x="212" y="549" class="dim">GH @sam-gx</text><text x="212" y="549" class="lit" style="fill:#74e0cc">GH @sam-gx</text></g>
+            <g class="id"><rect x="200" y="570" width="128" height="40" rx="8"/>
+              <text x="212" y="595" class="dim">Slack · globex</text><text x="212" y="595" class="lit" style="fill:#74e0cc">Slack · globex ✓</text></g>
+          </g>
+        </svg>
+
+        <figcaption id="stage-cap" class="stage-foot">
+          <div><b>Capture</b>Records with sources <code>record add</code></div>
+          <div><b>Brief</b>Bounded, reviewed <code>context brief</code></div>
+          <div><b>Any agent</b>Same context <code>agents install</code></div>
+          <div><b>Right identity</b>Per-org accounts <code>context resolve</code></div>
+        </figcaption>
+      </div>
+    </figure>
+  </div>
+  <CrtGlass />
+</section>

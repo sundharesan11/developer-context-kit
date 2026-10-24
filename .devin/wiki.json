@@ -1,0 +1,110 @@
+{
+  "repo_notes": [
+    {
+      "content": "Developer Context Kit (CLI: devctx) is a local, zero-dependency Node.js (>=22.13, ESM .mjs) CLI that keeps project context between coding-agent sessions. The owner's vision is to 'clone the developer': (1) project context, decisions and handoffs stored as private, source-linked, reviewable records OUTSIDE the project repository, read back as bounded briefs at session start; (2) the same context for every coding agent (Claude Code, Codex) through bundled skills; (3) organization identity routing, where each scope binds its own GitHub and Slack accounts; (4) a personal harness: a private profile plus skill templates the user turns into their own private skills. Entry point: bin/devctx.mjs -> src/cli.mjs, which dispatches '<group> <action>' commands to src/<area>/commands.mjs modules. Every command prints a JSON envelope {ok, command, result | error} (schemas/envelope.schema.json)."
+    },
+    {
+      "content": "Key boundary: the public kit (this repository: code, schemas, generic templates, tests) never contains private data. Pilot configuration, project records, profiles, drafts and operation receipts live under separate private roots described in docs/STORAGE.md. Stateful commands require an explicit pilot file (disposable pilot) or a live config (one real machine). Writes use preview -> approval (plan fingerprint) -> apply. Records are superseded, never silently overwritten, and carry source hashes (file:, commit:, issue: sources) so briefs can report freshness. When documenting, explain these invariants and point to the tests in test/*.test.mjs that enforce them."
+    },
+    {
+      "content": "Documentation map: user-facing docs live in site/src/content/docs/docs/** (Astro + Starlight site in site/). Maintainer contracts live in docs/*.md. docs/plans/** and docs/research/** are design history; use them for rationale but describe current behaviour from src/ and tests, and clearly label anything that exists only in a plan (for example organization identity routing beyond the auth library in src/auth/) as planned. Ignore site/samples/** (design mockups). Prefer concrete file paths and function names; keep pages concise."
+    }
+  ],
+  "pages": [
+    {
+      "title": "Overview",
+      "purpose": "What devctx is, the problem it solves, the 'clone the developer' vision, repository layout (bin, src, schemas, skills, templates, catalog, scripts, test, docs, site) and how the pieces fit."
+    },
+    {
+      "title": "Architecture",
+      "purpose": "End-to-end flow: repository sources -> onboarding preview -> approval -> private records -> context brief -> agent session -> new records. Public kit vs private roots. Based on docs/ARCHITECTURE.md and src/."
+    },
+    {
+      "title": "CLI and Command Dispatch",
+      "parent": "Architecture",
+      "purpose": "How bin/devctx.mjs and src/cli.mjs parse '<group> <action>' commands and flags, route to src/*/commands.mjs, and emit the JSON envelope; error handling in src/errors.mjs."
+    },
+    {
+      "title": "Configuration, Pilots and Live Mode",
+      "parent": "Architecture",
+      "purpose": "src/config: pilot files, live config, roots, registry, store and doctor; schemas/pilot.schema.json and registry.schema.json; the difference between disposable pilots and live mode."
+    },
+    {
+      "title": "Storage Layout",
+      "parent": "Architecture",
+      "purpose": "src/storage and docs/STORAGE.md: private roots, scopes, projects, records, receipts and locks; how the tracked private-state check keeps private data out of the public repo."
+    },
+    {
+      "title": "Records",
+      "purpose": "src/records and schemas/record.schema.json: record kinds (decision, fact, constraint, command, unknown, handoff), sources and hashing, review status, propose/add/publish, supersession, redaction (src/records/redact.mjs)."
+    },
+    {
+      "title": "Project Onboarding",
+      "parent": "Records",
+      "purpose": "src/onboarding: bounded repository scan, candidate records, preview vs apply, re-onboarding and retirement of stale candidates; repository identity in src/identity."
+    },
+    {
+      "title": "Context Briefs",
+      "parent": "Records",
+      "purpose": "src/context: project resolution from scope and working directory, brief assembly, item and byte limits, ordering, freshness of sources, omitted items."
+    },
+    {
+      "title": "Handoffs and Export",
+      "parent": "Records",
+      "purpose": "src/handoff: advisory handoffs, selected-record Markdown export, portable packets and the privacy checks applied before export (docs/HANDOFF.md)."
+    },
+    {
+      "title": "Coding Agent Integration",
+      "purpose": "src/agents and skills/: installing bundled skills (devctx-resume, devctx-record, devctx-onboard, devctx-setup, devctx-create-skill) into Claude Code and Codex homes, ownership tracking, status, uninstall beside foreign skills, rollback check; docs/AGENT-PROTOCOL.md."
+    },
+    {
+      "title": "Bundled Skills",
+      "parent": "Coding Agent Integration",
+      "purpose": "What each skill in skills/*/SKILL.md does, when an agent invokes it, and which devctx commands it runs."
+    },
+    {
+      "title": "Personal Harness",
+      "purpose": "src/profile, templates/ and docs/HARNESS.md: the private personal profile, devctx-setup, skill templates (stack-watch, slack-update, writing) and turning templates into private skills."
+    },
+    {
+      "title": "Stack Watch",
+      "parent": "Personal Harness",
+      "purpose": "src/stack and catalog/stack-sources.json: watching vendor and product announcements relevant to the user's stack (not version/CVE tracking); plan, approve, check, digest, per-scope digests and seen state."
+    },
+    {
+      "title": "Drafts",
+      "parent": "Personal Harness",
+      "purpose": "src/drafts: saving private drafts (for example Slack updates) without sending anything."
+    },
+    {
+      "title": "Skill Builder",
+      "purpose": "src/skill-builder and docs/SKILL-BUILDER.md: requirements, design approval, immutable drafts, validation, templates and local install of private skills."
+    },
+    {
+      "title": "Skill Sources",
+      "parent": "Skill Builder",
+      "purpose": "src/skill-sources, catalog/skill-sources.json and docs/SKILL-SOURCES.md: the curated source catalog, release checks, pinned acquisition, package review and reviewed disposable installation."
+    },
+    {
+      "title": "Identity and Organization Routing",
+      "purpose": "src/auth (connector, approval, secret references, fake provider), schemas/account.schema.json and binding.schema.json, docs/AUTH.md and the organization identity routing plan: binding each scope to its own GitHub and Slack accounts, exact-match identity checks, read/draft first. Label what is implemented versus planned."
+    },
+    {
+      "title": "Company Hub Proposals",
+      "parent": "Identity and Organization Routing",
+      "purpose": "src/hubs: proposing reviewed learnings to a private company knowledge hub; what is and is not written."
+    },
+    {
+      "title": "Security Model",
+      "purpose": "docs/SECURITY-MODEL.md and docs/LIMITATIONS.md: trust boundaries, the pilot fence (not a sandbox), secrets handling, approvals and fingerprints, what devctx does not protect against."
+    },
+    {
+      "title": "Testing and Acceptance",
+      "purpose": "test/*.test.mjs, scripts/run-tests.mjs, scripts/acceptance.mjs, scripts/check-package.mjs and CI (.github/workflows/ci.yml, docs/CI.md): how to run tests, synthetic acceptance pilots and package checks."
+    },
+    {
+      "title": "Contributing and Releasing",
+      "purpose": "CONTRIBUTING.md, SECURITY.md, docs/RELEASING.md and the documentation site in site/: development setup, public-safe examples, release gates, and how to update the docs site."
+    }
+  ]
+}

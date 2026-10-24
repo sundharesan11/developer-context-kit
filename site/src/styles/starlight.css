@@ -1,0 +1,164 @@
+/*
+ * devctx "Night" theme for Starlight.
+ * Tokens mirror the landing page (site/src/styles/landing.css :root):
+ *   --bg #06080f, --bg-2 #090d18, --surface #0e1321, --surface-2 #131a2b,
+ *   --surface-3 #1a2236, --text #edf0f7, --muted #a6b0c4, --faint #808aa2,
+ *   --accent #ff8a3d, --accent-2 #ffb07a, --accent-ink #1c0c02.
+ * Unlayered rules here win over Starlight's @layer styles.
+ */
+
+/* ---------- Dark (default) ---------- */
+:root {
+	--sl-font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--sl-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+	--dx-display: 'Inter Tight', 'Inter', system-ui, sans-serif;
+
+	--sl-color-white: #ffffff;
+	--sl-color-gray-1: #edf0f7;
+	--sl-color-gray-2: #c9d0de;
+	--sl-color-gray-3: #a6b0c4;
+	--sl-color-gray-4: #808aa2;
+	--sl-color-gray-5: #26304a;
+	--sl-color-gray-6: #0e1321;
+	--sl-color-black: #06080f;
+
+	--sl-color-accent-low: #3a1d08;
+	--sl-color-accent: #ff8a3d;
+	--sl-color-accent-high: #ffb07a;
+
+	--sl-color-text: #c9d0de;
+	--sl-color-text-accent: #ffb07a;
+	--sl-color-text-invert: #1c0c02;
+	--sl-color-bg: #06080f;
+	--sl-color-bg-nav: rgba(6, 8, 15, 0.86);
+	--sl-color-bg-sidebar: #090d18;
+	--sl-color-bg-inline-code: #131a2b;
+	--sl-color-bg-accent: #ff8a3d;
+	--sl-color-hairline-light: rgba(150, 170, 215, 0.2);
+	--sl-color-hairline: rgba(150, 170, 215, 0.11);
+	--sl-color-hairline-shade: #06080f;
+	--sl-color-backdrop-overlay: rgba(6, 8, 15, 0.72);
+}
+
+/* ---------- Light ---------- */
+:root[data-theme='light'] {
+	--sl-color-white: #0b1020;
+	--sl-color-gray-1: #131a2b;
+	--sl-color-gray-2: #2c3550;
+	--sl-color-gray-3: #4a546d;
+	--sl-color-gray-4: #6b7590;
+	--sl-color-gray-5: #c9d0de;
+	--sl-color-gray-6: #eef1f7;
+	--sl-color-gray-7: #f6f8fc;
+	--sl-color-black: #ffffff;
+
+	--sl-color-accent-low: #ffe3cf;
+	--sl-color-accent: #c2540f;
+	--sl-color-accent-high: #8a3606;
+
+	--sl-color-text: #2c3550;
+	--sl-color-text-accent: #b14a08;
+	--sl-color-text-invert: #ffffff;
+	--sl-color-bg: #ffffff;
+	--sl-color-bg-nav: rgba(255, 255, 255, 0.9);
+	--sl-color-bg-sidebar: #f6f8fc;
+	--sl-color-bg-inline-code: #eef1f7;
+	--sl-color-bg-accent: #c2540f;
+	--sl-color-hairline-light: #e2e6ef;
+	--sl-color-hairline: #e2e6ef;
+	--sl-color-hairline-shade: #c9d0de;
+	--sl-color-backdrop-overlay: rgba(40, 48, 70, 0.5);
+}
+
+/* ---------- Header ---------- */
+.header {
+	backdrop-filter: blur(14px) saturate(140%);
+	-webkit-backdrop-filter: blur(14px) saturate(140%);
+	border-bottom: 1px solid var(--sl-color-hairline);
+}
+.site-title {
+	font-family: var(--dx-display);
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	color: var(--sl-color-white);
+}
+.site-title img {
+	width: 26px;
+	height: 26px;
+}
+
+/* ---------- Typography ---------- */
+.sl-markdown-content :is(h1, h2, h3, h4),
+h1#_top {
+	font-family: var(--dx-display);
+	letter-spacing: -0.025em;
+	font-weight: 600;
+}
+h1#_top {
+	letter-spacing: -0.035em;
+}
+.sl-markdown-content a {
+	text-underline-offset: 3px;
+	text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+}
+.sl-markdown-content a:hover {
+	text-decoration-color: currentColor;
+}
+.sl-markdown-content :not(pre) > code {
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 5px;
+	padding: 0.1em 0.35em;
+}
+
+/* ---------- Sidebar ---------- */
+nav.sidebar .group-label .large {
+	font-family: var(--sl-font-mono);
+	font-size: 0.72rem;
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--sl-color-accent);
+}
+:root[data-theme='light'] nav.sidebar .group-label .large {
+	color: var(--sl-color-text-accent);
+}
+nav.sidebar a[aria-current='page'],
+nav.sidebar a[aria-current='page']:hover,
+nav.sidebar a[aria-current='page']:focus {
+	background: color-mix(in srgb, var(--sl-color-accent) 14%, transparent);
+	color: var(--sl-color-white);
+	box-shadow: inset 2px 0 0 var(--sl-color-accent);
+}
+
+/* ---------- Focus ---------- */
+:focus-visible {
+	outline: 2px solid var(--sl-color-accent);
+	outline-offset: 3px;
+}
+
+/* ---------- Code blocks (Expressive Code) ---------- */
+.expressive-code {
+	--ec-brdRad: 12px;
+}
+
+/* ---------- Cards ---------- */
+.sl-markdown-content .card {
+	border-radius: 14px;
+	border-color: var(--sl-color-hairline-light);
+	background: color-mix(in srgb, var(--sl-color-gray-6) 55%, transparent);
+}
+
+/* ---------- Asides: note uses the Night "cool" teal instead of stock blue ---------- */
+:root {
+	--sl-color-blue-low: #0f2a2c;
+	--sl-color-blue: #74e0cc;
+	--sl-color-blue-high: #b5f1e5;
+}
+:root[data-theme='light'] {
+	--sl-color-blue-low: #dcf5ef;
+	--sl-color-blue: #138a76;
+	--sl-color-blue-high: #0b5a4d;
+}
+.starlight-aside {
+	border-radius: 0 10px 10px 0;
+}

@@ -1,0 +1,22 @@
+---
+// Adds a text link back to the landing page and DeepWiki before the
+// default social icons in the Starlight header.
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+import { withBase } from '../../site';
+---
+
+<a class="dx-header-link" href={withBase("/")}>Home</a>
+<a class="dx-header-link" href="https://deepwiki.com/sundharesan11/developer-context-kit" target="_blank" rel="noopener">Ask DeepWiki</a>
+<Default />
+
+<style>
+	.dx-header-link {
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-sm);
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	.dx-header-link:hover {
+		color: var(--sl-color-white);
+	}
+</style>

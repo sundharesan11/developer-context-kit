@@ -1,0 +1,43 @@
+---
+// [marquee] Command marquee between the pillars and the CLI section (v3-lab 16 / v3-2-vector E8).
+// Decorative only: the same commands are listed, with descriptions, in Commands.astro.
+const big = [
+	{ cmd: 'context brief', hot: true },
+	{ cmd: 'record add' },
+	{ cmd: 'project onboard' },
+	{ cmd: 'handoff export', hot: true },
+	{ cmd: 'stack digest' },
+	{ cmd: 'context resolve' },
+	{ cmd: 'record supersede', hot: true },
+	{ cmd: 'agents install' },
+];
+const small = [
+	'doctor',
+	'record propose',
+	'skill template-seed',
+	'profile apply',
+	'context brief',
+	'project onboard',
+	'handoff export',
+	'context resolve',
+	'agents install',
+];
+// Each track is rendered twice so the -50% translate loops seamlessly.
+const copies = [0, 1];
+---
+<div class="marquee" aria-hidden="true">
+  <div class="mq-row mq-a">
+    {copies.map(() => (
+      <div class="mq-track">
+        {big.map((b) => (<><span class={b.hot ? 'hot' : undefined}>{b.cmd}</span><i></i></>))}
+      </div>
+    ))}
+  </div>
+  <div class="mq-row mq-b">
+    {copies.map(() => (
+      <div class="mq-track">
+        {small.map((c) => (<span><b>$</b> devctx {c}</span>))}
+      </div>
+    ))}
+  </div>
+</div>
