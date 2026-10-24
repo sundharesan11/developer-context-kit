@@ -1,0 +1,23 @@
+---
+import { DOCS } from '../../site';
+---
+<section class="band" aria-labelledby="install-title">
+  <div class="wrap reveal">
+    <div class="kicker" style="justify-content:center">Get started</div>
+    <h2 class="h2" id="install-title" data-words>One command to begin.</h2>
+    <!-- TODO: confirm install command at release -->
+    <div class="band-cmd">
+      <span><span class="p" aria-hidden="true">$ </span>npx devctx init</span>
+      <button class="copy" type="button" data-copy="npx devctx init">Copy</button>
+    </div>
+    <div class="steps">
+      <span><b>01</b>devctx project onboard</span>
+      <span><b>02</b>devctx agents install</span>
+      <span><b>03</b>open your agent → /devctx-resume</span>
+    </div>
+    <div class="band-links">
+      <a class="btn btn-primary" href={DOCS.installation}>Get started <span aria-hidden="true">→</span></a>
+      <a class="btn btn-ghost" href={DOCS.quickstart}>Quickstart</a>
+    </div>
+  </div>
+</section>

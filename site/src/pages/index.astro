@@ -1,0 +1,135 @@
+---
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter-tight/500.css';
+import '@fontsource/inter-tight/600.css';
+import '@fontsource/inter-tight/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '../styles/landing.css';
+import '../styles/motion.css';
+import { withBase } from '../site';
+
+import Nav from '../components/landing/Nav.astro';
+import Hero from '../components/landing/Hero.astro';
+import Pillars from '../components/landing/Pillars.astro';
+import Commands from '../components/landing/Commands.astro';
+import InstallBand from '../components/landing/InstallBand.astro';
+import OpenSource from '../components/landing/OpenSource.astro';
+import FinalCta from '../components/landing/FinalCta.astro';
+import CommandMarquee from '../components/landing/CommandMarquee.astro';
+import Footer from '../components/landing/Footer.astro';
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>devctx — Clone the developer</title>
+<meta name="description" content="Developer Context Kit (devctx) is an open-source, local-first CLI and harness that carries your project context, decisions and accounts into every coding-agent session.">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href={withBase("/favicon.svg")} type="image/svg+xml">
+<!-- Motion gate, before first paint: motion is on unless prefers-reduced-motion asks otherwise. -->
+<script is:inline>(function(){var r=document.documentElement,on=!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);r.classList.add('js',on?'m-on':'m-off')})();</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<Nav />
+
+<main id="main">
+<Hero />
+<Pillars />
+<CommandMarquee />
+<Commands />
+<InstallBand />
+<OpenSource />
+<FinalCta />
+</main>
+
+<Footer />
+
+<!-- Behaviour ported from the sample: reveal-on-scroll, copy buttons, agent tabs and the
+     account switcher. Motion follows the html.m-on / html.m-off gate set in <head>. -->
+<script is:inline>
+(function(){
+  document.documentElement.classList.add('js');
+  var root = document.documentElement;
+  var reduce = !root.classList.contains('m-on');
+
+  // reveal on scroll
+  var els = document.querySelectorAll('.reveal');
+  if (reduce || !('IntersectionObserver' in window)) {
+    els.forEach(function(e){ e.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if (en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
+    }, {rootMargin:'0px 0px -8% 0px', threshold:.08});
+    els.forEach(function(e){ io.observe(e); });
+  }
+
+  // copy buttons
+  document.querySelectorAll('[data-copy]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var t = b.getAttribute('data-copy');
+      var done = function(){ b.textContent = 'Copied'; setTimeout(function(){ b.textContent = 'Copy'; }, 1600); };
+      if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, done); else done();
+    });
+  });
+
+  // agent tabs
+  var tabs = document.querySelectorAll('.tab');
+  var panel = document.getElementById('brief-panel');
+  var cmdEl = panel.querySelector('[data-agent-cmd]');
+  function selectTab(tab){
+    tabs.forEach(function(t){ var on = t === tab; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
+    panel.setAttribute('aria-labelledby', tab.id);
+    cmdEl.textContent = tab.dataset.agent === 'cc' ? '/devctx-resume' : 'devctx-resume';
+  }
+  tabs.forEach(function(t, i){
+    t.addEventListener('click', function(){ selectTab(t); });
+    t.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft'){
+        var n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+        selectTab(n); n.focus(); e.preventDefault();
+      }
+    });
+  });
+
+  // account switcher
+  var data = {
+    acme:{cwd:'~/work/acme/atlas', gh:'@sam-acme', ghOrg:'acme-corp', sl:'Sam R.', slWs:'acme.slack.com', repo:'acme-corp/atlas', wrong:'@sam-gx'},
+    globex:{cwd:'~/work/globex/ledger', gh:'@sam-gx', ghOrg:'globex', sl:'Sam', slWs:'globex.slack.com', repo:'globex/ledger', wrong:'@sam-acme'}
+  };
+  var acct = document.getElementById('acct');
+  var auto = true, timer;
+  function setScope(s){
+    var d = data[s];
+    acct.dataset.scope = s;
+    acct.querySelectorAll('.scope-switch button').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.scope === s); });
+    document.getElementById('acct-cwd').innerHTML = 'cwd <b>' + d.cwd + '</b> → scope <b>' + s + '</b>';
+    acct.querySelector('[data-gh]').innerHTML = d.gh + '<small>GitHub · ' + d.ghOrg + '</small>';
+    acct.querySelector('[data-sl]').innerHTML = d.sl + '<small>Slack · ' + d.slWs + '</small>';
+    document.getElementById('r-repo').textContent = d.repo;
+    document.getElementById('r-who').textContent = d.wrong;
+    acct.querySelector('.refuse .muted').textContent = 'scope ' + s + ' is bound to ' + d.gh;
+  }
+  acct.querySelectorAll('.scope-switch button').forEach(function(b){
+    b.addEventListener('click', function(){ auto = false; clearInterval(timer); setScope(b.dataset.scope); });
+  });
+  if (auto) {
+    timer = setInterval(function(){
+      if (!root.classList.contains('m-on')) return;
+      var r = acct.getBoundingClientRect();
+      if (r.top < innerHeight && r.bottom > 0) setScope(acct.dataset.scope === 'acme' ? 'globex' : 'acme');
+    }, 5000);
+  }
+})();
+</script>
+<script>
+  import '../scripts/motion.ts';
+</script>
+</body>
+</html>

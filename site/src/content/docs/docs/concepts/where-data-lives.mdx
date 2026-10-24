@@ -1,0 +1,135 @@
+---
+title: Where your data lives
+description: The pilot file, the private store layout, file permissions, and what stays separate from the public kit.
+sidebar:
+  label: Where data lives
+---
+
+import { FileTree } from '@astrojs/starlight/components';
+
+`devctx` keeps two things apart: the **kit**, which is public code you clone, and your **store**, which holds everything you add. The store lives in private folders outside the kit and outside your repositories. Nothing moves from the store into the kit, and nothing is uploaded anywhere.
+
+## The pilot file
+
+Every stateful command takes `--pilot <file>`. The pilot file is a small JSON document that says which folders `devctx` may use:
+
+```json title="pilot.json"
+{
+  "schemaVersion": 1,
+  "pilotRoot": "/private/tmp/devctx-demo.WlXG7p",
+  "configRoot": "/private/tmp/devctx-demo.WlXG7p/config",
+  "dataRoot": "/private/tmp/devctx-demo.WlXG7p/data",
+  "stateRoot": "/private/tmp/devctx-demo.WlXG7p/state",
+  "inputsRoot": "/private/tmp/devctx-demo.WlXG7p/inputs",
+  "agentHomes": [],
+  "repos": ["/private/tmp/devctx-demo.WlXG7p/repos/atlas"],
+  "forbidden": []
+}
+```
+
+| Field | Purpose |
+| --- | --- |
+| `pilotRoot` | The folder that contains the store. |
+| `configRoot` | Settings, scopes, project bindings, the project registry and your personal profile. |
+| `dataRoot` | Records, proposals, handoff exports, digests and drafts. |
+| `stateRoot` | Locks, run receipts and other bookkeeping. |
+| `inputsRoot` | Files you hand to `devctx`, such as record bodies for `--body-file` and local policy hubs. |
+| `repos` | Repositories `devctx` may read. Onboarding refuses any other path. |
+| `agentHomes` | Disposable agent folders that test installs may write to. Leave it empty unless you need it. |
+| `forbidden` | Extra paths `devctx` must never touch. |
+
+All paths must be absolute and canonical. The store folders must not be inside a Git repository: `devctx init` refuses with `DEVCTX_PATH_UNSAFE` if they are.
+
+There are two ways to get a pilot file:
+
+- **A disposable pilot** for trying things out, like the one the [Quickstart](/docs/getting-started/quickstart/) writes in a temporary folder.
+- **A live config** at `~/.devctx/live.json` for daily use on your real projects. It adds a `live` block that names your real skill folders and a pinned copy of the kit. See [Live mode](/docs/guides/live-mode/).
+
+## Layout of the store
+
+After the Quickstart, a disposable store looks like this:
+
+<FileTree>
+
+- devctx-demo.WlXG7p/ the pilot root
+  - pilot.json
+  - config/
+    - user.json preferences and actor references from init
+    - registry.json which worktree belongs to which project
+    - scopes/
+      - example.json scope settings, hubs and policies
+    - projects/
+      - example/
+        - example.atlas/
+          - v1.json binding: worktree paths, remotes, approved source hashes
+    - profile/ your personal profile and its revisions, once set
+  - data/
+    - scopes/
+      - example/
+        - projects/
+          - example.atlas/
+            - records/
+              - rec_94315938d3e27ab174b5665d/
+                - record.json kind, status, title, sources, hashes
+                - body.md the record body
+              - …
+            - proposals/ records waiting for review
+            - operations/ manifests of each onboarding
+            - staging/ in-progress writes
+    - exports/
+      - handoffs/
+        - example/
+          - example.atlas/
+            - search.handoff.md
+  - state/
+    - locks/
+    - runs/
+      - run_acec42756c3bbc296b7b7c32/
+        - receipt.json
+  - inputs/ files you supply, such as record bodies
+  - repos/
+    - atlas/ the demo repository, never written by devctx
+
+</FileTree>
+
+Other features add their own folders as you use them: `data/digests/` and `data/drafts/` for the [stack watch](/docs/guides/stack-watch/) and saved drafts, `state/stack/` for its approvals, and skill workspaces for the [personal harness](/docs/guides/personal-harness/). Scoped versions of these live under `data/scopes/<scope>/`.
+
+## Live mode layout
+
+In live mode, everything private lives under one folder in your home directory:
+
+<FileTree>
+
+- ~/.devctx/ mode 0700, created by you
+  - live.json the live config
+  - kit/ a separate clone of the kit, pinned to a reviewed commit
+  - store/ the pilot root
+    - config/
+    - data/
+    - state/
+    - inputs/
+
+</FileTree>
+
+Outside this folder, live mode writes only `devctx-*` skill folders inside `~/.claude/skills` and `~/.agents/skills`, and only when you install the bundled skills. See [Live mode](/docs/guides/live-mode/).
+
+## Protection and its limits
+
+- **Private file modes.** New files are created with mode `0600` and folders with `0700`, so other users on the machine can't read them.
+- **Not encrypted.** `devctx` does not encrypt the store. Use full-disk encryption, such as FileVault on macOS.
+- **No backup and no sync.** The store exists only on your disk. If you lose it, you lose its records. Back up `~/.devctx` with your usual backup tool if the context matters to you.
+- **The fence is not a sandbox.** `devctx` refuses to write outside the pilot's folders and always refuses your real agent homes (`~/.claude`, `~/.codex`, `~/.agents`, `~/.gemini`, `~/.cursor`, `~/.commandcode`, plus `$CLAUDE_CONFIG_DIR` and `$CODEX_HOME` when set) and the kit checkout. That limits the CLI, not other programs: any process running as you, including your agent, can still read the store.
+
+Read the [Security model](/docs/security/security-model/) for the full set of assumptions.
+
+## Don't edit the store by hand
+
+Records, bindings and manifests are cross-checked by hash. If you edit or move a file, `devctx` treats it as corrupt. A corrupt record you added drops out of briefs, and handoff exports for that project fail with `DEVCTX_INTEGRITY`. A corrupt record written by onboarding goes further: every brief for that project fails with `DEVCTX_RECOVERY_REQUIRED`.
+
+Run `devctx doctor --pilot "$PILOT"` to check the store's health. It reports corrupt records, leftover locks and incomplete writes without changing anything. There is no repair command, so keep the files as they are and see the [error reference](/docs/reference/errors/) before you act.
+
+To change a record, [supersede it](/docs/concepts/records/#records-are-immutable). To remove a demo store, delete its folder yourself: `devctx` never deletes your data.
+
+## What's in the public kit
+
+The kit you clone contains only the CLI code, data schemas, generic skill templates, catalogs, tests and documentation. It never contains your records or profile. The kit's own package check fails if private-looking paths, such as `records/`, `profile/` or `drafts/`, are ever committed to it, so a personal fork stays clean too.

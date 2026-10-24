@@ -1,0 +1,10 @@
+---
+// [readout] Live CLI readout above the command grid (v3-lab 15 / v3-3-teletype TT-11):
+// braille spinner, ▁▂▃▅▇ sparkline and a block meter. The markup is the resting frame;
+// src/scripts/motion.ts animates it while it is on screen and motion is on.
+---
+<div class="readout" aria-hidden="true">
+  <span class="ro ro-a"><span class="spin">⠋</span><span class="ro-k">status</span><span class="ro-s">watching acme.atlas</span></span>
+  <span class="ro"><span class="ro-k">records/day</span><span class="spark">▁▂▃▅▇▅▃▂▁▂▃▅▆▅▃▂</span></span>
+  <span class="ro"><span class="ro-k">brief</span><span class="meter"><span class="e">▕</span><span class="f">███████████</span><span class="e e2">░░░</span><span class="e">▏</span></span><span class="ro-n">3.1 KB</span></span>
+</div>

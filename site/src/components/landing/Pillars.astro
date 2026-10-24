@@ -1,0 +1,252 @@
+---
+import { DOCS } from '../../site';
+
+// Kept as strings so the line breaks inside these white-space:pre trees
+// survive Astro's HTML whitespace compression.
+const kitTree = `<span class="d">developer-context-kit/</span>
+├─ bin/devctx.mjs
+├─ skills/
+│  ├─ devctx-resume/
+│  ├─ devctx-record/
+│  └─ devctx-onboard/
+├─ templates/
+└─ LICENSE  <span class="muted">Apache-2.0</span>`;
+const dataTree = `<span class="d">~/.devctx/</span>  <span class="muted">0700</span>
+├─ profile/
+├─ scopes/
+│  ├─ acme/
+│  │  └─ acme.atlas/
+│  └─ globex/
+├─ skills/  <span class="muted">yours</span>
+└─ exports/handoffs/`;
+// Each tree line gets its own span so the trees can print in line by line (motion on only).
+const lines = (tree: string) =>
+	tree.split('\n').map((l, i) => `<span class="ln" style="--i:${i}">${l}</span>`).join('\n');
+---
+<section class="section" aria-labelledby="pillars-title" style="padding-bottom:40px">
+  <div class="wrap">
+    <div class="intro reveal">
+      <div class="kicker">What devctx is</div>
+      <h2 class="h2" id="pillars-title" data-words>A second you, <span class="soft">in every session.</span></h2>
+      <p>Agents read your code. They don't know why the queue moved to SQS, which test command actually works, where you stopped yesterday, or which GitHub account belongs to this client. devctx does — and hands it over the moment a session starts.</p>
+    </div>
+
+    <!-- Pillar 1 -->
+    <article class="pillar" id="context" aria-labelledby="p1">
+      <div class="p-copy reveal">
+        <div class="p-num"><span>01</span> Project context</div>
+        <h3 id="p1">Context that carries over — with receipts.</h3>
+        <p>Decisions, facts, constraints, commands, unknowns and handoffs live as records outside the repo. Every record points at where it came from, gets reviewed before an agent sees it, and is superseded — never silently overwritten.</p>
+        <ul class="ticks">
+          <li><span><b>Source-linked.</b> A file range, a commit, an issue — hashed, so drift shows.</span></li>
+          <li><span><b>Reviewed first.</b> Agents <code>record propose</code>; you approve.</span></li>
+          <li><span><b>History kept.</b> <code>record supersede</code> links old to new.</span></li>
+        </ul>
+        <a class="p-more" href={DOCS.records}>How records work <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="frame reveal">
+        <div class="frame-in">
+          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">Review · acme.atlas</span><span class="right"><span class="pill acc">3 proposed</span></span></div>
+          <div class="review">
+            <div class="queue" role="list" aria-label="Proposed records">
+              <h5>Proposed</h5>
+              <span class="q-item on" role="listitem">Cursor pagination for /tasks<small>decision · by agent</small></span>
+              <span class="q-item" role="listitem">Integration tests need Docker<small>constraint · by agent</small></span>
+              <span class="q-item" role="listitem">Who owns the v1 webhook?<small>unknown · by you</small></span>
+            </div>
+            <div class="rec">
+              <div class="rec-top"><span class="pill acc">decision</span><span class="pill">proposed</span><span class="pill">acme.atlas</span></div>
+              <h4>Use cursor pagination for /tasks</h4>
+              <p>Offset paging skipped rows under concurrent inserts. Cursor on <span class="mono" style="font-size:12.5px;color:#c9d0de">(created_at, id)</span>; page size capped at 100.</p>
+              <div class="srcs">
+                <div class="src-row"><span class="k">file</span><span class="v">src/api/tasks.ts:40–88</span><span class="h">sha 3e1f…</span></div>
+                <div class="src-row"><span class="k">commit</span><span class="v">9f2c1ab · switch list to cursor</span><span class="h">main</span></div>
+                <div class="src-row"><span class="k">issue</span><span class="v">#148 · duplicate tasks on page 2</span><span class="h">open</span></div>
+              </div>
+              <div class="supers">supersedes <s>dec_7Q2 · “offset paging is fine for v1”</s></div>
+              <div class="rec-act">
+                <span class="btn btn-primary btn-sm" aria-hidden="true">Approve</span>
+                <span class="btn btn-ghost btn-sm" aria-hidden="true">Edit</span>
+                <span class="btn btn-ghost btn-sm" aria-hidden="true">Reject</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Pillar 2 -->
+    <article class="pillar flip" id="agents" aria-labelledby="p2">
+      <div class="p-copy reveal">
+        <div class="p-num"><span>02</span> Every agent</div>
+        <h3 id="p2">Claude Code today. Codex tomorrow. Same brief.</h3>
+        <p>At session start the agent loads a bounded brief — the few things that matter for this project, ranked and cited. Switch tools mid-week and nothing is lost: every agent reads the same reviewed context.</p>
+        <ul class="ticks">
+          <li><span><code>devctx-resume</code> loads the brief into the session.</span></li>
+          <li><span><code>devctx-record</code> captures a decision as you make it.</span></li>
+          <li><span><code>devctx-onboard</code> scans a repo into reviewed context.</span></li>
+          <li><span><code>handoff export</code> writes a clean Markdown packet for a person.</span></li>
+        </ul>
+        <a class="p-more" href={DOCS.codingAgents}>Set up your coding agents <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="frame reveal">
+        <div class="frame-in">
+          <div class="tabs" role="tablist" aria-label="Agent">
+            <button class="tab" role="tab" id="tab-cc" aria-selected="true" aria-controls="brief-panel" data-agent="cc">Claude Code</button>
+            <button class="tab" role="tab" id="tab-cx" aria-selected="false" aria-controls="brief-panel" data-agent="cx" tabindex="-1">Codex</button>
+          </div>
+          <div class="f-body" id="brief-panel" role="tabpanel" aria-labelledby="tab-cc">
+            <div class="agent-line">
+              <span class="cmd"><span class="p" data-agent-prompt>›</span> <span data-agent-cmd>/devctx-resume</span></span>
+              <span class="pill ok">brief loaded</span>
+            </div>
+            <div class="brief">
+              <div class="brief-h"><span><b>acme.atlas</b> <span class="muted">· brief · 2026-10-24</span></span><span class="muted">14 records · 3.1 KB</span></div>
+              <div class="bsec"><h4>Decisions</h4>
+                <div class="brow"><span class="dot"></span><span>Cursor pagination for /tasks</span><span class="src">#148 · 9f2c1ab</span></div>
+                <div class="brow"><span class="dot"></span><span>Jobs go through SQS, not Redis streams</span><span class="src">ADR-0007</span></div>
+              </div>
+              <div class="bsec"><h4>Constraints</h4>
+                <div class="brow"><span class="dot"></span><span>Workers never write to billing tables</span><span class="src">#212</span></div>
+              </div>
+              <div class="bsec"><h4>Commands</h4>
+                <div class="brow"><span class="dot c"></span><span>npm test -- --runInBand</span><span class="src">package.json</span></div>
+              </div>
+              <div class="bsec"><h4>Unknowns</h4>
+                <div class="brow"><span class="dot q"></span><span>Is the v1 webhook still called by mobile?</span><span class="src">open</span></div>
+              </div>
+              <div class="bsec"><h4>Last handoff</h4>
+                <div class="brow"><span class="dot"></span><span>Retry backoff half done — src/jobs/retry.ts</span><span class="src">yesterday</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Pillar 3 -->
+    <article class="pillar" id="accounts" aria-labelledby="p3">
+      <div class="p-copy reveal">
+        <div class="p-num"><span>03</span> Accounts</div>
+        <h3 id="p3">The right account, in every org.</h3>
+        <p>Work for two companies? Bind each scope to its own GitHub and Slack accounts. Open a project and devctx resolves its org — the agent acts as that org's you, with that org's credentials.</p>
+        <ul class="ticks">
+          <li><span><b>Automatic.</b> <code>context resolve</code> picks the identity from the project.</span></li>
+          <li><span><b>Refused on mismatch.</b> A globex token never touches an acme repo.</span></li>
+          <li><span><b>Kept apart.</b> Credentials never live in records or briefs.</span></li>
+        </ul>
+        <a class="p-more" href={DOCS.identityRouting}>Route identities per org <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="frame reveal">
+        <div class="frame-in">
+          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">devctx · identity</span><span class="right"><span class="pill" id="acct-pill">resolved</span></span></div>
+          <div class="acct" data-scope="acme" id="acct">
+            <div class="scope-switch" role="group" aria-label="Active scope">
+              <button type="button" aria-pressed="true" data-scope="acme"><i aria-hidden="true"></i>acme</button>
+              <button type="button" aria-pressed="false" data-scope="globex" class="gx"><i aria-hidden="true"></i>globex</button>
+            </div>
+            <p class="cwd swap" id="acct-cwd">cwd <b>~/work/acme/atlas</b> → scope <b>acme</b></p>
+            <div class="ids swap" id="acct-ids" aria-live="polite">
+              <div class="idrow">
+                <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 16 16"><path fill="#edf0f7" d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></span>
+                <span class="who" data-gh>@sam-acme<small>GitHub · acme-corp</small></span>
+                <span class="pill ok">active</span>
+              </div>
+              <div class="idrow">
+                <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#edf0f7" stroke-width="2" stroke-linecap="round"><path d="M9 3v8M15 13v8M3 15h8M13 9h8"/><path d="M9 3a2 2 0 1 1 2 2H9M15 21a2 2 0 1 1-2-2h2M3 15a2 2 0 1 1 2-2v2M21 9a2 2 0 1 1-2 2V9"/></svg></span>
+                <span class="who" data-sl>Sam R.<small>Slack · acme.slack.com</small></span>
+                <span class="pill ok">active</span>
+              </div>
+            </div>
+            <div class="refuse" id="acct-refuse"><b>✕ refused</b> push to <span id="r-repo">acme-corp/atlas</span> as <span id="r-who">@sam-gx</span><br><span class="muted">scope acme is bound to @sam-acme</span></div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Pillar 4 -->
+    <article class="pillar flip" id="harness" aria-labelledby="p4">
+      <div class="p-copy reveal">
+        <div class="p-num"><span>04</span> Your harness</div>
+        <h3 id="p4">Make it yours. Then make more.</h3>
+        <p>Clone the kit, set up a private profile, and turn templates into your own private skills. The kit ships the patterns; your profile supplies the taste.</p>
+        <ul class="ticks">
+          <li><span><b>Stack watch.</b> Vendor announcements that touch what you build — a new Claude model, an auth-provider release.</span></li>
+          <li><span><b>Slack updates.</b> Drafts in your voice from what actually changed.</span></li>
+          <li><span><b>Writing style.</b> Your rules, applied by every agent.</span></li>
+        </ul>
+        <a class="p-more" href={DOCS.personalHarness}>Build your personal harness <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="frame reveal">
+        <div class="frame-in">
+          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">devctx skill template-seed</span><span class="right"><span class="pill">profile: sam</span></span></div>
+          <div class="gallery">
+            <div class="tpl on">
+              <span class="tpl-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff8a3d" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 16 0"/><path d="M8 12a4 4 0 0 1 8 0"/><circle cx="12" cy="12" r="1.5" fill="#ff8a3d"/></svg></span>
+              <h4>Stack-update watch</h4>
+              <p>Announcements filtered by the dependencies in your projects.</p>
+              <code>template-seed stack-watch</code>
+            </div>
+            <div class="tpl">
+              <span class="tpl-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a6b0c4" stroke-width="2" stroke-linecap="round"><path d="M4 5h16v11H9l-5 4z"/></svg></span>
+              <h4>Slack update draft</h4>
+              <p>A weekly update from records and handoffs, in your tone.</p>
+              <code>template-seed slack-update</code>
+            </div>
+            <div class="tpl">
+              <span class="tpl-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a6b0c4" stroke-width="2" stroke-linecap="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></span>
+              <h4>Writing style</h4>
+              <p>Your voice for docs, PRs and messages.</p>
+              <code>template-seed writing</code>
+            </div>
+            <div class="tpl add">
+              <span class="tpl-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a6b0c4" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+              <h4>Your next skill</h4>
+              <p>Templates are just files. Write one.</p>
+            </div>
+          </div>
+          <div class="digest">
+            <div class="cmd"><span class="p">$</span> devctx stack digest</div>
+            <div><span class="acc">●</span> New Claude model available <span class="muted">— you use @anthropic-ai/sdk in 3 projects</span></div>
+            <div><span class="acc">●</span> Auth provider SDK major release <span class="muted">— matches acme.atlas</span></div>
+            <div class="muted">2 relevant · 31 skipped as unrelated</div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Pillar 5 -->
+    <article class="pillar" id="disk" aria-labelledby="p5">
+      <div class="p-copy reveal">
+        <div class="p-num"><span>05</span> Local-first</div>
+        <h3 id="p5">Yours. On your disk.</h3>
+        <p>The public kit and your private data live in separate places. Records, profiles and exports stay on your machine with private permissions. Nothing syncs anywhere — your repos stay untouched.</p>
+        <ul class="ticks">
+          <li><span><b>Public kit, private data.</b> Update the kit without touching your context.</span></li>
+          <li><span><b>No account, no server.</b> Plain files you can read, back up and diff.</span></li>
+          <li><span><b><code>devctx doctor</code></b> checks the boundaries for you.</span></li>
+        </ul>
+        <a class="p-more" href={DOCS.whereDataLives}>Where your data lives <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="frame reveal">
+        <div class="frame-in">
+          <div class="disk">
+            <div>
+              <h5><span class="pill">public</span> the kit</h5>
+<div class="tree" set:html={lines(kitTree)} />
+            </div>
+            <div>
+              <h5><span class="pill acc">private</span> your data</h5>
+<div class="tree" set:html={lines(dataTree)} />
+            </div>
+          </div>
+          <div class="disk-foot">
+            <span class="cmd"><span class="acc">$</span> devctx doctor</span>
+            <span class="pill ok">kit and data separate</span>
+            <span class="pill ok">no secrets in records</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>

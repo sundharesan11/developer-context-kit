@@ -1,0 +1,29 @@
+---
+import { DOCS } from '../../site';
+import CliReadout from './CliReadout.astro';
+---
+<section class="section" aria-labelledby="cmds-title" style="padding-top:60px">
+  <div class="wrap">
+    <div class="intro reveal">
+      <div class="kicker">The CLI</div>
+      <h2 class="h2" id="cmds-title" data-words>A small, sharp CLI.</h2>
+      <p>Every command previews first and applies when you say so. Agents call the same commands through bundled skills.</p>
+    </div>
+    <CliReadout />
+    <div class="cmds reveal">
+      <div class="cmdc"><code><span>›</span> project onboard</code><p>Scan a repo into proposed context.</p></div>
+      <div class="cmdc"><code><span>›</span> context brief</code><p>The bounded brief for this project.</p></div>
+      <div class="cmdc"><code><span>›</span> context resolve</code><p>Which scope, project and identity apply here.</p></div>
+      <div class="cmdc"><code><span>›</span> record add</code><p>Capture a decision, fact or constraint.</p></div>
+      <div class="cmdc"><code><span>›</span> record propose</code><p>Suggest a record for review.</p></div>
+      <div class="cmdc"><code><span>›</span> record supersede</code><p>Replace a record, keep the history.</p></div>
+      <div class="cmdc"><code><span>›</span> handoff export</code><p>Selected records as a Markdown packet.</p></div>
+      <div class="cmdc"><code><span>›</span> agents install</code><p>Put the skills into Claude Code and Codex.</p></div>
+      <div class="cmdc"><code><span>›</span> profile apply</code><p>Set up your private personal profile.</p></div>
+      <div class="cmdc"><code><span>›</span> skill template-seed</code><p>Turn a template into your own skill.</p></div>
+      <div class="cmdc"><code><span>›</span> stack digest</code><p>Vendor news that matters to your stack.</p></div>
+      <div class="cmdc"><code><span>›</span> doctor</code><p>Check setup, boundaries and permissions.</p></div>
+    </div>
+    <div class="section-more reveal"><a class="p-more" href={DOCS.cli}>Full CLI reference <span aria-hidden="true">→</span></a></div>
+  </div>
+</section>

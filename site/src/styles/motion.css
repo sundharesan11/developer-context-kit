@@ -1,0 +1,193 @@
+/* Landing motion layer, lifted from site/samples/v3-*.html and driven by src/scripts/motion.ts.
+   html.m-on / html.m-off is set before first paint by the gate in src/pages/index.astro.
+   Every animation below runs only under html.m-on; html.m-off (prefers-reduced-motion) is the static,
+   fully drawn resting state, and without JS the page shows its static content. */
+
+/* ---------- reduced motion (html.m-off): still the original page motion too ---------- */
+html.m-off{scroll-behavior:auto}
+html.m-off .d-pulse,html.m-off .d-node-ring{display:none}
+html.m-off .lane .lit,html.m-off .lane .dim,html.m-off .proj-a,html.m-off .proj-b,html.m-off .lit-wire-a,html.m-off .lit-wire-b{animation:none!important}
+html.m-off .lane-acme .lit,html.m-off .lit-wire-a{opacity:1}
+html.m-off .lane-acme .dim{opacity:0}
+html.m-off .lane-globex .lit,html.m-off .lit-wire-b{opacity:0}
+html.m-off .lane-globex .dim{opacity:1}
+html.m-off .proj-a{opacity:1}html.m-off .proj-b{opacity:0}
+html.m-off .reveal{opacity:1!important;transform:none!important;transition:none!important}
+html.m-off .swap,html.m-off .btn,html.m-off .dc-ch{transition:none}
+
+/* ---------- [grid] hero horizon perspective grid (canvas replaces the static ::after grid) ---------- */
+html.js .hero::after{display:none}
+.hero-grid{position:absolute;left:0;top:0;width:100%;max-width:none;z-index:-2;pointer-events:none;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent),linear-gradient(180deg,#000 72%,transparent);
+  -webkit-mask-composite:source-in;
+  mask-image:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent),linear-gradient(180deg,#000 72%,transparent);
+  mask-composite:intersect}
+html:not(.js) .hero-grid{display:none}
+
+/* ---------- [crt] scanlines + vignette (static), rolling bar + power-on (motion on) ---------- */
+.crt{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;
+  -webkit-mask-image:linear-gradient(#000 72%,transparent);mask-image:linear-gradient(#000 72%,transparent)}
+.crt::before{content:"";position:absolute;inset:0;opacity:.6;
+  background:repeating-linear-gradient(to bottom,rgba(255,196,150,.02) 0 1px,rgba(0,0,0,.11) 1px 2px,transparent 2px 3px)}
+.crt::after{content:"";position:absolute;inset:0;
+  background:radial-gradient(130% 95% at 50% 38%,transparent 60%,rgba(2,3,8,.42) 100%)}
+.crt-sweep{position:absolute;left:0;right:0;top:-170px;height:170px;opacity:0;mix-blend-mode:screen;will-change:transform;
+  background:linear-gradient(to bottom,transparent,rgba(255,138,61,.014) 60%,rgba(255,160,100,.04) 96%,rgba(255,206,170,.1))}
+@keyframes crt-sweep{0%{transform:translateY(0);opacity:0}5%{opacity:1}62%{opacity:1}68%,100%{transform:translateY(calc(var(--hh,900px) + 170px));opacity:0}}
+html.m-on .crt-sweep{animation:crt-sweep 11s cubic-bezier(.45,.05,.55,.95) 1.2s infinite;animation-play-state:paused}
+html.m-on .crt.vis .crt-sweep{animation-play-state:running}
+.crt-boot{position:absolute;left:0;right:0;top:24%;height:2px;opacity:0;
+  background:radial-gradient(closest-side,#fff3e8,rgba(255,138,61,.8) 45%,transparent)}
+@keyframes crt-boot{0%{opacity:1;transform:scaleX(0)}22%{opacity:1;transform:scaleX(1)}45%{opacity:.4;transform:scaleY(90)}100%{opacity:0;transform:scaleY(160)}}
+@keyframes crt-power{
+  0%{opacity:0;transform:scale(.985,.03);filter:brightness(2.4)}
+  20%{opacity:1;transform:scale(1,.03)}
+  42%{transform:scale(1,1);filter:brightness(1.5)}
+  52%{opacity:.72}58%{opacity:1}66%{opacity:.86}
+  100%{opacity:1;transform:none;filter:none}}
+html.m-on .hero.boot>.wrap{animation:crt-power .95s cubic-bezier(.2,.7,.2,1) both;transform-origin:50% 24%}
+html.m-on .hero.boot .crt-boot{animation:crt-boot .9s ease-out both}
+
+/* ---------- [decode] glyph decode on headings ---------- */
+/* Until the script splits a heading, hide it under motion-on so scrambled text never flashes after
+   real text; if the script never runs, the delayed keyframe shows it anyway. No JS: plain text. */
+@keyframes dc-wait{from{visibility:hidden}to{visibility:visible}}
+html.m-on [data-decode]:not([data-scr]){animation:dc-wait 0s linear 1.5s both}
+.dc-w{white-space:nowrap}
+.dc-ch{transition:color .75s ease,text-shadow .75s ease,-webkit-text-fill-color .75s ease}
+html.m-on .dc-ch.pre,html.m-on .dc-ch.sc{visibility:hidden}
+html.m-on .dc-ch.sc::before{content:attr(data-g);visibility:visible;display:inline-block;width:0;overflow:visible;
+  font-family:var(--mono);font-weight:400;font-size:.86em;letter-spacing:0;color:var(--accent);-webkit-text-fill-color:var(--accent);
+  text-shadow:0 0 .35em rgba(255,138,61,.6)}
+.dc-ch.hot{color:#ffd9bf;-webkit-text-fill-color:#ffd9bf;text-shadow:0 0 .4em rgba(255,138,61,.85);transition:none}
+
+/* ---------- [marquee] command marquee ---------- */
+.marquee{position:relative;overflow:hidden;padding:clamp(26px,4vw,44px) 0;border-block:1px solid var(--line);
+  background:linear-gradient(180deg,var(--bg),var(--bg-2) 50%,var(--bg));
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent);mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent)}
+.mq-row{display:flex;width:max-content;white-space:nowrap}
+.mq-track{display:flex;align-items:center;flex-shrink:0}
+.mq-a .mq-track{gap:clamp(22px,3vw,40px);padding-right:clamp(22px,3vw,40px)}
+.mq-a span{font:500 clamp(30px,5.4vw,66px)/1.12 var(--mono);letter-spacing:-.03em;color:transparent;-webkit-text-stroke:1px rgba(166,176,196,.4)}
+.mq-a span.hot{-webkit-text-stroke-color:rgba(255,138,61,.85)}
+.mq-a i{width:9px;height:9px;flex-shrink:0;border:1px solid var(--accent-line);transform:rotate(45deg);display:block}
+.mq-b{margin-top:clamp(14px,2vw,22px)}
+.mq-b .mq-track{gap:44px;padding-right:44px}
+.mq-b span{font:400 12.5px/1 var(--mono);color:var(--faint);letter-spacing:.04em}
+.mq-b span b{color:var(--accent);font-weight:400}
+html.m-on .mq-a{animation:mq 80s linear infinite paused}
+html.m-on .mq-b{animation:mq 60s linear infinite reverse paused}
+html.m-on .marquee.run .mq-row{animation-play-state:running}
+@keyframes mq{to{transform:translateX(-50%)}}
+@supports not (-webkit-text-stroke:1px #000){.mq-a span{color:rgba(166,176,196,.3)}}
+
+/* ---------- [readout] braille spinner + meters above the command grid ---------- */
+/* JetBrains Mono has no Braille patterns; name fonts that do, in a box of fixed width so a
+   fallback with different metrics cannot shift the row. */
+.readout{--braille:"Apple Braille",Menlo,"DejaVu Sans Mono","Segoe UI Symbol","Noto Sans Symbols 2",monospace;
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px 30px;margin-top:48px;padding:0 4px 18px;font:13px/1.3 var(--mono);color:var(--muted);position:relative}
+.readout::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:repeating-linear-gradient(90deg,var(--line-2) 0 6px,transparent 6px 10px)}
+.readout+.cmds{margin-top:18px}
+.ro{display:inline-flex;align-items:center;white-space:nowrap;min-width:0}
+.ro-a{margin-right:auto}
+.ro-k{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-right:10px}
+.ro-s{overflow:hidden;text-overflow:ellipsis}
+.spin{display:inline-block;width:1.4em;height:1em;margin-right:8px;font:400 19px/1 var(--braille);text-align:center;color:var(--accent);overflow:hidden}
+.spark{color:var(--accent);font-size:16px;line-height:1;letter-spacing:1px}
+.meter{font-size:14px;line-height:1}.meter .f{color:var(--accent-2)}.meter .e{color:#2f3a55}
+.ro-n{color:var(--text);margin-left:8px}
+@media (max-width:520px){.readout{gap:10px 18px}.ro-a{margin-right:0;flex-basis:100%}}
+
+/* ---------- [dither] ordered dither band behind the final CTA ---------- */
+.dither-band{position:absolute;inset:0;width:100%;height:100%;max-width:none;z-index:-1;pointer-events:none;opacity:.42;
+  image-rendering:pixelated;image-rendering:crisp-edges;
+  -webkit-mask-image:radial-gradient(ellipse 52% 46% at 50% 50%,rgba(0,0,0,.18) 35%,#000 100%);
+  mask-image:radial-gradient(ellipse 52% 46% at 50% 50%,rgba(0,0,0,.18) 35%,#000 100%)}
+html:not(.js) .dither-band{display:none}
+
+/* ---------- 360px layout fixes (ported from the v3 samples) ---------- */
+.pillar>*{min-width:0}
+@media (max-width:900px){.pillar,.pillar.flip{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.review{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.license .btn{white-space:normal;height:auto;min-height:42px;padding:10px 16px;line-height:1.3;max-width:100%;overflow-wrap:anywhere}}
+.tpl code{display:block}
+
+/* ---------- [words] section H2 word mask-up (v3-2-vector E3) ---------- */
+.split .mw{display:inline-block;overflow:hidden;vertical-align:bottom;padding:0 .07em .16em;margin:0 -.07em -.16em}
+.split .mwi{display:inline-block}
+html.m-on .split .mwi{transition:transform 1s cubic-bezier(.19,.8,.18,1) calc(var(--i,0) * 75ms + 140ms)}
+html.m-on .reveal:not(.in) .split .mwi{transform:translateY(112%)}
+
+/* ---------- [kicker] chromatic settle on kickers and pillar numbers (v3-2-vector E4) ---------- */
+html.m-on .reveal.in .kicker,html.m-on .reveal.in .p-num{animation:chroma 1.25s cubic-bezier(.3,.7,.2,1) .05s both}
+@keyframes chroma{
+  0%{opacity:0;text-shadow:-6px 0 rgba(116,224,204,0),6px 0 rgba(255,138,61,0)}
+  12%{opacity:1;text-shadow:-4px 0 rgba(116,224,204,.85),4px 0 rgba(255,90,40,.75)}
+  22%{text-shadow:2px 0 rgba(116,224,204,.8),-3px 0 rgba(255,90,40,.7)}
+  34%{text-shadow:-2px 0 rgba(116,224,204,.7),2px 0 rgba(255,90,40,.6)}
+  55%{text-shadow:-1px 0 rgba(116,224,204,.55),1px 0 rgba(255,90,40,.45)}
+  100%{opacity:1;text-shadow:0 0 rgba(116,224,204,0),0 0 rgba(255,90,40,0)}}
+html.m-on .reveal.in .kicker::before{animation:kline .9s cubic-bezier(.2,.7,.2,1) both;transform-origin:left}
+@keyframes kline{from{transform:scaleX(0)}to{transform:none}}
+
+/* ---------- [stagger] section content: kicker → title → copy → mock (v3-2-vector E2) ---------- */
+html.m-on :is(.intro,.p-copy,.band .wrap,.final .wrap).reveal{transform:none}
+html.m-on :is(.intro,.p-copy,.band .wrap,.final .wrap).reveal>*{opacity:0;transform:translateY(14px);
+  transition:opacity .8s ease,transform .9s cubic-bezier(.2,.7,.2,1)}
+html.m-on :is(.intro,.p-copy,.band .wrap,.final .wrap).reveal.in>*{opacity:1;transform:none}
+html.m-on :is(.intro,.p-copy,.band .wrap,.final .wrap).reveal.in>:nth-child(2){transition-delay:.1s}
+html.m-on :is(.intro,.p-copy,.band .wrap,.final .wrap).reveal.in>:nth-child(3){transition-delay:.22s}
+html.m-on :is(.intro,.p-copy,.band .wrap,.final .wrap).reveal.in>:nth-child(4){transition-delay:.34s}
+html.m-on :is(.intro,.p-copy,.band .wrap,.final .wrap).reveal.in>:nth-child(5){transition-delay:.46s}
+html.m-on :is(.intro,.p-copy,.band .wrap,.final .wrap).reveal.in>:nth-child(n+6){transition-delay:.58s}
+html.m-on .pillar .frame.reveal{transition-delay:.25s}
+
+/* ---------- [mock] calm motion inside the product mocks (line-printer arrival, TT-12 style) ---------- */
+/* Items carry --i (set by motion.ts); they arrive one by one once their frame/grid is revealed. */
+html.m-on .reveal:not(.in) :is(.q-item,.src-row,.supers,.rec-act,.brow,.idrow,.refuse,.tpl,.digest>div,.disk-foot>*,.tree .ln,.cmdc){opacity:0}
+html.m-on .reveal:not(.in) .q-item{transform:translateX(-8px)}
+html.m-on .reveal :is(.q-item,.src-row,.supers,.rec-act,.brow,.idrow,.refuse,.tpl,.digest>div,.disk-foot>*){
+  transition:opacity .45s ease calc(.55s + var(--i,0) * 110ms),transform .5s cubic-bezier(.2,.7,.2,1) calc(.55s + var(--i,0) * 110ms)}
+html.m-on .reveal .tree .ln{transition:opacity .2s steps(2,end) calc(.6s + var(--i,0) * 70ms)}
+html.m-on .reveal .cmdc{transition:opacity .3s steps(3,end) calc(.15s + var(--i,0) * 55ms),background .2s ease}
+html.m-on .disk>div+div .tree .ln{transition-delay:calc(.75s + var(--i,0) * 70ms)}
+/* status dot pulse */
+@keyframes dot-pulse{0%,100%{box-shadow:0 0 0 3px var(--accent-soft)}50%{box-shadow:0 0 0 6px rgba(255,138,61,0),0 0 10px 1px rgba(255,138,61,.55)}}
+html.m-on .stage-bar .live::before{animation:dot-pulse 2.4s ease-in-out infinite}
+html.m-on .q-item.on{animation:q-glow 3.2s ease-in-out 1.6s infinite}
+@keyframes q-glow{0%,100%{box-shadow:inset 2px 0 0 var(--accent)}50%{box-shadow:inset 2px 0 0 var(--accent-2),inset 6px 0 14px -8px rgba(255,138,61,.5)}}
+
+/* ---------- [trace] self-drawing card borders + orbiting light (v3-2-vector E5/E6) ---------- */
+.frame,.license{position:relative}
+.trace{display:none;position:absolute;inset:0;width:100%;height:100%;max-width:none;pointer-events:none;z-index:3;overflow:visible}
+html.m-on .trace{display:block}
+.trace rect{x:.5px;y:.5px;width:calc(100% - 1px);height:calc(100% - 1px);rx:var(--tr-r,22px);fill:none;vector-effect:non-scaling-stroke}
+.trace .t-line{stroke:rgba(150,170,215,.22);stroke-width:1;stroke-dasharray:100 100;stroke-dashoffset:100}
+.trace .t-head{stroke:var(--accent);stroke-width:1.4;stroke-linecap:round;stroke-dasharray:5 200;stroke-dashoffset:5;opacity:0}
+.reveal.in>.trace .t-line{animation:tDraw 1.9s cubic-bezier(.55,.05,.25,1) .15s forwards}
+.reveal.in>.trace .t-head{animation:tHead 1.9s cubic-bezier(.55,.05,.25,1) .15s forwards}
+@keyframes tDraw{to{stroke-dashoffset:0}}
+@keyframes tHead{0%{stroke-dashoffset:5;opacity:1}88%{opacity:1}100%{stroke-dashoffset:-95;opacity:0}}
+html.m-on .os-card,html.m-on .license{border-color:transparent}
+.trace .t-orbit{stroke:var(--accent-2);stroke-width:1.5;stroke-linecap:round;stroke-dasharray:7 93;opacity:0;transition:opacity .35s ease;animation:tOrbit 3.4s linear infinite paused}
+.trace .t-glow{stroke:rgba(255,138,61,.35);stroke-width:5;stroke-dasharray:9 91;filter:blur(2px)}
+.has-trace:is(:hover,:focus-within)>.trace .t-orbit{opacity:1;animation-play-state:running}
+@keyframes tOrbit{from{stroke-dashoffset:0}to{stroke-dashoffset:-100}}
+
+/* ---------- [rail] circuit rail (v3-2-vector E7): left margin on wide screens, slim in the gutter below ---------- */
+main{position:relative}
+.rail{position:absolute;left:0;top:0;max-width:none;pointer-events:none;z-index:1;overflow:hidden}
+.rail path,.rail line{fill:none;vector-effect:non-scaling-stroke}
+.rail .r-base{stroke:rgba(150,170,215,.16);stroke-width:1}
+.rail .r-lit{stroke:rgba(255,138,61,.55);stroke-width:1.2}
+.rail .r-stub{stroke:rgba(150,170,215,.16);stroke-width:1;transition:stroke .5s ease}
+.rail .r-pad{fill:var(--bg);stroke:rgba(150,170,215,.35);stroke-width:1;transition:fill .5s ease,stroke .5s ease}
+.rail .r-via{fill:var(--bg);stroke:rgba(150,170,215,.28);stroke-width:1}
+.rail .on .r-stub{stroke:rgba(255,138,61,.5)}
+.rail .on .r-pad{stroke:var(--accent);fill:rgba(255,138,61,.3)}
+.rail .r-pkt{opacity:0}
+html.m-on .rail .r-pkt{opacity:1}
+html.m-off .rail .r-lit{stroke:rgba(255,138,61,.4)}
+html.m-off .rail *{transition:none}
+.rail.slim .r-lit{stroke-width:1}
+html:not(.js) .rail{display:none}
