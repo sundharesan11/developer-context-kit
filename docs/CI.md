@@ -17,7 +17,9 @@ A green job establishes synthetic behavior on that runner and commit. It does no
 
 ## Last verified run
 
-Last verified run: run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four jobs passed: 234 of 234 tests, 24 acceptance checks passed and one `fresh-agent-smoke` deferred in every lane. This result applies to `8f1133a` only. Later commits, including branch work, need their own run before anyone cites its counts. The Linux and Node 22.13.0 lanes passing does not make either a supported configuration.
+Last verified run: run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four jobs passed: 234 of 234 tests, and 24 acceptance checks passed with one `fresh-agent-smoke` deferred in every lane. The workflow then expected 24 passed checks; it now expects 32 (step 6). This result applies to `8f1133a` only. The Linux and Node 22.13.0 lanes passing does not make either a supported configuration.
+
+A CI run for `aa8de74` is pending. The local run at `aa8de74` (macOS, Node 26.12.1) passed 498 of 498 tests across 44 files and the package audit, and acceptance reported 33 checks: 32 passed and one `fresh-agent-smoke` deferred. That is local evidence, not a CI result. Later commits, including branch work, need their own run before anyone cites their counts.
 
 ## What each job does
 
@@ -26,7 +28,7 @@ Last verified run: run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. Al
 3. Audit the exact source/package allowlist before running tests.
 4. Run the full required-test suite.
 5. Create a fresh canonical pilot under the runner's temporary directory, outside the checkout.
-6. Run acceptance and verify 32 passed checks plus exactly one deferred `fresh-agent-smoke`. The harness also checks the required IDs.
+6. Run acceptance and verify 33 checks: 32 passed plus exactly one deferred `fresh-agent-smoke`. The harness also checks the required IDs.
 7. Check the whole committed tree for whitespace errors and require a clean checkout, including untracked files.
 
 The workflow's GitHub token has only `contents: read`. It uses no repository secrets, package-manager cache or artifact upload. It never runs untrusted pull-request code through `pull_request_target` or on a self-hosted runner. Source acquisition and live connectors are not exercised.

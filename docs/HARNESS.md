@@ -46,7 +46,7 @@ node bin/devctx.mjs profile apply --pilot "$PILOT_FILE" --work 'Backend services
 
 `skills/devctx-setup` conducts first-run setup. It checks `DEVCTX_KIT` and the pilot path like the other bundled skills, and stops without creating anything if the pilot file is missing or `init` has not run. It asks at most five skippable questions, previews the full profile with `profile plan`, and lists the templates with `skill template-list`. It runs `profile apply` only after explicit approval from the user in the session for the plan just shown. A fingerprint an agent passes back is not consent. It creates no skill unless you ask.
 
-`devctx-setup` is not yet in the bundled installer, so `agents install` does not install it. It will be added after live-mode activation evidence is recorded. Until then, you can read its `SKILL.md` in the kit checkout.
+`devctx-setup` is not yet in the bundled installer, so `agents install` does not install it. Live-mode activation passed on 2026-10-25; the installer wiring (U9 of the harness plan) is not built yet. Until then, you can read its `SKILL.md` in the kit checkout.
 
 ## Skill templates
 

@@ -2,7 +2,7 @@
 
 This runbook turns on live mode on one machine. Live mode runs the kit against a real private store and the real Claude and Codex skill folders. It onboards one real repository, read-only. Follow the steps in order. Every write is a separate owner approval.
 
-Live mode is implemented. Activation evidence on a real machine is still pending; see the [roadmap](ROADMAP.md).
+Live mode is implemented. The owner ran steps 1 to 15 and 17 on one machine on 2026-10-25 at kit commit `aa8de74`, and they passed: live init, store init, scope add and read-only onboarding of one real client repository with identical before and after-onboarding snapshots; bundled install for Claude and Codex (three skills each, no conflicts); fresh `claude -p` and `codex exec` sessions from a neutral folder that listed the `devctx-*` skills, resolved the project and read the brief with an identical brief hash; and uninstall, `rollback-check` `ok` and reinstall. Step 16 (interactive sessions) is still the owner's to run, and step 14's `DEVCTX_KIT` export is not yet in the shell profile. See the [roadmap](ROADMAP.md).
 
 ## What live mode changes
 
@@ -215,8 +215,12 @@ Never use --apply and never edit files.
 
 Claude, with read tools and only the exact shell commands the checks need. Never widen these to `node` or `git -C` prefixes: those would let the session run any script or Git command, including writes to the repository. A command outside the list is refused, which fails the check safely.
 
+Pipe the prompt on stdin. `--allowedTools` takes several values, so a prompt placed after it is read as another tool rule, and `claude -p` then fails with "Input must be provided either through stdin or as a prompt argument".
+
+A session can run the CLI through the kit's absolute real path instead of the literal `"$DEVCTX_KIT"` form. The list therefore names both forms of exactly the two read-only commands. Replace `<kit real path>` with the output of `realpath "$KIT"`.
+
 ```sh
-claude -p --setting-sources user --allowedTools 'Read,Glob,Grep,Bash(printenv DEVCTX_KIT),Bash(realpath:*),Bash(git -C "$DEVCTX_KIT" rev-parse HEAD),Bash(node "$DEVCTX_KIT/bin/devctx.mjs" context resolve:*),Bash(node "$DEVCTX_KIT/bin/devctx.mjs" context brief:*)' '<prompt>'
+printf '%s\n' '<prompt>' | claude -p --setting-sources user --allowedTools 'Read,Glob,Grep,Bash(printenv DEVCTX_KIT),Bash(realpath:*),Bash(git -C "$DEVCTX_KIT" rev-parse HEAD),Bash(node "$DEVCTX_KIT/bin/devctx.mjs" context resolve:*),Bash(node "$DEVCTX_KIT/bin/devctx.mjs" context brief:*),Bash(node <kit real path>/bin/devctx.mjs context resolve:*),Bash(node <kit real path>/bin/devctx.mjs context brief:*)'
 ```
 
 If a listed command is still refused because the skill wrote it differently, record the refusal, compare the command with the list, and rerun with that one exact command added. Do not add a broader rule.
@@ -233,7 +237,7 @@ Pass when each session lists `devctx-onboard`, `devctx-record` and `devctx-resum
 
 The owner starts one interactive session per agent from the same neutral folder, with `claude` and `codex`. Ask the same question. Confirm the kit and pilot paths when the skill asks. Pass on the same terms as step 15.
 
-After the last session, take another snapshot and compare it with `before.json`, as in step 12.
+After the last session, take another snapshot and compare it with `before.json`, as in step 12. A tool that creates linked worktrees in the repository during the run, such as a test runner using `git worktree add`, shows up as `.git/worktrees/...` differences. The owner judges those by path, like any other difference.
 
 ## 17. Rollback rehearsal
 
