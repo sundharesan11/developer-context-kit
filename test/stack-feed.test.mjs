@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
-import { parseFeed, FEED_LIMITS } from "../src/stack/feed.mjs";
+import { parseFeed, reduceHtml, FEED_LIMITS } from "../src/stack/feed.mjs";
 import { hasTerm, classifyEntry, itemTerms } from "../src/stack/match.mjs";
 import { isUnsafeAddress, httpsRequest, createFetcher } from "../src/stack/fetch.mjs";
 
@@ -109,4 +109,11 @@ test("a fetch with a body over the cap, a redirect, an unexpected content type o
   await code(get({ status: 500 }), "UPSTREAM_UNAVAILABLE");
   const ok = await get({});
   assert.equal(ok.bytes.toString(), "x");
+});
+test("HTML reduction keeps its output and stays linear on unclosed markup", () => {
+  const cases = [["<p>Hi <b>there</b></p>", "Hi there"], ["a<script type=x>bad()</script >b", "a b"], ["x<!-- c -->y", "x y"], ["a < b", "a b"], ["<STYLE>p{}</STYLE>ok", "ok"], ["x<!-- open", "x !-- open"], ["<script>unclosed", "unclosed"], ["1 &amp; 2 &lt;tag&gt;", "1 & 2 <tag>"], ["</b> ip<<script>/</script>", "ip"], ["AA<!--<script>-<b></script>-</script>a", "AA a"]];
+  for (const [input, expected] of cases) assert.equal(reduceHtml(input, 100), expected, input);
+  const started = Date.now();
+  for (const input of ["<".repeat(FEED_LIMITS.nodeText), "<script ".repeat(FEED_LIMITS.nodeText / 8), "<!--".repeat(FEED_LIMITS.nodeText / 4)]) reduceHtml(input, FEED_LIMITS.summary);
+  assert.ok(Date.now() - started < 2000, "reduction took " + (Date.now() - started) + " ms");
 });
