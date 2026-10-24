@@ -19,7 +19,9 @@ A green job establishes synthetic behavior on that runner and commit. It does no
 
 Last verified run: run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four jobs passed: 234 of 234 tests, and 24 acceptance checks passed with one `fresh-agent-smoke` deferred in every lane. The workflow then expected 24 passed checks; it now expects 32 (step 6). This result applies to `8f1133a` only. The Linux and Node 22.13.0 lanes passing does not make either a supported configuration.
 
-A CI run for `aa8de74` is pending. The local run at `aa8de74` (macOS, Node 26.12.1) passed 498 of 498 tests across 44 files and the package audit, and acceptance reported 33 checks: 32 passed and one `fresh-agent-smoke` deferred. That is local evidence, not a CI result. Later commits, including branch work, need their own run before anyone cites their counts.
+Commit IDs from `6a90cbf` onward were rewritten on 2026-10-25 to remove a client name from the history. File contents at each tip are unchanged, and `8f1133a` keeps its ID. The live activation ran at `b95ff72` under its earlier ID.
+
+A CI run for `b95ff72` is pending. The local run at `b95ff72` (macOS, Node 26.12.1) passed 498 of 498 tests across 44 files and the package audit, and acceptance reported 33 checks: 32 passed and one `fresh-agent-smoke` deferred. That is local evidence, not a CI result. Later commits, including branch work, need their own run before anyone cites their counts.
 
 ## What each job does
 

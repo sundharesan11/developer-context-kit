@@ -2,11 +2,11 @@
 
 Status snapshot: 2026-10-25. This is a reviewed local pilot with an implemented and activated live mode, not a daily-use installer or a publicly released package. This file tracks product capabilities, not private projects, accounts or tasks.
 
-Last recorded CI evidence: [Pilot CI](CI.md) run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four lanes (macOS 15 and Ubuntu 24.04, each with Node 26.4.0 and 22.13.0) passed. That run is evidence for `8f1133a` only. A CI run for `aa8de74` is pending. Linux and the Node 22.13.0 floor remain evaluation lanes; support for them is not claimed.
+Last recorded CI evidence: [Pilot CI](CI.md) run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four lanes (macOS 15 and Ubuntu 24.04, each with Node 26.4.0 and 22.13.0) passed. That run is evidence for `8f1133a` only. A CI run for `b95ff72` is pending. Linux and the Node 22.13.0 floor remain evaluation lanes; support for them is not claimed.
 
-Local evidence at `aa8de74` (macOS, Node 26.12.1, not CI): 498 of 498 tests across 44 files, a clean package audit, and 33 acceptance checks with 32 passed and one `fresh-agent-smoke` deferred.
+Local evidence at `b95ff72` (macOS, Node 26.12.1, not CI): 498 of 498 tests across 44 files, a clean package audit, and 33 acceptance checks with 32 passed and one `fresh-agent-smoke` deferred.
 
-Skill-builder A/B, the source catalog, pinned acquisition, reviewed disposable source installation, portable selected-record handoff and live mode are implemented. Live mode passed its first activation on the owner's machine on 2026-10-25 at `aa8de74`; see [Live activation](LIVE.md). The public-alpha documentation adds a guided first run, architecture and release checklist. The core carries Apache-2.0; publication still needs the gates in [Releasing](RELEASING.md).
+Skill-builder A/B, the source catalog, pinned acquisition, reviewed disposable source installation, portable selected-record handoff and live mode are implemented. Live mode passed its first activation on the owner's machine on 2026-10-25 at `b95ff72`; see [Live activation](LIVE.md). The public-alpha documentation adds a guided first run, architecture and release checklist. The core carries Apache-2.0; publication still needs the gates in [Releasing](RELEASING.md).
 
 ## What works in the pilot
 

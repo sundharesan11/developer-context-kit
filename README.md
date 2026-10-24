@@ -37,7 +37,7 @@ The diagram shows the implemented pilot, not a live agent integration. See [arch
 
 ## Try it
 
-Requirements: Node.js and npm, Git, and a macOS shell. The reference environment is macOS with Node v26.4.0. The declared Node floor is `>=22.13.0`. The last recorded [CI](docs/CI.md) run, 38154524118 at commit `8f1133a` (2026-10-11), passed all tests and acceptance checks on macOS and Ubuntu with both Node 26.4.0 and 22.13.0. That is evaluation evidence for that commit only; a CI run for `aa8de74` is pending. Support for the Node floor is not claimed. Linux support is not claimed; Windows is unsupported.
+Requirements: Node.js and npm, Git, and a macOS shell. The reference environment is macOS with Node v26.4.0. The declared Node floor is `>=22.13.0`. The last recorded [CI](docs/CI.md) run, 38154524118 at commit `8f1133a` (2026-10-11), passed all tests and acceptance checks on macOS and Ubuntu with both Node 26.4.0 and 22.13.0. That is evaluation evidence for that commit only; a CI run for `b95ff72` is pending. Support for the Node floor is not claimed. Linux support is not claimed; Windows is unsupported.
 
 From a checkout containing this guide:
 
