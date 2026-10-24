@@ -2,7 +2,7 @@
 
 This runbook turns on live mode on one machine. Live mode runs the kit against a real private store and the real Claude and Codex skill folders. It onboards one real repository, read-only. Follow the steps in order. Every write is a separate owner approval.
 
-Live mode is implemented. The owner ran steps 1 to 15 and 17 on one machine on 2026-10-25 at kit commit `aa8de74`, and they passed: live init, store init, scope add and read-only onboarding of one real client repository with identical before and after-onboarding snapshots; bundled install for Claude and Codex (three skills each, no conflicts); fresh `claude -p` and `codex exec` sessions from a neutral folder that listed the `devctx-*` skills, resolved the project and read the brief with an identical brief hash; and uninstall, `rollback-check` `ok` and reinstall. Step 16 (interactive sessions) is still the owner's to run, and step 14's `DEVCTX_KIT` export is not yet in the shell profile. See the [roadmap](ROADMAP.md).
+Live mode is implemented. The owner ran steps 1 to 15 and 17 on one machine on 2026-10-25 at kit commit `b95ff72`, and they passed: live init, store init, scope add and read-only onboarding of one real client repository with identical before and after-onboarding snapshots; bundled install for Claude and Codex (three skills each, no conflicts); fresh `claude -p` and `codex exec` sessions from a neutral folder that listed the `devctx-*` skills, resolved the project and read the brief with an identical brief hash; and uninstall, `rollback-check` `ok` and reinstall. Step 16 (interactive sessions) is still the owner's to run, and step 14's `DEVCTX_KIT` export is not yet in the shell profile. See the [roadmap](ROADMAP.md).
 
 ## What live mode changes
 

@@ -66,7 +66,7 @@ Do not claim “works with every agent,” “automatically remembers everything
 Items follow the [roadmap](ROADMAP.md) order.
 
 - [ ] Private-state backup/restore and upgrade compatibility.
-- [x] Controlled real-project and real-home activation with reviewed targets and rollback. The owner's first [live activation](LIVE.md) passed on 2026-10-25 at `aa8de74`.
+- [x] Controlled real-project and real-home activation with reviewed targets and rollback. The owner's first [live activation](LIVE.md) passed on 2026-10-25 at `b95ff72`.
 - [ ] Fresh Claude and Codex sessions finding and using the intended skills. Fresh non-interactive sessions passed on 2026-10-25; interactive sessions remain.
 - [ ] Session start and end hooks that carry context into and out of a session.
 - [ ] Reviewed selective migration from an existing personal setup.
