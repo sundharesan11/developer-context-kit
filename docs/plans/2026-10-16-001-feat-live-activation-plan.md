@@ -281,6 +281,7 @@ Layout of `~/.devctx` after activation:
 
 ### U8. Activation on the owner's machine
 
+- **Status:** done. Run on 2026-10-25 at kit commit `aa8de74`; it passed. Live init, store init, scope add and read-only onboarding of one real client repository, with identical before and after-onboarding snapshots. Bundled install for Claude and Codex, three skills each, no conflicts. Fresh `claude -p --setting-sources user` and `codex exec --sandbox read-only` sessions from a neutral folder listed the `devctx-*` skills, resolved the project and read the brief, with an identical brief hash. Rollback rehearsal: uninstall, `rollback-check` `ok`, reinstall. The owner's interactive sessions and the `DEVCTX_KIT` shell-profile export remain. The private evidence stays in `~/.devctx/store/state/evidence/`.
 - **Goal:** produce the priority 2 exit evidence.
 - **Requirements:** R15, R16, R17.
 - **Dependencies:** U1 to U7 merged to main with green CI.

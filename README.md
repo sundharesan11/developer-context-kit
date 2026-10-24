@@ -6,7 +6,7 @@ Developer Context Kit is a local CLI for recording project facts, decisions and 
 
 It is also a personal-harness template: clone it, set up a small private personal profile, and turn generic skill templates into your own private skills. Your data stays outside the clone. See the [personal harness guide](docs/HARNESS.md).
 
-**Status: experimental pilot.** This is a **local package candidate**, not a daily-use agent installer. The `devctx` command is **NOT currently installed** globally by this checkout. All stateful commands require an explicit pilot file: a disposable pilot, or a live config for one real machine. Start with synthetic data. Live mode is implemented; its activation evidence on a real machine is pending. See the [live activation runbook](docs/LIVE.md).
+**Status: experimental pilot.** This is a **local package candidate**, not a daily-use agent installer. The `devctx` command is **NOT currently installed** globally by this checkout. All stateful commands require an explicit pilot file: a disposable pilot, or a live config for one real machine. Start with synthetic data. Live mode is implemented and passed its first activation on one real machine on 2026-10-25. See the [live activation runbook](docs/LIVE.md).
 
 [Start here](docs/GETTING-STARTED.md) · [Guided onboarding](docs/ONBOARDING.md) · [Documentation](docs/README.md) · [Roadmap](docs/ROADMAP.md)
 
@@ -37,7 +37,7 @@ The diagram shows the implemented pilot, not a live agent integration. See [arch
 
 ## Try it
 
-Requirements: Node.js and npm, Git, and a macOS shell. The reference environment is macOS with Node v26.4.0. The declared Node floor is `>=22.13.0`. [CI](docs/CI.md) run 38154524118 at commit `8f1133a` (2026-10-11) passed all tests and acceptance checks on macOS and Ubuntu with both Node 26.4.0 and 22.13.0. That is evaluation evidence for one commit; support for the Node floor is not claimed. Linux support is not claimed; Windows is unsupported.
+Requirements: Node.js and npm, Git, and a macOS shell. The reference environment is macOS with Node v26.4.0. The declared Node floor is `>=22.13.0`. The last recorded [CI](docs/CI.md) run, 38154524118 at commit `8f1133a` (2026-10-11), passed all tests and acceptance checks on macOS and Ubuntu with both Node 26.4.0 and 22.13.0. That is evaluation evidence for that commit only; a CI run for `aa8de74` is pending. Support for the Node floor is not claimed. Linux support is not claimed; Windows is unsupported.
 
 From a checkout containing this guide:
 
@@ -63,7 +63,7 @@ For checkout instructions, expected results and troubleshooting, use [Getting st
 | Skill creation | [Requirements, design approval, drafts and validation](docs/SKILL-BUILDER.md) (frozen: bug fixes only, except the create-from-template path) | Conversational creator, live behavior evaluation and export |
 | Personal harness | [Personal profile, setup skill, three skill templates, a manual announcement watch and private drafts](docs/HARNESS.md) | Real-home install of template-made skills or `devctx-setup`, schedules, Slack sending, authenticated GitHub requests, the watch in live mode |
 | Skill sources | [12-source catalog, release checks, pinned acquisition and reviewed disposable installation](docs/SKILL-SOURCES.md) (frozen: bug fixes only) | Universal agent compatibility or weekly automatic updates |
-| Live mode | [Live config](docs/LIVE.md) with a pinned kit clone, bundled-skill install and uninstall beside foreign skills, rollback check, read-only onboarding of a real repository | Activation evidence on a real machine, a global `devctx` command |
+| Live mode | [Live config](docs/LIVE.md) with a pinned kit clone, bundled-skill install and uninstall beside foreign skills, rollback check, read-only onboarding of a real repository | Interactive-session evidence, a global `devctx` command |
 | Identity and learning | Fake-provider identity checks and private hub proposals | Live Slack/email/issue connectors, sends or company-hub writes |
 
 Claude and Codex filesystem layouts have fixture tests. Those tests do not prove that a fresh native session discovers or uses a skill. Gemini, Cursor and Command Code support is not established. Cursor reads `~/.agents/skills` and will see live Codex installs.
