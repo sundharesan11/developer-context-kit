@@ -24,7 +24,7 @@ execution: code
 
 ### Summary
 
-Add a declared live profile that names the exact real skill folders and read-only repositories DCK may use, with private state in `~/.devctx/store` and a pinned kit clone in `~/.devctx/kit`. Make bundled-skill install, status, uninstall and rollback checking safe on real folders that already hold foreign skills. Then activate on the owner's machine, onboard one client monorepo into scope `example`, prove fresh Claude and Codex sessions find the skills, and rehearse rollback.
+Add a declared live profile that names the exact real skill folders and read-only repositories DCK may use, with private state in `~/.devctx/store` and a pinned kit clone in `~/.devctx/kit`. Make bundled-skill install, status, uninstall and rollback checking safe on real folders that already hold foreign skills. Then activate on the owner's machine, onboard one client monorepo into its client scope, prove fresh Claude and Codex sessions find the skills, and rehearse rollback.
 
 ### Problem Frame
 
@@ -81,7 +81,7 @@ The real skill folders are not empty. The owner's Claude skill folder already ho
 - DCK never edits the client repository's Git configuration to get past a refusal.
 - No Git tag or versioned release. The pin is a commit.
 - Skill-builder and skill-source installs stay pilot-only.
-- The personal-harness template stage is planned separately on branch `sundharesan11/dck-next-stage-plan`; this plan does not touch it.
+- The personal-harness template stage is planned separately on its own branch; this plan does not touch it.
 
 #### Deferred to Follow-Up Work
 
@@ -111,7 +111,7 @@ The real skill folders are not empty. The owner's Claude skill folder already ho
 - KTD8. **Rollback is evidence, not automation.** Rollback is the reviewed uninstall plus the inventory check. Nothing is restored automatically.
 - KTD9. **No backup in this stage.** (session-settled: user-directed — chosen over building backup first: the owner deferred it on 2026-10-16.) The docs state the risk, including that onboarding copies some client text into the store.
 - KTD10. **Delivering `DEVCTX_KIT`.** It is exported from the owner's shell profile, and the bundled skills verify it. Writing agent settings files is outside the allowlist. GUI-launched agents may not inherit it; the runbook says how to check.
-- KTD11. **First project.** The client monorepo `example-org/example-repo` goes in scope `example` and is read-only. (session-settled: user-directed — chosen over an example-repo-only scope: one scope for all Example Org work.)
+- KTD11. **First project.** The owner's first client monorepo goes in a single scope for that client and is read-only. (session-settled: user-directed — chosen over a per-repository scope: one scope for all of that client's work.)
 
 ### High-Level Technical Design
 
@@ -287,19 +287,19 @@ Layout of `~/.devctx` after activation:
 - **Files:** `docs/ROADMAP.md`, `docs/CI.md` (dated pass line only).
 - **Approach:** follow `docs/LIVE.md`, with the owner present and the steps below in order.
   - Preflight, read-only: confirm the installed Claude and Codex versions read `~/.claude/skills` and `~/.agents/skills`, and `lstat` both folders. If one is missing or symlinked, stop; the owner creates or fixes it by hand as a separate decision.
-  - Read-only Git check on example-repo that mirrors `locateWorktree`: repo-local `filter.*` and `diff.*` config, and a timed `status --porcelain`. Stop if either would be refused.
-  - Ask the owner to close editors and Git tools watching example-repo for the run.
-  - Clone the kit at the merged commit, then take the before snapshot of example-repo with the clone's `scripts/repo-snapshot.mjs`, held in a 0600 file in a private temp folder.
-  - Preview and apply `live init` with example-repo listed, then move the before snapshot into `state/evidence/`.
-  - Add scope `example`, then show the example-repo onboarding preview before any skill install; stop if it is refused. Apply after approval.
+  - Read-only Git check on the repository that mirrors `locateWorktree`: repo-local `filter.*` and `diff.*` config, and a timed `status --porcelain`. Stop if either would be refused.
+  - Ask the owner to close editors and Git tools watching the repository for the run.
+  - Clone the kit at the merged commit, then take the before snapshot of the repository with the clone's `scripts/repo-snapshot.mjs`, held in a 0600 file in a private temp folder.
+  - Preview and apply `live init` with the repository listed, then move the before snapshot into `state/evidence/`.
+  - Add the client scope, then show the repository's onboarding preview before any skill install; stop if it is refused. Apply after approval.
   - Show the install preview for both agents and apply after owner approval.
   - Ask before editing the shell profile.
-  - From a neutral working folder, run a fresh `claude -p --setting-sources user` session and `codex exec --sandbox read-only`, passing example-repo as `--cwd` to devctx and answering the kit confirmation in the prompt, to list `devctx-*` skills and resolve example-repo. The owner runs one interactive session per agent.
+  - From a neutral working folder, run a fresh `claude -p --setting-sources user` session and `codex exec --sandbox read-only`, passing the repository as `--cwd` to devctx and answering the kit confirmation in the prompt, to list `devctx-*` skills and resolve the repository. The owner runs one interactive session per agent.
   - Uninstall, run the rollback check at once, reinstall after a fresh approval, and recheck discovery.
-  - Snapshot example-repo right after onboarding apply and after the last session, and compare both with the before snapshot. Keep evidence in `~/.devctx/store/state/evidence/`.
+  - Snapshot the repository right after onboarding apply and after the last session, and compare both with the before snapshot. Keep evidence in `~/.devctx/store/state/evidence/`.
 - **Execution note:** operational, not code. Every write is a separate owner approval.
 - **Test expectation:** none -- this unit is a guarded manual run; the evidence files are its proof.
-- **Verification:** the evidence shows each R15 item. Any example-repo snapshot difference is listed by path, and the owner judges each one.
+- **Verification:** the evidence shows each R15 item. Any repository snapshot difference is listed by path, and the owner judges each one.
 
 ---
 
@@ -320,6 +320,6 @@ Layout of `~/.devctx` after activation:
 
 - U1 to U7 merged to main by fast-forward after all four CI lanes pass on the branch and on main.
 - Plan and diff reviews completed, with material findings fixed.
-- U8 evidence shows both agents installed with owner approval, foreign entries unchanged, fresh sessions discovering the skills, example-repo onboarded in `example` and unchanged, the rollback check passing, and reinstall working.
+- U8 evidence shows both agents installed with owner approval, foreign entries unchanged, fresh sessions discovering the skills, the repository onboarded in the client scope and unchanged, the rollback check passing, and reinstall working.
 - Docs no longer claim live activation is unavailable, and they state the no-backup risk.
 - No abandoned experimental code remains in the diff.

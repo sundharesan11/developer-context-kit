@@ -21,10 +21,71 @@ export function plainText(text, max) {
   const chars = [...clean];
   return chars.length > max ? chars.slice(0, max - 1).join("") + "…" : clean;
 }
+// Three forward passes in the order of the earlier regex chain: script and style elements, then comments, then tags.
+// Search positions only move forward and a "not found" ends the pass, so the cost stays linear on unclosed markup.
+function stripElements(text) {
+  const lower = text.toLowerCase();
+  const closeAt = new Map();
+  const close = (name, from) => {
+    const known = closeAt.get(name);
+    if (known !== undefined && (known === -1 || known >= from)) return known;
+    let found = -1;
+    for (let p = lower.indexOf("</" + name, from); p !== -1; p = lower.indexOf("</" + name, p + 1)) {
+      let q = p + name.length + 2;
+      while (q < text.length && /\s/.test(text[q])) q++;
+      if (text[q] === ">") { found = p; break; }
+    }
+    closeAt.set(name, found);
+    return found;
+  };
+  const out = [];
+  let kept = 0;
+  let i = 0;
+  let nextGt = 0;
+  while (i < text.length) {
+    const j = lower.indexOf("<s", i);
+    if (j === -1) break;
+    const name = lower.startsWith("<script", j) ? "script" : lower.startsWith("<style", j) ? "style" : null;
+    const after = j + 1 + (name?.length ?? 0);
+    if (!name || /\w/.test(text[after] ?? "")) { i = j + 1; continue; }
+    if (nextGt < after) nextGt = text.indexOf(">", after);
+    const gt = nextGt;
+    if (gt === -1) break;
+    const c = close(name, gt + 1);
+    if (c === -1) { i = j + 1; continue; }
+    out.push(text.slice(kept, j), " ");
+    kept = i = text.indexOf(">", c) + 1;
+  }
+  out.push(text.slice(kept));
+  return out.join("");
+}
+function stripComments(text) {
+  const out = [];
+  let i = 0;
+  for (let j = text.indexOf("<!--"); j !== -1; j = text.indexOf("<!--", i)) {
+    const c = text.indexOf("-->", j + 4);
+    if (c === -1) break;
+    out.push(text.slice(i, j), " ");
+    i = c + 3;
+  }
+  out.push(text.slice(i));
+  return out.join("");
+}
+function stripTags(text) {
+  const out = [];
+  let i = 0;
+  for (let j = text.indexOf("<"); j !== -1; j = text.indexOf("<", i)) {
+    const gt = text.indexOf(">", j);
+    if (gt === -1) break;
+    out.push(text.slice(i, j), " ");
+    i = gt + 1;
+  }
+  out.push(text.slice(i).replaceAll("<", " "));
+  return out.join("");
+}
 // HTML is reduced to text before matching and rendering: tags (with their attributes) go, then entities decode.
 export function reduceHtml(text, max) {
-  const stripped = String(text).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]*>/g, " ").replace(/</g, " ");
-  return plainText(decodeEntities(stripped, HTML_ENTITIES), max);
+  return plainText(decodeEntities(stripTags(stripComments(stripElements(String(text)))), HTML_ENTITIES), max);
 }
 function tagEnd(text, from) {
   let quote = null;
