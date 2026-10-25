@@ -81,6 +81,45 @@
           "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
         }
       }
+    },
+    "writeClasses": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hubRoot": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "instructionTargets": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "hookTargets": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "launchAgents": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "/devtwin\\.[a-z0-9][a-z0-9.-]{0,95}\\.plist$"
+          }
+        }
+      }
     }
   }
 }

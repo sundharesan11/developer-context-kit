@@ -16,13 +16,31 @@ A live config is a pilot file with a `live` block. It names the config ID, the h
     config/ data/ state/ inputs/
 ```
 
-- Outside the store, live mode writes only `devtwin-*` entries directly inside `~/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) and `~/.agents/skills`. It never creates, removes or changes the mode of a skill folder or its parents.
+- Outside the store, live mode writes only `devtwin-*` entries directly inside `~/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) and `~/.agents/skills`, plus the exact paths of an approved write class (see [Live-mode exceptions](#live-mode-exceptions)). It never creates, removes or changes the mode of a skill folder or its parents.
 - Codex skills go to `~/.agents/skills`. Nothing is written to `~/.codex/skills`. `CODEX_HOME` does not change the target; the preview warns with `CODEX_HOME_IGNORED` when it is set.
 - Live commands run only from the kit the live config names. That clone must be clean and detached at the live config's commit. Otherwise every live command fails with `GATE_REQUIRED`.
 - The home is the process home. A run with a different `$HOME` is refused.
 - The live config changes only through `live init`, `live add-repo`, `live set-kit` and `live migrate` ([Migrating from devctx](MIGRATING.md)). Each one records the approved config digest in `store/state/live/approved-config.json`. A live config that differs from the approved one is refused.
 - Listed repositories are read-only. Onboarding never writes to them.
 - There is no backup. See [No backup](#no-backup).
+
+## Live-mode exceptions
+
+A live config can hold an optional `writeClasses` block. It names the only other paths outside the store that devtwin may write. Each class is a list of exact absolute paths, at most 16 per class:
+
+| Class | Allowed paths |
+| --- | --- |
+| `hubRoot` | Folders inside the home for hub clones. Writes are allowed in the folder and below it, never in a sibling or a parent. |
+| `instructionTargets` | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`), `~/.codex/AGENTS.md`, and a devtwin-owned file named `devtwin*.md` directly in one of those two folders. |
+| `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) and `~/.codex/hooks.json`. |
+| `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. |
+
+- The classes are part of the approved config digest. A live config whose classes differ from the approved ones is refused with `GATE_REQUIRED`, `live.approval`. No CLI command sets the classes yet; do not edit them in `live.json` by hand.
+- Every path must be canonical and inside the home. A path whose folder is a link, or that is itself a link, is refused. A `hubRoot` folder must not overlap the store, the kit, a listed repository, a skill folder, a protected agent home or another hub root.
+- A write outside the store is allowed only when the writing code names one class and the path is exactly in it. Every other file in `~/.claude`, `~/.codex`, `~/.agents` and `~/Library/LaunchAgents` stays refused.
+- No command edits these files yet. The shared edit step that later commands use works as follows. In `CLAUDE.md` and `AGENTS.md`, it changes only the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. Every byte outside the markers stays the same. Malformed markers stop the edit with `CONFLICT`. In a JSON settings file, it changes only devtwin's own hook entries; the other values stay, but the file can be re-indented.
+- Before each edit, it writes the exact prior bytes to `store/state/runs/<run_id>/backups/` at mode 0600, with a record that names the path. For a file that did not exist, only the record is written. If the file changed during the edit, the edit stops with `INTEGRITY` and the file is not replaced. The edited file is replaced atomically and keeps its own mode. A file that devtwin creates gets mode 0600.
+- An edited file must be a regular file you own, with one link, that is not group or other writable.
 
 ## Placeholders
 

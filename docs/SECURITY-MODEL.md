@@ -44,6 +44,16 @@ Live mode ([Live activation](LIVE.md)) relaxes the fence for exactly the paths a
 - Cursor also reads `~/.agents/skills` and sees the installed skills. The skills keep every confirmation for any caller.
 - There is no backup. Onboarding copies some client repository text into the store, protected by mode 0700 and disk encryption only.
 
+## Live-mode exceptions
+
+The approved write classes in a live config ([Live-mode exceptions](LIVE.md#live-mode-exceptions)) are the only writes outside the store and the named skill folders. They widen the fence by exact paths only.
+
+- The four classes are `hubRoot`, `instructionTargets`, `hookTargets` and `launchAgents`. Each path has a fixed shape: a hub folder inside the home, `CLAUDE.md`, `AGENTS.md` or a `devtwin*.md` file in the Claude or Codex folder, `settings.json` or `hooks.json` in those folders, or a `devtwin.<name>.plist` file in `~/Library/LaunchAgents`. Every other path stays refused.
+- The classes are covered by the approved config digest, so an accidental change is refused with `GATE_REQUIRED`. As for the rest of the live config, this does not stop deliberate same-user tampering.
+- The fence accepts a class path only when the caller names that class. A record, draft or onboarding write cannot reach a class path.
+- A disposable pilot can list classes too. Its file targets must have the same shapes inside a listed fake agent home, and its hub folders must be inside `pilotRoot`.
+- No command edits a class file yet. The shared edit step limits edits to developer-owned files to the devtwin marker block or devtwin's own JSON entries. The prior bytes are backed up byte for byte in the run folder first. The file is read without following links and checked again just before the replace, but the same-user residual race between that check and the rename remains.
+
 ## Portable handoff boundary
 
 Handoff export uses a selected-project projection, not the personal brief. It excludes preferences, policies, binding paths/remotes and structured account identities; unsafe selected text holds instead of being redacted. Strict final byte bounds and dataRoot-only exclusive writes preserve the pilot fence. Bodies are inert fenced text. Pattern checks cannot establish confidentiality or rights, and hashes do not authenticate evidence. Present observations are checked twice, but path-based non-atomic writes retain the same-user residual race. Invalid-footer artifacts must not be consumed or shared. See [HANDOFF.md](HANDOFF.md).
