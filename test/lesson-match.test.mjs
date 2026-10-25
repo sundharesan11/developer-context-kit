@@ -142,7 +142,7 @@ test("lesson index rebuild is idempotent and private", async (t) => {
   const path = indexPath(s.roots, SCOPE);
   assert.equal(first.json.result.path, path);
   assert.equal(first.json.result.written, true);
-  assert.deepEqual(first.json.result.counts, { entries: 1, project: 1, org: 0, personal: 0, roots: 1, unavailable: 0 });
+  assert.deepEqual(first.json.result.counts, { entries: 1, project: 1, org: 0, personal: 0, hub: 0, roots: 1, unavailable: 0 });
   assert.equal(await mode(path), 0o600);
   assert.equal(await mode(join(s.stateRoot, "lessons")), 0o700);
   const bytes = await readFile(path, "utf8");

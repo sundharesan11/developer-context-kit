@@ -4,6 +4,7 @@ import { DevtwinError } from "../errors.mjs";
 import { assertScopeId, RECORD_ID } from "../identity/ids.mjs";
 import { isWithin } from "../storage/fsx.mjs";
 import { renderInbound } from "../records/isolation.mjs";
+import { LESSON_ID } from "../hubs/read.mjs";
 import { buildIndex, rebuildIndex, readIndex, findLesson, findRepoRoot, readCommonDir, resolveRepo } from "./index.mjs";
 import { matchLessons, normalizeRelPath, packageName, isStale } from "./match.mjs";
 const list = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
@@ -43,7 +44,7 @@ export const lessonMatchCommand = { options, async run(values, ctx) {
 // The full lesson as fenced, claimed, capped data (KTD11). Only an effective lesson in the scope's index is shown.
 export const lessonShowCommand = { options, async run(values, ctx) {
   const scope = assertScopeId(values.scope);
-  if (!RECORD_ID.test(values.id ?? "")) throw new DevtwinError("INVALID_ID", "Invalid record ID");
+  if (!RECORD_ID.test(values.id ?? "") && !LESSON_ID.test(values.id ?? "")) throw new DevtwinError("INVALID_ID", "Invalid record ID");
   const found = await findLesson(ctx.roots, scope, values.id);
   if (!found) throw new DevtwinError("NOT_FOUND", "No effective lesson with this ID", { id: values.id });
   const { entry, body } = found;

@@ -6,7 +6,7 @@ import { assertWritable, assertInPilot } from "./pilot.mjs";
 import { assertScopeId, assertProjectId, assertActorRef } from "../identity/ids.mjs";
 import { assertSourceRel, isDeniedRel } from "../storage/source-read.mjs";
 import { canonicalJson, sha256 } from "../storage/canonical.mjs";
-import { readPrivateJson, readPrivateText, writeNewFile, ensurePrivateDir, ensurePrivatePath, fsyncDir } from "../storage/fsx.mjs";
+import { readPrivateJson, readPrivateText, writeNewFile, ensurePrivateDir, ensurePrivatePath, fsyncDir, atomicReplace } from "../storage/fsx.mjs";
 import { withPilotLock, registryLockPath, scopeLockPath } from "../storage/lock.mjs";
 import { assertNoSensitive } from "../records/redact.mjs";
 import { gitQuery } from "../identity/git.mjs";
@@ -146,4 +146,39 @@ export async function readManifest(roots, scope, project, operationId, expectHas
   try { text = await readPrivateText(manifestPath(roots, scope, project, operationId)); } catch { throw new DevtwinError("RECOVERY_REQUIRED", "Manifest unavailable"); }
   if (sha256(text) !== expectHash) throw new DevtwinError("RECOVERY_REQUIRED", "Manifest hash mismatch");
   return JSON.parse(text);
+}
+// U10 (KTD4): the hub binding of a scope, at configRoot/hubs/<scope>.json. Only hub join and hub leave write it, and
+// hub schedule and hub sync update its job and schema fields. Routing reads the binding, never a remote URL.
+export const HUB_BINDING_KEYS = ["schemaVersion", "scope", "hubId", "status", "remote", "branch", "handle", "actorRef", "email", "sshCommand", "clone", "readOnly", "hubSchemaVersion", "delivery", "noteConsent", "jobs", "joinedAt", "leftAt"];
+export const hubBindingPath = (roots, scope) => join(roots.configRoot, "hubs", assertScopeId(scope) + ".json");
+function checkHubBinding(value, scope) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || value.schemaVersion !== 1 || value.scope !== scope || Object.keys(value).some((key) => !HUB_BINDING_KEYS.includes(key)) || !["joined", "left"].includes(value.status)) throw new DevtwinError("INTEGRITY", "Hub binding invalid");
+  return value;
+}
+// The binding, or null when the scope never joined a hub.
+export async function readHubBinding(roots, scope) {
+  try { return checkHubBinding(await readPrivateJson(hubBindingPath(roots, scope), 16384), scope); }
+  catch (error) { if (error.code === "ENOENT") return null; throw error; }
+}
+// Callers hold the hub-sync lock.
+export async function writeHubBinding(roots, binding) {
+  const path = hubBindingPath(roots, binding.scope);
+  checkHubBinding(binding, binding.scope);
+  assertWritable(roots, [path]);
+  ensurePrivatePath(roots.configRoot, ["hubs"]);
+  await atomicReplace(path, canonicalJson(binding) + "\n");
+  return path;
+}
+// Every joined binding, for the one-scope-per-hub check.
+export async function listHubBindings(roots) {
+  let names;
+  try { names = await readdir(join(roots.configRoot, "hubs")); } catch (error) { if (error.code === "ENOENT") return []; throw error; }
+  const out = [];
+  for (const name of names.filter((n) => n.endsWith(".json")).sort()) {
+    const scope = name.slice(0, -5);
+    try { assertScopeId(scope); } catch { continue; }
+    const binding = await readHubBinding(roots, scope);
+    if (binding) out.push(binding);
+  }
+  return out;
 }

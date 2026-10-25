@@ -65,6 +65,11 @@ export const COMMANDS = {
   "agents rollback-check": { load: async () => (await import("./agents/commands.mjs")).agentsRollbackCheckCommand },
   "locks release": { load: async () => (await import("./storage/lock.mjs")).locksReleaseCommand },
   "hub propose": { load: async () => (await import("./hubs/commands.mjs")).hubProposeCommand },
+  "hub join": { load: async () => (await import("./hubs/commands.mjs")).hubJoinCommand },
+  "hub sync": { load: async () => (await import("./hubs/commands.mjs")).hubSyncCommand },
+  "hub leave": { load: async () => (await import("./hubs/commands.mjs")).hubLeaveCommand },
+  "hub status": { load: async () => (await import("./hubs/commands.mjs")).hubStatusCommand },
+  "hub schedule": { load: async () => (await import("./hubs/commands.mjs")).hubScheduleCommand },
   "skill workspace-create": { load: async () => (await import("./skill-builder/commands.mjs")).workspaceCreateCommand },
   "skill requirements-record": { load: async () => (await import("./skill-builder/commands.mjs")).requirementsRecordCommand },
   "skill design-record": { load: async () => (await import("./skill-builder/commands.mjs")).designRecordCommand },
@@ -96,7 +101,8 @@ export async function main(argv, options = {}) {
   // stackCatalog, resolvePublicRead, request and lookup are seams for the stack routes; routing will supply the real
   // resolver. Without request and lookup, stack check uses node:https pinned to the checked address (src/stack/fetch.mjs).
   // stdin carries the agent payload for the hook route: a stream in production, a string in tests.
-  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot } = options;
+  // ownerDialog and launchctl are seams for the owner dialog (src/owner/dialog.mjs) and launchd (src/schedule/launchd.mjs).
+  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot, ownerDialog, launchctl } = options;
   let command = argv.slice(0, 2).join(" ");
   try {
     const routed = routeFor(argv);
@@ -139,7 +145,7 @@ export async function main(argv, options = {}) {
         if (values[flag] && values[flag] !== roots[key]) throw new DevtwinError("GATE_REQUIRED", "Root does not match pilot");
       }
     }
-    const context = { roots, pilot, now, home, env, kitRoot, templateRoot };
+    const context = { roots, pilot, now, home, env, kitRoot, templateRoot, ownerDialog, launchctl };
     if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
     if (command.startsWith("stack ")) Object.assign(context, { stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (COMMANDS[command].interactive === true) return await impl.run(values, { ...context, stdin, stdout });

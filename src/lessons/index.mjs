@@ -3,7 +3,8 @@ import { readFileSync, realpathSync } from "node:fs";
 import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
 import { readRegistry } from "../config/registry.mjs";
-import { loadScope, readBindingVersion } from "../config/store.mjs";
+import { loadScope, readBindingVersion, readHubBinding } from "../config/store.mjs";
+import { readHub, hubRecords } from "../hubs/read.mjs";
 import { readPrivateJson, ensurePrivatePath, atomicReplace, info } from "../storage/fsx.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { canonicalJson, digest } from "../storage/canonical.mjs";
@@ -31,8 +32,9 @@ function latestEntries(registry, scope) {
   return [...latest.values()].sort((a, b) => a.project < b.project ? -1 : 1);
 }
 // Sources give {records, unavailable}. Records carry body and effective, as the snapshot readers return them.
-// U10 adds the hub clone here as a fourth source ({ name: "hub", read }). Its records name the author in
-// recordedBy.actorRef, which claimedBy then uses in place of the local user.
+// The hub clone is the fourth source (U10). It reads the clone only while the scope is joined with delivery on, and a
+// hub with a newer schema version gives nothing. Its records name the author in recordedBy.actorRef, which claimedBy
+// then uses in place of the local user.
 export const SOURCES = [
   { name: "project", async read(roots, scope) {
     const records = [], unavailable = [];
@@ -43,7 +45,14 @@ export const SOURCES = [
     return { records, unavailable };
   } },
   { name: "org", async read(roots, scope) { return { records: (await readOrgSnapshot(roots, scope)).records, unavailable: [] }; } },
-  { name: "personal", async read(roots) { return { records: (await readPersonalSnapshot(roots)).records, unavailable: [] }; } }
+  { name: "personal", async read(roots) { return { records: (await readPersonalSnapshot(roots)).records, unavailable: [] }; } },
+  { name: "hub", async read(roots, scope) {
+    const binding = await readHubBinding(roots, scope);
+    if (!binding || binding.status !== "joined" || binding.delivery !== "on") return { records: [], unavailable: [] };
+    const read = await readHub(binding.clone);
+    if (read.readOnly) return { records: [], unavailable: [{ source: "hub", code: "DEVTWIN_HUB_SCHEMA_NEWER" }] };
+    return { records: hubRecords(binding, read), unavailable: [] };
+  } }
 ];
 const hasMatch = (match) => ["paths", "packages", "topics"].some((key) => match?.[key]?.length);
 const isLive = (r) => r.schemaVersion === 2 && ["lesson", "preference"].includes(r.kind) && LIVE.includes(r.effective) && hasMatch(r.match);
@@ -93,7 +102,7 @@ async function gather(roots, scope, { sources = SOURCES } = {}) {
   const bound = await boundRoots(roots, scope);
   unavailable.push(...bound.unavailable);
   const body = { schemaVersion: 1, scope, roots: bound.roots, entries, unavailable,
-    counts: { entries: entries.length, project: counts.project ?? 0, org: counts.org ?? 0, personal: counts.personal ?? 0, roots: bound.roots.length, unavailable: unavailable.length } };
+    counts: { entries: entries.length, project: counts.project ?? 0, org: counts.org ?? 0, personal: counts.personal ?? 0, hub: counts.hub ?? 0, roots: bound.roots.length, unavailable: unavailable.length } };
   // No clock value goes in, so the same sources always give the same bytes and fingerprint.
   return { index: { ...body, fingerprint: digest(body) }, bodies };
 }
