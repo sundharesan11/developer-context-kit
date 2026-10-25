@@ -1,48 +1,55 @@
 # devtwin
 
-Clone the developer. Keep project context between coding-agent sessions.
+**Clone the developer.** devtwin keeps your project context, decisions and handoffs between coding-agent sessions, so the next session starts where the last one stopped.
 
-devtwin is a local CLI for recording project facts, decisions and handoffs outside the project repository. It builds bounded, source-linked briefs so you can carry reviewed context into the next session.
+[![CI](https://github.com/sundharesan11/devtwin/actions/workflows/ci.yml/badge.svg)](https://github.com/sundharesan11/devtwin/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/sundharesan11/devtwin)
 
-It is also a personal-harness template: clone it, set up a small private personal profile, and turn generic skill templates into your own private skills. Your data stays outside the clone. See the [personal harness guide](docs/HARNESS.md).
+[Website](https://sundharesan11.github.io/devtwin/) · [Docs](https://sundharesan11.github.io/devtwin/docs/) · [Getting started](docs/GETTING-STARTED.md) · [DeepWiki](https://deepwiki.com/sundharesan11/devtwin) · [Roadmap](docs/ROADMAP.md)
 
-**Status: experimental pilot.** This is a **local package candidate**, not a daily-use agent installer. The `devtwin` command is **NOT currently installed** globally by this checkout. All stateful commands require an explicit pilot file: a disposable pilot, or a live config for one real machine. Start with synthetic data. Live mode is implemented and passed its first activation on one real machine on 2026-10-25. See the [live activation runbook](docs/LIVE.md).
+A repository tells an agent what the code is. It rarely says why a decision was made, what is still unknown, or where the last session stopped. devtwin keeps that knowledge as private, source-linked records outside the repository and turns them into a short, bounded brief for each new session.
 
-[Start here](docs/GETTING-STARTED.md) · [Guided onboarding](docs/ONBOARDING.md) · [Documentation](docs/README.md) · [Roadmap](docs/ROADMAP.md)
+## What it does
 
-## Why it exists
+| Pillar | What you get |
+| --- | --- |
+| **Project context** | Onboard a repository read-only, then keep its facts, decisions, constraints, commands, unknowns and handoffs as reviewable records. Each record links to its sources by hash, so a brief can tell you when evidence has changed. Records are superseded, never silently overwritten. |
+| **Every coding agent** | Bundled `devtwin-onboard`, `devtwin-resume` and `devtwin-record` skills give Claude Code and Codex the same context through the same CLI. |
+| **Organization identity routing** *(planned)* | Each scope binds its own GitHub and Slack accounts, and devtwin checks the live identity before acting. This is designed, not built yet; see the [roadmap](docs/ROADMAP.md). |
+| **Personal harness** | Clone it as a personal-harness template: a small private profile, skill templates you turn into your own private skills, and a watch on vendor announcements for your stack. See the [harness guide](docs/HARNESS.md). |
 
-A repository tells an agent what the code is. It does not always explain why a decision was made, what remains uncertain, or where the last session stopped.
-
-This kit provides a place to:
-
-- Keep facts and decisions scoped to one project.
-- Preserve sources, review status and supersession instead of silently replacing history.
-- Produce a brief or selected-record Markdown handoff for a person or agent to read.
-- Keep reusable toolkit code separate from private working context.
-
-It does not make an agent remember automatically. Someone must invoke the CLI and supply the resulting context to the session.
-
-## How it fits together
+## How it works
 
 ![Project sources are previewed through the CLI, approved into private stores, and read as briefs or selected handoffs. New observations return through explicit record operations.](docs/assets/architecture.svg)
 
-1. Read bounded repository sources and preview proposed context.
-2. Approve onboarding into a named scope and project. The project repository stays unchanged.
-3. Resolve that project and produce a brief from its private records.
-4. Give the brief to a session; record new evidence and decisions explicitly.
-5. Review selected records before sharing a handoff or proposing a company learning.
+1. **Read.** devtwin scans a bounded set of repository files (README, agent instructions, manifests) and Git metadata. It never writes to the repository.
+2. **Review.** Every write is a preview first. You approve the exact plan fingerprint before anything is stored.
+3. **Keep private.** Records live in local stores outside the repository, with private file modes.
+4. **Brief.** `context brief` returns at most 12 items and 24 KiB, with sources, freshness and unknowns.
+5. **Learn.** New decisions go back in as records, or out as a [selected-record handoff](docs/HANDOFF.md).
 
-The diagram shows the implemented pilot, not a live agent integration. See [architecture and boundaries](docs/ARCHITECTURE.md).
+More in [Architecture](docs/ARCHITECTURE.md).
 
-## Try it
+## Quick start
 
-Requirements: Node.js and npm, Git, and a macOS shell. The reference environment is macOS with Node v26.4.0. The declared Node floor is `>=22.13.0`. The last recorded [CI](docs/CI.md) run, 38154524118 at commit `8f1133a` (2026-10-11), passed all tests and acceptance checks on macOS and Ubuntu with both Node 26.4.0 and 22.13.0. That is evaluation evidence for that commit only; a CI run for `b95ff72` is pending. Support for the Node floor is not claimed. Linux support is not claimed; Windows is unsupported.
-
-From a checkout containing this guide:
+You need Node.js 22.13 or later and Git. There is nothing to install: devtwin has no third-party dependencies.
 
 ```sh
+git clone https://github.com/sundharesan11/devtwin.git
+cd devtwin
 node bin/devtwin.mjs help
+```
+
+Every command prints one line of JSON, `{"ok": true, ...}` or `{"ok": false, "error": {...}}`. To call it from anywhere, add an alias with the checkout's absolute path to your shell profile:
+
+```sh
+alias devtwin="node $HOME/code/devtwin/bin/devtwin.mjs"
+```
+
+Then run the offline demo. It builds synthetic repositories, a disposable pilot and fake agent homes in a fresh temporary folder, and checks onboarding, records, briefs, handoffs, installs and the personal harness end to end:
+
+```sh
 DEMO_PARENT="$(mktemp -d /tmp/devtwin-demo.XXXXXX)"
 DEMO_PARENT="$(cd "$DEMO_PARENT" && pwd -P)"
 node scripts/acceptance.mjs \
@@ -50,46 +57,38 @@ node scripts/acceptance.mjs \
   --report "$DEMO_PARENT/acceptance.json"
 ```
 
-This runs offline synthetic checks in a fresh disposable directory. It creates fixture repositories and private pilot files; it does not install into your real agent homes or connect accounts. The report intentionally defers fresh-agent discovery. It is a test harness, not a normal client workspace.
+Expect `"ok": true`, with 32 checks `passed` and `fresh-agent-smoke` `deferred` (it needs a real agent). The demo never touches your real agent homes or accounts.
 
-For checkout instructions, expected results and troubleshooting, use [Getting started](docs/GETTING-STARTED.md). For the actual preview → approval → brief workflow, follow [Guided onboarding](docs/ONBOARDING.md).
+Next steps:
 
-## What works, and what does not
+- [Getting started](docs/GETTING-STARTED.md): the demo in detail, with troubleshooting.
+- [Guided onboarding](docs/ONBOARDING.md): preview, approve, brief and record on a synthetic project, step by step.
+- [Live activation](docs/LIVE.md): run devtwin on your own machine against real repositories and agent skill folders.
+- [Migrating from devctx](docs/MIGRATING.md): `devtwin live migrate` moves a setup made under the old name.
 
-| Area | Available | Not delivered |
-| --- | --- | --- |
-| Project context | Onboarding preview/apply with re-onboard retirement, scoped records, source hashes, bounded briefs | Backup and restore, migration |
-| Continuity | Advisory handoffs and [selected-record Markdown export](docs/HANDOFF.md) | Session start and end hooks, packet import or sharing |
-| Skill creation | [Requirements, design approval, drafts and validation](docs/SKILL-BUILDER.md) (frozen: bug fixes only, except the create-from-template path) | Conversational creator, live behavior evaluation and export |
-| Personal harness | [Personal profile, setup skill, three skill templates, a manual announcement watch and private drafts](docs/HARNESS.md) | Real-home install of template-made skills or `devtwin-setup`, schedules, Slack sending, authenticated GitHub requests, the watch in live mode |
-| Skill sources | [12-source catalog, release checks, pinned acquisition and reviewed disposable installation](docs/SKILL-SOURCES.md) (frozen: bug fixes only) | Universal agent compatibility or weekly automatic updates |
-| Live mode | [Live config](docs/LIVE.md) with a pinned kit clone, bundled-skill install and uninstall beside foreign skills, rollback check, read-only onboarding of a real repository | Interactive-session evidence, a global `devtwin` command |
-| Identity and learning | Fake-provider identity checks and private hub proposals | Live Slack/email/issue connectors, sends or company-hub writes |
+## How it compares
 
-Claude and Codex filesystem layouts have fixture tests. Those tests do not prove that a fresh native session discovers or uses a skill. Gemini, Cursor and Command Code support is not established. Cursor reads `~/.agents/skills` and will see live Codex installs.
+| | Repo files (`AGENTS.md`, `CLAUDE.md`) | Hosted agent memory | devtwin |
+| --- | --- | --- | --- |
+| Where it lives | In the repository, shared with everyone who clones it | On the vendor's service | Local private stores, outside the repository |
+| Works across agents | Depends on which file each agent reads | Usually one product | Claude Code and Codex through the same CLI |
+| Sources and freshness | None | Usually none | Every record is hashed against its sources |
+| History | Git history of one file | Varies | Immutable records with supersession |
+| Writes | Anyone edits the file | Often automatic | Preview → approve → apply, every time |
 
-## Your data stays separate
+devtwin complements repository instruction files rather than replacing them: repository instructions always take precedence over a brief.
 
-The reusable repository contains code, schemas, generic templates and tests. Pilot configuration, project context and operation receipts live under separate private roots outside it. There is **no automatic private-to-public synchronization**.
+## Status and requirements
 
-Do not store secrets in records. Keep credentials in a separately approved credential store. Bitwarden and Composio integration is not implemented.
+- **Status.** devtwin is a local package candidate at version `0.0.0-local`. Live mode is implemented, and its first activation on a real machine passed, including fresh non-interactive Claude Code and Codex sessions that found the skills and read the brief. Backup and restore, session hooks and organization identity routing are on the [roadmap](docs/ROADMAP.md); known gaps are in [Limitations](docs/LIMITATIONS.md).
+- **Install.** Run devtwin from a checkout. A global `devtwin` command is NOT currently installed by cloning; use the alias above. The npm name `devtwin` is reserved with a placeholder package; the CLI is not published to npm yet, and `package.json` stays `"private": true` to prevent accidental publication.
+- **Requirements.** Node.js `>=22.13.0` and Git. macOS is the reference platform. CI also runs on Ubuntu, but Linux support is not claimed yet. Windows is unsupported.
+- **Safety.** Every stateful command needs an explicit pilot file: a disposable pilot for evaluation, or a live config for one real machine. There is no automatic private-to-public synchronization, and the pilot fence is not a sandbox: it limits this CLI, not your agent or other processes. Read the [security model](docs/SECURITY-MODEL.md) before using private data.
 
-The pilot fence is **not a sandbox**. A coding agent or another same-user process can have wider access than this CLI. There is no backup or sync. Read the [limitations](docs/LIMITATIONS.md) and [security model](docs/SECURITY-MODEL.md) before evaluating private data.
+## Contributing
 
-A personal assistant setup, an agent host and a company knowledge hub are optional surrounding systems—not prerequisites. This kit does not install or replace them.
-
-## Explore and contribute
-
-- [Documentation index](docs/README.md): guides, contracts and design history.
-- [Contributing](CONTRIBUTING.md): development setup, tests and public-safe examples.
-- [Security reporting](SECURITY.md): keep vulnerabilities and private data out of public issues.
-- [Release checklist](docs/RELEASING.md): what must pass before publication.
-- [Live activation](docs/LIVE.md): the runbook for one real machine and one real repository.
-- [Personal harness](docs/HARNESS.md): the personal profile, skill templates and announcement watch.
-- [Roadmap](docs/ROADMAP.md): remaining work toward daily use, starting with backup and restore.
+Contributions are welcome. Start with [Contributing](CONTRIBUTING.md) for setup, tests and the rules for keeping examples public-safe. Report vulnerabilities privately as described in [Security](SECURITY.md). The [documentation index](docs/README.md) lists every guide and maintainer contract.
 
 ## License
 
-The toolkit is licensed under [Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party skill sources retain their own licenses and notices. A catalog entry is not permission to redistribute its contents.
-
-`"private": true` in `package.json` prevents accidental npm publication. It is not a substitute for a license or a statement about GitHub visibility. This checkout is an unreleased candidate; publication and rights clearance remain separate release steps.
+[Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party skill sources listed in the catalog keep their own licenses.
