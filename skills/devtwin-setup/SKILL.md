@@ -14,6 +14,8 @@ Conduct a short first-run setup. Ask a few skippable questions, preview the comp
 
 To read project context, use `devtwin-resume`. To onboard a repository, use `devtwin-onboard`.
 
+The devtwin hook entries in the agent settings files are not part of this setup. The owner installs them with `agents install --hooks`, as `docs/LIVE.md` describes. Never install, remove or edit hook entries from this skill. The hook denies owner-only devtwin commands from agent shells; never try to work around it.
+
 ## Preconditions
 
 Check all of these before the first CLI call. If any check fails, stop and ask the user.

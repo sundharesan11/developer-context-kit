@@ -192,9 +192,11 @@ test("live forged receipts without a matching journal or naming extra or travers
   await writeFile(join(f.codex, "devtwin-resume/.devtwin-owned.json"), canonicalJson(receipt) + "\n");
   await writeFile(join(run, "journal.json"), canonicalJson({ schemaVersion: 2, kind: "skill-bundled", configId: "cfg_0123456789abcdef", runId: "run_forgedjrnl1", kitCommit: f.kitA.commit, mode: "install", planFingerprint: "sha256:" + "0".repeat(64), targetHome: null, intended: [action], started: [0], completed: [action] }) + "\n", { mode: 0o600 });
   const plan = await planInstall(p.pilot, { agents: ["codex"], mode: "install" });
-  assert.ok(plan.actions.every((x) => x.status === "conflict" && x.reason === "unowned-receipt"), JSON.stringify(plan.actions));
+  // devtwin-capture is not forged: the forged entries' conflicts block its create for this agent.
+  assert.ok(plan.actions.filter((x) => x.skill !== "devtwin-capture").every((x) => x.status === "conflict" && x.reason === "unowned-receipt"), JSON.stringify(plan.actions));
+  assert.deepEqual(plan.actions.filter((x) => x.skill === "devtwin-capture").map((x) => [x.status, x.reason]), [["blocked", "agent-conflict"]]);
   const uninstall = await planInstall(p.pilot, { agents: ["codex"], mode: "uninstall" });
-  assert.ok(uninstall.actions.every((x) => x.status === "preserve"));
+  assert.ok(uninstall.actions.filter((x) => x.skill !== "devtwin-capture").every((x) => x.status === "preserve"));
   const before = await treeSnapshot(f.codex);
   await applyInstall(p.roots, p.pilot, { agents: ["codex"], mode: "uninstall" }, { fingerprint: uninstall.fingerprint, runId: "run_forgedun01" });
   assert.equal(await treeSnapshot(f.codex), before);
@@ -421,7 +423,7 @@ test("live recovery persists a completed update in a run that also holds an entr
   assert.equal((await installStatus(b.roots, b.pilot, {})).status, "ok");
   // The completed update is owned: uninstall removes it, and the held entry is left in place.
   const uninstall = await planInstall(b.pilot, { ...input, mode: "uninstall" });
-  assert.deepEqual(uninstall.actions.map((x) => [x.skill, x.status]), [["devtwin-onboard", "modified"], ["devtwin-resume", "remove"], ["devtwin-record", "remove"]]);
+  assert.deepEqual(uninstall.actions.map((x) => [x.skill, x.status]), [["devtwin-onboard", "modified"], ["devtwin-resume", "remove"], ["devtwin-record", "remove"], ["devtwin-capture", "remove"]]);
   await applyInstall(b.roots, b.pilot, { ...input, mode: "uninstall" }, { fingerprint: uninstall.fingerprint, runId: "run_mixunin01" });
   assert.deepEqual(await readdir(f.claude), ["devtwin-onboard"]);
 });

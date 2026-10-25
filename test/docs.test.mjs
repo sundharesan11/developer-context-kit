@@ -97,7 +97,7 @@ test("docs state the candidate's limits in pinned phrases", async () => {
 });
 
 // Skill-text checks only; which skills the installer installs is pinned by SKILL_NAMES in src/agents/install.mjs.
-const BUNDLED_SKILLS = ["devtwin-onboard", "devtwin-resume", "devtwin-record", "devtwin-setup"];
+const BUNDLED_SKILLS = ["devtwin-onboard", "devtwin-resume", "devtwin-record", "devtwin-setup", "devtwin-capture"];
 const PROJECT_SKILLS = ["devtwin-onboard", "devtwin-resume", "devtwin-record"];
 const readBundledSkill = (name) => readFile(join(import.meta.dirname, "..", "skills", name, "SKILL.md"), "utf8");
 function assertSkillRoutes(name, text, COMMANDS) {

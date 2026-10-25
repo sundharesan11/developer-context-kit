@@ -80,6 +80,11 @@ function decode(bytes) {
   if (!Buffer.from(text).equals(bytes)) throw new DevtwinError("INTEGRITY", "Owned file is not UTF-8");
   return text;
 }
+// Read-only view for a preview: the file's text under the same safety checks as an edit, or null when it is absent.
+export function readOwnedText(path, limit = OWNED_LIMIT) {
+  const prior = readOwned(path, limit);
+  return prior ? decode(prior.bytes) : null;
+}
 // Edits one approved write-class file. edit(text) gets the current text, or null when the file is absent, and
 // returns the new text. Before the replace, the exact prior bytes go to stateRoot/runs/<runId>/backups/ with a
 // record naming the path; an absent file gets a record only. A run never overwrites a backup it already wrote.
