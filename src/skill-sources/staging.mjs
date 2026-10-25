@@ -1,7 +1,7 @@
 import { lstatSync, mkdirSync, readdirSync, linkSync, unlinkSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
 import { isWithin, checkNode, writeNewFile, readPrivateBytes, fsyncDir } from "../storage/fsx.mjs";
 import { digest } from "../storage/canonical.mjs";
@@ -9,17 +9,17 @@ import { ACQUISITION_LIMITS as L, ASSESSMENT, validateManifest, validateSelectio
 import { downloadAcquisition } from "./github-package.mjs";
 
 const RUN = /^stage_[0-9a-f]{32}$/;
-const fail = (code, field = "stage") => { throw new DevctxError(code, "Skill source staging refused", {field}); };
+const fail = (code, field = "stage") => { throw new DevtwinError(code, "Skill source staging refused", {field}); };
 const same = (a, b) => a.dev === b.dev && a.ino === b.ino;
 function sanitized(error, operation) {
-  if (error instanceof DevctxError && error.code === "DEVCTX_RATE_LIMITED") {
+  if (error instanceof DevtwinError && error.code === "DEVTWIN_RATE_LIMITED") {
     const details = {};
     if (Number.isInteger(error.details.retryAfterSeconds) && error.details.retryAfterSeconds >= 0 && error.details.retryAfterSeconds <= 86400) details.retryAfterSeconds = error.details.retryAfterSeconds;
     if (typeof error.details.resetAt === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/.test(error.details.resetAt) && Number.isFinite(Date.parse(error.details.resetAt))) details.resetAt = error.details.resetAt;
-    return new DevctxError("RATE_LIMITED", "GitHub rate limit reached", details);
+    return new DevtwinError("RATE_LIMITED", "GitHub rate limit reached", details);
   }
-  if (error instanceof DevctxError) return new DevctxError(error.code, "Skill source staging refused", {field: ["pilotDigest", "pilot", "destination"].includes(error.details.field) ? error.details.field : "stage"});
-  return new DevctxError("STORAGE_ERROR", "Skill source storage operation failed", {operation});
+  if (error instanceof DevtwinError) return new DevtwinError(error.code, "Skill source staging refused", {field: ["pilotDigest", "pilot", "destination"].includes(error.details.field) ? error.details.field : "stage"});
+  return new DevtwinError("STORAGE_ERROR", "Skill source storage operation failed", {operation});
 }
 function io(operation, fn) {
   try { const result = fn(); return result?.then ? result.catch((e) => { throw sanitized(e, operation); }) : result; }
@@ -145,7 +145,7 @@ export async function stageAcquisition(roots, source, input, {request = fetch, n
     fence.check(run);
     return inspected;
   } catch (error) {
-    if (published) throw new DevctxError("STAGE_UNCONFIRMED", "Stage publication needs inspection", {runId, next: "inspect"});
+    if (published) throw new DevtwinError("STAGE_UNCONFIRMED", "Stage publication needs inspection", {runId, next: "inspect"});
     throw sanitized(error, "write");
   }
 }

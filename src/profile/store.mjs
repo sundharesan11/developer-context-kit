@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
 import { deepestExisting } from "../config/roots.mjs";
 import { gitQuery } from "../identity/git.mjs";
@@ -16,9 +16,9 @@ export const profileDir = (roots) => join(roots.configRoot, "profile");
 export const profileLockPath = (roots) => join(roots.stateRoot, "locks", "profile.lock");
 const currentPath = (roots) => join(profileDir(roots), "current.json");
 const revisionPath = (roots, generation) => join(profileDir(roots), "v" + generation + ".json");
-const recovery = (message, details = {}) => { throw new DevctxError("RECOVERY_REQUIRED", message, details); };
+const recovery = (message, details = {}) => { throw new DevtwinError("RECOVERY_REQUIRED", message, details); };
 function assertOutsideGit(roots) {
-  if (gitQuery(deepestExisting(roots.configRoot), ["rev-parse", "--is-inside-work-tree"], { notRepo: true }).stdout.trim() === "true") throw new DevctxError("PATH_UNSAFE", "Private roots inside Git worktree", { remedy: REMEDY });
+  if (gitQuery(deepestExisting(roots.configRoot), ["rev-parse", "--is-inside-work-tree"], { notRepo: true }).stdout.trim() === "true") throw new DevtwinError("PATH_UNSAFE", "Private roots inside Git worktree", { remedy: REMEDY });
 }
 async function readText(path) {
   try { return await readPrivateText(path, 65536); } catch (error) { if (error.code === "ENOENT") return null; throw error; }
@@ -61,7 +61,7 @@ export async function readProfile(roots) {
   return { ...base, profile: revision.profile, createdAt: revision.createdAt };
 }
 export async function readProfileRevision(roots, generation) {
-  if (!Number.isInteger(generation) || generation < 1) throw new DevctxError("INVALID_INPUT", "Invalid profile generation");
+  if (!Number.isInteger(generation) || generation < 1) throw new DevtwinError("INVALID_INPUT", "Invalid profile generation");
   const text = await revisionText(roots, generation);
   const revision = parseRevision(text, generation);
   return { generation, revisionHash: sha256(text), profile: revision.profile, createdAt: revision.createdAt };
@@ -76,7 +76,7 @@ async function assertCurrentPlan(roots, plan, profile, fingerprint) {
   if (!fingerprint || fingerprint === plan.fingerprint) return assertFingerprint(plan, fingerprint);
   for (let generation = 0; generation < plan.base.generation; generation++) {
     const revisionHash = generation ? sha256(await revisionText(roots, generation)) : null;
-    if (buildPlan(roots, profile, { generation, revisionHash }).fingerprint === fingerprint) throw new DevctxError("STALE_VERSION", "Profile changed since preview", { base: generation, current: plan.base.generation });
+    if (buildPlan(roots, profile, { generation, revisionHash }).fingerprint === fingerprint) throw new DevtwinError("STALE_VERSION", "Profile changed since preview", { base: generation, current: plan.base.generation });
   }
   assertFingerprint(plan, fingerprint);
 }

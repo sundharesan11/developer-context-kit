@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { isIP } from "node:net";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertNoSensitive } from "../records/redact.mjs";
 
 const CATALOG_PATH = fileURLToPath(new URL("../../catalog/stack-sources.json", import.meta.url));
@@ -16,7 +16,7 @@ export const IDENTIFIERS = Object.freeze({
   pypi: /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?$/,
   crates: /^[A-Za-z][A-Za-z0-9_-]{0,63}$/
 });
-const bad = (field) => { throw new DevctxError("INVALID_INPUT", "Invalid stack catalog", { field }); };
+const bad = (field) => { throw new DevtwinError("INVALID_INPUT", "Invalid stack catalog", { field }); };
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const freeze = (value) => {
   if (value && typeof value === "object") { for (const child of Object.values(value)) freeze(child); Object.freeze(value); }
@@ -25,7 +25,7 @@ const freeze = (value) => {
 // KTD17 static rules: https, no user info, default port, DNS host name with at least two labels, no IP literal or
 // localhost. Private-address checks after DNS resolution happen before each request (U5), not here.
 export function checkFeedUrl(text, field = "feed") {
-  const fail = () => { throw new DevctxError("INVALID_INPUT", "Invalid feed URL", { field }); };
+  const fail = () => { throw new DevtwinError("INVALID_INPUT", "Invalid feed URL", { field }); };
   if (typeof text !== "string" || !text.length || text.length > 2048 || /[\s\p{Cc}\p{Cf}]/u.test(text)) fail();
   let url;
   try { url = new URL(text); } catch { fail(); }
@@ -39,8 +39,8 @@ export function checkFeedUrl(text, field = "feed") {
   return url.href;
 }
 export function checkIdentifier(kind, id, field) {
-  if (!Object.hasOwn(IDENTIFIERS, kind)) throw new DevctxError("INVALID_INPUT", "Unknown identifier kind", { field, allowed: Object.keys(IDENTIFIERS) });
-  if (typeof id !== "string" || !IDENTIFIERS[kind].test(id) || id.endsWith(".git")) throw new DevctxError("INVALID_INPUT", "Invalid identifier", { field });
+  if (!Object.hasOwn(IDENTIFIERS, kind)) throw new DevtwinError("INVALID_INPUT", "Unknown identifier kind", { field, allowed: Object.keys(IDENTIFIERS) });
+  if (typeof id !== "string" || !IDENTIFIERS[kind].test(id) || id.endsWith(".git")) throw new DevtwinError("INVALID_INPUT", "Invalid identifier", { field });
   return id;
 }
 function strings(value, field, { max, length, check = (item) => item }) {
@@ -67,7 +67,7 @@ function validateItem(entry, field) {
   if (entry.package !== undefined) {
     const pkg = entry.package;
     if (!isObject(pkg) || Object.keys(pkg).length !== 2 || !Object.hasOwn(pkg, "ecosystem") || !Object.hasOwn(pkg, "name")) bad(`${field}.package`);
-    if (!ECOSYSTEMS.includes(pkg.ecosystem)) throw new DevctxError("INVALID_INPUT", "Unknown identifier kind", { field: `${field}.package.ecosystem`, allowed: ECOSYSTEMS });
+    if (!ECOSYSTEMS.includes(pkg.ecosystem)) throw new DevtwinError("INVALID_INPUT", "Unknown identifier kind", { field: `${field}.package.ecosystem`, allowed: ECOSYSTEMS });
     item.package = { ecosystem: pkg.ecosystem, name: checkIdentifier(pkg.ecosystem, pkg.name, `${field}.package.name`) };
   }
   return item;

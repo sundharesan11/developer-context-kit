@@ -1,5 +1,5 @@
 import {join, posix} from "node:path";
-import {DevctxError} from "../errors.mjs";
+import {DevtwinError} from "../errors.mjs";
 import {digest, sha256} from "../storage/canonical.mjs";
 import {readPrivateBytes} from "../storage/fsx.mjs";
 import {assertSourceRel, isDeniedRel} from "../storage/source-read.mjs";
@@ -8,10 +8,10 @@ import {inspectAcquisition} from "./staging.mjs";
 import {gitBlobSha} from "./selection.mjs";
 
 export const exact = (v, keys) => !!v && typeof v === "object" && [null, Object.prototype].includes(Object.getPrototypeOf(v)) && Object.keys(v).length === keys.length && keys.every((k) => Object.hasOwn(v, k));
-export const fail = (code = "INVALID_INPUT") => { throw new DevctxError(code, "Source package operation refused"); };
+export const fail = (code = "INVALID_INPUT") => { throw new DevtwinError(code, "Source package operation refused"); };
 export async function sourceOperation(fn) {
   try { return await fn(); }
-  catch (e) { throw new DevctxError(e instanceof DevctxError ? e.code : "STORAGE_ERROR", "Source package operation refused"); }
+  catch (e) { throw new DevtwinError(e instanceof DevtwinError ? e.code : "STORAGE_ERROR", "Source package operation refused"); }
 }
 const legal = /^(LICENSE|NOTICE|COPYING)(\.md|\.txt)?$/;
 export function assertSourcePackageRel(path) { if (legal.test(path)) return path; return assertPackageRel(path); }
@@ -28,7 +28,7 @@ function paths(values, {nonempty = false} = {}) {
 }
 export function validateSourceMapping(value) {
   if (!exact(value, ["schemaVersion", "name", "skillRoot", "files", "requiredPaths", "licensePaths", "noticePaths", "dependencies", "compatibility", "review"]) || value.schemaVersion !== 1) fail();
-  if (typeof value.name !== "string" || !SKILL_NAME.test(value.name) || value.name.length > 64 || value.name.startsWith("devctx-") || ["synced", "anthropic-skills"].includes(value.name)) fail();
+  if (typeof value.name !== "string" || !SKILL_NAME.test(value.name) || value.name.length > 64 || value.name.startsWith("devtwin-") || ["synced", "anthropic-skills"].includes(value.name)) fail();
   if (typeof value.skillRoot !== "string") fail();
   if (value.skillRoot) sourcePath(value.skillRoot);
   if (!Array.isArray(value.files) || !value.files.length || value.files.length > 24) fail();
@@ -42,7 +42,7 @@ export function validateSourceMapping(value) {
     const inside = !prefix || file.source.startsWith(prefix);
     const expected = inside ? file.source.slice(prefix.length) : posix.basename(file.source);
     if (file.target !== expected || !inside && (!legalSources.has(file.source) || !legal.test(file.target))) fail();
-    if (file.target === ".devctx-owned.json") fail();
+    if (file.target === ".devtwin-owned.json") fail();
     return {...file};
   }).sort((a, b) => a.source.localeCompare(b.source, "en"));
   const skill = prefix + "SKILL.md";

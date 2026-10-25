@@ -50,9 +50,9 @@ export async function runDoctor(roots) {
     try { const snap = await readSnapshot(roots, entry.scope, entry.project); bundleProblems += snap.corrupt.length; }
     catch { bundleProblems++; }
     try { const loc = await locateWorktree(entry.path); if (!loc.git || loc.commonDir !== entry.commonDir) boundProblems++; }
-    catch (error) { if (error?.code === "DEVCTX_GIT_QUERY_FAILED") gitQueryFailed++; else boundProblems++; }
+    catch (error) { if (error?.code === "DEVTWIN_GIT_QUERY_FAILED") gitQueryFailed++; else boundProblems++; }
   }
-  if (registry) checks.push(check("registry", registryProblems ? "fail" : "ok", registryProblems ? { code: "DEVCTX_RECOVERY_REQUIRED", invalidEntries: registryProblems } : { generation: registry.generation }));
+  if (registry) checks.push(check("registry", registryProblems ? "fail" : "ok", registryProblems ? { code: "DEVTWIN_RECOVERY_REQUIRED", invalidEntries: registryProblems } : { generation: registry.generation }));
   checks.push(check("bundles", bundleProblems ? "fail" : registry ? "ok" : "unavailable", { corrupt: bundleProblems }));
   const incomplete = [];
   for (const run of await names(join(roots.stateRoot, "runs"))) {
@@ -62,6 +62,6 @@ export async function runDoctor(roots) {
     catch { incomplete.push(run); }
   }
   checks.push(check("install-journals", incomplete.length ? "warn" : "ok", incomplete));
-  checks.push(check("bound-roots", boundProblems || gitQueryFailed ? "fail" : registry ? "ok" : "unavailable", gitQueryFailed ? { code: "DEVCTX_GIT_QUERY_FAILED", changed: boundProblems, gitQueryFailed } : { changed: boundProblems }));
+  checks.push(check("bound-roots", boundProblems || gitQueryFailed ? "fail" : registry ? "ok" : "unavailable", gitQueryFailed ? { code: "DEVTWIN_GIT_QUERY_FAILED", changed: boundProblems, gitQueryFailed } : { changed: boundProblems }));
   return { ok: !checks.some((c) => c.status === "fail"), checks };
 }

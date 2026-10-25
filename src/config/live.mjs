@@ -2,7 +2,7 @@ import { readdirSync, realpathSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { checkLiveConfig, loadPilot, rootsFromPilot, recordApprovedDigest, approvedDigestPath, skillDirsFor } from "./pilot.mjs";
 import { ensureRoots, validateRoot } from "./roots.mjs";
 import { info, checkNode, ensurePrivateDir, writeNewFile, atomicReplace, fsyncDir } from "../storage/fsx.mjs";
@@ -16,8 +16,8 @@ const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot
 const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 // Stands in for the config ID while a new config is validated; apply draws the real ID once.
 const PENDING_ID = "cfg_pending0000";
-const invalid = (field) => { throw new DevctxError("INVALID_INPUT", "Invalid live config input", { field }); };
-const gate = (field, reason) => { throw new DevctxError("GATE_REQUIRED", "Live config gate refused", { field, reason }); };
+const invalid = (field) => { throw new DevtwinError("INVALID_INPUT", "Invalid live config input", { field }); };
+const gate = (field, reason) => { throw new DevtwinError("GATE_REQUIRED", "Live config gate refused", { field, reason }); };
 const sorted = (values) => [...new Set(values)].sort();
 const rawOf = (pilot) => Object.fromEntries(KEYS.map((key) => [key, pilot[key]]));
 const configText = (raw) => JSON.stringify(raw, null, 2) + "\n";
@@ -30,12 +30,12 @@ function configPath(path) {
 function runningKit(ctx) {
   try { return realpathSync(ctx.kitRoot ?? KIT); } catch { return gate("live.kitRoot", "running-kit"); }
 }
-// The live config folder (~/.devctx) is created by the owner at 0700 and is never created or chmodded here.
+// The live config folder (~/.devtwin) is created by the owner at 0700 and is never created or chmodded here.
 function assertConfigDir(dir) {
   const node = info(dir);
-  if (!node) throw new DevctxError("PATH_UNSAFE", "Live config folder must exist and be private", { field: "configDir" });
+  if (!node) throw new DevtwinError("PATH_UNSAFE", "Live config folder must exist and be private", { field: "configDir" });
   validateRoot(dir, "configDir");
-  if (!node.isDirectory() || node.uid !== process.getuid() || (node.mode & 0o077)) throw new DevctxError("PATH_UNSAFE", "Live config folder must exist and be private", { field: "configDir" });
+  if (!node.isDirectory() || node.uid !== process.getuid() || (node.mode & 0o077)) throw new DevtwinError("PATH_UNSAFE", "Live config folder must exist and be private", { field: "configDir" });
 }
 function storeLayout(dir) {
   const pilotRoot = join(dir, "store");
@@ -47,7 +47,7 @@ const RETRY_LAYOUT = { config: {}, data: {}, inputs: {}, state: { locks: {}, liv
 function assertLeftover(dir, allowed) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name), node = info(path), want = Object.hasOwn(allowed, name) ? allowed[name] : undefined;
-    if (want === undefined || !node || (want === null ? !node.isFile() : !node.isDirectory())) throw new DevctxError("CONFLICT", "Live store exists without a live config", { field: "pilotRoot" });
+    if (want === undefined || !node || (want === null ? !node.isFile() : !node.isDirectory())) throw new DevtwinError("CONFLICT", "Live store exists without a live config", { field: "pilotRoot" });
     checkNode(node, path, { directory: want !== null });
     if (want) assertLeftover(path, want);
   }
@@ -61,7 +61,7 @@ function assertFreshStore(pilotRoot) {
 export function planLiveInit(input, ctx) {
   const path = configPath(input.configPath), dir = dirname(path);
   assertConfigDir(dir);
-  if (info(path)) throw new DevctxError("CONFLICT", "Live config already exists", { field: "pilot" });
+  if (info(path)) throw new DevtwinError("CONFLICT", "Live config already exists", { field: "pilot" });
   const layout = storeLayout(dir);
   assertFreshStore(layout.pilotRoot);
   const agents = sorted(input.agents ?? []);
@@ -85,7 +85,7 @@ export async function applyLiveInit(input, ctx, { faults = {} } = {}) {
   ensurePrivateDir(pilot.pilotRoot);
   // The approval is recorded before the config appears, so a config on disk is always an approved one.
   return withPilotLock(roots, lockPath(roots), { kind: "live-init" }, async () => {
-    if (info(path)) throw new DevctxError("CONFLICT", "Live config already exists", { field: "pilot" });
+    if (info(path)) throw new DevtwinError("CONFLICT", "Live config already exists", { field: "pilot" });
     ensureRoots(roots);
     ensurePrivateDir(pilot.inputsRoot);
     await faults.afterRoots?.();

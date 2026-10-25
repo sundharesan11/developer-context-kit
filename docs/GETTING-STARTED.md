@@ -9,8 +9,8 @@ This is not a production installer. You do not need Claude, Codex, Orca, a compa
 Clone the repository into a development directory:
 
 ```sh
-git clone https://github.com/sundharesan11/developer-context-kit.git
-cd developer-context-kit
+git clone https://github.com/sundharesan11/devtwin.git
+cd devtwin
 ```
 
 If the repository is still private, you need access. Use the reviewed checkout or release that contains this guide; do not assume an older default branch has the same commands. There is no published npm installation path.
@@ -21,7 +21,7 @@ Check prerequisites:
 node --version
 npm --version
 git --version
-node bin/devctx.mjs help
+node bin/devtwin.mjs help
 ```
 
 The reference environment is macOS with Node v26.4.0. The manifest declares Node `>=22.13.0`. [CI](CI.md) run 38154524118 at commit `8f1133a` (2026-10-11) passed on macOS and Ubuntu with Node 26.4.0 and 22.13.0. Those are evaluation lanes for that commit, not a support claim. Support for the Node floor and for Linux is not claimed. Windows is unsupported.
@@ -33,7 +33,7 @@ There are no third-party runtime dependencies. Do not run `npm install -g`, `npm
 Run these commands in the same shell, from the repository root:
 
 ```sh
-DEMO_PARENT="$(mktemp -d /tmp/devctx-demo.XXXXXX)"
+DEMO_PARENT="$(mktemp -d /tmp/devtwin-demo.XXXXXX)"
 DEMO_PARENT="$(cd "$DEMO_PARENT" && pwd -P)"
 node scripts/acceptance.mjs \
   --pilot-root "$DEMO_PARENT/pilot" \
@@ -72,11 +72,11 @@ The kit does not delete demo directories. Temporary directories can disappear af
 
 | Symptom | What to check |
 | --- | --- |
-| `DEVCTX_GATE_REQUIRED` | Use the generated pilot file and canonical paths. Do not weaken the fence. |
+| `DEVTWIN_GATE_REQUIRED` | Use the generated pilot file and canonical paths. Do not weaken the fence. |
 | `PILOT_ROOT_REQUIRED_AND_ABSENT` | Start a fresh demo; the harness will not reuse an existing pilot root. |
 | Package allowlist failure | Untracked files in the checkout can fail the package gate. Use a clean checkout or inspect the finding; do not broadly allowlist private files. |
-| `DEVCTX_PLAN_MISMATCH` | Sources or state changed after preview. Review a fresh plan before applying it. |
-| `DEVCTX_BUSY` or recovery warning | Do not remove locks or journals blindly. Preserve the evidence and read [Storage](STORAGE.md). |
+| `DEVTWIN_PLAN_MISMATCH` | Sources or state changed after preview. Review a fresh plan before applying it. |
+| `DEVTWIN_BUSY` or recovery warning | Do not remove locks or journals blindly. Preserve the evidence and read [Storage](STORAGE.md). |
 | Permission, symlink or hard-link error | Use a fresh canonical local directory and a filesystem with required link support. Read [Limitations](LIMITATIONS.md). |
 
 For a reproducible bug, use synthetic inputs and the commands in [Contributing](../CONTRIBUTING.md). For a suspected vulnerability, follow [Security reporting](../SECURITY.md).

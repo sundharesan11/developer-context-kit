@@ -1,4 +1,4 @@
-import {DevctxError} from "../errors.mjs";
+import {DevtwinError} from "../errors.mjs";
 import {reviewSourcePackage} from "./package.mjs";
 import {approveSourceContent, planSourceInstall, approveSourceAction, applySourceInstall, sourceInstallStatus} from "./installation.mjs";
 
@@ -6,7 +6,7 @@ const string = {type: "string"};
 const packageOptions = {pilot: string, run: string, "mapping-json": string};
 const planOptions = {pilot: string, "content-decision": string, home: string, "agent-json": string, mode: string};
 const approvalOptions = {decision: string, "interaction-ref": string, response: string};
-const usage = () => { throw new DevctxError("USAGE", "Missing or malformed source installation option"); };
+const usage = () => { throw new DevtwinError("USAGE", "Missing or malformed source installation option"); };
 function required(values, keys) { for (const key of keys) if (typeof values[key] !== "string" || !values[key]) usage(); }
 function json(value) {
   if (typeof value !== "string" || Buffer.byteLength(value) > 32768) usage();

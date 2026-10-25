@@ -7,7 +7,7 @@ import { hasTerm, classifyEntry, itemTerms } from "../src/stack/match.mjs";
 import { isUnsafeAddress, httpsRequest, createFetcher } from "../src/stack/fetch.mjs";
 
 const fixture = (name) => readFileSync(new URL("./fixtures/stack/" + name, import.meta.url));
-const rejectsCode = (fn, code) => assert.throws(fn, (e) => e.code === "DEVCTX_" + code, code);
+const rejectsCode = (fn, code) => assert.throws(fn, (e) => e.code === "DEVTWIN_" + code, code);
 const rss = (items) => `<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>${items}</channel></rss>`;
 
 test("an RSS fixture, an Atom fixture and a JSON Feed fixture each yield their entries with title, link, date and hash inputs", () => {
@@ -100,7 +100,7 @@ test("a fetch with a body over the cap, a redirect, an unexpected content type o
   const lookup = async () => [{ address: "93.184.216.34", family: 4 }];
   const respond = (r) => async () => ({ status: 200, headers: { "content-type": "application/rss+xml" }, body: Buffer.from("x"), ...r });
   const get = (r, limits) => createFetcher({ request: respond(r), lookup, hosts: ["changelog.example.com"], limits }).fetchResource("https://changelog.example.com/feed.xml", { accept: "*/*", types: ["application/rss+xml"] });
-  const code = async (promise, want) => assert.rejects(promise, (e) => e.code === "DEVCTX_" + want, want);
+  const code = async (promise, want) => assert.rejects(promise, (e) => e.code === "DEVTWIN_" + want, want);
   await code(get({ body: Buffer.alloc(2048) }, { body: 1024 }), "RESPONSE_TOO_LARGE");
   await code(get({ headers: { "content-type": "application/rss+xml", "content-length": "999999999" } }), "RESPONSE_TOO_LARGE");
   await code(get({ status: 301, headers: { location: "https://elsewhere.example.net/" } }), "REDIRECT_REFUSED");

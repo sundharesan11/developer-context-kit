@@ -44,7 +44,7 @@ async function approve(p, args = [], options) {
 }
 const host = (plan, name) => plan.hosts.find((h) => h.host === name);
 const currentPlan = (p, resolvePublicRead, input = {}) => planStack(p.roots, input, deps(resolvePublicRead));
-const rejectsApproval = (promise) => assert.rejects(promise, (e) => e.code === "DEVCTX_APPROVAL_REQUIRED");
+const rejectsApproval = (promise) => assert.rejects(promise, (e) => e.code === "DEVTWIN_APPROVAL_REQUIRED");
 
 test("stack plan resolves a fixture catalog item to its feed host and api.github.com with a deterministic fingerprint", async (t) => {
   const p = await makePilot(t);
@@ -83,7 +83,7 @@ test("stack plan previews per-host content and what hosts still see, adding OSV 
   assert.equal(item("next").advisories, "exact");
   for (const plan of [plain, wide]) {
     assert.match(plan.requestContent, /limited to the feed URLs, identifiers and versions/);
-    assert.deepEqual(plan.hostsStillSee, ["IP address", "request time", "fixed user agent devctx-stack-check"]);
+    assert.deepEqual(plan.hostsStillSee, ["IP address", "request time", "fixed user agent devtwin-stack-check"]);
     assert.match(plan.followNote, /which vendors you follow/);
     assert.equal(plan.authentication.github, "unauthenticated");
   }
@@ -148,7 +148,7 @@ test("approving without the routed public-read binding and then adding it requir
   await assertStackApproved(p.roots, await currentPlan(p));
   const plan = await currentPlan(p, bound);
   assert.equal(plan.authentication.github, "routed-public-read");
-  await assert.rejects(assertStackApproved(p.roots, plan), (e) => e.code === "DEVCTX_APPROVAL_REQUIRED" && e.details.differences.includes("authentication"));
+  await assert.rejects(assertStackApproved(p.roots, plan), (e) => e.code === "DEVTWIN_APPROVAL_REQUIRED" && e.details.differences.includes("authentication"));
 });
 
 test("overrides carry forward from the current approval and --clear-overrides drops them", async (t) => {
@@ -175,7 +175,7 @@ test("overrides carry forward from the current approval and --clear-overrides dr
 test("token variables in the environment are never read: without a routed binding GitHub requests are unauthenticated", async (t) => {
   const p = await makePilot(t);
   await setProfile(p, { stackCurrent: AE12 });
-  const env = Object.fromEntries(["GH_TOKEN", "GITHUB_TOKEN", "DEVCTX_GITHUB_TOKEN"].map((key) => [key, BINDING_VALUE]));
+  const env = Object.fromEntries(["GH_TOKEN", "GITHUB_TOKEN", "DEVTWIN_GITHUB_TOKEN"].map((key) => [key, BINDING_VALUE]));
   const saved = Object.fromEntries(Object.keys(env).map((key) => [key, process.env[key]]));
   Object.assign(process.env, env);
   t.after(() => { for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value; });
@@ -204,7 +204,7 @@ test("every stored approval records mode manual and a check presenting another m
   assert.equal((await readStackApproval(p.roots)).mode, "manual");
   const plan = await currentPlan(p);
   await assertStackApproved(p.roots, plan, { mode: "manual" });
-  await assert.rejects(assertStackApproved(p.roots, plan, { mode: "scheduled" }), (e) => e.code === "DEVCTX_APPROVAL_REQUIRED" && e.details.differences.includes("mode"));
+  await assert.rejects(assertStackApproved(p.roots, plan, { mode: "scheduled" }), (e) => e.code === "DEVTWIN_APPROVAL_REQUIRED" && e.details.differences.includes("mode"));
 });
 
 test("an unknown stack item is not watched and excluded from hosts until --feed or --map maps it", async (t) => {
@@ -232,11 +232,11 @@ test("an empty stackCurrent produces an empty plan that cannot be approved", asy
   assert.equal(plan.approvable, false);
   const out = await stack(p, "approve", ["--plan-fingerprint", plan.fingerprint]);
   assert.equal(out.code, 1);
-  assert.equal(out.json.error.code, "DEVCTX_CONFLICT");
+  assert.equal(out.json.error.code, "DEVTWIN_CONFLICT");
   await assert.rejects(access(join(p.stateRoot, "stack", "approval.json")));
   await setProfile(p, { stackCurrent: ["widget"] });
   const unmapped = await stack(p, "approve", ["--plan-fingerprint", (await planOk(p)).fingerprint]);
-  assert.equal(unmapped.json.error.code, "DEVCTX_CONFLICT");
+  assert.equal(unmapped.json.error.code, "DEVTWIN_CONFLICT");
 });
 
 test("--feed refuses http, user info, a non-default port, an IP literal, localhost or a single-label host with INVALID_INPUT", async (t) => {
@@ -246,7 +246,7 @@ test("--feed refuses http, user info, a non-default port, an IP literal, localho
     "https://192.0.2.10/feed.xml", "https://[2001:db8::1]/feed.xml", "https://0x7f.1/feed.xml", "https://localhost/feed.xml", "https://app.localhost/feed.xml", "https://intranet/feed.xml", "not a url"]) {
     const out = await stack(p, "plan", ["--feed", "widget=" + url]);
     assert.equal(out.code, 1, url);
-    assert.equal(out.json.error.code, "DEVCTX_INVALID_INPUT", url);
+    assert.equal(out.json.error.code, "DEVTWIN_INVALID_INPUT", url);
   }
 });
 
@@ -257,7 +257,7 @@ test("stack catalog validation refuses an unknown field, an unknown identifier k
   for (const bad of [catalog({ homepage: "https://example.com" }), catalog({ package: { ecosystem: "maven", name: "acme" } }), catalog({ package: { ecosystem: "npm", name: "acme", extra: 1 } }),
     catalog({ feeds: ["http://changelog.example.com/feed.xml"] }), catalog({ feeds: ["https://127.0.0.1/feed.xml"] }), catalog({ feeds: ["https://changelog.example.com:444/feed.xml"] }),
     catalog({ github: ["not a repo"] }), catalog({ name: "Acme" }), { version: 1, items: [item, { ...item }] }, { version: 2, items: [] }]) {
-    assert.throws(() => validateStackCatalog(bad), (e) => e.code === "DEVCTX_INVALID_INPUT", JSON.stringify(bad));
+    assert.throws(() => validateStackCatalog(bad), (e) => e.code === "DEVTWIN_INVALID_INPUT", JSON.stringify(bad));
   }
   const bundled = loadStackCatalog();
   assert.ok(bundled.items.length > 0);
@@ -270,7 +270,7 @@ test("a --map override with an unknown kind or a --with value outside the three 
   for (const args of [["--map", "widget=maven:example/widget"], ["--map", "widget=github"], ["--map", "widget=github:not a repo"], ["--map", "other=github:example/other"], ["--with", "announcements"], ["--with", "secrets"]]) {
     const out = await stack(p, "plan", args);
     assert.equal(out.code, 1, args.join(" "));
-    assert.equal(out.json.error.code, "DEVCTX_INVALID_INPUT", args.join(" "));
+    assert.equal(out.json.error.code, "DEVTWIN_INVALID_INPUT", args.join(" "));
   }
 });
 
@@ -296,11 +296,11 @@ test("stack approve with a mismatched or missing fingerprint writes nothing", as
   await setProfile(p, { stackCurrent: AE12 });
   const plan = await planOk(p);
   const wrong = await stack(p, "approve", ["--plan-fingerprint", "sha256:" + "0".repeat(64)]);
-  assert.equal(wrong.json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal(wrong.json.error.code, "DEVTWIN_PLAN_MISMATCH");
   const other = await stack(p, "approve", ["--with", "advisories", "--plan-fingerprint", plan.fingerprint]);
-  assert.equal(other.json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal(other.json.error.code, "DEVTWIN_PLAN_MISMATCH");
   const missing = await stack(p, "approve");
-  assert.equal(missing.json.error.code, "DEVCTX_PLAN_REQUIRED");
+  assert.equal(missing.json.error.code, "DEVTWIN_PLAN_REQUIRED");
   await assert.rejects(access(join(p.stateRoot, "stack", "approval.json")));
 });
 
@@ -320,12 +320,12 @@ test("the stack plan and profile suggestions take stack entry parsing from profi
   assert.equal(commands.parseStackEntry, validate.parseStackEntry);
   assert.equal(commands.formatStackEntry, validate.formatStackEntry);
   assert.deepEqual(validate.parseStackEntry("node=>=22:high"), { name: "node", version: ">=22", care: "high" });
-  assert.throws(() => validate.parseStackEntry("bad entry"), (e) => e.code === "DEVCTX_INVALID_INPUT" && e.details.field === "stack");
+  assert.throws(() => validate.parseStackEntry("bad entry"), (e) => e.code === "DEVTWIN_INVALID_INPUT" && e.details.field === "stack");
 });
 
 test("a --map override without a kind:identifier colon fails with INVALID_INPUT naming map", () => {
   for (const text of ["acme-sdk=npm", "acme-sdk=github", "acme-sdk=endoflife"]) {
-    assert.throws(() => parseMapOverride(text), (e) => e.code === "DEVCTX_INVALID_INPUT" && e.details.field === "map", text);
+    assert.throws(() => parseMapOverride(text), (e) => e.code === "DEVTWIN_INVALID_INPUT" && e.details.field === "map", text);
   }
   assert.deepEqual(parseMapOverride("acme-sdk=npm:acme-sdk"), { name: "acme-sdk", kind: "npm", id: "acme-sdk" });
 });

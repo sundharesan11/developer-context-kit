@@ -1,4 +1,4 @@
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { planDraft, applyDraft } from "./save.mjs";
 // No message-type, send, post or connector option: draft save only stores an approved draft privately.
 export const draftSaveCommand = {
@@ -6,7 +6,7 @@ export const draftSaveCommand = {
   async run(values, ctx) {
     const input = { scope: values.scope, bodyFile: values["body-file"] };
     if (!values.apply) return planDraft(ctx.roots, input);
-    if (!values["plan-fingerprint"]) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
+    if (!values["plan-fingerprint"]) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");
     return applyDraft(ctx.roots, input, { fingerprint: values["plan-fingerprint"] });
   }
 };

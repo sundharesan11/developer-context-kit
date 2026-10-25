@@ -8,12 +8,12 @@ test("writeNewFile is 0600 and never overwrites; readPrivateText refuses symlink
   const dir = await sandbox(t), file = join(dir, "a");
   await writeNewFile(file, "x");
   assert.equal((await stat(file)).mode & 0o777, 0o600);
-  await assert.rejects(writeNewFile(file, "y"), { code: "DEVCTX_CONFLICT" });
+  await assert.rejects(writeNewFile(file, "y"), { code: "DEVTWIN_CONFLICT" });
   await symlink(file, join(dir, "l"));
-  await assert.rejects(readPrivateText(join(dir, "l")), { code: "DEVCTX_PATH_UNSAFE" });
+  await assert.rejects(readPrivateText(join(dir, "l")), { code: "DEVTWIN_PATH_UNSAFE" });
 });
 test("safeJoin refuses traversal", () => {
-  for (const bad of ["..", "../x", "/a", "", "A", ".h"]) assert.throws(() => safeJoin("/r", bad), { code: "DEVCTX_PATH_ESCAPE" });
+  for (const bad of ["..", "../x", "/a", "", "A", ".h"]) assert.throws(() => safeJoin("/r", bad), { code: "DEVTWIN_PATH_ESCAPE" });
 });
 test("U4 writeNewFile removes its partial file after an injected write failure and a retry succeeds", async (t) => {
   const dir = await sandbox(t), file = join(dir, "a");
@@ -40,12 +40,12 @@ test("U4 fsyncDir refuses a symlinked or non-directory path", async (t) => {
   await symlink(join(dir, "real"), join(dir, "link"));
   await writeNewFile(join(dir, "f"), "x");
   fsyncDir(join(dir, "real"));
-  assert.throws(() => fsyncDir(join(dir, "link")), { code: "DEVCTX_PATH_UNSAFE" });
-  assert.throws(() => fsyncDir(join(dir, "f")), { code: "DEVCTX_PATH_UNSAFE" });
+  assert.throws(() => fsyncDir(join(dir, "link")), { code: "DEVTWIN_PATH_UNSAFE" });
+  assert.throws(() => fsyncDir(join(dir, "f")), { code: "DEVTWIN_PATH_UNSAFE" });
 });
 test("U4 readPrivateBytes refuses a file whose ctime changes during the read", async (t) => {
   const dir = await sandbox(t), file = join(dir, "a");
   await writeNewFile(file, "x");
-  await assert.rejects(readPrivateBytes(file, 1024, { faults: { afterRead: async () => { await sleep(5); await chmod(file, 0o600); } } }), { code: "DEVCTX_INTEGRITY" });
+  await assert.rejects(readPrivateBytes(file, 1024, { faults: { afterRead: async () => { await sleep(5); await chmod(file, 0o600); } } }), { code: "DEVTWIN_INTEGRITY" });
   assert.equal((await readPrivateBytes(file)).toString(), "x");
 });

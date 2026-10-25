@@ -1,4 +1,4 @@
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { validateSourceRecipe } from "./catalog.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -7,7 +7,7 @@ const BODY_LIMIT = 256 * 1024;
 const TOTAL_LIMIT = 1024 * 1024;
 const CHECK_MS = 15000;
 const NO_RELEASE = Symbol("no release");
-const fail = (code, message, details = {}) => { throw new DevctxError(code, message, details); };
+const fail = (code, message, details = {}) => { throw new DevtwinError(code, message, details); };
 const validTag = (tag) => typeof tag === "string" && tag.length >= 1 && tag.length <= 128 &&
   !/[~^:?*\[\\\p{Cc}\p{Cf}\p{Zs}\p{Zl}\p{Zp}]/u.test(tag) && !tag.includes("..") && !tag.includes("@{") &&
   tag.split("/").every((part) => part && !part.startsWith(".") && !part.endsWith(".") && !part.endsWith(".lock"));
@@ -73,7 +73,7 @@ export async function checkSource(source, { request = fetch, priorLock, timeoutM
     try {
       try {
         response = await request(`${stem}${path}`, {
-          headers: { Accept: "application/vnd.github+json", "User-Agent": "devctx-skill-sources" },
+          headers: { Accept: "application/vnd.github+json", "User-Agent": "devtwin-skill-sources" },
           signal: controller.signal, redirect: "manual"
         });
       } catch {

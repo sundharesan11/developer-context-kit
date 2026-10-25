@@ -32,7 +32,7 @@ test("source sandbox lifecycle installs updates restores and removes exact revie
   await apply(a, install);
   for (const host of ["claude", "codex"]) {
     assert.equal(await readFile(join(target(a, host), "LICENSE"), "utf8"), a.contents.LICENSE);
-    assert.equal(JSON.parse(await readFile(join(target(a, host), ".devctx-owned.json"))).schemaVersion, 3);
+    assert.equal(JSON.parse(await readFile(join(target(a, host), ".devtwin-owned.json"))).schemaVersion, 3);
   }
   assert.equal(existsSync(join(a.input.targetHome, ".codex")), false);
   const b = await approved(t, {p: a.p, version: 2});
@@ -54,12 +54,12 @@ test("source approvals bind content actions and explicit unverified pin acceptan
   d.responseText += " with caller-supplied-unverified pin";
   await assert.rejects(approveSourceContent(x.p.roots, {...input, packageDigest: "sha256:" + "0".repeat(64)}, d));
   await approveSourceContent(x.p.roots, input, d);
-  await assert.rejects(approveSourceContent(x.p.roots, input, d), {code: "DEVCTX_CONFLICT"});
+  await assert.rejects(approveSourceContent(x.p.roots, input, d), {code: "DEVTWIN_CONFLICT"});
   const mapping = structuredClone(x.mapping); mapping.dependencies.push({name: "missing-runtime", status: "missing"});
   const held = await reviewSourcePackage(x.p.roots, {...x, mapping});
   await assert.rejects(approveSourceContent(x.p.roots, {...x, mapping, packageDigest: held.packageDigest}, {...d, decisionId: id(), responseText: `Approved source content ${held.packageDigest} with caller-supplied-unverified pin`}));
   const y = await approved(t), a = await action(y);
-  await assert.rejects(apply(y, {...a, approval: {...a.approval, fingerprint: "sha256:" + "0".repeat(64)}}), {code: "DEVCTX_PLAN_MISMATCH"});
+  await assert.rejects(apply(y, {...a, approval: {...a.approval, fingerprint: "sha256:" + "0".repeat(64)}}), {code: "DEVTWIN_PLAN_MISMATCH"});
   await apply(y, a);
   await assert.rejects(apply(y, a));
 });
@@ -135,13 +135,13 @@ test("source apply rechecks stage target decisions and selected host compatibili
   const z = await approved(t);
   const decision = join(z.p.dataRoot, "skill-sources/decisions", z.input.contentDecisionId + ".json");
   await chmod(decision, 0o700);
-  await assert.rejects(planSourceInstall(z.p.roots, z.input), {code: "DEVCTX_PATH_UNSAFE"});
+  await assert.rejects(planSourceInstall(z.p.roots, z.input), {code: "DEVTWIN_PATH_UNSAFE"});
 });
 
 test("source installer shares the personal install lock and never breaks a foreign lock", async (t) => {
   const x = await approved(t), a = await action(x);
   await withPilotLock(x.p.roots, join(x.p.stateRoot, "locks/install.lock"), {kind: "fixture-owner"}, async () => {
-    await assert.rejects(apply(x, a), {code: "DEVCTX_BUSY"});
+    await assert.rejects(apply(x, a), {code: "DEVTWIN_BUSY"});
     assert.equal(existsSync(join(x.p.stateRoot, "locks/install.lock")), true);
   }, {destinations: [x.input.targetHome], targetHome: x.input.targetHome});
   assert.equal(existsSync(target(x)), false);
@@ -153,11 +153,11 @@ test("malformed completed source journals block both package adapters", async (t
   await writeFile(join(runPath, "journal.json"), JSON.stringify({kind: "skill-source-local", targetHome: x.input.targetHome, intended: [], completed: []}), {mode: 0o600});
   assert.deepEqual((await journals(x.p.roots, x.input.targetHome)).incomplete, ["run_malformed01"]);
   const a = await action(x);
-  await assert.rejects(apply(x, a), {code: "DEVCTX_RECOVERY_REQUIRED"});
+  await assert.rejects(apply(x, a), {code: "DEVTWIN_RECOVERY_REQUIRED"});
   await assert.rejects(applyPackageInstall(x.p.roots, {audience: "personal", workspace: "ws_recovery1"},
     {targetHome: x.input.targetHome, agents: ["claude"], mode: "install", revisionId: "rv_unknown01", contentDecisionId: "dc_unknown01"},
     {decisionId: "dc_unknown02", fingerprint: "sha256:" + "0".repeat(64)}
-  ), {code: "DEVCTX_RECOVERY_REQUIRED"});
+  ), {code: "DEVTWIN_RECOVERY_REQUIRED"});
 });
 
 test("source installation keeps unreviewed host compatibility and pilot gates visible", async (t) => {
@@ -165,14 +165,14 @@ test("source installation keeps unreviewed host compatibility and pilot gates vi
   x.mapping.compatibility.codex = "unsupported";
   const review = await reviewSourcePackage(x.p.roots, x), contentDecisionId = id();
   const input = {...x, packageDigest: review.packageDigest}, approval = {decisionId: contentDecisionId, interactionRef: "user:fixture", responseText: `Approved source content ${review.packageDigest} with caller-supplied-unverified pin`};
-  await assert.rejects(approveSourceContent(undefined, input, approval), {code: "DEVCTX_GATE_REQUIRED"});
+  await assert.rejects(approveSourceContent(undefined, input, approval), {code: "DEVTWIN_GATE_REQUIRED"});
   await approveSourceContent(x.p.roots, input, approval);
   const install = {contentDecisionId, targetHome: x.p.agentHomes[0], agents: ["codex"], mode: "install"};
   const plan = await planSourceInstall(x.p.roots, install);
   assert.deepEqual(plan.holds, [{code: "COMPATIBILITY_UNSUPPORTED", agent: "codex"}]);
-  await assert.rejects(approveSourceAction(x.p.roots, install, {decisionId: id(), fingerprint: plan.fingerprint, interactionRef: "user:fixture", responseText: `Approved source install ${plan.fingerprint}`}), {code: "DEVCTX_CONFLICT"});
-  await assert.rejects(planSourceInstall(undefined, install), {code: "DEVCTX_GATE_REQUIRED"});
-  await assert.rejects(applySourceInstall(undefined, install, {decisionId: id()}), {code: "DEVCTX_GATE_REQUIRED"});
+  await assert.rejects(approveSourceAction(x.p.roots, install, {decisionId: id(), fingerprint: plan.fingerprint, interactionRef: "user:fixture", responseText: `Approved source install ${plan.fingerprint}`}), {code: "DEVTWIN_CONFLICT"});
+  await assert.rejects(planSourceInstall(undefined, install), {code: "DEVTWIN_GATE_REQUIRED"});
+  await assert.rejects(applySourceInstall(undefined, install, {decisionId: id()}), {code: "DEVTWIN_GATE_REQUIRED"});
 });
 
 test("source updates refuse path role changes case aliases and moved package roots", async (t) => {
@@ -193,7 +193,7 @@ test("source package CLI requires a pilot and explicit two-step approvals", asyn
   const args = ["--pilot", x.p.path, "--run", x.stageRunId, "--mapping-json", JSON.stringify(x.mapping)];
   const review = await runCli(["skill-sources", "package-review", ...args]);
   assert.equal(review.code, 0, JSON.stringify(review.json));
-  assert.equal((await runCli(["skill-sources", "package-review"])).json.error.code, "DEVCTX_GATE_REQUIRED");
+  assert.equal((await runCli(["skill-sources", "package-review"])).json.error.code, "DEVTWIN_GATE_REQUIRED");
   assert.equal((await runCli(["skill-sources", "package-review", ...args, "--run", x.stageRunId])).code, 2);
   const contentId = id(), packageDigest = review.json.result.packageDigest;
   const approve = await runCli(["skill-sources", "content-approve", ...args, "--package-digest", packageDigest, "--decision", contentId, "--interaction-ref", "user:fixture", "--response", `Approved source content ${packageDigest} with caller-supplied-unverified pin`]);

@@ -1,14 +1,14 @@
 ---
 title: Personal harness
-description: Set up your private personal profile, run first-run setup with devctx-setup, and turn the generic skill templates into your own private skills.
+description: Set up your private personal profile, run first-run setup with devtwin-setup, and turn the generic skill templates into your own private skills.
 ---
 
-devctx can act as your personal harness. You keep the kit checkout generic and store everything about *you* — your working preferences, your stack, your drafts and your own skills — under the pilot's private roots, outside the checkout and outside every repository.
+devtwin can act as your personal harness. You keep the kit checkout generic and store everything about *you* — your working preferences, your stack, your drafts and your own skills — under the pilot's private roots, outside the checkout and outside every repository.
 
 This guide covers three pieces:
 
 1. The **personal profile**: how you like to work and what you build with.
-2. The **`devctx-setup`** skill: a short, guided first run that writes the profile.
+2. The **`devtwin-setup`** skill: a short, guided first run that writes the profile.
 3. **Skill templates**: generic starting points you render into your own private skills.
 
 The [stack watch](/docs/guides/stack-watch/) uses the profile's stack and has its own guide.
@@ -19,7 +19,7 @@ The personal profile is unrelated to the **client profile**, which is the per-pr
 
 ## Before you start
 
-You need a pilot whose `init` has run. Start with a disposable pilot; see [Quickstart](/docs/getting-started/quickstart/). The pilot's private roots must not be inside a Git worktree: the profile commands refuse with `DEVCTX_PATH_UNSAFE` if they are.
+You need a pilot whose `init` has run. Start with a disposable pilot; see [Quickstart](/docs/getting-started/quickstart/). The pilot's private roots must not be inside a Git worktree: the profile commands refuse with `DEVTWIN_PATH_UNSAFE` if they are.
 
 ## The personal profile
 
@@ -38,12 +38,12 @@ The profile holds only these fields. Every field is optional.
 
 A stack entry is `name[=version][:care]`, where care is `low`, `normal` or `high`. For example `node=>=22:high` or just `react`.
 
-The whole profile is capped at 4,096 bytes of canonical JSON (`DEVCTX_LIMIT` beyond that). Unknown keys, secret-named fields and credential-like text are refused. Never put credentials or client names in it.
+The whole profile is capped at 4,096 bytes of canonical JSON (`DEVTWIN_LIMIT` beyond that). Unknown keys, secret-named fields and credential-like text are refused. Never put credentials or client names in it.
 
 ### Read it
 
 ```sh
-node bin/devctx.mjs profile show --pilot "$PILOT"
+node bin/devtwin.mjs profile show --pilot "$PILOT"
 ```
 
 ```json
@@ -55,7 +55,7 @@ node bin/devctx.mjs profile show --pilot "$PILOT"
 ### Preview a change
 
 ```sh
-node bin/devctx.mjs profile plan --pilot "$PILOT" \
+node bin/devtwin.mjs profile plan --pilot "$PILOT" \
   --work 'Backend services' \
   --preference 'explanationStyle=concise' --preference 'autonomy=ask-first' \
   --stack-current 'node=>=22:high' --stack-current 'react' \
@@ -81,7 +81,7 @@ How flags combine: the plan starts from your current profile. Each flag you pass
 Pass exactly the same flags plus the reviewed fingerprint:
 
 ```sh
-node bin/devctx.mjs profile apply --pilot "$PILOT" \
+node bin/devtwin.mjs profile apply --pilot "$PILOT" \
   --work 'Backend services' \
   --preference 'explanationStyle=concise' --preference 'autonomy=ask-first' \
   --stack-current 'node=>=22:high' --stack-current 'react' \
@@ -93,7 +93,7 @@ node bin/devctx.mjs profile apply --pilot "$PILOT" \
 {"ok":true,"command":"profile apply","result":{"generation":1,"revisionHash":"sha256:31dd…","destination":{"root":"configRoot","path":"profile"}}}
 ```
 
-Each apply writes a new revision and keeps the old ones. Read an earlier one with `profile show --generation <n>`. If the profile changed since your preview, apply fails with `DEVCTX_STALE_VERSION`; different flags fail with `DEVCTX_PLAN_MISMATCH`. Preview again.
+Each apply writes a new revision and keeps the old ones. Read an earlier one with `profile show --generation <n>`. If the profile changed since your preview, apply fails with `DEVTWIN_STALE_VERSION`; different flags fail with `DEVTWIN_PLAN_MISMATCH`. Preview again.
 
 ### More profile commands
 
@@ -105,11 +105,11 @@ Each apply writes a new revision and keeps the old ones. Read an earlier one wit
 
 `context brief` includes the profile in a `profile` field with a notice: it is preference data for style and workflow, never permission, and it never overrides repository instructions or you. Where the profile and your `init` preferences set the same field, the profile wins. [Handoff exports](/docs/concepts/handoffs/) never include it.
 
-## First-run setup with devctx-setup
+## First-run setup with devtwin-setup
 
-`skills/devctx-setup` is a guided first run. In a session with your agent it:
+`skills/devtwin-setup` is a guided first run. In a session with your agent it:
 
-1. Checks `DEVCTX_KIT` and the pilot path, and runs `doctor` to confirm `init` has run. If not, it stops without creating anything.
+1. Checks `DEVTWIN_KIT` and the pilot path, and runs `doctor` to confirm `init` has run. If not, it stops without creating anything.
 2. Reads your current profile and explains what is stored and where.
 3. Asks at most five skippable questions: kind of work, how you like to work with agents, stack you know, stack you build on now (offering `profile suggest-stack` results), and whether to seed from `init`.
 4. Shows the full `profile plan`.
@@ -117,7 +117,7 @@ Each apply writes a new revision and keeps the old ones. Read an earlier one wit
 6. Lists the skill templates with `skill template-list`.
 
 :::caution[Not yet in the installer]
-`agents install` does not install `devctx-setup` yet. Until it does, point your agent at `skills/devctx-setup/SKILL.md` in the kit checkout and ask it to follow that file.
+`agents install` does not install `devtwin-setup` yet. Until it does, point your agent at `skills/devtwin-setup/SKILL.md` in the kit checkout and ask it to follow that file.
 :::
 
 ## Turn a template into your own skill
@@ -135,7 +135,7 @@ A template contains no personal data and no scripts, and is never installed by `
 ### 1. List templates
 
 ```sh
-node bin/devctx.mjs skill template-list
+node bin/devtwin.mjs skill template-list
 ```
 
 No pilot needed. Each template lists its placeholders, which are required, and their defaults.
@@ -143,33 +143,33 @@ No pilot needed. Each template lists its placeholders, which are required, and t
 ### 2. Create a private workspace
 
 ```sh
-node bin/devctx.mjs skill workspace-create --pilot "$PILOT" --audience personal --workspace ws_example01
+node bin/devtwin.mjs skill workspace-create --pilot "$PILOT" --audience personal --workspace ws_example01
 ```
 
 ### 3. Render the template
 
 ```sh
-node bin/devctx.mjs skill template-seed --pilot "$PILOT" \
+node bin/devtwin.mjs skill template-seed --pilot "$PILOT" \
   --audience personal --workspace ws_example01 \
   --template writing --set 'skill-name=draft-my-notes'
 ```
 
 This is a read-only render. It returns each file's `path`, `content` and `sha256`, the `layout` (`candidate/SKILL.md`, `design.json`, `requirements.json`) and a `renderDigest`. It writes nothing.
 
-The skill name cannot start with `devctx-` or match a bundled skill:
+The skill name cannot start with `devtwin-` or match a bundled skill:
 
 ```json
-{"ok":false,"command":"skill template-seed","error":{"code":"DEVCTX_INVALID_INPUT","message":"Reserved skill name","details":{"name":"devctx-notes"}}}
+{"ok":false,"command":"skill template-seed","error":{"code":"DEVTWIN_INVALID_INPUT","message":"Reserved skill name","details":{"name":"devtwin-notes"}}}
 ```
 
 ### 4. Write the files yourself
 
-After you review the rendered files, write them **unchanged** into a new directory under the pilot's `inputsRoot`, keeping the relative paths. devctx does not write them for you.
+After you review the rendered files, write them **unchanged** into a new directory under the pilot's `inputsRoot`, keeping the relative paths. devtwin does not write them for you.
 
 ### 5. Verify the bytes
 
 ```sh
-node bin/devctx.mjs skill template-verify --pilot "$PILOT" \
+node bin/devtwin.mjs skill template-verify --pilot "$PILOT" \
   --audience personal --workspace ws_example01 \
   --template writing --set 'skill-name=draft-my-notes' \
   --dir /absolute/path/to/pilot/inputs/seeded-writing \
@@ -180,7 +180,7 @@ node bin/devctx.mjs skill template-verify --pilot "$PILOT" \
 {"ok":true,"command":"skill template-verify","result":{"verified":true,"template":"writing","renderDigest":"sha256:d477…","files":[…]}}
 ```
 
-An edited, missing or extra file fails with `DEVCTX_INTEGRITY` naming it.
+An edited, missing or extra file fails with `DEVTWIN_INTEGRITY` naming it.
 
 ### 6. Continue in the skill builder
 
@@ -197,8 +197,8 @@ Installing a template-made skill into your real agent homes is not available yet
 The `writing` and `slack-update` skills never send anything. When you want to keep a draft, save it privately:
 
 ```sh
-node bin/devctx.mjs draft save --pilot "$PILOT" --scope example --body-file /absolute/path/to/pilot/inputs/draft.md
-node bin/devctx.mjs draft save --pilot "$PILOT" --scope example --body-file /absolute/path/to/pilot/inputs/draft.md \
+node bin/devtwin.mjs draft save --pilot "$PILOT" --scope example --body-file /absolute/path/to/pilot/inputs/draft.md
+node bin/devtwin.mjs draft save --pilot "$PILOT" --scope example --body-file /absolute/path/to/pilot/inputs/draft.md \
   --apply --plan-fingerprint '<fingerprint>'
 ```
 
@@ -219,4 +219,4 @@ Agents apply only after you approve the exact preview in the session. That cover
 | Seeded template files | a directory under `inputsRoot` |
 | Skill workspaces | `dataRoot/personal/skill-workspaces/` (or under a scope) |
 
-devctx does not sync anything. Never `git init` inside these roots; keep history by exporting into a separate private repository.
+devtwin does not sync anything. Never `git init` inside these roots; keep history by exporting into a separate private repository.

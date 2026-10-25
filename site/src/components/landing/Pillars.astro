@@ -3,15 +3,15 @@ import { DOCS } from '../../site';
 
 // Kept as strings so the line breaks inside these white-space:pre trees
 // survive Astro's HTML whitespace compression.
-const kitTree = `<span class="d">developer-context-kit/</span>
-├─ bin/devctx.mjs
+const kitTree = `<span class="d">devtwin/</span>
+├─ bin/devtwin.mjs
 ├─ skills/
-│  ├─ devctx-resume/
-│  ├─ devctx-record/
-│  └─ devctx-onboard/
+│  ├─ devtwin-resume/
+│  ├─ devtwin-record/
+│  └─ devtwin-onboard/
 ├─ templates/
 └─ LICENSE  <span class="muted">Apache-2.0</span>`;
-const dataTree = `<span class="d">~/.devctx/</span>  <span class="muted">0700</span>
+const dataTree = `<span class="d">~/.devtwin/</span>  <span class="muted">0700</span>
 ├─ profile/
 ├─ scopes/
 │  ├─ acme/
@@ -26,9 +26,9 @@ const lines = (tree: string) =>
 <section class="section" aria-labelledby="pillars-title" style="padding-bottom:40px">
   <div class="wrap">
     <div class="intro reveal">
-      <div class="kicker">What devctx is</div>
+      <div class="kicker">What devtwin is</div>
       <h2 class="h2" id="pillars-title" data-words>A second you, <span class="soft">in every session.</span></h2>
-      <p>Agents read your code. They don't know why the queue moved to SQS, which test command actually works, where you stopped yesterday, or which GitHub account belongs to this client. devctx does — and hands it over the moment a session starts.</p>
+      <p>Agents read your code. They don't know why the queue moved to SQS, which test command actually works, where you stopped yesterday, or which GitHub account belongs to this client. devtwin does — and hands it over the moment a session starts.</p>
     </div>
 
     <!-- Pillar 1 -->
@@ -82,9 +82,9 @@ const lines = (tree: string) =>
         <h3 id="p2">Claude Code today. Codex tomorrow. Same brief.</h3>
         <p>At session start the agent loads a bounded brief — the few things that matter for this project, ranked and cited. Switch tools mid-week and nothing is lost: every agent reads the same reviewed context.</p>
         <ul class="ticks">
-          <li><span><code>devctx-resume</code> loads the brief into the session.</span></li>
-          <li><span><code>devctx-record</code> captures a decision as you make it.</span></li>
-          <li><span><code>devctx-onboard</code> scans a repo into reviewed context.</span></li>
+          <li><span><code>devtwin-resume</code> loads the brief into the session.</span></li>
+          <li><span><code>devtwin-record</code> captures a decision as you make it.</span></li>
+          <li><span><code>devtwin-onboard</code> scans a repo into reviewed context.</span></li>
           <li><span><code>handoff export</code> writes a clean Markdown packet for a person.</span></li>
         </ul>
         <a class="p-more" href={DOCS.codingAgents}>Set up your coding agents <span aria-hidden="true">→</span></a>
@@ -97,7 +97,7 @@ const lines = (tree: string) =>
           </div>
           <div class="f-body" id="brief-panel" role="tabpanel" aria-labelledby="tab-cc">
             <div class="agent-line">
-              <span class="cmd"><span class="p" data-agent-prompt>›</span> <span data-agent-cmd>/devctx-resume</span></span>
+              <span class="cmd"><span class="p" data-agent-prompt>›</span> <span data-agent-cmd>/devtwin-resume</span></span>
               <span class="pill ok">brief loaded</span>
             </div>
             <div class="brief">
@@ -129,7 +129,7 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>03</span> Accounts</div>
         <h3 id="p3">The right account, in every org.</h3>
-        <p>Work for two companies? Bind each scope to its own GitHub and Slack accounts. Open a project and devctx resolves its org — the agent acts as that org's you, with that org's credentials.</p>
+        <p>Work for two companies? Bind each scope to its own GitHub and Slack accounts. Open a project and devtwin resolves its org — the agent acts as that org's you, with that org's credentials.</p>
         <ul class="ticks">
           <li><span><b>Automatic.</b> <code>context resolve</code> picks the identity from the project.</span></li>
           <li><span><b>Refused on mismatch.</b> A globex token never touches an acme repo.</span></li>
@@ -139,7 +139,7 @@ const lines = (tree: string) =>
       </div>
       <div class="frame reveal">
         <div class="frame-in">
-          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">devctx · identity</span><span class="right"><span class="pill" id="acct-pill">resolved</span></span></div>
+          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">devtwin · identity</span><span class="right"><span class="pill" id="acct-pill">resolved</span></span></div>
           <div class="acct" data-scope="acme" id="acct">
             <div class="scope-switch" role="group" aria-label="Active scope">
               <button type="button" aria-pressed="true" data-scope="acme"><i aria-hidden="true"></i>acme</button>
@@ -179,7 +179,7 @@ const lines = (tree: string) =>
       </div>
       <div class="frame reveal">
         <div class="frame-in">
-          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">devctx skill template-seed</span><span class="right"><span class="pill">profile: sam</span></span></div>
+          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">devtwin skill template-seed</span><span class="right"><span class="pill">profile: sam</span></span></div>
           <div class="gallery">
             <div class="tpl on">
               <span class="tpl-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff8a3d" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 16 0"/><path d="M8 12a4 4 0 0 1 8 0"/><circle cx="12" cy="12" r="1.5" fill="#ff8a3d"/></svg></span>
@@ -206,7 +206,7 @@ const lines = (tree: string) =>
             </div>
           </div>
           <div class="digest">
-            <div class="cmd"><span class="p">$</span> devctx stack digest</div>
+            <div class="cmd"><span class="p">$</span> devtwin stack digest</div>
             <div><span class="acc">●</span> New Claude model available <span class="muted">— you use @anthropic-ai/sdk in 3 projects</span></div>
             <div><span class="acc">●</span> Auth provider SDK major release <span class="muted">— matches acme.atlas</span></div>
             <div class="muted">2 relevant · 31 skipped as unrelated</div>
@@ -224,7 +224,7 @@ const lines = (tree: string) =>
         <ul class="ticks">
           <li><span><b>Public kit, private data.</b> Update the kit without touching your context.</span></li>
           <li><span><b>No account, no server.</b> Plain files you can read, back up and diff.</span></li>
-          <li><span><b><code>devctx doctor</code></b> checks the boundaries for you.</span></li>
+          <li><span><b><code>devtwin doctor</code></b> checks the boundaries for you.</span></li>
         </ul>
         <a class="p-more" href={DOCS.whereDataLives}>Where your data lives <span aria-hidden="true">→</span></a>
       </div>
@@ -241,7 +241,7 @@ const lines = (tree: string) =>
             </div>
           </div>
           <div class="disk-foot">
-            <span class="cmd"><span class="acc">$</span> devctx doctor</span>
+            <span class="cmd"><span class="acc">$</span> devtwin doctor</span>
             <span class="pill ok">kit and data separate</span>
             <span class="pill ok">no secrets in records</span>
           </div>

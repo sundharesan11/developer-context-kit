@@ -55,9 +55,9 @@ test("skill acquisition rejects ambiguous selections before requests", async () 
   let calls = 0;
   const request = () => { calls++; throw new Error("unexpected request"); };
   for (const files of [[], ["../a"], ["/a"], ["a//b"], ["a\\b"], ["a%2fb"], ["é"], ["a."], [".git/config"], ["id_mapping"], ["a.db"], ["a", "a"], ["A/x", "a/y"], ["a", "a/b"], ["A", "a"]]) {
-    await assert.rejects(previewAcquisition(source, {pin, files}, {request}), (e) => ["DEVCTX_INVALID_INPUT", "DEVCTX_SELECTION_CONFLICT"].includes(e.code));
+    await assert.rejects(previewAcquisition(source, {pin, files}, {request}), (e) => ["DEVTWIN_INVALID_INPUT", "DEVTWIN_SELECTION_CONFLICT"].includes(e.code));
   }
-  await assert.rejects(previewAcquisition(source, {...input, pin: {...pin, extra: true}}, {request}), {code: "DEVCTX_INVALID_INPUT"});
+  await assert.rejects(previewAcquisition(source, {...input, pin: {...pin, extra: true}}, {request}), {code: "DEVTWIN_INVALID_INPUT"});
   assert.equal(calls, 0);
   assert.deepEqual(validateSelection(source, pin, input.files).files, ["LICENSE", "SKILL.md"]);
   assert.equal(gitBlobSha(Buffer.alloc(0)), "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391");
@@ -78,7 +78,7 @@ test("skill acquisition verifies pinned blob bytes with bounded local transport"
   const reversed = await previewAcquisition(source, {...input, files: [...input.files].reverse()}, {request});
   assert.equal(reversed.fingerprint, preview.fingerprint);
   const before = seen.length;
-  await assert.rejects(downloadAcquisition(source, {...input, fingerprint: "sha256:" + "0".repeat(64)}, {request}), {code: "DEVCTX_PREVIEW_CHANGED"});
+  await assert.rejects(downloadAcquisition(source, {...input, fingerprint: "sha256:" + "0".repeat(64)}, {request}), {code: "DEVTWIN_PREVIEW_CHANGED"});
   assert.equal(seen.length - before, 2);
   assert.notEqual(manifestFingerprint({...preview.manifest, pin: {...pin, tag: "v2"}}), preview.fingerprint);
 });
@@ -92,11 +92,11 @@ test("skill acquisition refuses truncated trees, unsupported selections and iden
   ]) {
     const r = routes(); mutate(r);
     const {request} = await fixture(t, r);
-    await assert.rejects(previewAcquisition(source, input, {request}), {code: `DEVCTX_${code}`});
+    await assert.rejects(previewAcquisition(source, input, {request}), {code: `DEVTWIN_${code}`});
   }
   const {request} = await fixture(t);
-  await assert.rejects(previewAcquisition(source, {pin, files: ["link"]}, {request}), {code: "DEVCTX_UNSUPPORTED_ENTRY"});
-  await assert.rejects(previewAcquisition(source, {pin, files: ["missing"]}, {request}), {code: "DEVCTX_SELECTION_MISSING"});
+  await assert.rejects(previewAcquisition(source, {pin, files: ["link"]}, {request}), {code: "DEVTWIN_UNSUPPORTED_ENTRY"});
+  await assert.rejects(previewAcquisition(source, {pin, files: ["missing"]}, {request}), {code: "DEVTWIN_SELECTION_MISSING"});
 });
 
 test("skill acquisition rejects malformed base64 and bytes with a false Git object ID", async (t) => {
@@ -109,7 +109,7 @@ test("skill acquisition rejects malformed base64 and bytes with a false Git obje
     const r = routes(); Object.assign(r[`${stem}/blobs/${blob}`], patch);
     const {request} = await fixture(t, r);
     const preview = await previewAcquisition(source, input, {request});
-    await assert.rejects(downloadAcquisition(source, {...input, fingerprint: preview.fingerprint}, {request}), {code: `DEVCTX_${code}`});
+    await assert.rejects(downloadAcquisition(source, {...input, fingerprint: preview.fingerprint}, {request}), {code: `DEVTWIN_${code}`});
   }
 });
 
@@ -117,11 +117,11 @@ test("skill acquisition handles HTTP errors and streamed size caps without expos
   for (const [status, code] of [[301, "REDIRECT_REFUSED"], [404, "SOURCE_NOT_FOUND"], [401, "GITHUB_UNAUTHORIZED"], [403, "GITHUB_FORBIDDEN"], [429, "RATE_LIMITED"], [500, "UPSTREAM_UNAVAILABLE"]]) {
     const r = routes(); r[`${stem}/commits/${pin.commit}`] = {status, raw: "PRIVATE_RESPONSE_CANARY", headers: {location: "https://elsewhere.invalid"}};
     const {request, seen} = await fixture(t, r);
-    await assert.rejects(previewAcquisition(source, input, {request}), (e) => e.code === `DEVCTX_${code}` && !JSON.stringify(e).includes("PRIVATE_RESPONSE_CANARY"));
+    await assert.rejects(previewAcquisition(source, input, {request}), (e) => e.code === `DEVTWIN_${code}` && !JSON.stringify(e).includes("PRIVATE_RESPONSE_CANARY"));
     assert.equal(seen.length, 1);
   }
   const request = async () => new Response("x".repeat(2097153), {headers: {"content-type": "application/json"}});
-  await assert.rejects(previewAcquisition(source, input, {request}), {code: "DEVCTX_LIMIT"});
+  await assert.rejects(previewAcquisition(source, input, {request}), {code: "DEVTWIN_LIMIT"});
 });
 
 async function cli(args, options = {}) {
@@ -144,20 +144,20 @@ test("skill acquisition CLI preserves old gates and explicit selection", async (
   assert.deepEqual(inspected.result, staged.result);
   assert.equal(seen.length, calls);
   for (const route of ["stage", "inspect"]) {
-    assert.equal((await cli(["skill-sources", route], opts)).error.code, "DEVCTX_GATE_REQUIRED");
+    assert.equal((await cli(["skill-sources", route], opts)).error.code, "DEVTWIN_GATE_REQUIRED");
   }
   for (const extra of [["--run", "x"], ["--source", "humanizer"], ["--data-root", p.dataRoot], ["--config-root=x"], ["--state-root=x"]]) {
-    assert.equal((await cli([...args, ...extra], opts)).error.code, "DEVCTX_USAGE");
+    assert.equal((await cli([...args, ...extra], opts)).error.code, "DEVTWIN_USAGE");
   }
   assert.equal(seen.length, calls);
-  assert.equal((await cli(["skill-sources", "preview", ...selectionArgs, "--pilot", p.path], opts)).error.code, "DEVCTX_USAGE");
+  assert.equal((await cli(["skill-sources", "preview", ...selectionArgs, "--pilot", p.path], opts)).error.code, "DEVTWIN_USAGE");
   await chmod(p.pilot.pilotRoot, 0o777);
   const refused = await cli(args, opts);
-  assert.equal(refused.error.code, "DEVCTX_PATH_UNSAFE");
+  assert.equal(refused.error.code, "DEVTWIN_PATH_UNSAFE");
   assert.ok(!JSON.stringify(refused).includes(p.sandbox));
   const malformedPilot = await p.with({pilotRoot: p.sandbox + "/" + "x".repeat(5000)});
   const preStage = await cli(["skill-sources", "inspect", "--pilot", malformedPilot, "--run", "stage_" + "00".repeat(16)], opts);
-  assert.equal(preStage.error.code, "DEVCTX_STORAGE_ERROR");
+  assert.equal(preStage.error.code, "DEVTWIN_STORAGE_ERROR");
   assert.ok(!JSON.stringify(preStage).includes(p.sandbox));
 });
 
@@ -182,15 +182,15 @@ test("skill acquisition bounds decoded files, tree counts and aggregate response
       return new Response(JSON.stringify(body), {headers: {"content-type": "application/json"}});
     };
   }
-  await assert.rejects(previewAcquisition(source, {pin, files}, {request: transport({count: true})}), {code: "DEVCTX_LIMIT"});
-  await assert.rejects(previewAcquisition(source, {pin, files}, {request: transport({sizes: true})}), {code: "DEVCTX_LIMIT"});
+  await assert.rejects(previewAcquisition(source, {pin, files}, {request: transport({count: true})}), {code: "DEVTWIN_LIMIT"});
+  await assert.rejects(previewAcquisition(source, {pin, files}, {request: transport({sizes: true})}), {code: "DEVTWIN_LIMIT"});
   const preview = await previewAcquisition(source, {pin, files}, {request: transport()});
   calls = 0;
   const acquired = await downloadAcquisition(source, {pin, files, fingerprint: preview.fingerprint}, {request: transport()});
   assert.equal(calls, 26);
   assert.equal(acquired.blobs.length, 24);
   assert.ok(acquired.blobs.every((b) => b.bytes.length === 0));
-  await assert.rejects(downloadAcquisition(source, {pin, files, fingerprint: preview.fingerprint}, {request: transport({padding: true})}), {code: "DEVCTX_LIMIT"});
+  await assert.rejects(downloadAcquisition(source, {pin, files, fingerprint: preview.fingerprint}, {request: transport({padding: true})}), {code: "DEVTWIN_LIMIT"});
 });
 
 test("skill acquisition validates wrapped base64, compressed JSON and protocol faults", async (t) => {
@@ -206,18 +206,18 @@ test("skill acquisition validates wrapped base64, compressed JSON and protocol f
     new Response("{}", {headers: {"content-type": "text/plain"}}),
     new Response("{}", {headers: {"content-type": "application/json", "content-length": "3"}}),
     new Response("{}", {headers: {"content-type": "application/json", "content-length": "bad"}})
-  ]) await assert.rejects(previewAcquisition(source, input, {request: async () => response}), {code: "DEVCTX_UPSTREAM_INVALID"});
-  await assert.rejects(previewAcquisition(source, input, {request: async () => { throw new Error("canary"); }}), {code: "DEVCTX_NETWORK_UNAVAILABLE"});
+  ]) await assert.rejects(previewAcquisition(source, input, {request: async () => response}), {code: "DEVTWIN_UPSTREAM_INVALID"});
+  await assert.rejects(previewAcquisition(source, input, {request: async () => { throw new Error("canary"); }}), {code: "DEVTWIN_NETWORK_UNAVAILABLE"});
 });
 
 test("skill acquisition deadlines cancel hanging bodies and bound the whole operation", async (t) => {
   let canceled = false;
   const request = async () => new Response(new ReadableStream({pull: () => new Promise(() => undefined), cancel: () => { canceled = true; }}), {headers: {"content-type": "application/json"}});
-  await assert.rejects(previewAcquisition(source, input, {request}), {code: "DEVCTX_NETWORK_TIMEOUT"});
+  await assert.rejects(previewAcquisition(source, input, {request}), {code: "DEVTWIN_NETWORK_TIMEOUT"});
   assert.equal(canceled, true);
   let clockReads = 0, calls = 0;
   const mocked = t.mock.method(performance, "now", () => ++clockReads < 3 ? 0 : 30001);
-  await assert.rejects(previewAcquisition(source, input, {request: async () => { calls++; return new Response(JSON.stringify({sha: pin.commit, tree: {sha: tree}}), {headers: {"content-type": "application/json"}}); }}), {code: "DEVCTX_NETWORK_TIMEOUT"});
+  await assert.rejects(previewAcquisition(source, input, {request: async () => { calls++; return new Response(JSON.stringify({sha: pin.commit, tree: {sha: tree}}), {headers: {"content-type": "application/json"}}); }}), {code: "DEVTWIN_NETWORK_TIMEOUT"});
   mocked.mock.restore();
   assert.equal(calls, 1);
 });

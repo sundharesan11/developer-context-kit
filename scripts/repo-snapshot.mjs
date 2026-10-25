@@ -7,7 +7,7 @@
 // walks it with lstat only, never following symlinks, and records file, folder and symlink counts, total
 // bytes, the newest mtime and a sha256 over every node's path, type, size and mtime, so any add, remove,
 // resize or touch inside changes the entry. Ignored folders together may hold at most maxNodes nodes
-// (default 2,000,000, or DEVCTX_SNAPSHOT_MAX_NODES); beyond that the snapshot fails rather than pass.
+// (default 2,000,000, or DEVTWIN_SNAPSHOT_MAX_NODES); beyond that the snapshot fails rather than pass.
 // Git runs only through gitQuery, which never refreshes the index or takes optional locks. The snapshot
 // never writes inside the repository.
 import { createReadStream, lstatSync, readdirSync, readlinkSync, realpathSync } from "node:fs";
@@ -18,7 +18,7 @@ import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 import { gitQuery } from "../src/identity/git.mjs";
 import { isWithin, writeNewFile } from "../src/storage/fsx.mjs";
-import { DevctxError, toJson } from "../src/errors.mjs";
+import { DevtwinError, toJson } from "../src/errors.mjs";
 const list = (cwd, args) => gitQuery(cwd, ["ls-files", "-z", ...args]).stdout.split("\0").filter(Boolean);
 const sha256File = (path) => new Promise((done, fail) => {
   const hash = createHash("sha256");
@@ -27,7 +27,7 @@ const sha256File = (path) => new Promise((done, fail) => {
 function located(repo) {
   const root = realpathSync(repo);
   const top = gitQuery(root, ["rev-parse", "--show-toplevel"], { notRepo: true });
-  if (top.notRepo || realpathSync(top.stdout.trim()) !== root) throw new DevctxError("INVALID_INPUT", "Repository root required");
+  if (top.notRepo || realpathSync(top.stdout.trim()) !== root) throw new DevtwinError("INVALID_INPUT", "Repository root required");
   const common = gitQuery(root, ["rev-parse", "--git-common-dir"]).stdout.trim();
   return { root, commonDir: realpathSync(isAbsolute(common) ? common : resolve(root, common)) };
 }
@@ -56,9 +56,9 @@ function walk(dir, base = dir, out = []) {
 }
 export const DEFAULT_MAX_NODES = 2_000_000;
 function maxNodesFrom(env) {
-  const raw = env.DEVCTX_SNAPSHOT_MAX_NODES;
+  const raw = env.DEVTWIN_SNAPSHOT_MAX_NODES;
   if (raw === undefined || raw === "") return DEFAULT_MAX_NODES;
-  if (!/^[1-9][0-9]*$/.test(raw)) throw new DevctxError("INVALID_INPUT", "DEVCTX_SNAPSHOT_MAX_NODES must be a positive integer");
+  if (!/^[1-9][0-9]*$/.test(raw)) throw new DevtwinError("INVALID_INPUT", "DEVTWIN_SNAPSHOT_MAX_NODES must be a positive integer");
   return Number(raw);
 }
 // Aggregate of a wholly ignored folder: lstat only, children sorted by name, depth first, so the digest is
@@ -71,7 +71,7 @@ function ignoredFolder(dir, rel, budget) {
     const sub = stack.pop();
     const childDirs = [];
     for (const name of readdirSync(join(dir, sub)).sort()) {
-      if (--budget.left < 0) throw new DevctxError("SNAPSHOT_TOO_LARGE", "Ignored folders exceed the snapshot node cap; raise DEVCTX_SNAPSHOT_MAX_NODES or snapshot a smaller repository", { maxNodes: budget.max, folder: rel });
+      if (--budget.left < 0) throw new DevtwinError("SNAPSHOT_TOO_LARGE", "Ignored folders exceed the snapshot node cap; raise DEVTWIN_SNAPSHOT_MAX_NODES or snapshot a smaller repository", { maxNodes: budget.max, folder: rel });
       const path = sub ? sub + "/" + name : name;
       const st = lstatSync(join(dir, path));
       const type = st.isSymbolicLink() ? "link" : st.isDirectory() ? "dir" : st.isFile() ? "file" : "other";
@@ -121,7 +121,7 @@ export function compareSnapshots(a, b) {
 export async function writeSnapshot(repo, out) {
   const { root, commonDir } = located(repo);
   const parent = realpathSync(dirname(resolve(out)));
-  if (isWithin(parent, root) || isWithin(parent, commonDir)) throw new DevctxError("PATH_UNSAFE", "Snapshot output must be outside the repository");
+  if (isWithin(parent, root) || isWithin(parent, commonDir)) throw new DevtwinError("PATH_UNSAFE", "Snapshot output must be outside the repository");
   const snapshot = await snapshotRepo(root);
   await writeNewFile(join(parent, basename(out)), JSON.stringify(snapshot, null, 2) + "\n");
   return snapshot;
@@ -129,7 +129,7 @@ export async function writeSnapshot(repo, out) {
 async function cli(argv) {
   let values, positionals;
   try { ({ values, positionals } = parseArgs({ args: argv, options: { repo: { type: "string" }, out: { type: "string" }, compare: { type: "boolean" } }, allowPositionals: true, strict: true })); }
-  catch { return [2, { ok: false, error: { code: "DEVCTX_USAGE" } }]; }
+  catch { return [2, { ok: false, error: { code: "DEVTWIN_USAGE" } }]; }
   if (values.compare && positionals.length === 2 && !values.repo && !values.out) {
     const [a, b] = await Promise.all(positionals.map(async (p) => JSON.parse(await readFile(p, "utf8"))));
     const differences = compareSnapshots(a, b);
@@ -139,7 +139,7 @@ async function cli(argv) {
     const snapshot = await writeSnapshot(values.repo, values.out);
     return [0, { ok: true, out: resolve(values.out), entries: Object.keys(snapshot.entries).length }];
   }
-  return [2, { ok: false, error: { code: "DEVCTX_USAGE" } }];
+  return [2, { ok: false, error: { code: "DEVTWIN_USAGE" } }];
 }
 if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const [code, body] = await cli(process.argv.slice(2)).catch((error) => [1, { ok: false, error: toJson(error) }]);

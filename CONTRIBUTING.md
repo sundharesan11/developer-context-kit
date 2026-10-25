@@ -23,7 +23,7 @@ The test runner checks for missing required tests and rejects skipped, focused o
 For synthetic end-to-end checks:
 
 ```sh
-ACCEPTANCE_PARENT="$(mktemp -d /tmp/devctx-acceptance.XXXXXX)"
+ACCEPTANCE_PARENT="$(mktemp -d /tmp/devtwin-acceptance.XXXXXX)"
 ACCEPTANCE_PARENT="$(cd "$ACCEPTANCE_PARENT" && pwd -P)"
 node scripts/acceptance.mjs \
   --pilot-root "$ACCEPTANCE_PARENT/pilot" \

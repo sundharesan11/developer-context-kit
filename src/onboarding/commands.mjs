@@ -1,4 +1,4 @@
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { planOnboard, applyOnboard } from "./onboard.mjs";
 const list = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
 export const projectOnboardCommand = {
@@ -6,7 +6,7 @@ export const projectOnboardCommand = {
   async run(values, ctx) {
     const input = { scope: values.scope, project: values.project, repo: values.repo, approvedDocs: list(values.doc), expectedRemotes: list(values["expect-remote"]), environments: list(values.environment), actorRefs: list(values.actor), accept: values.accept ?? "none", requestId: values["request-id"], keepPrevious: values["keep-previous"] === true };
     if (!values.apply) return planOnboard(ctx.roots, ctx.pilot, input);
-    if (!values["plan-fingerprint"]) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
+    if (!values["plan-fingerprint"]) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");
     return applyOnboard(ctx.roots, ctx.pilot, input, { fingerprint: values["plan-fingerprint"], now: ctx.now });
   }
 };

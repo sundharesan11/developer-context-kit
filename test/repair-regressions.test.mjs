@@ -19,9 +19,9 @@ test("N1 proposal IDs cannot traverse scopes through library or CLI", async (t) 
   const p = await proposeRecord(s.roots, draftFor("globex", "globex.beacon", { requestId: "req_traverse01", body: "GLOBEX-ONLY-CANARY-4411" }), { now });
   const id = "../../../../globex/projects/globex.beacon/proposals/" + p.proposalId;
   const before = (await readSnapshot(s.roots, "acme", "acme.atlas")).records.length;
-  await assert.rejects(publishProposal(s.roots, { scope: "acme", project: "acme.atlas", proposalId: id }, { controller: "human", now }), { code: "DEVCTX_INVALID_ID" });
+  await assert.rejects(publishProposal(s.roots, { scope: "acme", project: "acme.atlas", proposalId: id }, { controller: "human", now }), { code: "DEVTWIN_INVALID_ID" });
   const cli = await runCli(["record", "publish", "--pilot", s.pilot.path, "--scope", "acme", "--project", "acme.atlas", "--proposal", id, "--apply"]);
-  assert.equal(cli.json.error.code, "DEVCTX_INVALID_ID");
+  assert.equal(cli.json.error.code, "DEVTWIN_INVALID_ID");
   assert.equal((await readSnapshot(s.roots, "acme", "acme.atlas")).records.length, before);
 });
 
@@ -31,7 +31,7 @@ test("N1 proposal content must belong to the selected scope", async (t) => {
   const raw = JSON.parse(await readFile(p.path, "utf8"));
   raw.input.scope = "globex";
   await writeFile(p.path, JSON.stringify(raw));
-  await assert.rejects(publishProposal(s.roots, { scope: "acme", project: "acme.atlas", proposalId: p.proposalId }, { controller: "human", now }), { code: "DEVCTX_CONFLICT" });
+  await assert.rejects(publishProposal(s.roots, { scope: "acme", project: "acme.atlas", proposalId: p.proposalId }, { controller: "human", now }), { code: "DEVTWIN_CONFLICT" });
 });
 
 test("N2 public record mutators reject caller supersession and leave target effective", async (t) => {
@@ -39,10 +39,10 @@ test("N2 public record mutators reject caller supersession and leave target effe
   const target = await addRecord(s.roots, draft({ requestId: "req_target001" }), { now });
   for (const mutate of [addRecord, commitBundle, proposeRecord]) {
     const input = { ...draft({ requestId: "req_bad" + mutate.name.toLowerCase(), status: "confirmed", review: { reviewer: "email:owner@example.com" } }), recordedBy: { actor: "claude", runId: "run_agent001" }, supersedes: [target.recordId] };
-    await assert.rejects(mutate(s.roots, input, { now }), { code: "DEVCTX_INVALID_INPUT" });
+    await assert.rejects(mutate(s.roots, input, { now }), { code: "DEVTWIN_INVALID_INPUT" });
   }
-  await assert.rejects(commitBundle(s.roots, draft({ requestId: "req_optbad001" }), { now, supersedes: [target.recordId] }), { code: "DEVCTX_INVALID_INPUT" });
-  await assert.rejects(addRecord(s.roots, { ...draft({ requestId: "req_phantom01", status: "confirmed", review: { reviewer: "email:owner@example.com" } }), recordedBy: { actor: "codex", runId: "run_agent001" }, supersedes: ["rec_" + "0".repeat(24)] }, { now }), { code: "DEVCTX_INVALID_INPUT" });
+  await assert.rejects(commitBundle(s.roots, draft({ requestId: "req_optbad001" }), { now, supersedes: [target.recordId] }), { code: "DEVTWIN_INVALID_INPUT" });
+  await assert.rejects(addRecord(s.roots, { ...draft({ requestId: "req_phantom01", status: "confirmed", review: { reviewer: "email:owner@example.com" } }), recordedBy: { actor: "codex", runId: "run_agent001" }, supersedes: ["rec_" + "0".repeat(24)] }, { now }), { code: "DEVTWIN_INVALID_INPUT" });
   assert.equal((await readSnapshot(s.roots, "acme", "acme.atlas")).records.find((r) => r.id === target.recordId).effective, "observed");
 });
 
@@ -61,7 +61,7 @@ test("N3 effective include and worktree filter config is refused before status",
     }
     await writeFile(join(repo, "a.txt"), "other\n");
     const before = await treeSnapshot(repo);
-    await assert.rejects(locateWorktree(repo), { code: "DEVCTX_PATH_UNSAFE" });
+    await assert.rejects(locateWorktree(repo), { code: "DEVTWIN_PATH_UNSAFE" });
     await assert.rejects(access(canary));
     assert.equal(await treeSnapshot(repo), before);
   }
@@ -84,7 +84,7 @@ test("N4 different repository cannot join an existing project", async (t) => {
   const s = await onboardFixture(t);
   await applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now });
   const unrelated = await makeRepo(join(s.reposDir, "beacon"), { "README.md": "# Other\n" });
-  await assert.rejects(planOnboard(s.roots, s.pilot, { ...s.input, repo: unrelated, requestId: "req_otherrepo01" }), { code: "DEVCTX_BINDING_CONFLICT" });
+  await assert.rejects(planOnboard(s.roots, s.pilot, { ...s.input, repo: unrelated, requestId: "req_otherrepo01" }), { code: "DEVTWIN_BINDING_CONFLICT" });
 });
 
 test("N5 earlier onboard request replays after same-path re-onboard", async (t) => {
@@ -97,14 +97,14 @@ test("N5 earlier onboard request replays after same-path re-onboard", async (t) 
   assert.deepEqual(replay, { ...first, replayed: true });
   const oldBody = join(s.roots.dataRoot, "scopes/acme/projects/acme.atlas/records", first.bundles[0].id, "body.md");
   await writeFile(oldBody, "corrupt old bundle");
-  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now }), { code: "DEVCTX_RECOVERY_REQUIRED" });
+  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now }), { code: "DEVTWIN_RECOVERY_REQUIRED" });
 });
 
 test("N6 proposal validates sensitive and extra fields before persistence", async (t) => {
   const s = await committedProject(t);
   const secret = "api" + "_key = " + "abcdef123456";
-  await assert.rejects(proposeRecord(s.roots, draft({ requestId: "req_secret001", body: secret }), { now }), { code: "DEVCTX_SENSITIVE_CONTENT" });
-  await assert.rejects(proposeRecord(s.roots, { ...draft({ requestId: "req_extra001" }), unexpected: true }, { now }), { code: "DEVCTX_INVALID_INPUT" });
+  await assert.rejects(proposeRecord(s.roots, draft({ requestId: "req_secret001", body: secret }), { now }), { code: "DEVTWIN_SENSITIVE_CONTENT" });
+  await assert.rejects(proposeRecord(s.roots, { ...draft({ requestId: "req_extra001" }), unexpected: true }, { now }), { code: "DEVTWIN_INVALID_INPUT" });
   const dir = join(s.roots.dataRoot, "scopes/acme/projects/acme.atlas/proposals");
   assert.deepEqual(await readdir(dir).catch((e) => e.code === "ENOENT" ? [] : Promise.reject(e)), []);
 });
@@ -114,26 +114,26 @@ test("N7 uninstall preserves owned directory with an added user file", async (t)
   const input = { targetHome: home, agents: ["claude"], mode: "install" };
   const install = await planInstall(p.pilot, input);
   await applyInstall(p.roots, p.pilot, input, { fingerprint: install.fingerprint, runId: "run_repair001" });
-  const dir = join(home, ".claude/skills/devctx-record");
+  const dir = join(home, ".claude/skills/devtwin-record");
   await writeFile(join(dir, "notes.md"), "user note");
   const removeInput = { ...input, mode: "uninstall" };
   const remove = await planInstall(p.pilot, removeInput);
-  assert.equal(remove.actions.find((a) => a.skill === "devctx-record").status, "modified");
+  assert.equal(remove.actions.find((a) => a.skill === "devtwin-record").status, "modified");
   await applyInstall(p.roots, p.pilot, removeInput, { fingerprint: remove.fingerprint, runId: "run_repair002" });
   assert.equal(await readFile(join(dir, "notes.md"), "utf8"), "user note");
-  assert.match(await readFile(join(dir, "SKILL.md"), "utf8"), /devctx/);
+  assert.match(await readFile(join(dir, "SKILL.md"), "utf8"), /devtwin/);
 });
 
 test("N8 init refuses roots inside a Git worktree and partial init reports recovery", async (t) => {
   const p = await makePilot(t);
   await fixtureGit(p.sandbox, ["init", "-q", "-b", "main"]);
-  await assert.rejects(applyInit(p.roots, { now }), { code: "DEVCTX_PATH_UNSAFE" });
+  await assert.rejects(applyInit(p.roots, { now }), { code: "DEVTWIN_PATH_UNSAFE" });
   const q = await makePilot(t);
   await mkdir(q.configRoot, { recursive: true, mode: 0o700 });
   await chmod(q.configRoot, 0o700);
   await writeFile(join(q.configRoot, "user.json"), "{}", { mode: 0o600 });
-  await assert.rejects(applyInit(q.roots, { now }), { code: "DEVCTX_RECOVERY_REQUIRED" });
-  assert.throws(() => validatePreferences({ notes: ["api" + "_key = " + "abcdef123456"] }), { code: "DEVCTX_SENSITIVE_CONTENT" });
+  await assert.rejects(applyInit(q.roots, { now }), { code: "DEVTWIN_RECOVERY_REQUIRED" });
+  assert.throws(() => validatePreferences({ notes: ["api" + "_key = " + "abcdef123456"] }), { code: "DEVTWIN_SENSITIVE_CONTENT" });
 });
 
 test("N9 CLI default installer run IDs allow install then uninstall", async (t) => {
@@ -146,10 +146,10 @@ test("N9 CLI default installer run IDs allow install then uninstall", async (t) 
 });
 
 test("N10 empty and undated approvals are invalid", () => {
-  assert.throws(() => createApproval({}), { code: "DEVCTX_APPROVAL_INVALID" });
+  assert.throws(() => createApproval({}), { code: "DEVTWIN_APPROVAL_INVALID" });
   const fields = { scope: "acme", project: "acme.atlas", provider: "fake", accountId: "acct", actorRef: "email:owner@example.com", workspaceId: "ws", operation: "draft", recipient: "issue:ABC-1", payloadHash: "sha256:" + "0".repeat(64), expiresAt: "2026-10-07T01:00:00.000Z" };
   const approval = createApproval(fields);
-  assert.throws(() => verifyApproval({ ...approval, expiresAt: undefined }, { ...fields, expiresAt: undefined }, now()), { code: "DEVCTX_APPROVAL_INVALID" });
+  assert.throws(() => verifyApproval({ ...approval, expiresAt: undefined }, { ...fields, expiresAt: undefined }, now()), { code: "DEVTWIN_APPROVAL_INVALID" });
 });
 
 test("N11 doctor attributes broken committed binding to registry", async (t) => {

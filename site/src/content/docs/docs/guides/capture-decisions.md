@@ -33,7 +33,7 @@ See [Records](/docs/concepts/records/) for the full model.
 Preview first. Without `--apply`, nothing is written:
 
 ```sh
-node bin/devctx.mjs record add --pilot "$PILOT" \
+node bin/devtwin.mjs record add --pilot "$PILOT" \
   --scope example --project example.atlas \
   --kind decision --title "Use server-side search" \
   --body "Filter on the server because the list can grow." \
@@ -47,7 +47,7 @@ node bin/devctx.mjs record add --pilot "$PILOT" \
 Then write it with the same flags plus `--apply`:
 
 ```sh
-node bin/devctx.mjs record add --pilot "$PILOT" \
+node bin/devtwin.mjs record add --pilot "$PILOT" \
   --scope example --project example.atlas \
   --kind decision --title "Use server-side search" \
   --body "Filter on the server because the list can grow." \
@@ -64,22 +64,22 @@ Keep the `recordId` and `recordHash`. You need both to replace the record later.
 
 - `--request-id` is required to apply. It has the form `req_` plus 8–64 lowercase letters, digits, `_` or `-`. The record ID is derived from the scope, project and request ID, so repeating the same request is safe and returns the existing record.
 - `--title` is one line, up to 200 characters. The body is up to 32,768 bytes.
-- Text that looks like a credential is refused with `DEVCTX_SENSITIVE_CONTENT`.
-- `--status confirmed` without `--reviewer` fails with `DEVCTX_APPROVAL_REQUIRED`.
+- Text that looks like a credential is refused with `DEVTWIN_SENSITIVE_CONTENT`.
+- `--status confirmed` without `--reviewer` fails with `DEVTWIN_APPROVAL_REQUIRED`.
 
 ### Keep the body out of shell history
 
 `--body` lands in your shell history. For anything longer or more sensitive, write the body to a file under the pilot's `inputsRoot` and pass `--body-file`:
 
 ```sh
-node bin/devctx.mjs record add --pilot "$PILOT" \
+node bin/devtwin.mjs record add --pilot "$PILOT" \
   --scope example --project example.atlas \
   --kind constraint --title "No direct database access from the UI" \
   --body-file /absolute/path/to/pilot/inputs/constraint.md \
   --request-id req_atlas_constraint_01 --apply
 ```
 
-A body file outside `inputsRoot` is refused with `DEVCTX_GATE_REQUIRED`.
+A body file outside `inputsRoot` is refused with `DEVTWIN_GATE_REQUIRED`.
 
 ### Cite your evidence
 
@@ -97,7 +97,7 @@ Add `--source` (repeatable, up to 20) so later readers can check the claim. Acce
 ### Confirm a record
 
 ```sh
-node bin/devctx.mjs record add --pilot "$PILOT" \
+node bin/devtwin.mjs record add --pilot "$PILOT" \
   --scope example --project example.atlas \
   --kind decision --title "Use server-side search" \
   --body "Filter on the server." \
@@ -112,7 +112,7 @@ The reviewer must be an actor reference: `email:`, `github:`, `slack:`, `linear:
 Records are immutable. To change one, write a successor that **supersedes** it. Pass the target's ID and its current hash, so a concurrent change is caught:
 
 ```sh
-node bin/devctx.mjs record supersede --pilot "$PILOT" \
+node bin/devtwin.mjs record supersede --pilot "$PILOT" \
   --scope example --project example.atlas \
   --kind decision --title "Use client-side search for now" \
   --body "Small lists; revisit at 10k rows." \
@@ -121,7 +121,7 @@ node bin/devctx.mjs record supersede --pilot "$PILOT" \
   --request-id req_atlas_decision_03 --apply
 ```
 
-The brief now shows the successor and leaves the superseded record out. History keeps both. If the target was already superseded or its hash changed, you get `DEVCTX_STALE_VERSION` with the message `Target changed`. Read the brief again and supersede the current record instead.
+The brief now shows the successor and leaves the superseded record out. History keeps both. If the target was already superseded or its hash changed, you get `DEVTWIN_STALE_VERSION` with the message `Target changed`. Read the brief again and supersede the current record instead.
 
 `--target` and `--expect-hash` are repeatable and pair up in order, so one successor can replace several records.
 
@@ -129,10 +129,10 @@ The brief now shows the successor and leaves the superseded record out. History 
 
 When an agent records something, it should not write straight into the brief. It **proposes**; you **publish**.
 
-1. The agent (usually through the [`devctx-record` skill](/docs/reference/bundled-skills/)) writes a private proposal:
+1. The agent (usually through the [`devtwin-record` skill](/docs/reference/bundled-skills/)) writes a private proposal:
 
    ```sh
-   node bin/devctx.mjs record propose --pilot "$PILOT" \
+   node bin/devtwin.mjs record propose --pilot "$PILOT" \
      --scope example --project example.atlas \
      --kind unknown --title "Search threshold" \
      --body-file /absolute/path/to/pilot/inputs/note.md \
@@ -148,7 +148,7 @@ When an agent records something, it should not write straight into the brief. It
 2. You read the proposal file and decide. To publish it:
 
    ```sh
-   node bin/devctx.mjs record publish --pilot "$PILOT" \
+   node bin/devtwin.mjs record publish --pilot "$PILOT" \
      --scope example --project example.atlas \
      --proposal prop_d4b10a44abfac39728707954 --apply
    ```
@@ -164,12 +164,12 @@ The bundled skills never run `record publish --apply`. Keep it that way: an agen
 If a scope lists a local hub (see `--hub` in the [configuration reference](/docs/reference/configuration/#scope-configuration)), you can prepare a learning proposal from **confirmed** records:
 
 ```sh
-node bin/devctx.mjs hub propose --pilot "$PILOT" \
+node bin/devtwin.mjs hub propose --pilot "$PILOT" \
   --scope example --project example.atlas \
   --record rec_640c02d0eeba927643c3d5cf --hub team-notes
 ```
 
-Add `--apply` to write a private proposal file under the project's `proposals/` directory. devctx never writes to the hub itself. Text that names the scope, project, bound paths or remote hosts is refused with `DEVCTX_SENSITIVE_CONTENT`.
+Add `--apply` to write a private proposal file under the project's `proposals/` directory. devtwin never writes to the hub itself. Text that names the scope, project, bound paths or remote hosts is refused with `DEVTWIN_SENSITIVE_CONTENT`.
 
 ## Who recorded what
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "devctx install-owned v1 or v2",
+  "title": "devtwin install-owned v1 or v2",
   "oneOf": [
     {
       "type": "object",

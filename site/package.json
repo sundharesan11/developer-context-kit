@@ -1,9 +1,9 @@
 {
-  "name": "devctx-site",
+  "name": "devtwin-site",
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "Landing page and documentation for Developer Context Kit (devctx).",
+  "description": "Landing page and documentation for devtwin.",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

@@ -2,13 +2,13 @@ import { constants, lstatSync, realpathSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 export const SOURCE_LIMITS = { maxFiles: 24, maxBytes: 131072 };
 const REL = /^[A-Za-z0-9._\/-]{1,200}$/;
 const segmentDeny = [/^\.env/i, /^\.git$/i, /^node_modules$/i, /^(\.npmrc|\.pypirc|\.netrc|\.pgpass|id_[a-z0-9]+|credentials(\.json)?)$/i];
 const finalDeny = /\.(pem|key|p12|pfx|kdbx|sqlite3?|db)$/i;
 export function assertSourceRel(rel) {
-  if (typeof rel !== "string" || !REL.test(rel) || rel.split("/").some((part) => !part || part === "." || part === "..")) throw new DevctxError("PATH_ESCAPE", "Unsafe source path");
+  if (typeof rel !== "string" || !REL.test(rel) || rel.split("/").some((part) => !part || part === "." || part === "..")) throw new DevtwinError("PATH_ESCAPE", "Unsafe source path");
   return rel;
 }
 export function isDeniedRel(rel) {
@@ -16,7 +16,7 @@ export function isDeniedRel(rel) {
   const parts = rel.split("/");
   return parts.some((part) => segmentDeny.some((rule) => rule.test(part))) || finalDeny.test(parts.at(-1));
 }
-const changed = () => new DevctxError("SOURCE_CHANGED", "Approved source changed");
+const changed = () => new DevtwinError("SOURCE_CHANGED", "Approved source changed");
 function ancestors(root, rel) {
   const parts = rel.split("/").slice(0, -1);
   const paths = [root];

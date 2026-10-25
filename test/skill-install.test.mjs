@@ -21,8 +21,8 @@ test("package receipt is not published when output changes before receipt", asyn
   await assert.rejects(applyPackageInstall(x.p.roots, selection, input,
     {fingerprint: x.plan.fingerprint, decisionId: "dc_local001", runId: "run_verify001"},
     {faults: {beforeReceipt: async (action) => writeFile(join(action.path, "SKILL.md"), "changed")}}
-  ), {code: "DEVCTX_INTEGRITY"});
-  assert.equal((await readdir(x.dir)).includes(".devctx-owned.json"), false);
+  ), {code: "DEVTWIN_INTEGRITY"});
+  assert.equal((await readdir(x.dir)).includes(".devtwin-owned.json"), false);
 });
 
 test("personal Codex plan writes to .agents/skills and refuses a foreign same-name copy there", async (t) => {
@@ -42,7 +42,7 @@ test("package receipt refuses unexpected empty directories at publication", asyn
   await assert.rejects(applyPackageInstall(x.p.roots, selection, input,
     {fingerprint: x.plan.fingerprint, decisionId: "dc_local001", runId: "run_emptydir01"},
     {faults: {beforeReceipt: async (action) => mkdir(join(action.path, "extra"), {mode: 0o700})}}
-  ), {code: "DEVCTX_INTEGRITY"});
+  ), {code: "DEVTWIN_INTEGRITY"});
 });
 
 test("personal and source packages refuse each others valid ownership markers", async (t) => {
@@ -129,7 +129,7 @@ test("synthetic content and action approvals install pinned copies in a disposab
     assert.match(await readFile(join(dir, "SKILL.md"), "utf8"), /# Summary/);
     assert.equal((await stat(join(dir, "SKILL.md"))).mode & 0o777, 0o600);
     assert.equal((await stat(dir)).mode & 0o777, 0o700);
-    assert.equal(JSON.parse(await readFile(join(dir, ".devctx-owned.json"), "utf8")).schemaVersion, 2);
+    assert.equal(JSON.parse(await readFile(join(dir, ".devtwin-owned.json"), "utf8")).schemaVersion, 2);
   }
   assert.equal((await cli(p, "local-apply", [...common, "--decision", "dc_local001", "--plan-fingerprint", plan.json.result.fingerprint, "--run-id", "run_package02"])).code, 1);
 });
@@ -145,7 +145,7 @@ test("uninstall requires a distinct approval and preserves the whole edited pack
   const blocked = await cli(x.p, "local-apply", [...remove, "--decision", "dc_remove001", "--plan-fingerprint", plan.json.result.fingerprint, "--run-id", "run_remove001"]);
   assert.equal(blocked.code, 1);
   assert.equal(await readFile(join(x.dir, "SKILL.md"), "utf8"), "user edited");
-  assert.ok((await readdir(x.dir)).includes(".devctx-owned.json"));
+  assert.ok((await readdir(x.dir)).includes(".devtwin-owned.json"));
 });
 
 test("uninstall of intact package removes only its owned files", async (t) => {
@@ -166,19 +166,19 @@ test("interrupted create is reported and blocks package apply until journal revi
   assert.equal(status.json.result.status, "RECOVERY_REQUIRED");
   assert.equal(status.json.result.actions[0].status, "conflict");
   const retry = await cli(x.p, "local-apply", [...x.install, "--decision", "dc_local001", "--plan-fingerprint", x.plan.fingerprint, "--run-id", "run_package02"]);
-  assert.equal(retry.json.error.code, "DEVCTX_RECOVERY_REQUIRED");
+  assert.equal(retry.json.error.code, "DEVTWIN_RECOVERY_REQUIRED");
 });
 
 test("stale fingerprint and reused run ID do not consume a local approval", async (t) => {
   const x = await approvedInstall(t);
   const stale = await cli(x.p, "local-apply", [...x.install, "--decision", "dc_local001", "--plan-fingerprint", "sha256:" + "0".repeat(64), "--run-id", "run_package01"]);
-  assert.equal(stale.json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal(stale.json.error.code, "DEVTWIN_PLAN_MISMATCH");
   const markerPath = join(x.p.stateRoot, "skill-installs/consumed/ws_install01/dc_local001.json");
   const { existsSync } = await import("node:fs");
   assert.equal(existsSync(markerPath), false);
   await mkdir(join(x.p.stateRoot, "runs/run_package01"), { recursive: true });
   const reuse = await cli(x.p, "local-apply", [...x.install, "--decision", "dc_local001", "--plan-fingerprint", x.plan.fingerprint, "--run-id", "run_package01"]);
-  assert.equal(reuse.json.error.code, "DEVCTX_CONFLICT");
+  assert.equal(reuse.json.error.code, "DEVTWIN_CONFLICT");
   assert.equal(existsSync(markerPath), false);
 });
 
@@ -211,13 +211,13 @@ test("unsafe installed directory mode is modified and cannot be uninstalled", as
 test("direct package APIs reject roots without the matching pilot before target reads", async (t) => {
   const x = await approvedInstall(t);
   const input = { revisionId: "rv_install01", contentDecisionId: "dc_content01", targetHome: x.home, agents: ["claude"], mode: "install" };
-  await assert.rejects(planPackageInstall({ ...x.p.roots, pilot: { ...x.p.pilot, agentHomes: [x.p.fakeHome] } }, selection, input), { code: "DEVCTX_GATE_REQUIRED" });
-  await assert.rejects(planPackageInstall({ dataRoot: x.p.dataRoot, stateRoot: x.p.stateRoot }, selection, input), { code: "DEVCTX_GATE_REQUIRED" });
+  await assert.rejects(planPackageInstall({ ...x.p.roots, pilot: { ...x.p.pilot, agentHomes: [x.p.fakeHome] } }, selection, input), { code: "DEVTWIN_GATE_REQUIRED" });
+  await assert.rejects(planPackageInstall({ dataRoot: x.p.dataRoot, stateRoot: x.p.stateRoot }, selection, input), { code: "DEVTWIN_GATE_REQUIRED" });
 });
 
 test("untrusted receipt cannot name a path outside the installed package", async (t) => {
   const x = await approvedInstall(t); await applyApproved(x);
-  const receiptPath = join(x.dir, ".devctx-owned.json"), receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+  const receiptPath = join(x.dir, ".devtwin-owned.json"), receipt = JSON.parse(await readFile(receiptPath, "utf8"));
   receipt.files["../other.md"] = receipt.files["SKILL.md"];
   await writeFile(receiptPath, JSON.stringify(receipt));
   const remove = await cli(x.p, "local-plan", ["--mode", "uninstall", "--revision", "rv_install01", "--home", x.home, "--agent", "claude"]);
@@ -228,7 +228,7 @@ test("untrusted receipt cannot name a path outside the installed package", async
 test("content approval needs explicit generic-content attestation", async (t) => {
   const { p, draft } = await fixture(t);
   const denied = await cli(p, "content-approve", ["--revision", "rv_install01", "--decision", "dc_content01", "--interaction-ref", "user:synthetic", "--response", `Approved content ${draft.packageDigest}`]);
-  assert.equal(denied.json.error.code, "DEVCTX_APPROVAL_REQUIRED");
+  assert.equal(denied.json.error.code, "DEVTWIN_APPROVAL_REQUIRED");
 });
 
 test("reviewed interrupted journal clears the recovery gate without deleting partial files", async (t) => {
@@ -258,7 +258,7 @@ test("interrupted update keeps the old receipt and reports modified target", asy
   const status = await cli(x.p, "local-status", ["--mode", "install", "--revision", "rv_install02", "--home", x.home, "--agent", "claude"]);
   assert.equal(status.json.result.status, "RECOVERY_REQUIRED");
   assert.equal(status.json.result.actions[0].status, "modified");
-  assert.equal(JSON.parse(await readFile(join(x.dir, ".devctx-owned.json"), "utf8")).revision, "rv_install01");
+  assert.equal(JSON.parse(await readFile(join(x.dir, ".devtwin-owned.json"), "utf8")).revision, "rv_install01");
 });
 
 test("interrupted removal keeps the receipt and reports modified target", async (t) => {
@@ -270,7 +270,7 @@ test("interrupted removal keeps the receipt and reports modified target", async 
   const status = await cli(x.p, "local-status", ["--mode", "uninstall", "--revision", "rv_install01", "--home", x.home, "--agent", "claude"]);
   assert.equal(status.json.result.status, "RECOVERY_REQUIRED");
   assert.equal(status.json.result.actions[0].status, "modified");
-  assert.ok((await readdir(x.dir)).includes(".devctx-owned.json"));
+  assert.ok((await readdir(x.dir)).includes(".devtwin-owned.json"));
 });
 
 test("status rejects a content decision for another revision", async (t) => {
@@ -279,7 +279,7 @@ test("status rejects a content decision for another revision", async (t) => {
   const decision = JSON.parse(await readFile(path, "utf8"));
   await writeFile(path, JSON.stringify({ ...decision, revision: "rv_other001" }));
   const result = await cli(x.p, "local-status", ["--mode", "install", "--revision", "rv_install01", "--content-decision", "dc_content01", "--home", x.home, "--agent", "claude"]);
-  assert.equal(result.json.error.code, "DEVCTX_STALE_VERSION");
+  assert.equal(result.json.error.code, "DEVTWIN_STALE_VERSION");
 });
 
 test("malformed completed journal cannot bypass recovery gate", async (t) => {
@@ -289,36 +289,36 @@ test("malformed completed journal cannot bypass recovery gate", async (t) => {
   await writeFile(join(run, "journal.json"), JSON.stringify({ schemaVersion: 1, kind: "skill-package-local", targetHome: x.home, intended: [{ skill: "summarize-note" }], completed: [{ skill: "other" }] }));
   await chmod(join(run, "journal.json"), 0o600);
   const retry = await cli(x.p, "local-apply", [...x.install, "--decision", "dc_local001", "--plan-fingerprint", x.plan.fingerprint, "--run-id", "run_package01"]);
-  assert.equal(retry.json.error.code, "DEVCTX_RECOVERY_REQUIRED");
+  assert.equal(retry.json.error.code, "DEVTWIN_RECOVERY_REQUIRED");
 });
 
 test("package installer refuses names reserved for bundled skills", async (t) => {
-  const { p, draft } = await fixture(t, { name: "devctx-private" });
+  const { p, draft } = await fixture(t, { name: "devtwin-private" });
   assert.equal((await cli(p, "content-approve", ["--revision", "rv_install01", "--decision", "dc_content01", "--interaction-ref", "user:synthetic", "--response", `Approved content ${draft.packageDigest} as personal generic non-confidential`])).code, 0);
   const planned = await cli(p, "local-plan", ["--mode", "install", "--revision", "rv_install01", "--content-decision", "dc_content01", "--home", p.agentHomes[0], "--agent", "claude"]);
-  assert.equal(planned.json.error.code, "DEVCTX_CONFLICT");
+  assert.equal(planned.json.error.code, "DEVTWIN_CONFLICT");
 });
 
 test("package installer rejects inherited object names as agents", async (t) => {
   const x = await approvedInstall(t);
   const planned = await cli(x.p, "local-plan", ["--mode", "install", "--revision", "rv_install01", "--content-decision", "dc_content01", "--home", x.home, "--agent", "toString"]);
-  assert.equal(planned.json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.equal(planned.json.error.code, "DEVTWIN_INVALID_INPUT");
 });
 
 test("legacy incomplete installer journal conservatively blocks package apply", async (t) => {
   const x = await approvedInstall(t), run = join(x.p.stateRoot, "runs/run_legacy001");
   await mkdir(run, { recursive: true, mode: 0o700 });
-  await writeFile(join(run, "journal.json"), JSON.stringify({ planFingerprint: "sha256:" + "0".repeat(64), intended: [{ skill: "devctx-record" }], completed: [] }));
+  await writeFile(join(run, "journal.json"), JSON.stringify({ planFingerprint: "sha256:" + "0".repeat(64), intended: [{ skill: "devtwin-record" }], completed: [] }));
   await chmod(join(run, "journal.json"), 0o600);
   const applied = await cli(x.p, "local-apply", [...x.install, "--decision", "dc_local001", "--plan-fingerprint", x.plan.fingerprint, "--run-id", "run_package01"]);
-  assert.equal(applied.json.error.code, "DEVCTX_RECOVERY_REQUIRED");
+  assert.equal(applied.json.error.code, "DEVTWIN_RECOVERY_REQUIRED");
 });
 
 test("package installer refuses an unsafe agent-skill parent directory", async (t) => {
   const x = await approvedInstall(t);
   await mkdir(join(x.home, ".claude"), { mode: 0o755 });
   const plan = await cli(x.p, "local-plan", x.install);
-  assert.equal(plan.json.error.code, "DEVCTX_PATH_UNSAFE");
+  assert.equal(plan.json.error.code, "DEVTWIN_PATH_UNSAFE");
 });
 
 test("an intervening intact owned revision invalidates an approved update plan", async (t) => {
@@ -334,7 +334,7 @@ test("an intervening intact owned revision invalidates an approved update plan",
   const changed = await cli(x.p, "local-plan", third);
   assert.notEqual(changed.json.result.fingerprint, firstPlan.json.result.fingerprint);
   const stale = await cli(x.p, "local-apply", [...third, "--decision", "dc_third001", "--plan-fingerprint", firstPlan.json.result.fingerprint, "--run-id", "run_third001"]);
-  assert.equal(stale.json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal(stale.json.error.code, "DEVTWIN_PLAN_MISMATCH");
 });
 
 test("invalid UTF-8 edit to an installed replacement character is preserved", async (t) => {
@@ -359,7 +359,7 @@ test("update refuses turning an owned file into a directory", async (t) => {
   const update = ["--mode", "install", "--revision", "rv_install02", "--content-decision", "dc_content02", "--home", x.home, "--agent", "claude"];
   const plan = await cli(x.p, "local-plan", update);
   assert.equal(plan.json.result.actions[0].status, "conflict");
-  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVCTX_CONFLICT");
+  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVTWIN_CONFLICT");
   assert.match(await readFile(join(x.dir, "references/old.md"), "utf8"), /Old synthetic/);
 });
 
@@ -374,7 +374,7 @@ test("update refuses turning an owned directory into a file", async (t) => {
   const update = ["--mode", "install", "--revision", "rv_install02", "--content-decision", "dc_content02", "--home", x.home, "--agent", "claude"];
   const plan = await cli(x.p, "local-plan", update);
   assert.equal(plan.json.result.actions[0].status, "conflict");
-  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVCTX_CONFLICT");
+  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVTWIN_CONFLICT");
   assert.match(await readFile(join(x.dir, "references/old.md/child.md"), "utf8"), /Nested synthetic/);
 });
 
@@ -385,21 +385,21 @@ test("tampered local decision keys and interaction reference are refused before 
   for (const changed of [{ ...original, unexpected: "field" }, { ...original, interactionRef: "not-a-user-reference" }]) {
     await writeFile(path, JSON.stringify(changed));
     const result = await cli(x.p, "local-apply", [...x.install, "--decision", "dc_local001", "--plan-fingerprint", x.plan.fingerprint, "--run-id", "run_package01"]);
-    assert.equal(result.json.error.code, "DEVCTX_INTEGRITY");
+    assert.equal(result.json.error.code, "DEVTWIN_INTEGRITY");
   }
 });
 
 test("local plan requires an explicit mode", async (t) => {
   const x = await approvedInstall(t);
   const result = await cli(x.p, "local-plan", ["--revision", "rv_install01", "--content-decision", "dc_content01", "--home", x.home, "--agent", "claude"]);
-  assert.equal(result.json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.equal(result.json.error.code, "DEVTWIN_INVALID_INPUT");
 });
 
 test("declared pilot home disappearing is a typed refusal", async (t) => {
   const x = await approvedInstall(t);
   await rmdir(x.home);
   const result = await cli(x.p, "local-plan", x.install);
-  assert.equal(result.json.error.code, "DEVCTX_GATE_REQUIRED");
+  assert.equal(result.json.error.code, "DEVTWIN_GATE_REQUIRED");
 });
 
 test("revision changes after journal creation cannot change installed bytes", async (t) => {
@@ -417,19 +417,19 @@ test("revision changes after journal creation cannot change installed bytes", as
     validation.packageDigest = manifest.packageDigest;
     await writeFile(validationPath, JSON.stringify(validation));
   };
-  await assert.rejects(applyPackageInstall(x.p.roots, selection, input, { fingerprint: x.plan.fingerprint, decisionId: "dc_local001", runId: "run_package01" }, { faults: { afterJournal: changeRevision } }), { code: "DEVCTX_STALE_VERSION" });
+  await assert.rejects(applyPackageInstall(x.p.roots, selection, input, { fingerprint: x.plan.fingerprint, decisionId: "dc_local001", runId: "run_package01" }, { faults: { afterJournal: changeRevision } }), { code: "DEVTWIN_STALE_VERSION" });
   const { existsSync } = await import("node:fs");
   assert.equal(existsSync(x.dir), false);
 });
 
 test("package plan refuses the real home and scoped audiences", async (t) => {
   const x = await approvedInstall(t), input = { revisionId: "rv_install01", contentDecisionId: "dc_content01", targetHome: x.home, agents: ["claude"], mode: "install" };
-  await assert.rejects(planPackageInstall(x.p.roots, selection, { ...input, targetHome: homedir() }), { code: "DEVCTX_GATE_REQUIRED" });
+  await assert.rejects(planPackageInstall(x.p.roots, selection, { ...input, targetHome: homedir() }), { code: "DEVTWIN_GATE_REQUIRED" });
   for (const scoped of [{ audience: "company", scope: "acme", workspace: "ws_install01" }, { audience: "project", scope: "acme", project: "acme.atlas", workspace: "ws_install01" }]) {
-    await assert.rejects(planPackageInstall(x.p.roots, scoped, input), { code: "DEVCTX_GATE_REQUIRED" });
+    await assert.rejects(planPackageInstall(x.p.roots, scoped, input), { code: "DEVTWIN_GATE_REQUIRED" });
     const flags = ["--audience", scoped.audience, "--scope", scoped.scope, ...(scoped.project ? ["--project", scoped.project] : []), "--workspace", scoped.workspace];
     const approved = await runCli(["skill", "local-approve", "--pilot", x.p.path, ...flags, "--mode", "install", "--revision", "rv_install01", "--content-decision", "dc_content01", "--home", x.home, "--agent", "claude", "--decision", "dc_scoped01", "--plan-fingerprint", x.plan.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", x.plan.fingerprint)]);
-    assert.equal(approved.json.error.code, "DEVCTX_GATE_REQUIRED");
+    assert.equal(approved.json.error.code, "DEVTWIN_GATE_REQUIRED");
   }
 });
 
@@ -449,11 +449,11 @@ test("v1 and another workspace ownership receipts are conflicts", async (t) => {
   const x = await approvedInstall(t), dir = x.dir;
   await mkdir(dir, { recursive: true, mode: 0o700 });
   await writeFile(join(dir, "SKILL.md"), "foreign", { mode: 0o600 });
-  await writeFile(join(dir, ".devctx-owned.json"), JSON.stringify({ schemaVersion: 1, skill: "summarize-note", version: "0.0.0-local", files: { "SKILL.md": sha256("foreign") }, runId: "run_foreign01" }), { mode: 0o600 });
+  await writeFile(join(dir, ".devtwin-owned.json"), JSON.stringify({ schemaVersion: 1, skill: "summarize-note", version: "0.0.0-local", files: { "SKILL.md": sha256("foreign") }, runId: "run_foreign01" }), { mode: 0o600 });
   assert.equal((await cli(x.p, "local-plan", x.install)).json.result.actions[0].status, "conflict");
-  await unlink(join(dir, "SKILL.md")); await unlink(join(dir, ".devctx-owned.json")); await rmdir(dir);
+  await unlink(join(dir, "SKILL.md")); await unlink(join(dir, ".devtwin-owned.json")); await rmdir(dir);
   await applyApproved(x);
-  const receiptPath = join(dir, ".devctx-owned.json"), receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+  const receiptPath = join(dir, ".devtwin-owned.json"), receipt = JSON.parse(await readFile(receiptPath, "utf8"));
   await writeFile(receiptPath, JSON.stringify({ ...receipt, workspace: "ws_foreign01" }));
   assert.equal((await cli(x.p, "local-plan", x.install)).json.result.actions[0].status, "conflict");
 });
@@ -469,7 +469,7 @@ test("case-only owned file rename is refused before approval and consumption", a
   const update = ["--mode", "install", "--revision", "rv_install02", "--content-decision", "dc_content02", "--home", x.home, "--agent", "claude"];
   const plan = await cli(x.p, "local-plan", update);
   assert.equal(plan.json.result.actions[0].status, "conflict");
-  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVCTX_CONFLICT");
+  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVTWIN_CONFLICT");
   await assert.rejects(stat(join(x.p.stateRoot, "skill-installs/consumed/ws_install01/dc_update001.json")), { code: "ENOENT" });
 });
 
@@ -484,6 +484,6 @@ test("case-folded file-to-directory update is refused before approval", async (t
   const update = ["--mode", "install", "--revision", "rv_install02", "--content-decision", "dc_content02", "--home", x.home, "--agent", "claude"];
   const plan = await cli(x.p, "local-plan", update);
   assert.equal(plan.json.result.actions[0].status, "conflict");
-  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVCTX_CONFLICT");
+  assert.equal((await cli(x.p, "local-approve", [...update, "--decision", "dc_update001", "--plan-fingerprint", plan.json.result.fingerprint, "--interaction-ref", "user:synthetic", "--response", response("install", plan.json.result.fingerprint)])).json.error.code, "DEVTWIN_CONFLICT");
   await assert.rejects(stat(join(x.p.stateRoot, "skill-installs/consumed/ws_install01/dc_update001.json")), { code: "ENOENT" });
 });

@@ -1,6 +1,6 @@
 ---
 title: Records
-description: What a devctx record is, the kinds and statuses it can have, where its evidence comes from, and how to replace one without losing history.
+description: What a devtwin record is, the kinds and statuses it can have, where its evidence comes from, and how to replace one without losing history.
 ---
 
 A record is one piece of project knowledge: a decision, a fact, a command, an open question. Records are what a [brief](/docs/concepts/briefs/) is made of. Each one belongs to exactly one project and is stored privately on your disk.
@@ -8,7 +8,7 @@ A record is one piece of project knowledge: a decision, a fact, a command, an op
 ## Anatomy of a record
 
 ```sh
-devctx record add --pilot "$PILOT" --scope example --project example.atlas \
+devtwin record add --pilot "$PILOT" --scope example --project example.atlas \
   --kind decision \
   --title "Use server-side search" \
   --body "Filter on the server because the list can grow." \
@@ -25,7 +25,7 @@ devctx record add --pilot "$PILOT" --scope example --project example.atlas \
 | Sources | Evidence the record is based on. See [sources](#sources). | Up to 20 |
 | Request ID | Your name for this write, used to make it repeatable. | `req_` plus 8 to 64 of `a-z`, `0-9`, `_`, `-` |
 
-`devctx` adds the rest: a record ID derived from the scope, project and request ID, hashes of the record and body, a creation time, and who recorded it.
+`devtwin` adds the rest: a record ID derived from the scope, project and request ID, hashes of the record and body, a creation time, and who recorded it.
 
 :::tip[Keep long or sensitive text out of your shell history]
 Instead of `--body`, put the text in a file under your pilot's `inputsRoot` folder and pass `--body-file <path>`. The file must be 32 KiB or less.
@@ -60,13 +60,13 @@ Briefs list records in this order of kind, so constraints and decisions come bef
 To confirm a record, pass a reviewer reference:
 
 ```sh
-devctx record add --pilot "$PILOT" --scope example --project example.atlas \
+devtwin record add --pilot "$PILOT" --scope example --project example.atlas \
   --kind constraint --status confirmed --reviewer github:your-handle \
   --title "Node 22 or later" --body "The service runs on Node 22 LTS." \
   --request-id req_atlas_node_01 --apply
 ```
 
-Without `--reviewer`, the command fails with `DEVCTX_APPROVAL_REQUIRED`. Reviewer references take the form `email:`, `github:`, `slack:`, `linear:` or `handle:` followed by an identifier.
+Without `--reviewer`, the command fails with `DEVTWIN_APPROVAL_REQUIRED`. Reviewer references take the form `email:`, `github:`, `slack:`, `linear:` or `handle:` followed by an identifier.
 
 :::note
 `confirmed` records that the owner signed off through the CLI. It is not proof of who ran the command: every record written through the CLI shows its recorder as `human`, even when an agent ran it.
@@ -92,7 +92,7 @@ File sources drive the freshness label in a brief. Files that onboarding read ar
 Once written, a record never changes. When something changes, write a successor that supersedes it. You need the old record's ID and its current hash, both of which appear in the brief:
 
 ```sh
-devctx record supersede --pilot "$PILOT" --scope example --project example.atlas \
+devtwin record supersede --pilot "$PILOT" --scope example --project example.atlas \
   --target rec_94315938d3e27ab174b5665d \
   --expect-hash sha256:b411bd1f8c215be10b51c23b52ecac6614a9c3a1d627502e237f5f78e5988423 \
   --kind decision --title "Use server-side search with paging" \
@@ -100,7 +100,7 @@ devctx record supersede --pilot "$PILOT" --scope example --project example.atlas
   --request-id req_atlas_search_02 --apply
 ```
 
-The old record drops out of briefs; the new one takes its place. Both stay on disk, so the history is never lost. The hash check makes sure you are replacing the version you think you are: if someone already superseded it, the command fails with `DEVCTX_STALE_VERSION`.
+The old record drops out of briefs; the new one takes its place. Both stay on disk, so the history is never lost. The hash check makes sure you are replacing the version you think you are: if someone already superseded it, the command fails with `DEVTWIN_STALE_VERSION`.
 
 You can pass `--target` and `--expect-hash` more than once to replace several records with one.
 
@@ -109,7 +109,7 @@ You can pass `--target` and `--expect-hash` more than once to replace several re
 The record ID comes from the scope, project and request ID. That means:
 
 - Running the same command twice returns the existing record with `"created": false`.
-- Reusing a request ID with different content fails with `DEVCTX_CONFLICT`.
+- Reusing a request ID with different content fails with `DEVTWIN_CONFLICT`.
 
 So pick a new request ID for each new record, and reuse it only to retry.
 
@@ -118,31 +118,31 @@ So pick a new request ID for each new record, and reuse it only to retry.
 Sometimes you want a record reviewed before it counts, for example when an agent drafts it. `record propose` writes a private proposal file instead of a record:
 
 ```sh
-devctx record propose --pilot "$PILOT" --scope example --project example.atlas \
+devtwin record propose --pilot "$PILOT" --scope example --project example.atlas \
   --kind fact --title "Tests use node:test" \
   --body "package.json declares node --test." --source file:package.json \
   --request-id req_atlas_tests_01 --apply
 ```
 
 ```json
-{"ok":true,"command":"record propose","result":{"proposalId":"prop_ff03889979eda8c380fdaea8","path":"/private/tmp/devctx-onboard.vgS21y/data/scopes/example/projects/example.atlas/proposals/prop_ff03889979eda8c380fdaea8.json"}}
+{"ok":true,"command":"record propose","result":{"proposalId":"prop_ff03889979eda8c380fdaea8","path":"/private/tmp/devtwin-onboard.vgS21y/data/scopes/example/projects/example.atlas/proposals/prop_ff03889979eda8c380fdaea8.json"}}
 ```
 
 A proposal does not appear in briefs. When you have reviewed it, publish it:
 
 ```sh
-devctx record publish --pilot "$PILOT" --scope example --project example.atlas \
+devtwin record publish --pilot "$PILOT" --scope example --project example.atlas \
   --proposal prop_ff03889979eda8c380fdaea8 --reviewer github:your-handle --apply
 ```
 
-Publishing turns the proposal into an `observed` record. The bundled `devctx-record` skill works this way: the agent proposes and you publish. See [Capture decisions](/docs/guides/capture-decisions/).
+Publishing turns the proposal into an `observed` record. The bundled `devtwin-record` skill works this way: the agent proposes and you publish. See [Capture decisions](/docs/guides/capture-decisions/).
 
 ## What records refuse
 
-`devctx` scans every title and body for text that looks like a secret, such as private keys, authorization headers, key-and-token assignments, JWTs, and GitHub, AWS or Slack tokens. A match fails with `DEVCTX_SENSITIVE_CONTENT` and nothing is written:
+`devtwin` scans every title and body for text that looks like a secret, such as private keys, authorization headers, key-and-token assignments, JWTs, and GitHub, AWS or Slack tokens. A match fails with `DEVTWIN_SENSITIVE_CONTENT` and nothing is written:
 
 ```json
-{"ok":false,"command":"record add","error":{"code":"DEVCTX_SENSITIVE_CONTENT","message":"Sensitive content refused","details":{"types":["credential-assignment"]}}}
+{"ok":false,"command":"record add","error":{"code":"DEVTWIN_SENSITIVE_CONTENT","message":"Sensitive content refused","details":{"types":["credential-assignment"]}}}
 ```
 
 This check is a tripwire, not a guarantee. Never store credentials in records; keep them in your password manager or credential store.

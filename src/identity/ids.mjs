@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { digest } from "../storage/canonical.mjs";
 export const SCOPE_ID = /^[a-z][a-z0-9-]{1,31}$/;
 export const PROJECT_ID = /^[a-z][a-z0-9-]{1,31}\.[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
 export const RECORD_ID = /^rec_[a-f0-9]{24}$/;
 export const AGENT_ID = /^[a-z][a-z0-9-]{0,31}$/;
 export const ACTOR_REF = /^(email|github|slack|linear|handle):[A-Za-z0-9._@+-]{1,128}$/;
-const invalid = () => { throw new DevctxError("INVALID_ID", "Invalid identifier"); };
+const invalid = () => { throw new DevtwinError("INVALID_ID", "Invalid identifier"); };
 export function assertScopeId(id) { if (typeof id !== "string" || !SCOPE_ID.test(id)) invalid(); return id; }
 export function assertProjectId(id, scope) { if (typeof id !== "string" || id.length > 96 || !PROJECT_ID.test(id) || !id.startsWith(scope + ".")) invalid(); return id; }
 export function assertAgent(id) { if (typeof id !== "string" || !AGENT_ID.test(id)) invalid(); return id; }

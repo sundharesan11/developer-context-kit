@@ -1,13 +1,13 @@
 import { parseArgs } from "node:util";
 import { homedir } from "node:os";
-import { DevctxError, toJson } from "./errors.mjs";
+import { DevtwinError, toJson } from "./errors.mjs";
 import { loadPilot, rootsFromPilot } from "./config/pilot.mjs";
 const ROOT_OPTIONS = {
   "config-root": { type: "string" }, "data-root": { type: "string" },
   "state-root": { type: "string" }, pilot: { type: "string" }
 };
 export const COMMANDS = {
-  version: { rootFree: true, load: async () => ({ options: {}, run: () => ({ name: "devctx", version: "0.0.0-local" }) }) },
+  version: { rootFree: true, load: async () => ({ options: {}, run: () => ({ name: "devtwin", version: "0.0.0-local" }) }) },
   help: { rootFree: true, load: async () => ({ options: {}, run: () => ({ commands: listCommands() }) }) },
   "skill-sources catalog": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/commands.mjs")).catalogCommand },
   "skill-sources check": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/commands.mjs")).checkCommand },
@@ -71,11 +71,11 @@ export const COMMANDS = {
 export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;
 function routeFor(argv) {
-  if (argv.length === 0 || argv[0].startsWith("-")) throw new DevctxError("USAGE", "A command is required");
+  if (argv.length === 0 || argv[0].startsWith("-")) throw new DevtwinError("USAGE", "A command is required");
   const two = argv.slice(0, 2).join(" ");
   if (COMMANDS[two]) return { route: two, args: argv.slice(2) };
   if (COMMANDS[argv[0]]) return { route: argv[0], args: argv.slice(1) };
-  throw new DevctxError("USAGE", "Unknown command");
+  throw new DevtwinError("USAGE", "Unknown command");
 }
 export async function main(argv, options = {}) {
   // kitRoot and templateRoot are test seams for the running kit; production leaves them undefined.
@@ -86,7 +86,7 @@ export async function main(argv, options = {}) {
   try {
     const routed = routeFor(argv);
     command = routed.route;
-    if (!isRootFree(command) && !routed.args.some((arg) => arg === "--pilot" || arg.startsWith("--pilot="))) throw new DevctxError("GATE_REQUIRED", "v0 runs only inside a pilot fence");
+    if (!isRootFree(command) && !routed.args.some((arg) => arg === "--pilot" || arg.startsWith("--pilot="))) throw new DevtwinError("GATE_REQUIRED", "v0 runs only inside a pilot fence");
     const impl = await COMMANDS[command].load();
     let values;
     try {
@@ -101,12 +101,12 @@ export async function main(argv, options = {}) {
         const seen = new Set();
         for (const token of parsed.tokens) {
           if (token.kind !== "option") continue;
-          if (seen.has(token.name) && impl.options[token.name]?.multiple !== true) throw new DevctxError("USAGE", "Duplicate command option");
+          if (seen.has(token.name) && impl.options[token.name]?.multiple !== true) throw new DevtwinError("USAGE", "Duplicate command option");
           seen.add(token.name);
         }
       }
     } catch {
-      throw new DevctxError("USAGE", "Invalid command options");
+      throw new DevtwinError("USAGE", "Invalid command options");
     }
     let pilot, roots;
     // Live config routes still require --pilot but load the live config themselves.
@@ -117,10 +117,10 @@ export async function main(argv, options = {}) {
       } catch (error) {
         if (command === "handoff export") throw (await import("./handoff/privacy.mjs")).handoffError(error);
         if (!command.startsWith("skill-sources ")) throw error;
-        throw new DevctxError(error instanceof DevctxError ? error.code : "STORAGE_ERROR", "Acquisition pilot could not be loaded", {field: "pilot"});
+        throw new DevtwinError(error instanceof DevtwinError ? error.code : "STORAGE_ERROR", "Acquisition pilot could not be loaded", {field: "pilot"});
       }
       for (const [flag, key] of [["config-root", "configRoot"], ["data-root", "dataRoot"], ["state-root", "stateRoot"]]) {
-        if (values[flag] && values[flag] !== roots[key]) throw new DevctxError("GATE_REQUIRED", "Root does not match pilot");
+        if (values[flag] && values[flag] !== roots[key]) throw new DevtwinError("GATE_REQUIRED", "Root does not match pilot");
       }
     }
     const context = { roots, pilot, now, home, env, kitRoot, templateRoot };
@@ -132,6 +132,6 @@ export async function main(argv, options = {}) {
   } catch (error) {
     const err = toJson(error);
     stdout.write(JSON.stringify({ ok: false, command, error: err }) + "\n");
-    return err.code === "DEVCTX_USAGE" ? 2 : 1;
+    return err.code === "DEVTWIN_USAGE" ? 2 : 1;
   }
 }

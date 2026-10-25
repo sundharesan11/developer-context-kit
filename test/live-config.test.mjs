@@ -9,26 +9,26 @@ import { loadPilot, rootsFromPilot, assertWritable, recordApprovedDigest, pilotD
 import { ensureRoots } from "../src/config/roots.mjs";
 import { toJson } from "../src/errors.mjs";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const refused = (field, code = "DEVCTX_GATE_REQUIRED") => (e) => e.code === code && (field === undefined || e.details.field === field);
+const refused = (field, code = "DEVTWIN_GATE_REQUIRED") => (e) => e.code === code && (field === undefined || e.details.field === field);
 async function pinnedKit(dir, files = { "README.md": "kit\n" }) {
   const kit = await makeRepo(dir, files);
   await fixtureGit(kit, ["checkout", "-q", "--detach"]);
   return { kit, commit: (await fixtureGit(kit, ["rev-parse", "HEAD"])).trim() };
 }
 async function liveFixture(t, { env = {}, kit } = {}) {
-  const sb = await sandbox(t), home = join(sb, "home"), devctx = join(home, ".devctx"), store = join(devctx, "store");
+  const sb = await sandbox(t), home = join(sb, "home"), devtwin = join(home, ".devtwin"), store = join(devtwin, "store");
   for (const rel of [".claude/skills", ".agents/skills"]) await mkdir(join(home, rel), { recursive: true });
   await mkdir(store, { recursive: true, mode: 0o700 });
-  const pinned = kit ?? await pinnedKit(join(devctx, "kit"));
+  const pinned = kit ?? await pinnedKit(join(devtwin, "kit"));
   const repo = await makeRepo(join(sb, "work/atlas"), { "README.md": "# Atlas\n" });
   const storeAt = (root) => ({ pilotRoot: root, configRoot: join(root, "config"), dataRoot: join(root, "data"), stateRoot: join(root, "state"), inputsRoot: join(root, "inputs") });
   const obj = { schemaVersion: 1, ...storeAt(store), agentHomes: [], repos: [repo], forbidden: [], live: { configId: "cfg_0123456789abcdef", home, skillDirs: { claude: join(home, ".claude/skills"), codex: join(home, ".agents/skills") }, kitRoot: pinned.kit, kitCommit: pinned.commit } };
   const context = { home, env, kitRoot: pinned.kit };
   let n = 0;
   const f = {
-    sb, home, devctx, store, repo, obj, context, storeAt, kit: pinned.kit, kitCommit: pinned.commit,
+    sb, home, devtwin, store, repo, obj, context, storeAt, kit: pinned.kit, kitCommit: pinned.commit,
     claudeSkills: obj.live.skillDirs.claude, codexSkills: obj.live.skillDirs.codex,
-    async write(patch = {}, live = {}, { dir = devctx, mode = 0o600 } = {}) {
+    async write(patch = {}, live = {}, { dir = devtwin, mode = 0o600 } = {}) {
       const path = join(dir, "live-" + ++n + ".json"), body = { ...obj, ...patch, live: live === null ? undefined : { ...obj.live, ...live } };
       await writeFile(path, JSON.stringify(body), { mode });
       await chmod(path, mode);
@@ -113,7 +113,7 @@ test("live config refuses a symlinked .claude ancestor with PATH_UNSAFE", async 
   await mkdir(join(real, "skills"), { recursive: true });
   await rm(join(f.home, ".claude"), { recursive: true });
   await symlink(real, join(f.home, ".claude"));
-  await assert.rejects(loadPilot(await f.write(), f.context), refused("live.skillDirs.claude", "DEVCTX_PATH_UNSAFE"));
+  await assert.rejects(loadPilot(await f.write(), f.context), refused("live.skillDirs.claude", "DEVTWIN_PATH_UNSAFE"));
 });
 test("live CLAUDE_CONFIG_DIR requires the Claude skill folder inside it and CODEX_HOME only warns", async (t) => {
   const f = await liveFixture(t);
@@ -135,7 +135,7 @@ test("live running kit at another path fails with GATE_REQUIRED naming the kit",
   const path = await f.approved();
   for (const context of [{ ...f.context, kitRoot: REPO_ROOT }, { home: f.home, env: {} }]) {
     const error = await loadPilot(path, context).catch((e) => e);
-    assert.equal(error.code, "DEVCTX_GATE_REQUIRED");
+    assert.equal(error.code, "DEVTWIN_GATE_REQUIRED");
     assert.equal(error.details.field, "live.kitRoot");
     assert.equal(error.details.reason, "running-kit");
     assert.ok(!JSON.stringify(toJson(error)).includes(f.sb));
@@ -172,7 +172,7 @@ test("live config edited after approval, unapproved, or not private fails", asyn
   await writeFile(path, JSON.stringify(f.obj), { mode: 0o600 });
   assert.ok(await loadPilot(path, f.context));
   await chmod(path, 0o644);
-  await assert.rejects(loadPilot(path, f.context), { code: "DEVCTX_PATH_UNSAFE" });
+  await assert.rejects(loadPilot(path, f.context), { code: "DEVTWIN_PATH_UNSAFE" });
 });
 test("live skill folder inside a listed repository is refused", async (t) => {
   const f = await liveFixture(t);
@@ -180,17 +180,17 @@ test("live skill folder inside a listed repository is refused", async (t) => {
   await assert.rejects(loadPilot(await f.write({}, { skillDirs: { claude: join(f.repo, ".claude/skills"), codex: f.codexSkills } }), f.context), refused("live.skillDirs.claude"));
   const context = { ...f.context, env: { CLAUDE_CONFIG_DIR: join(f.repo, ".claude") } };
   await assert.rejects(loadPilot(await f.write({}, { skillDirs: { claude: join(f.repo, ".claude/skills"), codex: f.codexSkills } }), context), refused("repos"));});
-test("live assertWritable takes only devctx entries inside a named skill folder", async (t) => {
+test("live assertWritable takes only devtwin entries inside a named skill folder", async (t) => {
   const f = await liveFixture(t);
   const pilot = await loadPilot(await f.approved(), f.context), roots = rootsFromPilot(pilot);
-  assert.doesNotThrow(() => assertWritable(roots, [join(f.claudeSkills, "devctx-resume"), join(f.claudeSkills, "devctx-resume/SKILL.md"), join(pilot.stateRoot, "runs/x")], { targetHome: f.claudeSkills }));
-  for (const destination of [f.claudeSkills, join(f.claudeSkills, "foreign"), join(f.claudeSkills, "foreign/devctx-x"), join(f.codexSkills, "devctx-resume"), join(f.home, ".claude/settings.json")]) {
+  assert.doesNotThrow(() => assertWritable(roots, [join(f.claudeSkills, "devtwin-resume"), join(f.claudeSkills, "devtwin-resume/SKILL.md"), join(pilot.stateRoot, "runs/x")], { targetHome: f.claudeSkills }));
+  for (const destination of [f.claudeSkills, join(f.claudeSkills, "foreign"), join(f.claudeSkills, "foreign/devtwin-x"), join(f.codexSkills, "devtwin-resume"), join(f.home, ".claude/settings.json")]) {
     await assert.rejects(Promise.resolve().then(() => assertWritable(roots, [destination], { targetHome: f.claudeSkills })), refused("destination"));
   }
-  for (const targetHome of [f.home, join(f.home, ".claude"), join(f.home, ".codex/skills")]) await assert.rejects(Promise.resolve().then(() => assertWritable(roots, [join(targetHome, "devctx-x")], { targetHome })), refused("targetHome"));
-  await assert.rejects(Promise.resolve().then(() => assertWritable(roots, [join(f.claudeSkills, "devctx-resume")])), refused("destination"));
+  for (const targetHome of [f.home, join(f.home, ".claude"), join(f.home, ".codex/skills")]) await assert.rejects(Promise.resolve().then(() => assertWritable(roots, [join(targetHome, "devtwin-x")], { targetHome })), refused("targetHome"));
+  await assert.rejects(Promise.resolve().then(() => assertWritable(roots, [join(f.claudeSkills, "devtwin-resume")])), refused("destination"));
 });
-test("live kit clone of the committed HEAD runs devctx from a pinned detached checkout", async (t) => {
+test("live kit clone of the committed HEAD runs devtwin from a pinned detached checkout", async (t) => {
   const head = (await fixtureGit(REPO_ROOT, ["rev-parse", "HEAD"])).trim();
   const parent = await sandbox(t), clone = join(parent, "kit");
   await fixtureGit(parent, ["clone", "-q", "--no-hardlinks", REPO_ROOT, clone]);
@@ -198,7 +198,7 @@ test("live kit clone of the committed HEAD runs devctx from a pinned detached ch
   const f = await liveFixture(t, { kit: { kit: clone, commit: head } });
   const path = await f.approved();
   const run = (kit) => {
-    const r = spawnSync(process.execPath, [join(kit, "bin/devctx.mjs"), "doctor", "--pilot", path], { cwd: f.sb, encoding: "utf8", env: { PATH: process.env.PATH, HOME: f.home } });
+    const r = spawnSync(process.execPath, [join(kit, "bin/devtwin.mjs"), "doctor", "--pilot", path], { cwd: f.sb, encoding: "utf8", env: { PATH: process.env.PATH, HOME: f.home } });
     return JSON.parse(r.stdout);
   };
   const ok = run(clone);
@@ -206,12 +206,12 @@ test("live kit clone of the committed HEAD runs devctx from a pinned detached ch
   assert.equal(ok.command, "doctor");
   const mismatch = run(REPO_ROOT);
   assert.equal(mismatch.ok, false);
-  assert.equal(mismatch.error.code, "DEVCTX_GATE_REQUIRED");
+  assert.equal(mismatch.error.code, "DEVTWIN_GATE_REQUIRED");
   assert.equal(mismatch.error.details.field, "live.kitRoot");
 });
 test("live kit tolerates stray files outside its code paths and refuses untracked, ignored or changed code", async (t) => {
   const sb = await sandbox(t);
-  const kit = await pinnedKit(join(sb, "home/.devctx/kit"), { "README.md": "kit\n", ".gitignore": "*.local.mjs\nnode_modules/\n", "src/a.mjs": "export {};\n", "docs/x.md": "doc\n" });
+  const kit = await pinnedKit(join(sb, "home/.devtwin/kit"), { "README.md": "kit\n", ".gitignore": "*.local.mjs\nnode_modules/\n", "src/a.mjs": "export {};\n", "docs/x.md": "doc\n" });
   const f = await liveFixture(t, { kit });
   const path = await f.approved();
   const dirty = (e) => refused("live.kitCommit")(e) && e.details.reason === "dirty";

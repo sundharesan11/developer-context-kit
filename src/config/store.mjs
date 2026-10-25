@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertWritable, assertInPilot } from "./pilot.mjs";
 import { assertScopeId, assertProjectId, assertActorRef } from "../identity/ids.mjs";
 import { assertSourceRel, isDeniedRel } from "../storage/source-read.mjs";
@@ -11,7 +11,7 @@ import { withPilotLock, registryLockPath, scopeLockPath } from "../storage/lock.
 import { assertNoSensitive } from "../records/redact.mjs";
 import { gitQuery } from "../identity/git.mjs";
 import { deepestExisting } from "./roots.mjs";
-const invalid = () => { throw new DevctxError("INVALID_INPUT", "Invalid configuration"); };
+const invalid = () => { throw new DevtwinError("INVALID_INPUT", "Invalid configuration"); };
 export function validatePreferences(value = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) invalid();
   if (Object.keys(value).some((key) => !["explanationStyle", "diagrams", "notes"].includes(key))) invalid();
@@ -33,16 +33,16 @@ export async function applyInit(roots, { actorRefs = [], preferences = {}, now =
   actorRefs.forEach(assertActorRef);
   const userPath = join(roots.configRoot, "user.json"), registryPath = join(roots.configRoot, "registry.json");
   for (const root of [roots.configRoot, roots.dataRoot, roots.stateRoot]) {
-    if (gitQuery(deepestExisting(root), ["rev-parse", "--is-inside-work-tree"], { notRepo: true }).stdout.trim() === "true") throw new DevctxError("PATH_UNSAFE", "Private roots inside Git worktree");
+    if (gitQuery(deepestExisting(root), ["rev-parse", "--is-inside-work-tree"], { notRepo: true }).stdout.trim() === "true") throw new DevtwinError("PATH_UNSAFE", "Private roots inside Git worktree");
   }
   assertWritable(roots, [roots.configRoot, roots.dataRoot, roots.stateRoot, userPath, registryPath]);
   return withPilotLock(roots, registryLockPath(roots), { kind: "init" }, async () => {
     assertWritable(roots, [roots.configRoot, roots.dataRoot, roots.stateRoot, userPath, registryPath]);
     for (const path of [roots.configRoot, roots.dataRoot, roots.stateRoot]) ensurePrivateDir(path);
-    if (existsSync(userPath) !== existsSync(registryPath)) throw new DevctxError("RECOVERY_REQUIRED", "Partial initialization");
+    if (existsSync(userPath) !== existsSync(registryPath)) throw new DevtwinError("RECOVERY_REQUIRED", "Partial initialization");
     if (existsSync(userPath)) {
       const old = await readPrivateJson(userPath);
-      if (canonicalJson({ actorRefs: old.actorRefs, preferences: old.preferences }) !== canonicalJson({ actorRefs, preferences })) throw new DevctxError("CONFLICT", "Initialization differs");
+      if (canonicalJson({ actorRefs: old.actorRefs, preferences: old.preferences }) !== canonicalJson({ actorRefs, preferences })) throw new DevtwinError("CONFLICT", "Initialization differs");
       return { created: false };
     }
     await writeNewFile(userPath, canonicalJson({ schemaVersion: 1, actorRefs, preferences, createdAt: now().toISOString() }) + "\n");
@@ -77,7 +77,7 @@ export async function applyScopeAdd(roots, { scope, displayName, hubs = [], poli
     const desired = { schemaVersion: 1, id: scope, displayName: displayName ?? scope, hubs, policies, accounts: [], createdAt: now().toISOString() };
     if (existsSync(path)) {
       const old = await readPrivateJson(path);
-      if (canonicalJson({ ...old, createdAt: null }) !== canonicalJson({ ...desired, createdAt: null })) throw new DevctxError("CONFLICT", "Scope differs");
+      if (canonicalJson({ ...old, createdAt: null }) !== canonicalJson({ ...desired, createdAt: null })) throw new DevtwinError("CONFLICT", "Scope differs");
       return { created: false, scope };
     }
     await writeNewFile(path, canonicalJson(desired) + "\n");
@@ -88,7 +88,7 @@ export async function applyScopeAdd(roots, { scope, displayName, hubs = [], poli
 export async function loadScope(roots, scope) {
   assertScopeId(scope);
   try { return await readPrivateJson(join(roots.configRoot, "scopes", scope + ".json")); }
-  catch (error) { if (error.code === "ENOENT") throw new DevctxError("SCOPE_UNKNOWN", "Scope unknown"); throw error; }
+  catch (error) { if (error.code === "ENOENT") throw new DevtwinError("SCOPE_UNKNOWN", "Scope unknown"); throw error; }
 }
 export function bindingPath(roots, scope, project, version) {
   assertScopeId(scope); assertProjectId(project, scope);
@@ -101,21 +101,21 @@ export async function writeBindingVersion(roots, binding) {
   const content = canonicalJson(binding) + "\n", hash = sha256(content);
   if (existsSync(path)) {
     if (await readPrivateText(path) === content) return hash;
-    throw new DevctxError("RECOVERY_REQUIRED", "Binding conflict");
+    throw new DevtwinError("RECOVERY_REQUIRED", "Binding conflict");
   }
   await writeNewFile(path, content); fsyncDir(join(roots.configRoot, "projects", binding.scope, binding.project)); return hash;
 }
 export async function readBindingVersion(roots, entry) {
   const path = bindingPath(roots, entry.scope, entry.project, entry.bindingVersion);
   let text;
-  try { text = await readPrivateText(path); } catch { throw new DevctxError("RECOVERY_REQUIRED", "Binding unavailable"); }
-  if (sha256(text) !== entry.bindingHash) throw new DevctxError("RECOVERY_REQUIRED", "Binding hash mismatch");
+  try { text = await readPrivateText(path); } catch { throw new DevtwinError("RECOVERY_REQUIRED", "Binding unavailable"); }
+  if (sha256(text) !== entry.bindingHash) throw new DevtwinError("RECOVERY_REQUIRED", "Binding hash mismatch");
   return JSON.parse(text);
 }
 export async function readBindingByHash(roots, scope, project, expectedHash) {
   const dir = join(roots.configRoot, "projects", scope, project);
   let names;
-  try { names = await readdir(dir); } catch { throw new DevctxError("RECOVERY_REQUIRED", "Historical binding unavailable"); }
+  try { names = await readdir(dir); } catch { throw new DevtwinError("RECOVERY_REQUIRED", "Historical binding unavailable"); }
   for (const name of names) {
     const match = /^v([1-9][0-9]*)\.json$/.exec(name);
     if (!match) continue;
@@ -127,7 +127,7 @@ export async function readBindingByHash(roots, scope, project, expectedHash) {
       if (binding.scope === scope && binding.project === project && binding.version === Number(match[1])) return binding;
     } catch { /* A matching hash still needs a valid binding. */ }
   }
-  throw new DevctxError("RECOVERY_REQUIRED", "Historical binding unavailable");
+  throw new DevtwinError("RECOVERY_REQUIRED", "Historical binding unavailable");
 }
 export function manifestPath(roots, scope, project, operationId) { assertProjectId(project, scope); return join(roots.dataRoot, "scopes", scope, "projects", project, "operations", operationId + ".json"); }
 export async function writeManifest(roots, manifest) {
@@ -137,13 +137,13 @@ export async function writeManifest(roots, manifest) {
   const text = canonicalJson(manifest) + "\n", hash = sha256(text);
   if (existsSync(path)) {
     if (await readPrivateText(path) === text) return hash;
-    throw new DevctxError("RECOVERY_REQUIRED", "Manifest conflict");
+    throw new DevtwinError("RECOVERY_REQUIRED", "Manifest conflict");
   }
   await writeNewFile(path, text); fsyncDir(join(roots.dataRoot, "scopes", manifest.scope, "projects", manifest.project, "operations")); return hash;
 }
 export async function readManifest(roots, scope, project, operationId, expectHash) {
   let text;
-  try { text = await readPrivateText(manifestPath(roots, scope, project, operationId)); } catch { throw new DevctxError("RECOVERY_REQUIRED", "Manifest unavailable"); }
-  if (sha256(text) !== expectHash) throw new DevctxError("RECOVERY_REQUIRED", "Manifest hash mismatch");
+  try { text = await readPrivateText(manifestPath(roots, scope, project, operationId)); } catch { throw new DevtwinError("RECOVERY_REQUIRED", "Manifest unavailable"); }
+  if (sha256(text) !== expectHash) throw new DevtwinError("RECOVERY_REQUIRED", "Manifest hash mismatch");
   return JSON.parse(text);
 }

@@ -72,7 +72,7 @@ test("skill source catalog has exactly twelve public unverified recipes", () => 
   assert.ok(catalog.sources.every((s) => s.installation.status === "unverified"));
   assert.deepEqual(Object.keys(getSource(catalog, "taste-skill").source), ["channel"]);
   assert.equal(listSources(catalog).sources.length, 12);
-  assert.throws(() => getSource(catalog, "missing"), { code: "DEVCTX_INVALID_INPUT" });
+  assert.throws(() => getSource(catalog, "missing"), { code: "DEVTWIN_INVALID_INPUT" });
 });
 
 test("skill source catalog rejects malformed public recipes and isolates caller mutation", () => {
@@ -92,7 +92,7 @@ test("skill source catalog rejects malformed public recipes and isolates caller 
   ]) {
     const candidate = variant();
     mutate(candidate);
-    assert.throws(() => validateCatalog(candidate), { code: "DEVCTX_INVALID_INPUT" });
+    assert.throws(() => validateCatalog(candidate), { code: "DEVTWIN_INVALID_INPUT" });
   }
   const candidate = variant();
   const validated = validateCatalog(candidate);
@@ -144,18 +144,18 @@ test("skill source annotated tags stop at four objects and reject cycles", async
   assert.equal((await checkSource(source(), { request: accepted.request })).commit, shaA);
   routes[`${base}/git/tags/${tagShas[3]}`] = { sha: tagShas[3], tag: "v1", object: { type: "tag", sha: tagShas[4] } };
   const excessive = await fixture(t, routes);
-  await assert.rejects(checkSource(source(), { request: excessive.request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+  await assert.rejects(checkSource(source(), { request: excessive.request }), { code: "DEVTWIN_UPSTREAM_INVALID" });
   routes[`${base}/git/tags/${tagShas[1]}`] = { sha: tagShas[1], tag: "v1", object: { type: "tag", sha: tagShas[0] } };
   const cycle = await fixture(t, routes);
-  await assert.rejects(checkSource(source(), { request: cycle.request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+  await assert.rejects(checkSource(source(), { request: cycle.request }), { code: "DEVTWIN_UPSTREAM_INVALID" });
 });
 
 test("skill source HTTP fixture refuses redirects and oversized bodies", async (t) => {
   for (const [route, entry, code, message] of [
-    [base, { status: 301, headers: { location: "https://elsewhere.invalid" }, body: {} }, "DEVCTX_SOURCE_MOVED"],
-    [`${base}/releases/latest`, { status: 302, body: {} }, "DEVCTX_REDIRECT_REFUSED"],
-    [`${base}/releases/latest`, { headers: { "content-length": "262145" }, body: {} }, "DEVCTX_UPSTREAM_INVALID", "GitHub response too large"],
-    [`${base}/releases/latest`, { chunks: ["x".repeat(130000), "x".repeat(132145)] }, "DEVCTX_UPSTREAM_INVALID", "GitHub response too large"]
+    [base, { status: 301, headers: { location: "https://elsewhere.invalid" }, body: {} }, "DEVTWIN_SOURCE_MOVED"],
+    [`${base}/releases/latest`, { status: 302, body: {} }, "DEVTWIN_REDIRECT_REFUSED"],
+    [`${base}/releases/latest`, { headers: { "content-length": "262145" }, body: {} }, "DEVTWIN_UPSTREAM_INVALID", "GitHub response too large"],
+    [`${base}/releases/latest`, { chunks: ["x".repeat(130000), "x".repeat(132145)] }, "DEVTWIN_UPSTREAM_INVALID", "GitHub response too large"]
   ]) {
     const routes = { ...routesFor(), [route]: entry };
     const { request } = await fixture(t, routes);
@@ -166,31 +166,31 @@ test("skill source HTTP fixture refuses redirects and oversized bodies", async (
 
 test("skill source maps HTTP, protocol, timeout, and transport failures", async (t) => {
   const cases = [
-    [base, { status: 404, body: {} }, "DEVCTX_SOURCE_NOT_FOUND"],
-    [base, { status: 401, body: {} }, "DEVCTX_GITHUB_UNAUTHORIZED"],
-    [base, { status: 403, headers: { "x-ratelimit-remaining": "0", "retry-after": "12" }, body: {} }, "DEVCTX_RATE_LIMITED"],
-    [base, { status: 403, body: {} }, "DEVCTX_GITHUB_FORBIDDEN"],
-    [base, { status: 429, body: {} }, "DEVCTX_RATE_LIMITED"],
-    [base, { status: 500, body: {} }, "DEVCTX_UPSTREAM_UNAVAILABLE"],
-    [`${base}/releases/latest`, { body: { draft: false, prerelease: true, tag_name: "v1" } }, "DEVCTX_NO_STABLE_RELEASE"],
-    [`${base}/releases/latest`, { contentType: "text/plain", body: "bad" }, "DEVCTX_UPSTREAM_INVALID"],
-    [`${base}/releases/latest`, { body: "{" }, "DEVCTX_UPSTREAM_INVALID"],
-    [`${base}/git/ref/tags/v1`, { status: 404, body: {} }, "DEVCTX_UPSTREAM_INVALID"],
-    [`${base}/git/ref/tags/v1`, { body: { ref: "refs/tags/v1", object: { type: "tag", sha: shaB } } }, "DEVCTX_UPSTREAM_INVALID"],
-    [`${base}/git/commits/${shaA}`, { body: { sha: shaB } }, "DEVCTX_UPSTREAM_INVALID"]
+    [base, { status: 404, body: {} }, "DEVTWIN_SOURCE_NOT_FOUND"],
+    [base, { status: 401, body: {} }, "DEVTWIN_GITHUB_UNAUTHORIZED"],
+    [base, { status: 403, headers: { "x-ratelimit-remaining": "0", "retry-after": "12" }, body: {} }, "DEVTWIN_RATE_LIMITED"],
+    [base, { status: 403, body: {} }, "DEVTWIN_GITHUB_FORBIDDEN"],
+    [base, { status: 429, body: {} }, "DEVTWIN_RATE_LIMITED"],
+    [base, { status: 500, body: {} }, "DEVTWIN_UPSTREAM_UNAVAILABLE"],
+    [`${base}/releases/latest`, { body: { draft: false, prerelease: true, tag_name: "v1" } }, "DEVTWIN_NO_STABLE_RELEASE"],
+    [`${base}/releases/latest`, { contentType: "text/plain", body: "bad" }, "DEVTWIN_UPSTREAM_INVALID"],
+    [`${base}/releases/latest`, { body: "{" }, "DEVTWIN_UPSTREAM_INVALID"],
+    [`${base}/git/ref/tags/v1`, { status: 404, body: {} }, "DEVTWIN_UPSTREAM_INVALID"],
+    [`${base}/git/ref/tags/v1`, { body: { ref: "refs/tags/v1", object: { type: "tag", sha: shaB } } }, "DEVTWIN_UPSTREAM_INVALID"],
+    [`${base}/git/commits/${shaA}`, { body: { sha: shaB } }, "DEVTWIN_UPSTREAM_INVALID"]
   ];
   for (const [route, entry, code] of cases) {
     const { request } = await fixture(t, { ...routesFor(), [route]: entry });
     await assert.rejects(checkSource(source(), { request }), (error) => error.code === code && !JSON.stringify(error.details).includes("bad"));
   }
   const hanging = await fixture(t, { [base]: { hang: true } });
-  await assert.rejects(checkSource(source(), { request: hanging.request, timeoutMs: 20 }), { code: "DEVCTX_NETWORK_TIMEOUT" });
-  await assert.rejects(checkSource(source(), { request: () => { throw new Error("offline"); } }), { code: "DEVCTX_NETWORK_UNAVAILABLE" });
+  await assert.rejects(checkSource(source(), { request: hanging.request, timeoutMs: 20 }), { code: "DEVTWIN_NETWORK_TIMEOUT" });
+  await assert.rejects(checkSource(source(), { request: () => { throw new Error("offline"); } }), { code: "DEVTWIN_NETWORK_UNAVAILABLE" });
 });
 
 test("skill source rejects a 200 JSON string that resembles no-release", async (t) => {
   const { request } = await fixture(t, { ...routesFor(), [`${base}/releases/latest`]: { body: '"no_release"' } });
-  await assert.rejects(checkSource(source(), { request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+  await assert.rejects(checkSource(source(), { request }), { code: "DEVTWIN_UPSTREAM_INVALID" });
 });
 
 test("skill source accepts bounded gzip JSON with wire content-length", async (t) => {
@@ -205,7 +205,7 @@ test("skill source refuses malformed direct recipes before transport", async () 
   let calls = 0;
   const request = () => { calls++; throw new Error("transport called"); };
   for (const repository of [{ owner: "phuryn", name: "." }, { owner: "-bad", name: "repo" }, { owner: "phuryn", name: "repo.git" }]) {
-    await assert.rejects(checkSource({ ...source(), repository }, { request }), { code: "DEVCTX_INVALID_INPUT" });
+    await assert.rejects(checkSource({ ...source(), repository }, { request }), { code: "DEVTWIN_INVALID_INPUT" });
   }
   assert.equal(calls, 0);
 });
@@ -215,40 +215,40 @@ test("skill source rejects mismatched identity length and annotated SHA", async 
   const request = (url, options) => new URL(url).pathname === base
     ? Promise.resolve(new Response(JSON.stringify({ full_name: "phuryn/pm-skills" }), { headers: { "content-type": "application/json", "content-length": "9999" } }))
     : local.request(url, options);
-  await assert.rejects(checkSource(source(), { request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+  await assert.rejects(checkSource(source(), { request }), { code: "DEVTWIN_UPSTREAM_INVALID" });
   const routes = routesFor();
   routes[`${base}/git/ref/tags/v1`] = { ref: "refs/tags/v1", object: { type: "tag", sha: shaB } };
   routes[`${base}/git/tags/${shaB}`] = { sha: shaA, tag: "v1", object: { type: "commit", sha: shaA } };
   const mismatch = await fixture(t, routes);
-  await assert.rejects(checkSource(source(), { request: mismatch.request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+  await assert.rejects(checkSource(source(), { request: mismatch.request }), { code: "DEVTWIN_UPSTREAM_INVALID" });
   routes[`${base}/git/tags/${shaB}`] = { sha: shaB, tag: "other", object: { type: "commit", sha: shaA } };
   const name = await fixture(t, routes);
-  await assert.rejects(checkSource(source(), { request: name.request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+  await assert.rejects(checkSource(source(), { request: name.request }), { code: "DEVTWIN_UPSTREAM_INVALID" });
 });
 
 test("skill source bounds rate-limit details and prior-lock fields", async (t) => {
   const limited = await fixture(t, { [base]: { status: 403, headers: { "retry-after": "12", "x-ratelimit-reset": "1700000000" }, body: {} } });
   await assert.rejects(checkSource(source(), { request: limited.request }), (error) => {
-    assert.equal(error.code, "DEVCTX_RATE_LIMITED");
+    assert.equal(error.code, "DEVTWIN_RATE_LIMITED");
     assert.deepEqual(error.details, { retryAfterSeconds: 12, resetAt: "2023-11-14T22:13:20.000Z" });
     return true;
   });
   const malformed = await fixture(t, { [base]: { status: 429, headers: { "retry-after": "bad", "x-ratelimit-reset": "9999999999999999" }, body: {} } });
-  await assert.rejects(checkSource(source(), { request: malformed.request }), (error) => error.code === "DEVCTX_RATE_LIMITED" && Object.keys(error.details).length === 0);
+  await assert.rejects(checkSource(source(), { request: malformed.request }), (error) => error.code === "DEVTWIN_RATE_LIMITED" && Object.keys(error.details).length === 0);
   for (const priorLock of [
     { sourceId: "other", channel: "stable-release", tag: "v1", commit: shaA },
     { sourceId: "pm-skills", channel: "stable-release", tag: "v1..bad", commit: shaA },
     []
-  ]) await assert.rejects(checkSource(source(), { request: () => { throw new Error("unexpected request"); }, priorLock }), { code: "DEVCTX_INVALID_INPUT" });
+  ]) await assert.rejects(checkSource(source(), { request: () => { throw new Error("unexpected request"); }, priorLock }), { code: "DEVTWIN_INVALID_INPUT" });
 });
 
 test("skill source rejects deceptive public text", async () => {
   const candidate = structuredClone(loadBundledCatalog());
   candidate.sources[0].installation.note = `safe\u202Ehidden`;
-  assert.throws(() => validateCatalog(candidate), { code: "DEVCTX_INVALID_INPUT" });
+  assert.throws(() => validateCatalog(candidate), { code: "DEVTWIN_INVALID_INPUT" });
   for (const tag of [".hidden/v1", "release/.lock", "v1.", "v\u202E1"]) {
     const priorLock = { sourceId: "pm-skills", channel: "stable-release", tag, commit: shaA };
-    await assert.rejects(checkSource(source(), { priorLock, request: () => { throw new Error("unexpected request"); } }), { code: "DEVCTX_INVALID_INPUT" });
+    await assert.rejects(checkSource(source(), { priorLock, request: () => { throw new Error("unexpected request"); } }), { code: "DEVTWIN_INVALID_INPUT" });
   }
 });
 
@@ -256,7 +256,7 @@ test("skill source whole check stops at the fifteen-second deadline", async (t) 
   const routes = Object.fromEntries(Object.entries(routesFor()).map(([path, body]) => [path, { body, delay: 3900 }]));
   const { request } = await fixture(t, routes);
   const started = Date.now();
-  await assert.rejects(checkSource(source(), { request }), { code: "DEVCTX_NETWORK_TIMEOUT" });
+  await assert.rejects(checkSource(source(), { request }), { code: "DEVTWIN_NETWORK_TIMEOUT" });
   const elapsed = Date.now() - started;
   assert.ok(elapsed >= 14500 && elapsed < 17000, `deadline elapsed ${elapsed} ms`);
 });
@@ -274,7 +274,7 @@ test("skill source enforces aggregate one-megabyte body limit", async (t) => {
     routes[path] = { ...routes[path], pad: "x".repeat(190000) };
   }
   const { request, seen } = await fixture(t, routes);
-  await assert.rejects(checkSource(source(), { request }), { code: "DEVCTX_UPSTREAM_INVALID" });
+  await assert.rejects(checkSource(source(), { request }), { code: "DEVTWIN_UPSTREAM_INVALID" });
   assert.ok(seen.length >= 6);
 });
 
@@ -293,7 +293,7 @@ test("skill source CLI is root-free while existing writes remain pilot-bound", a
   assert.ok(help.json.result.commands.includes("skill-sources catalog"));
   assert.ok(help.json.result.commands.includes("skill-sources check"));
   const oldRoute = await cli(["skill", "discover"]);
-  assert.equal(oldRoute.json.error.code, "DEVCTX_GATE_REQUIRED");
+  assert.equal(oldRoute.json.error.code, "DEVTWIN_GATE_REQUIRED");
   const { request } = await fixture(t, routesFor());
   const checked = await cli(["skill-sources", "check", "--source", "pm-skills"], { request });
   assert.equal(checked.code, 0);
@@ -306,7 +306,7 @@ test("skill source CLI rejects root options and malformed command options", asyn
       for (const suffix of [[`--${flag}`, "anything"], [`--${flag}=anything`]]) {
         const result = await cli([...route, ...suffix]);
         assert.equal(result.code, 2);
-        assert.equal(result.json.error.code, "DEVCTX_USAGE");
+        assert.equal(result.json.error.code, "DEVTWIN_USAGE");
       }
     }
   }
@@ -320,10 +320,10 @@ test("skill source CLI rejects root options and malformed command options", asyn
   ]) {
     const result = await cli(args);
     assert.equal(result.code, 2, args.join(" "));
-    assert.equal(result.json.error.code, "DEVCTX_USAGE");
+    assert.equal(result.json.error.code, "DEVTWIN_USAGE");
   }
   const unknown = await cli(["skill-sources", "check", "--source", "missing"]);
-  assert.equal(unknown.json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.equal(unknown.json.error.code, "DEVTWIN_INVALID_INPUT");
   const invalid = await cli(["skill-sources", "check", "--source", "pm-skills", "--prior-lock-json", "{}"]);
-  assert.equal(invalid.json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.equal(invalid.json.error.code, "DEVTWIN_INVALID_INPUT");
 });

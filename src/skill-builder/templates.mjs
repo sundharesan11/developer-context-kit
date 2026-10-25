@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { PROJECT_ID } from "../identity/ids.mjs";
 import { assertInPilot } from "../config/pilot.mjs";
 import { loadScope } from "../config/store.mjs";
@@ -19,8 +19,8 @@ const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const TEMPLATE_NAME = /^[a-z][a-z0-9-]{0,31}$/, KEY = /^[a-z][a-z0-9-]{0,31}$/;
 const RENDERED = ["candidate/SKILL.md", "design.json", "requirements.json"];
 const MARKER = /\{\{dck:([^{}]*)\}\}/g;
-const invalid = (message, details) => { throw new DevctxError("INVALID_INPUT", message, details); };
-const unsafe = (message, details) => { throw new DevctxError("PATH_UNSAFE", message, details); };
+const invalid = (message, details) => { throw new DevtwinError("INVALID_INPUT", message, details); };
+const unsafe = (message, details) => { throw new DevtwinError("PATH_UNSAFE", message, details); };
 const exact = (value, fields) => value && typeof value === "object" && !Array.isArray(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...fields].sort());
 const text = (value, max) => typeof value === "string" && value.trim().length > 0 && value.length <= max;
 export const templateRootFor = (ctx = {}) => ctx.templateRoot ?? join(ctx.kitRoot ?? KIT, "templates", "skills");
@@ -59,10 +59,10 @@ function checkMeta(meta, name) {
 export function loadTemplate(root, name) {
   if (typeof name !== "string" || !TEMPLATE_NAME.test(name)) invalid("Invalid template name");
   const dir = join(root, name), node = info(dir);
-  if (!node) throw new DevctxError("NOT_FOUND", "Template unavailable", { template: name });
+  if (!node) throw new DevtwinError("NOT_FOUND", "Template unavailable", { template: name });
   if (node.isSymbolicLink() || !node.isDirectory()) unsafe("Unsafe template folder", { path: name });
   inventory(dir, name);
-  let meta; try { meta = JSON.parse(readKitFile(join(dir, "template.json"), name + "/template.json")); } catch (error) { if (error instanceof DevctxError) throw error; invalid("Invalid template metadata", { template: name }); }
+  let meta; try { meta = JSON.parse(readKitFile(join(dir, "template.json"), name + "/template.json")); } catch (error) { if (error instanceof DevtwinError) throw error; invalid("Invalid template metadata", { template: name }); }
   checkMeta(meta, name);
   const files = {}, declared = new Set(meta.placeholders.map((p) => p.key)), used = new Set();
   for (const rel of RENDERED) {
@@ -91,10 +91,10 @@ async function existingWorkspace(roots, selection) {
   if (selection.audience === "company") await loadScope(roots, selection.scope);
   validateRoot(path, "workspace");
   const node = info(path);
-  if (!node) throw new DevctxError("NOT_FOUND", "Skill workspace unavailable");
+  if (!node) throw new DevtwinError("NOT_FOUND", "Skill workspace unavailable");
   checkNode(node, path, { directory: true });
   const meta = await readPrivateJson(join(path, "workspace.json"));
-  if (meta?.schemaVersion !== 1 || meta.audience !== selection.audience || meta.scope !== (selection.scope ?? null) || meta.project !== null || meta.workspace !== selection.workspace) throw new DevctxError("INTEGRITY", "Workspace scope mismatch");
+  if (meta?.schemaVersion !== 1 || meta.audience !== selection.audience || meta.scope !== (selection.scope ?? null) || meta.project !== null || meta.workspace !== selection.workspace) throw new DevtwinError("INTEGRITY", "Workspace scope mismatch");
 }
 export function parseSets(sets = []) {
   const values = {};
@@ -134,7 +134,7 @@ function render({ meta, files }, filled) {
   }
   const name = JSON.parse(out.find((f) => f.path === "design.json").content).name;
   if (typeof name !== "string" || !SKILL_NAME.test(name) || name.length > 64) invalid("Invalid skill name", { template: meta.name });
-  if (name.startsWith("devctx-") || bundledNames().includes(name)) invalid("Reserved skill name", { name });
+  if (name.startsWith("devtwin-") || bundledNames().includes(name)) invalid("Reserved skill name", { name });
   // Same frontmatter rules as validatePackage, so a value that would fail draft-validate fails here.
   if (parseFrontmatter(out.find((f) => f.path === "candidate/SKILL.md").content).meta.name !== name) invalid("Candidate name differs from design name", { template: meta.name });
   return out;
@@ -155,11 +155,11 @@ function seededInventory(dir) {
   const found = [];
   function visit(path, rel, depth) {
     const node = info(path);
-    if (!node) throw new DevctxError("NOT_FOUND", "Seeded directory unavailable");
+    if (!node) throw new DevtwinError("NOT_FOUND", "Seeded directory unavailable");
     if (node.isSymbolicLink()) unsafe("Seeded symlink refused", { path: rel || "." });
     if (node.isDirectory()) {
-      if (depth > 2) throw new DevctxError("INTEGRITY", "Unexpected seeded file", { path: rel });
-      for (const name of readdirSync(path).sort()) { if (found.length >= PACKAGE_LIMITS.files) throw new DevctxError("LIMIT", "Seeded file limit exceeded"); visit(join(path, name), rel ? rel + "/" + name : name, depth + 1); }
+      if (depth > 2) throw new DevtwinError("INTEGRITY", "Unexpected seeded file", { path: rel });
+      for (const name of readdirSync(path).sort()) { if (found.length >= PACKAGE_LIMITS.files) throw new DevtwinError("LIMIT", "Seeded file limit exceeded"); visit(join(path, name), rel ? rel + "/" + name : name, depth + 1); }
     } else if (node.isFile()) { if (node.nlink !== 1) unsafe("Linked seeded file refused", { path: rel }); found.push(rel); }
     else unsafe("Non-regular seeded entry", { path: rel });
   }
@@ -174,12 +174,12 @@ export async function verifyTemplate(roots, root, selection, template, values, d
   assertFingerprint(plan, renderDigest);
   const found = seededInventory(dir), expected = new Map(files.map((f) => [f.path, f]));
   for (const rel of [...new Set([...found, ...expected.keys()])].sort()) {
-    if (!expected.has(rel)) throw new DevctxError("INTEGRITY", "Unexpected seeded file", { path: rel });
-    if (!found.includes(rel)) throw new DevctxError("INTEGRITY", "Seeded file missing", { path: rel });
+    if (!expected.has(rel)) throw new DevtwinError("INTEGRITY", "Unexpected seeded file", { path: rel });
+    if (!found.includes(rel)) throw new DevtwinError("INTEGRITY", "Seeded file missing", { path: rel });
     const read = await readApprovedSource(pilot.inputsRoot, relative(pilot.inputsRoot, join(dir, ...rel.split("/"))));
     if (read.skipped === "symlink") unsafe("Seeded symlink refused", { path: rel });
     if (read.skipped || !read.utf8Valid || info(join(dir, ...rel.split("/")))?.nlink !== 1) unsafe("Seeded file unavailable", { path: rel });
-    if (read.text !== expected.get(rel).content) throw new DevctxError("INTEGRITY", "Seeded file differs from the render", { path: rel });
+    if (read.text !== expected.get(rel).content) throw new DevtwinError("INTEGRITY", "Seeded file differs from the render", { path: rel });
   }
   return { verified: true, template, audience: plan.audience, scope: plan.scope, workspace: plan.workspace, renderDigest: plan.fingerprint, files: files.map(({ path, sha256: hash }) => ({ path, sha256: hash })) };
 }

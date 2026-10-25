@@ -35,7 +35,7 @@ test("draft save previews the destination and hash, and apply writes the draft u
   assert.equal((await stat(written)).mode & 0o777, 0o600);
   assert.equal((await stat(join(p.dataRoot, "drafts"))).mode & 0o777, 0o700);
   const again = await cli(p, ["--body-file", file, "--apply", "--plan-fingerprint", result.fingerprint]);
-  assert.equal(again.json.error.code, "DEVCTX_CONFLICT");
+  assert.equal(again.json.error.code, "DEVTWIN_CONFLICT");
 });
 test("draft save with --scope writes under dataRoot/scopes/<scope>/drafts and an unknown scope fails", async (t) => {
   const p = await makePilot(t);
@@ -50,9 +50,9 @@ test("draft save with --scope writes under dataRoot/scopes/<scope>/drafts and an
   assert.equal(await readFile(join(p.dataRoot, plan.json.result.destination.path), "utf8"), BODY);
   await assert.rejects(access(join(p.dataRoot, "drafts")));
   const unknown = await cli(p, ["--body-file", file, "--scope", "globex"]);
-  assert.equal(unknown.json.error.code, "DEVCTX_SCOPE_UNKNOWN");
+  assert.equal(unknown.json.error.code, "DEVTWIN_SCOPE_UNKNOWN");
   const unknownApply = await cli(p, ["--body-file", file, "--scope", "globex", "--apply", "--plan-fingerprint", plan.json.result.fingerprint]);
-  assert.equal(unknownApply.json.error.code, "DEVCTX_SCOPE_UNKNOWN");
+  assert.equal(unknownApply.json.error.code, "DEVTWIN_SCOPE_UNKNOWN");
   await assert.rejects(access(join(p.dataRoot, "scopes", "globex")));
 });
 test("draft save preview states that a draft saved here cannot be sent by routing later", async (t) => {
@@ -68,15 +68,15 @@ test("draft save refuses a body file outside inputsRoot with GATE_REQUIRED", asy
   await writeFile(outside, BODY);
   const res = await cli(p, ["--body-file", outside]);
   assert.equal(res.code, 1);
-  assert.equal(res.json.error.code, "DEVCTX_GATE_REQUIRED");
+  assert.equal(res.json.error.code, "DEVTWIN_GATE_REQUIRED");
   const missing = await cli(p, []);
-  assert.equal(missing.json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.equal(missing.json.error.code, "DEVTWIN_INVALID_INPUT");
 });
 test("draft save refuses a body containing a JWT with SENSITIVE_CONTENT and writes nothing", async (t) => {
   const p = await makePilot(t);
   const jwt = ["eyJhbGciOiJIUzI1NiJ9", "eyJzdWIiOiJ4In0", "c2lnbmF0dXJlMDA"].join(".");
   const res = await cli(p, ["--body-file", await bodyFile(p, "Note: " + jwt + "\n")]);
-  assert.equal(res.json.error.code, "DEVCTX_SENSITIVE_CONTENT");
+  assert.equal(res.json.error.code, "DEVTWIN_SENSITIVE_CONTENT");
   await assert.rejects(access(join(p.dataRoot, "drafts")));
 });
 test("draft save apply with a mismatched or missing fingerprint writes nothing", async (t) => {
@@ -85,9 +85,9 @@ test("draft save apply with a mismatched or missing fingerprint writes nothing",
   const plan = await cli(p, ["--body-file", file]);
   await writeFile(file, BODY + "Edited after preview.\n");
   const stale = await cli(p, ["--body-file", file, "--apply", "--plan-fingerprint", plan.json.result.fingerprint]);
-  assert.equal(stale.json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal(stale.json.error.code, "DEVTWIN_PLAN_MISMATCH");
   const missing = await cli(p, ["--body-file", file, "--apply"]);
-  assert.equal(missing.json.error.code, "DEVCTX_PLAN_REQUIRED");
+  assert.equal(missing.json.error.code, "DEVTWIN_PLAN_REQUIRED");
   await assert.rejects(access(join(p.dataRoot, "drafts")));
 });
 test("draft save is listed in help and takes no message-type or send option", async () => {

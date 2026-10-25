@@ -3,7 +3,7 @@ import { mkdir, unlink, rmdir, readdir, rename } from "node:fs/promises";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertInPilot, assertWritable } from "../config/pilot.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { sha256, canonicalJson, digest } from "../storage/canonical.mjs";
@@ -14,8 +14,8 @@ import { recordInventory, INVENTORY } from "./inventory.mjs";
 export const AGENT_HOMES = { claude: ".claude/skills", codex: ".agents/skills" };
 // Earlier releases wrote Codex skills here. Status reports leftovers; nothing ever acts on them.
 export const LEGACY_HOMES = { codex: ".codex/skills" };
-export const SKILL_NAMES = ["devctx-onboard", "devctx-resume", "devctx-record"];
-const SKILL = "SKILL.md", RECEIPT = ".devctx-owned.json", KIND = "skill-bundled", FILE_LIMIT = 1048576;
+export const SKILL_NAMES = ["devtwin-onboard", "devtwin-resume", "devtwin-record"];
+const SKILL = "SKILL.md", RECEIPT = ".devtwin-owned.json", KIND = "skill-bundled", FILE_LIMIT = 1048576;
 const WRITES = ["create", "update", "remove"];
 const KIT = fileURLToPath(new URL("../..", import.meta.url));
 const configIdOf = (pilot) => pilot.live?.configId ?? null;
@@ -26,7 +26,7 @@ const receiptBytes = (receipt) => canonicalJson(receipt) + "\n";
 // Live sources come from the live config's kit, which loadPilot has proven is the running kit at the pinned commit.
 function source(pilot, skill) {
   const path = join(pilot.live?.kitRoot ?? KIT, "skills", skill, SKILL), st = info(path);
-  if (!st?.isFile()) throw new DevctxError("INTEGRITY", "Bundled skill source missing", { skill });
+  if (!st?.isFile()) throw new DevtwinError("INTEGRITY", "Bundled skill source missing", { skill });
   return readFileSync(path);
 }
 function hashOf(path) {
@@ -37,20 +37,20 @@ function hashOf(path) {
 }
 // Each selected agent's skill folder and the root assertWritable takes for it. Live mode never derives either from an argument.
 function skillRoots(pilot, targetHome, agents) {
-  if (!Array.isArray(agents) || agents.some((a) => typeof a !== "string" || !Object.hasOwn(AGENT_HOMES, a))) throw new DevctxError("INVALID_INPUT", "Invalid installer selection");
+  if (!Array.isArray(agents) || agents.some((a) => typeof a !== "string" || !Object.hasOwn(AGENT_HOMES, a))) throw new DevtwinError("INVALID_INPUT", "Invalid installer selection");
   const chosen = [...new Set(agents)].sort();
   if (!pilot.live) {
     assertInPilot(pilot, targetHome, "agentHomes");
-    if (targetHome === homedir()) throw new DevctxError("GATE_REQUIRED", "Real home refused");
+    if (targetHome === homedir()) throw new DevtwinError("GATE_REQUIRED", "Real home refused");
     return chosen.map((agent) => ({ agent, dir: join(targetHome, AGENT_HOMES[agent]), root: targetHome }));
   }
   const home = pilot.live.home;
-  if (targetHome !== undefined && targetHome !== home) throw new DevctxError("GATE_REQUIRED", "Live target must be the live config home", { field: "targetHome" });
+  if (targetHome !== undefined && targetHome !== home) throw new DevtwinError("GATE_REQUIRED", "Live target must be the live config home", { field: "targetHome" });
   return chosen.map((agent) => {
     const dir = Object.hasOwn(pilot.live.skillDirs, agent) ? pilot.live.skillDirs[agent] : undefined;
     const st = typeof dir === "string" ? info(dir) : null;
-    if (!st?.isDirectory() || st.isSymbolicLink()) throw new DevctxError("GATE_REQUIRED", "Live skill folder unavailable", { field: "live.skillDirs." + agent });
-    if (isWithin(dir, home) && realpathSync.native(dir) !== join(realpathSync.native(home), relative(home, dir))) throw new DevctxError("GATE_REQUIRED", "Live skill folder does not resolve to the live config", { field: "live.skillDirs." + agent });
+    if (!st?.isDirectory() || st.isSymbolicLink()) throw new DevtwinError("GATE_REQUIRED", "Live skill folder unavailable", { field: "live.skillDirs." + agent });
+    if (isWithin(dir, home) && realpathSync.native(dir) !== join(realpathSync.native(home), relative(home, dir))) throw new DevtwinError("GATE_REQUIRED", "Live skill folder does not resolve to the live config", { field: "live.skillDirs." + agent });
     return { agent, dir, root: dir };
   });
 }
@@ -116,7 +116,7 @@ async function observe(pilot, owned, dir, skill, mode) {
   return { status: receipt.files[SKILL] === sha256(source(pilot, skill)) ? "installed" : "update", receipt, old };
 }
 export async function planInstall(pilot, { targetHome, agents, mode = "install" }) {
-  if (!["install", "uninstall"].includes(mode)) throw new DevctxError("INVALID_INPUT", "Invalid installer selection");
+  if (!["install", "uninstall"].includes(mode)) throw new DevtwinError("INVALID_INPUT", "Invalid installer selection");
   const roots = skillRoots(pilot, targetHome, agents);
   const owned = ledger(pilot, await readJournals(pilot.stateRoot));
   const actions = [];
@@ -161,11 +161,11 @@ async function perform(pilot, entry, bytes, faults, created) {
   }
 }
 export async function applyInstall(roots, pilot, input, { fingerprint, runId }, { faults = {} } = {}) {
-  if (!RUN_ID.test(runId)) throw new DevctxError("INVALID_ID", "Invalid run ID");
+  if (!RUN_ID.test(runId)) throw new DevtwinError("INVALID_ID", "Invalid run ID");
   assertFingerprint(await planInstall(pilot, input), fingerprint);
   const runDir = join(roots.stateRoot, "runs", runId), journalPath = join(runDir, "journal.json");
   return withPilotLock(roots, lockPath(roots), { kind: "install", runId }, async () => {
-    if ((await incompleteRuns(pilot)).length) throw new DevctxError("RECOVERY_REQUIRED", "Incomplete installer journal");
+    if ((await incompleteRuns(pilot)).length) throw new DevtwinError("RECOVERY_REQUIRED", "Incomplete installer journal");
     const plan = await planInstall(pilot, input);
     assertFingerprint(plan, fingerprint);
     const intended = plan.actions.filter((a) => WRITES.includes(a.status));
@@ -173,7 +173,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
     for (const a of intended) assertWritable(roots, [...entryPaths(a.path), journalPath, join(runDir, INVENTORY)], { targetHome: a.root });
     ensurePrivatePath(roots.stateRoot, ["runs"]);
     try { await mkdir(runDir, { mode: 0o700 }); }
-    catch (error) { if (error.code === "EEXIST") throw new DevctxError("CONFLICT", "Run ID already exists"); throw error; }
+    catch (error) { if (error.code === "EEXIST") throw new DevtwinError("CONFLICT", "Run ID already exists"); throw error; }
     // The inventory of every target skill folder comes first; faults.afterInventory is a test seam just after it.
     const folders = [...new Map(plan.actions.map((a) => [a.agent, { agent: a.agent, dir: dirname(a.path) }])).values()];
     await recordInventory(runDir, { runId, configId: configIdOf(pilot), mode: plan.mode, folders });
@@ -185,14 +185,14 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
       const entry = { agent: a.agent, skill: a.skill, path: a.path, root: a.root, status: a.status, old: null, new: null, receipt: null }, own = {};
       if (a.status !== "create") {
         const skill = await readPrivateBytes(join(a.path, SKILL), FILE_LIMIT), receipt = await readPrivateBytes(join(a.path, RECEIPT), FILE_LIMIT);
-        if (digest(JSON.parse(receipt.toString("utf8"))) !== a.prior) throw new DevctxError("STALE_VERSION", "Target changed during apply");
+        if (digest(JSON.parse(receipt.toString("utf8"))) !== a.prior) throw new DevtwinError("STALE_VERSION", "Target changed during apply");
         await writeNewFile(join(copies, i + "-old-skill"), skill);
         await writeNewFile(join(copies, i + "-old-receipt"), receipt);
         entry.old = { [SKILL]: sha256(skill), [RECEIPT]: sha256(receipt) };
       }
       if (a.status !== "remove") {
         own.skill = source(pilot, a.skill);
-        if (sha256(own.skill) !== a.hash) throw new DevctxError("STALE_VERSION", "Bundled source changed during apply");
+        if (sha256(own.skill) !== a.hash) throw new DevtwinError("STALE_VERSION", "Bundled source changed during apply");
         entry.receipt = { schemaVersion: 2, kind: KIND, skill: a.skill, configId: configIdOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, files: { [SKILL]: sha256(own.skill) } };
         own.receipt = receiptBytes(entry.receipt);
         await writeNewFile(join(copies, i + "-new-skill"), own.skill);
@@ -209,7 +209,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
       assertWritable(roots, [...entryPaths(entry.path), journalPath], { targetHome: entry.root });
       if (entry.status === "remove") {
         const now = await observe(pilot, ledger(pilot, await readJournals(roots.stateRoot)), entry.path, entry.skill, "uninstall");
-        if (now.status !== "remove") throw new DevctxError("CONFLICT", "Installed skill changed before removal");
+        if (now.status !== "remove") throw new DevtwinError("CONFLICT", "Installed skill changed before removal");
       }
       journal.started.push(i);
       await atomicReplace(journalPath, journalBytes(journal));
@@ -262,7 +262,7 @@ async function closeRun(roots, pilot, id, journal, recovery) {
   if (!ourJournal(pilot, id, journal)) {
     const kept = join(roots.stateRoot, "runs", id, "journal.released.json");
     assertWritable(roots, [kept]);
-    if (info(kept)) throw new DevctxError("CONFLICT", "Released journal already exists", { runId: id });
+    if (info(kept)) throw new DevtwinError("CONFLICT", "Released journal already exists", { runId: id });
     await rename(path, kept);
     fsyncDir(dirname(path));
     return;
@@ -287,7 +287,7 @@ export async function applyRecovery(roots, pilot, { fingerprint, release = false
         for (const [name, kind] of [[SKILL, "skill"], [RECEIPT, "receipt"]]) {
           if (hashOf(join(entry.path, name)) === entry.new[name]) continue;
           const body = await readPrivateBytes(join(copies, action.index + "-new-" + kind), FILE_LIMIT);
-          if (sha256(body) !== entry.new[name]) throw new DevctxError("INTEGRITY", "Run folder copy changed");
+          if (sha256(body) !== entry.new[name]) throw new DevtwinError("INTEGRITY", "Run folder copy changed");
           await atomicReplace(join(entry.path, name), body);
         }
         journal.completed.push(entry);
@@ -317,7 +317,7 @@ function legacyEntries(home) {
   for (const [agent, rel] of Object.entries(LEGACY_HOMES)) {
     const dir = join(home, rel), st = info(dir);
     if (!st?.isDirectory() || st.isSymbolicLink()) continue;
-    for (const name of readdirSync(dir).sort()) if (name.startsWith("devctx-")) found.push({ agent, skill: name, path: join(dir, name) });
+    for (const name of readdirSync(dir).sort()) if (name.startsWith("devtwin-")) found.push({ agent, skill: name, path: join(dir, name) });
   }
   return found;
 }

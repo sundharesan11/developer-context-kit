@@ -1,5 +1,5 @@
 {
-  "name": "developer-context-kit",
+  "name": "devtwin",
   "version": "0.0.0-local",
   "private": true,
   "license": "Apache-2.0",
@@ -12,6 +12,6 @@
     "node": ">=22.13.0"
   },
   "bin": {
-    "devctx": "bin/devctx.mjs"
+    "devtwin": "bin/devtwin.mjs"
   }
 }

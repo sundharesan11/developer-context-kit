@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "devctx binding v1",
+  "title": "devtwin binding v1",
   "type": "object",
   "required": [
     "schemaVersion",

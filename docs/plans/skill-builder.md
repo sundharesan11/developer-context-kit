@@ -24,7 +24,7 @@ Do not introduce a web app, scheduler, database, marketplace or publishing servi
 
 ```text
 docs/plans/skill-builder.md                 # this design; generic, tracked
-skills/devctx-create-skill/
+skills/devtwin-create-skill/
   SKILL.md                                # shared conversational entrypoint
   references/
     skill-format.md                       # concise format and authoring contract

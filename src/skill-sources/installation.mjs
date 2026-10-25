@@ -14,7 +14,7 @@ import {exact, fail, sourceOperation, loadSourcePackage, validateSourceMapping, 
 
 export const SOURCE_LAYOUTS = Object.freeze({claude: ".claude/skills", codex: ".agents/skills"});
 const DECISION = /^dc_[a-z0-9_-]{8,64}$/, HASH = /^sha256:[0-9a-f]{64}$/;
-const marker = ".devctx-owned.json";
+const marker = ".devtwin-owned.json";
 const decisionId = (id) => { if (!DECISION.test(id ?? "")) fail("INVALID_ID"); return id; };
 const contentResponse = (hash) => `Approved source content ${hash} with caller-supplied-unverified pin`;
 function interaction(ref) { if (typeof ref !== "string" || !/^user:[A-Za-z0-9._:-]{1,120}$/.test(ref)) fail(); }

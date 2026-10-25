@@ -9,14 +9,14 @@ sidebar:
 ---
 
 :::note[Coming soon]
-Identity routing is designed but **not shipped**. None of the `account` or `connect` commands on this page exist in the CLI today; `node bin/devctx.mjs help` does not list them. This page describes the intended design and workflow so you can see where devctx is going. Names and details may change before release. Track progress on the [roadmap](/docs/project/roadmap/).
+Identity routing is designed but **not shipped**. None of the `account` or `connect` commands on this page exist in the CLI today; `node bin/devtwin.mjs help` does not list them. This page describes the intended design and workflow so you can see where devtwin is going. Names and details may change before release. Track progress on the [roadmap](/docs/project/roadmap/).
 :::
 
 ## The problem
 
 If you work for more than one organization, each has its own GitHub organization and Slack workspace. Today an agent uses whichever account a tool happens to be logged into. One wrong pick posts as the wrong person, or into the wrong company.
 
-Identity routing lets the **project decide the account**. You bind each [scope](/docs/concepts/scopes-and-projects/) to its own GitHub and Slack accounts once. Inside a bound project, devctx picks that scope's account, loads its credential from outside the store, checks the live identity on every call, and refuses any mismatch.
+Identity routing lets the **project decide the account**. You bind each [scope](/docs/concepts/scopes-and-projects/) to its own GitHub and Slack accounts once. Inside a bound project, devtwin picks that scope's account, loads its credential from outside the store, checks the live identity on every call, and refuses any mismatch.
 
 ## What it will do
 
@@ -53,11 +53,11 @@ A scope gets at most one GitHub account and one Slack account. A binding records
 
 Numeric IDs survive renames, so the binding stores no display names. A binding never contains a credential.
 
-### Credentials stay outside devctx's files
+### Credentials stay outside devtwin's files
 
-At call time devctx will look for the credential in exactly two places, in order:
+At call time devtwin will look for the credential in exactly two places, in order:
 
-1. An environment variable named for that one binding: `DEVCTX_SECRET_<SCOPE>__<ID>` (scope, double underscore, binding ID, upper-cased, `-` as `_`).
+1. An environment variable named for that one binding: `DEVTWIN_SECRET_<SCOPE>__<ID>` (scope, double underscore, binding ID, upper-cased, `-` as `_`).
 2. The macOS keychain item named by the binding's secret reference.
 
 It will never read `GH_TOKEN`, `GITHUB_TOKEN`, `SLACK_TOKEN`, the `gh` CLI or Git credential stores. A global token applies to every scope, which is exactly the cross-organization leak routing prevents. A credential never reaches a record, receipt, draft, plan, error, log or standard output.
@@ -79,7 +79,7 @@ connect read|draft --scope S --cwd W --provider P
   → read, or preview/save the draft
 ```
 
-- The scope is always explicit, as for every devctx call. There is no `--account` flag to get wrong.
+- The scope is always explicit, as for every devtwin call. There is no `--account` flag to get wrong.
 - The identity check runs with the same credential the operation uses, on every call. Results are never cached.
 - A GitHub target must be one of the bound project's own remotes, owned by the bound organization. A Slack channel must belong to the bound workspace.
 
@@ -96,16 +96,16 @@ These commands are the planned shape. They do not run today.
 
    ```sh
    # Planned, not available yet
-   devctx account discover --scope alpha --id alpha-github --provider github --secret keychain:devctx/alpha-github
+   devtwin account discover --scope alpha --id alpha-github --provider github --secret keychain:devtwin/alpha-github
    ```
 
 3. **Bind it**, in your own terminal, with preview, fingerprint and typed confirmation:
 
    ```sh
    # Planned, not available yet
-   devctx account add --scope alpha --provider github --id alpha-github \
+   devtwin account add --scope alpha --provider github --id alpha-github \
      --account-id <id> --workspace <org id> --actor github:<login> \
-     --secret keychain:devctx/alpha-github --allow read,draft
+     --secret keychain:devtwin/alpha-github --allow read,draft
    ```
 
 4. **Check it**: `account whoami --scope alpha --id alpha-github` runs the identity gate for a bound account. `account list --scope alpha` shows bindings and approval state.
@@ -113,11 +113,11 @@ These commands are the planned shape. They do not run today.
 
    ```sh
    # Planned, not available yet
-   devctx connect read --scope alpha --cwd "$REPO" --provider github --open-prs
-   devctx connect draft --scope alpha --cwd "$REPO" --provider slack --target <channel> --body-file <file>
+   devtwin connect read --scope alpha --cwd "$REPO" --provider github --open-prs
+   devtwin connect draft --scope alpha --cwd "$REPO" --provider slack --target <channel> --body-file <file>
    ```
 
-A new bundled skill, `devctx-connect`, will tell agents to use these routes for bound projects, never to run `account add` or `account remove` with `--apply`, and to stop on `AUTH_MISMATCH` or `TARGET_MISMATCH`.
+A new bundled skill, `devtwin-connect`, will tell agents to use these routes for bound projects, never to run `account add` or `account remove` with `--apply`, and to stop on `AUTH_MISMATCH` or `TARGET_MISMATCH`.
 
 ### Public-read GitHub token for the stack watch
 
@@ -129,7 +129,7 @@ One optional, scope-free GitHub binding is planned only to raise rate limits for
 - No OAuth flow, app install or token creation. You create tokens yourself.
 - No Slack Enterprise Grid, bot or rotating tokens, and no GitHub App installation tokens at first.
 - No 1Password or Bitwarden resolution yet.
-- No change to tools devctx does not run. A GitHub or Slack MCP server, `gh` or Git the agent also has still uses whatever account it is logged into. A routed launcher (`devctx exec … -- gh …`) is the planned follow-up.
+- No change to tools devtwin does not run. A GitHub or Slack MCP server, `gh` or Git the agent also has still uses whatever account it is logged into. A routed launcher (`devtwin exec … -- gh …`) is the planned follow-up.
 - Routing protects against mistakes, not against a misbehaving agent with a shell: that agent can read the same keychain items and variables.
 
 ## What exists today

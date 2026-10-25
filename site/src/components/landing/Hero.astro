@@ -9,12 +9,12 @@ import CrtGlass from './CrtGlass.astro';
     <div class="hero-copy">
       <a class="eyebrow" href="#open-source"><b>Open source</b> Apache-2.0 · local-first CLI + harness</a>
       <h1 id="hero-title" data-decode data-decode-delay="360">Clone the <em>developer.</em></h1>
-      <p class="lede">devctx carries everything that makes you effective on a project — <strong>decisions, constraints, commands, handoffs and the right accounts</strong> — into every coding-agent session. On your disk. In every org you work for.</p>
+      <p class="lede">devtwin carries everything that makes you effective on a project — <strong>decisions, constraints, commands, handoffs and the right accounts</strong> — into every coding-agent session. On your disk. In every org you work for.</p>
       <div class="hero-actions">
         <!-- TODO: confirm install command at release -->
         <div class="install" role="group" aria-label="Install command">
-          <span><span class="prompt" aria-hidden="true">$ </span><span class="install-text">npx devctx init</span></span>
-          <button class="copy" type="button" data-copy="npx devctx init">Copy</button>
+          <span><span class="prompt" aria-hidden="true">$ </span><span class="install-text">npx devtwin init</span></span>
+          <button class="copy" type="button" data-copy="npx devtwin init">Copy</button>
         </div>
         <!-- TODO: confirm the GitHub org/user (sundharesan11) at release -->
         <a class="btn btn-primary" href={DOCS.installation}>Get started <span aria-hidden="true">→</span></a>
@@ -31,13 +31,13 @@ import CrtGlass from './CrtGlass.astro';
       <div class="stage-inner">
         <div class="stage-bar" aria-hidden="true">
           <span class="dots"><i></i><i></i><i></i></span>
-          <span class="t">devctx · session start</span>
+          <span class="t">devtwin · session start</span>
           <span class="live">context flowing</span>
         </div>
 
         <!-- Desktop diagram -->
         <svg class="diagram diagram-d" viewBox="0 0 1120 600" role="img" aria-labelledby="dd-title dd-desc">
-          <title id="dd-title">How context flows through devctx</title>
+          <title id="dd-title">How context flows through devtwin</title>
           <desc id="dd-desc">Six kinds of record — decision, fact, constraint, command, unknown and handoff — stream into a bounded brief beside the developer. The brief fans out to Claude Code and Codex. Below, two organisation lanes, acme and globex, each light up their own GitHub and Slack identity when that org's project is active.</desc>
 
           <text class="d-label" x="40" y="62">RECORDS</text>
@@ -114,7 +114,7 @@ import CrtGlass from './CrtGlass.astro';
             <path class="d-win-bar" d="M861 104 H1071 A11 11 0 0 1 1082 115 V132 H850 V115 A11 11 0 0 1 861 104Z"/>
             <circle cx="866" cy="118" r="3.5" fill="#2a3349"/><circle cx="878" cy="118" r="3.5" fill="#2a3349"/><circle cx="890" cy="118" r="3.5" fill="#2a3349"/>
             <text class="d-win-t" x="904" y="122">Claude Code</text>
-            <text class="d-acc" x="864" y="156">›</text><text class="d-txt" x="878" y="156">/devctx-resume</text>
+            <text class="d-acc" x="864" y="156">›</text><text class="d-txt" x="878" y="156">/devtwin-resume</text>
             <text class="d-ok" x="864" y="180">✓</text><text class="d-txt" x="878" y="180">brief loaded · 14 records</text>
             <text class="d-txt" x="864" y="204" style="fill:#808aa2">picking up retry backoff…</text>
 
@@ -122,7 +122,7 @@ import CrtGlass from './CrtGlass.astro';
             <path class="d-win-bar" d="M861 288 H1071 A11 11 0 0 1 1082 299 V316 H850 V299 A11 11 0 0 1 861 288Z"/>
             <circle cx="866" cy="302" r="3.5" fill="#2a3349"/><circle cx="878" cy="302" r="3.5" fill="#2a3349"/><circle cx="890" cy="302" r="3.5" fill="#2a3349"/>
             <text class="d-win-t" x="904" y="306">Codex</text>
-            <text class="d-acc" x="864" y="340">›</text><text class="d-txt" x="878" y="340">devctx-resume</text>
+            <text class="d-acc" x="864" y="340">›</text><text class="d-txt" x="878" y="340">devtwin-resume</text>
             <text class="d-ok" x="864" y="364">✓</text><text class="d-txt" x="878" y="364">same brief · 14 records</text>
             <text class="d-txt" x="864" y="388" style="fill:#808aa2">constraint noted: no billing…</text>
           </g>
@@ -206,11 +206,11 @@ import CrtGlass from './CrtGlass.astro';
           <rect class="d-win" x="20" y="352" width="152" height="84" rx="10"/>
           <text class="d-win-t" x="34" y="376">Claude Code</text>
           <text class="d-ok" x="34" y="402">✓</text><text class="d-txt" x="48" y="402" style="font-size:11px">brief loaded</text>
-          <text class="d-txt" x="34" y="422" style="font-size:11px;fill:#808aa2">/devctx-resume</text>
+          <text class="d-txt" x="34" y="422" style="font-size:11px;fill:#808aa2">/devtwin-resume</text>
           <rect class="d-win" x="188" y="352" width="152" height="84" rx="10"/>
           <text class="d-win-t" x="202" y="376">Codex</text>
           <text class="d-ok" x="202" y="402">✓</text><text class="d-txt" x="216" y="402" style="font-size:11px">same brief</text>
-          <text class="d-txt" x="202" y="422" style="font-size:11px;fill:#808aa2">devctx-resume</text>
+          <text class="d-txt" x="202" y="422" style="font-size:11px;fill:#808aa2">devtwin-resume</text>
 
           <text class="d-label" x="20" y="474">ACCOUNTS</text>
           <g class="lane lane-acme">

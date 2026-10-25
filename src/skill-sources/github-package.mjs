@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { ACQUISITION_LIMITS as L, ASSESSMENT, validateSelection, validateManifest, manifestFingerprint, gitBlobSha } from "./selection.mjs";
 
-const fail = (code, message, details = {}) => { throw new DevctxError(code, message, details); };
+const fail = (code, message, details = {}) => { throw new DevtwinError(code, message, details); };
 const object = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const sha = (v) => typeof v === "string" && /^[0-9a-f]{40}$/.test(v);
 const asciiFold = (v) => v.replace(/[A-Z]/g, (c) => c.toLowerCase());
@@ -31,13 +31,13 @@ function client(source, request) {
     const controller = new AbortController();
     let timeoutReject;
     const timeout = new Promise((_, reject) => { timeoutReject = reject; });
-    const timer = setTimeout(() => { controller.abort(); timeoutReject(new DevctxError("NETWORK_TIMEOUT", "GitHub request deadline exceeded")); }, remaining);
+    const timer = setTimeout(() => { controller.abort(); timeoutReject(new DevtwinError("NETWORK_TIMEOUT", "GitHub request deadline exceeded")); }, remaining);
     let response, reader;
     try {
       try {
-        response = await Promise.race([request(stem + path, {headers: {Accept: "application/vnd.github+json", "User-Agent": "devctx-skill-sources"}, signal: controller.signal, redirect: "manual"}), timeout]);
+        response = await Promise.race([request(stem + path, {headers: {Accept: "application/vnd.github+json", "User-Agent": "devtwin-skill-sources"}, signal: controller.signal, redirect: "manual"}), timeout]);
       } catch (e) {
-        if (e instanceof DevctxError) throw e;
+        if (e instanceof DevtwinError) throw e;
         fail(controller.signal.aborted ? "NETWORK_TIMEOUT" : "NETWORK_UNAVAILABLE", "GitHub request failed");
       }
       if (!response || !Number.isInteger(response.status) || typeof response.headers?.get !== "function") fail("UPSTREAM_INVALID", "Invalid GitHub response");
@@ -53,7 +53,7 @@ function client(source, request) {
       while (true) {
         let chunk;
         try { chunk = await Promise.race([reader.read(), timeout]); }
-        catch (e) { if (e instanceof DevctxError) throw e; fail(controller.signal.aborted ? "NETWORK_TIMEOUT" : "UPSTREAM_INVALID", "GitHub body read failed"); }
+        catch (e) { if (e instanceof DevtwinError) throw e; fail(controller.signal.aborted ? "NETWORK_TIMEOUT" : "UPSTREAM_INVALID", "GitHub body read failed"); }
         if (chunk.done) break;
         if (!(chunk.value instanceof Uint8Array)) fail("UPSTREAM_INVALID", "Invalid GitHub body chunk");
         size += chunk.value.byteLength; transferred += chunk.value.byteLength;

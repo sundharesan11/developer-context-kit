@@ -3,17 +3,17 @@ title: Contributing
 description: Set up a development checkout, run the tests and package audit, and keep your changes public-safe.
 ---
 
-Contributions are welcome. devctx keeps reusable code separate from private working data, so the main things to get right are tests, approval boundaries and keeping private information out of the repository.
+Contributions are welcome. devtwin keeps reusable code separate from private working data, so the main things to get right are tests, approval boundaries and keeping private information out of the repository.
 
 Before you implement a change that weakens the pilot fence, adds a live connector or alters an approval contract, open an issue to discuss it.
 
 ## Set up
 
 ```sh
-git clone https://github.com/sundharesan11/developer-context-kit.git
-cd developer-context-kit
+git clone https://github.com/sundharesan11/devtwin.git
+cd devtwin
 node --version   # 22.13 or later
-node bin/devctx.mjs help
+node bin/devtwin.mjs help
 ```
 
 There are no third-party runtime dependencies and no install step.
@@ -37,7 +37,7 @@ git diff --check
 The acceptance harness builds synthetic repositories, isolated roots and fake agent homes, then exercises onboarding, records, handoffs, installs, the personal profile, the stack watch (against offline fixtures), templates and packaging. It makes no network requests.
 
 ```sh
-ACCEPTANCE_PARENT="$(mktemp -d /tmp/devctx-acceptance.XXXXXX)"
+ACCEPTANCE_PARENT="$(mktemp -d /tmp/devtwin-acceptance.XXXXXX)"
 ACCEPTANCE_PARENT="$(cd "$ACCEPTANCE_PARENT" && pwd -P)"
 node scripts/acceptance.mjs \
   --pilot-root "$ACCEPTANCE_PARENT/pilot" \
@@ -69,7 +69,7 @@ A catalog entry references an upstream project; it is not a reviewed installatio
 
 ## License
 
-devctx is licensed under [Apache-2.0](https://github.com/sundharesan11/developer-context-kit/blob/main/LICENSE). Submit only material you have the right to contribute. Contributions you intentionally submit are covered by the license's contribution terms unless stated otherwise.
+devtwin is licensed under [Apache-2.0](https://github.com/sundharesan11/devtwin/blob/main/LICENSE). Submit only material you have the right to contribute. Contributions you intentionally submit are covered by the license's contribution terms unless stated otherwise.
 
 ## Security issues
 

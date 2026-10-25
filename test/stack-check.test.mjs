@@ -227,7 +227,7 @@ test("a feed that fails to fetch produces a failed item with a typed reason and 
   const result = await check(p, fakeNet({ [ATOM]: { status: 503 } }));
   const widget = result.items.find((i) => i.name === "widget");
   assert.equal(widget.status, "failed");
-  assert.equal(failureOf(result, "widget").code, "DEVCTX_UPSTREAM_UNAVAILABLE");
+  assert.equal(failureOf(result, "widget").code, "DEVTWIN_UPSTREAM_UNAVAILABLE");
   assert.equal(result.entries.filter((e) => e.item === "widget").length, 0);
   assert.deepEqual(result.notWatched, ["lonely-tool"]);
   const lonely = result.items.find((i) => i.name === "lonely-tool");
@@ -240,10 +240,10 @@ test("a feed with a DOCTYPE or over the byte, depth or entry caps fails that ite
   const p = await ready(t);
   const deep = "<x>".repeat(40) + "</x>".repeat(40);
   const cases = [
-    [`<?xml version="1.0"?><!DOCTYPE rss [<!ENTITY a "b">]><rss version="2.0"><channel><item><title>&a;</title></item></channel></rss>`, "DEVCTX_FEED_INVALID"],
-    [`<rss version="2.0"><channel><item><title>${deep}</title></item></channel></rss>`, "DEVCTX_FEED_LIMIT"],
-    [`<rss version="2.0"><channel>${"<item><title>a</title></item>".repeat(201)}</channel></rss>`, "DEVCTX_FEED_LIMIT"],
-    ["<rss version=\"2.0\"><channel>" + " ".repeat(1048577) + "</channel></rss>", "DEVCTX_RESPONSE_TOO_LARGE"]
+    [`<?xml version="1.0"?><!DOCTYPE rss [<!ENTITY a "b">]><rss version="2.0"><channel><item><title>&a;</title></item></channel></rss>`, "DEVTWIN_FEED_INVALID"],
+    [`<rss version="2.0"><channel><item><title>${deep}</title></item></channel></rss>`, "DEVTWIN_FEED_LIMIT"],
+    [`<rss version="2.0"><channel>${"<item><title>a</title></item>".repeat(201)}</channel></rss>`, "DEVTWIN_FEED_LIMIT"],
+    ["<rss version=\"2.0\"><channel>" + " ".repeat(1048577) + "</channel></rss>", "DEVTWIN_RESPONSE_TOO_LARGE"]
   ];
   for (const [body, code] of cases) {
     const result = await check(p, fakeNet({ [ATOM]: { type: "application/atom+xml", body } }));
@@ -267,7 +267,7 @@ test("a feed host that resolves to a loopback or private address is refused with
   for (const address of ["127.0.0.1", "10.0.0.7", "fd00::1", "169.254.169.254"]) {
     const net = fakeNet({}, { addresses: { "updates.example.com": address } });
     const result = await check(p, net);
-    assert.equal(failureOf(result, "widget").code, "DEVCTX_PATH_UNSAFE");
+    assert.equal(failureOf(result, "widget").code, "DEVTWIN_PATH_UNSAFE");
     assert.ok(net.lookups.includes("updates.example.com"));
     assert.ok(!net.log.some((r) => r.url === ATOM), address);
   }
@@ -290,11 +290,11 @@ test("a gzip response fails that item with a typed code and every request carrie
   const p = await ready(t, { args: ["--with", "advisories", "--with", "lifecycle", "--with", "versions"] });
   const net = fakeNet({ [JSONF]: { type: "application/feed+json", headers: { "content-encoding": "gzip" }, body: "x" } });
   const result = await check(p, net);
-  assert.equal(failureOf(result, "gadget").code, "DEVCTX_ENCODING_REFUSED");
+  assert.equal(failureOf(result, "gadget").code, "DEVTWIN_ENCODING_REFUSED");
   assert.ok(net.log.length >= 6);
   for (const r of net.log) {
     assert.equal(r.headers["Accept-Encoding"], "identity");
-    assert.equal(r.headers["User-Agent"], "devctx-stack-check");
+    assert.equal(r.headers["User-Agent"], "devtwin-stack-check");
   }
 });
 
@@ -302,7 +302,7 @@ test("a 429 from one host reports those items as rate limited while other items 
   const p = await ready(t);
   const result = await check(p, fakeNet({ [RELEASES]: { status: 429, headers: { "retry-after": "60" } } }));
   const failure = failureOf(result, "acme-sdk", "github-release");
-  assert.equal(failure.code, "DEVCTX_RATE_LIMITED");
+  assert.equal(failure.code, "DEVTWIN_RATE_LIMITED");
   assert.equal(failure.details.retryAfterSeconds, 60);
   assert.equal(result.items.find((i) => i.name === "acme-sdk").status, "partial");
   assert.ok(result.entries.some((e) => e.item === "widget"));
@@ -316,9 +316,9 @@ test("oversized bodies, redirects and unexpected content types fail per item wit
     [JSONF]: { type: "text/html", body: "<html></html>" },
     [RSS]: { type: "application/rss+xml", body: "x".repeat(1048577) }
   }));
-  assert.equal(failureOf(result, "widget").code, "DEVCTX_REDIRECT_REFUSED");
-  assert.equal(failureOf(result, "gadget").code, "DEVCTX_CONTENT_TYPE_REFUSED");
-  assert.equal(failureOf(result, "acme-sdk", "feed").code, "DEVCTX_RESPONSE_TOO_LARGE");
+  assert.equal(failureOf(result, "widget").code, "DEVTWIN_REDIRECT_REFUSED");
+  assert.equal(failureOf(result, "gadget").code, "DEVTWIN_CONTENT_TYPE_REFUSED");
+  assert.equal(failureOf(result, "acme-sdk", "feed").code, "DEVTWIN_RESPONSE_TOO_LARGE");
   assert.ok(result.entries.some((e) => e.sourceKind === "github-release"));
 });
 
@@ -363,7 +363,7 @@ test("a request to a host not in the approval is never made", async (t) => {
   // The catalog now names a new feed, so the approval no longer matches and nothing is fetched.
   const changed = { version: 1, items: CATALOG.items.map((i) => i.name === "widget" ? { ...i, feeds: ["https://other.example.org/atom.xml"] } : i) };
   const net = fakeNet();
-  await assert.rejects(runStackCheck(p.roots, {}, { ...deps(net), catalog: validateStackCatalog(changed) }), (e) => e.code === "DEVCTX_APPROVAL_REQUIRED");
+  await assert.rejects(runStackCheck(p.roots, {}, { ...deps(net), catalog: validateStackCatalog(changed) }), (e) => e.code === "DEVTWIN_APPROVAL_REQUIRED");
   assert.equal(net.log.length, 0);
   assert.equal(net.lookups.length, 0);
   const result = await check(p, net);
@@ -372,7 +372,7 @@ test("a request to a host not in the approval is never made", async (t) => {
   const direct = fakeNet();
   const fetcher = createFetcher({ request: direct.request, lookup: direct.lookup, hosts: ["changelog.example.com"] });
   for (const url of ["https://other.example.org/atom.xml", "http://changelog.example.com/feed.xml", "https://changelog.example.com:8443/feed.xml"]) {
-    await assert.rejects(fetcher.fetchResource(url, { accept: "*/*", types: ["application/rss+xml"] }), (e) => e.code === "DEVCTX_HOST_NOT_APPROVED", url);
+    await assert.rejects(fetcher.fetchResource(url, { accept: "*/*", types: ["application/rss+xml"] }), (e) => e.code === "DEVTWIN_HOST_NOT_APPROVED", url);
   }
   assert.equal(direct.log.length + direct.lookups.length, 0);
 });
@@ -395,8 +395,8 @@ test("the routed public-read value goes only to api.github.com and never appears
   assert.ok(!out.text.includes(BINDING_VALUE));
 });
 
-test("with GH_TOKEN, GITHUB_TOKEN and DEVCTX_GITHUB_TOKEN set and no routed binding, no request carries an Authorization header", async (t) => {
-  const names = ["GH_TOKEN", "GITHUB_TOKEN", "DEVCTX_GITHUB_TOKEN"];
+test("with GH_TOKEN, GITHUB_TOKEN and DEVTWIN_GITHUB_TOKEN set and no routed binding, no request carries an Authorization header", async (t) => {
+  const names = ["GH_TOKEN", "GITHUB_TOKEN", "DEVTWIN_GITHUB_TOKEN"];
   const saved = names.map((n) => [n, process.env[n]]);
   t.after(() => { for (const [n, v] of saved) if (v === undefined) delete process.env[n]; else process.env[n] = v; });
   const env = {};
@@ -414,18 +414,18 @@ test("with GH_TOKEN, GITHUB_TOKEN and DEVCTX_GITHUB_TOKEN set and no routed bind
 test("when the resolver refuses the public-read value with TOKEN_TOO_BROAD the run falls back to unauthenticated, reports once and the next run asks for approval", async (t) => {
   let refused = false;
   const resolvePublicRead = async (q) => {
-    if (q.reveal || refused) { refused = true; const { DevctxError } = await import("../src/errors.mjs"); throw new DevctxError("TOKEN_TOO_BROAD", "Binding can see a private repository"); }
+    if (q.reveal || refused) { refused = true; const { DevtwinError } = await import("../src/errors.mjs"); throw new DevtwinError("TOKEN_TOO_BROAD", "Binding can see a private repository"); }
     return { bound: true };
   };
   const p = await ready(t, { options: { resolvePublicRead } });
   const net = fakeNet();
   const result = await check(p, net, {}, { resolvePublicRead });
   assert.equal(result.authentication.used, "unauthenticated");
-  assert.equal(result.authentication.refused, "DEVCTX_TOKEN_TOO_BROAD");
-  assert.equal(JSON.stringify(result).split("DEVCTX_TOKEN_TOO_BROAD").length - 1, 1);
+  assert.equal(result.authentication.refused, "DEVTWIN_TOKEN_TOO_BROAD");
+  assert.equal(JSON.stringify(result).split("DEVTWIN_TOKEN_TOO_BROAD").length - 1, 1);
   assert.ok(net.log.some((r) => r.url === RELEASES));
   for (const r of net.log) assert.ok(!(AUTH in r.headers));
-  await assert.rejects(check(p, fakeNet(), {}, { resolvePublicRead }), (e) => e.code === "DEVCTX_APPROVAL_REQUIRED" && e.details.differences.includes("authentication"));
+  await assert.rejects(check(p, fakeNet(), {}, { resolvePublicRead }), (e) => e.code === "DEVTWIN_APPROVAL_REQUIRED" && e.details.differences.includes("authentication"));
 });
 
 test("stack check refuses with APPROVAL_REQUIRED when there is no approval and makes no request", async (t) => {
@@ -434,7 +434,7 @@ test("stack check refuses with APPROVAL_REQUIRED when there is no approval and m
   const net = fakeNet();
   const out = await cli(p, ["stack", "check"], { request: net.request, lookup: net.lookup });
   assert.equal(out.json.ok, false);
-  assert.equal(out.json.error.code, "DEVCTX_APPROVAL_REQUIRED");
+  assert.equal(out.json.error.code, "DEVTWIN_APPROVAL_REQUIRED");
   assert.equal(net.log.length + net.lookups.length, 0);
 });
 
@@ -456,13 +456,13 @@ test("stack check is listed in help", async () => {
 });
 
 test("with a live config and before the watch's live-mode entry lands, stack check fails with GATE_REQUIRED and makes no request", async (t) => {
-  const sb = await sandbox(t), home = join(sb, "home"), devctx = join(home, ".devctx");
+  const sb = await sandbox(t), home = join(sb, "home"), devtwin = join(home, ".devtwin");
   for (const rel of [".claude/skills", ".agents/skills"]) await mkdir(join(home, rel), { recursive: true });
-  await mkdir(devctx);
-  await chmod(devctx, 0o700);
-  const kit = await makeRepo(join(devctx, "kit"), { "README.md": "kit\n" });
+  await mkdir(devtwin);
+  await chmod(devtwin, 0o700);
+  const kit = await makeRepo(join(devtwin, "kit"), { "README.md": "kit\n" });
   await fixtureGit(kit, ["checkout", "-q", "--detach"]);
-  const liveConfig = join(devctx, "live.json");
+  const liveConfig = join(devtwin, "live.json");
   const run = (args, extra = {}) => { const chunks = []; return main(args, { stdout: { write(v) { chunks.push(v); return true; } }, now, home, env: {}, kitRoot: kit, ...extra }).then((code) => ({ code, json: JSON.parse(chunks.join("")) })); };
   const preview = await run(["live", "init", "--pilot", liveConfig, "--agent", "claude"]);
   assert.equal(preview.json.ok, true, JSON.stringify(preview.json));
@@ -471,7 +471,7 @@ test("with a live config and before the watch's live-mode entry lands, stack che
   const net = fakeNet();
   const out = await run(["stack", "check", "--pilot", liveConfig], { request: net.request, lookup: net.lookup, stackCatalog: CATALOG });
   assert.equal(out.json.ok, false);
-  assert.equal(out.json.error.code, "DEVCTX_GATE_REQUIRED");
+  assert.equal(out.json.error.code, "DEVTWIN_GATE_REQUIRED");
   assert.equal(out.json.error.details.field, "live");
   assert.equal(out.json.error.details.reason, "no-live-exception");
   assert.equal(net.log.length + net.lookups.length, 0);

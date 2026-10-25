@@ -1,19 +1,19 @@
 ---
 title: Handoffs
-description: Leave a handoff note for your next session, or export selected records as a private Markdown packet for someone who doesn't use devctx.
+description: Leave a handoff note for your next session, or export selected records as a private Markdown packet for someone who doesn't use devtwin.
 ---
 
-A handoff carries work from one session to the next. `devctx` supports two kinds:
+A handoff carries work from one session to the next. `devtwin` supports two kinds:
 
 - A **handoff record** is a note for the next session, yours or an agent's, that shows up in the project brief.
-- A **handoff export** is a Markdown file built from records you select, readable by someone who doesn't have `devctx`.
+- A **handoff export** is a Markdown file built from records you select, readable by someone who doesn't have `devtwin`.
 
 ## Leave a note for the next session
 
 Before you stop, record where you are as a `handoff` record. A useful handoff says what you last verified, what changed, what to do next and what is blocking you:
 
 ```sh
-devctx record add --pilot "$PILOT" --scope example --project example.atlas \
+devtwin record add --pilot "$PILOT" --scope example --project example.atlas \
   --kind handoff --title "Handoff: search paging" \
   --body-file "$DEMO/inputs/handoff-search.md" \
   --source commit:1791ed0 \
@@ -36,7 +36,7 @@ With the bundled skills installed, you can ask your agent to leave the handoff f
 `handoff export` writes a self-contained Markdown file from the records you name. The recipient needs nothing installed to read it.
 
 ```sh
-devctx handoff export --pilot "$PILOT" --scope example --cwd "$REPO" \
+devtwin handoff export --pilot "$PILOT" --scope example --cwd "$REPO" \
   --record rec_42cda2baa21c74516c2d593c \
   --record rec_9fdf36bf44a7336f4c65eab5 \
   --as-of 2026-10-25T00:00:00.000Z \
@@ -53,10 +53,10 @@ devctx handoff export --pilot "$PILOT" --scope example --cwd "$REPO" \
 | --- | --- |
 | `--record` | A record ID to include. Repeat it for each record, up to 12. There is no "export everything" option. |
 | `--as-of` | Required. A UTC timestamp with milliseconds, such as `2026-10-25T00:00:00.000Z`. It is the date used to judge review dates, not a snapshot of the past. |
-| `--out` | A new file directly inside `<dataRoot>/exports/handoffs/<scope>/<project>/`. The name is 1 to 64 lowercase letters, digits, `.`, `_` or `-`, starting with a letter or digit, and ends in `.handoff.md`. An existing file is never overwritten; the export fails with `DEVCTX_CONFLICT`. |
+| `--out` | A new file directly inside `<dataRoot>/exports/handoffs/<scope>/<project>/`. The name is 1 to 64 lowercase letters, digits, `.`, `_` or `-`, starting with a letter or digit, and ends in `.handoff.md`. An existing file is never overwritten; the export fails with `DEVTWIN_CONFLICT`. |
 | `--cwd` | The worktree to export from. It finds the project, and freshness is checked against this worktree. |
 
-The whole packet, including its header and footer, must fit in 32,768 bytes. A larger packet fails with `DEVCTX_LIMIT` and nothing is written; nothing is truncated.
+The whole packet, including its header and footer, must fit in 32,768 bytes. A larger packet fails with `DEVTWIN_LIMIT` and nothing is written; nothing is truncated.
 
 ### What's in the packet
 
@@ -71,13 +71,13 @@ Some things never go into a packet: your preferences and personal profile, scope
 
 ### What holds an export
 
-`devctx` would rather refuse than rewrite your text. An export fails, and writes nothing, when a selected record:
+`devtwin` would rather refuse than rewrite your text. An export fails, and writes nothing, when a selected record:
 
 | Problem | Error |
 | --- | --- |
-| Is missing, proposed, superseded, or belongs to another project | `DEVCTX_RECORD_NOT_EXPORTABLE` |
-| Contains text that looks like a credential | `DEVCTX_SENSITIVE_CONTENT` |
-| Contains a URL, an absolute or home path, a token starting with `/`, an email address or an account reference | `DEVCTX_HANDOFF_UNSAFE` |
+| Is missing, proposed, superseded, or belongs to another project | `DEVTWIN_RECORD_NOT_EXPORTABLE` |
+| Contains text that looks like a credential | `DEVTWIN_SENSITIVE_CONTENT` |
+| Contains a URL, an absolute or home path, a token starting with `/`, an email address or an account reference | `DEVTWIN_HANDOFF_UNSAFE` |
 
 To export such a record, supersede it with a version that leaves out the problem text, then select the new record. Nothing selects the successor automatically.
 

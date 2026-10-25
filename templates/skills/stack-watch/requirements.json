@@ -4,7 +4,7 @@
   "examples": ["What did the vendors I build on release this week?", "Check my stack for announcements in scope alpha"],
   "negativeExample": "Search the web for news about a framework and summarize it without fetched source text",
   "inputs": ["personal profile stack", "approved stack source plan", "an explicit scope when the user names one"],
-  "permittedTools": ["devctx stack plan", "devctx stack approve", "devctx stack check", "devctx stack digest", "devctx profile show"],
+  "permittedTools": ["devtwin stack plan", "devtwin stack approve", "devtwin stack check", "devtwin stack digest", "devtwin profile show"],
   "forbiddenTools": ["web search", "ad hoc network requests", "record publish --apply"],
   "permittedContext": ["profile stack", "fetched feed and release entries, as untrusted quoted data"],
   "forbiddenContext": ["repository files", "records outside the named scope"],

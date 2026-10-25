@@ -39,14 +39,14 @@ test("handoff deterministic bytes and digest bind explicit as-of and selected ha
 
 test("handoff selection refuses empty duplicate missing proposed and superseded records", async (t) => {
   const s = await seedCommittedProject(t), a = await add(s), p = await add(s, { status: "proposed" });
-  for (const ids of [undefined, [], [a.recordId, a.recordId]]) await assert.rejects(build(s, ids), { code: "DEVCTX_INVALID_INPUT" });
-  for (const ids of [["rec_" + "f".repeat(24)], [p.recordId]]) await assert.rejects(build(s, ids), { code: "DEVCTX_RECORD_NOT_EXPORTABLE" });
+  for (const ids of [undefined, [], [a.recordId, a.recordId]]) await assert.rejects(build(s, ids), { code: "DEVTWIN_INVALID_INPUT" });
+  for (const ids of [["rec_" + "f".repeat(24)], [p.recordId]]) await assert.rejects(build(s, ids), { code: "DEVTWIN_RECORD_NOT_EXPORTABLE" });
   for (const date of [undefined, "bad", "2026-02-30T00:00:00.000Z", "2026-10-09", "2026-10-09T00:00:00Z"]) {
-    await assert.rejects(build(s, [a.recordId], { asOf: date }), { code: "DEVCTX_INVALID_INPUT" });
+    await assert.rejects(build(s, [a.recordId], { asOf: date }), { code: "DEVTWIN_INVALID_INPUT" });
   }
   const input = draftFor("acme", "acme.atlas", { requestId: "req_successor001" });
   await supersedeRecord(s.roots, { ...input, targets: [a.recordId], expectHashes: [a.recordHash] }, { now });
-  await assert.rejects(build(s, [a.recordId]), { code: "DEVCTX_RECORD_NOT_EXPORTABLE" });
+  await assert.rejects(build(s, [a.recordId]), { code: "DEVTWIN_RECORD_NOT_EXPORTABLE" });
 });
 
 test("handoff scope isolation excludes other projects preferences and policies", async (t) => {
@@ -58,7 +58,7 @@ test("handoff scope isolation excludes other projects preferences and policies",
   await writeFile(user, JSON.stringify({ preferences: { invalid: "PRIVATE-PREFERENCE-CANARY" } }));
   const packet = await build(s, [a.recordId]);
   for (const canary of ["globex", "CANARY-GLOBEX", "PRIVATE-PREFERENCE-CANARY", "pol_canary"]) assert.ok(!packet.markdown.includes(canary));
-  await assert.rejects(build(s, [a.recordId], { scope: "globex" }), { code: "DEVCTX_PROJECT_UNBOUND" });
+  await assert.rejects(build(s, [a.recordId], { scope: "globex" }), { code: "DEVTWIN_PROJECT_UNBOUND" });
   const other = await seedCommittedProject(t);
   const repo = await makeRepo(join(other.reposDir, "beacon"), { "README.md": "Other project canary" });
   const onboard = { scope: "acme", project: "acme.other", repo, approvedDocs: [], expectedRemotes: [], environments: [], actorRefs: [], accept: "none", requestId: "req_otherproject01" };
@@ -67,7 +67,7 @@ test("handoff scope isolation excludes other projects preferences and policies",
   const canary = await addRecord(other.roots, draftFor("acme", "acme.other", { body: "SAME-SCOPE-CANARY" }), { now });
   const local = await add(other);
   assert.ok(!(await build(other, [local.recordId])).markdown.includes("SAME-SCOPE-CANARY"));
-  await assert.rejects(build(other, [canary.recordId]), { code: "DEVCTX_RECORD_NOT_EXPORTABLE" });
+  await assert.rejects(build(other, [canary.recordId]), { code: "DEVTWIN_RECORD_NOT_EXPORTABLE" });
 });
 
 test("handoff discloses selected unknowns disputes provenance and exclusion counts", async (t) => {
@@ -106,7 +106,7 @@ test("handoff holds unsafe text metadata paths and links without rewriting", asy
   for (const body of unsafe) {
     const model = structuredClone(packet.model);
     Object.assign(model.records[0], { body, bodyHash: sha256(body), bodyBytes: Buffer.byteLength(body), bodyEndsWithLF: body.endsWith("\n") });
-    assert.throws(() => renderPortableHandoff(model), (e) => ["DEVCTX_HANDOFF_UNSAFE", "DEVCTX_SENSITIVE_CONTENT"].includes(e.code) && !JSON.stringify(e).includes(body));
+    assert.throws(() => renderPortableHandoff(model), (e) => ["DEVTWIN_HANDOFF_UNSAFE", "DEVTWIN_SENSITIVE_CONTENT"].includes(e.code) && !JSON.stringify(e).includes(body));
   }
   for (const body of ["Next action: review\nBlockers: none", "sha256:abc commit:abc file:README.md and/or", "<img src=relative.png>\n```\n~~~~"]) {
     const model = structuredClone(packet.model);
@@ -115,10 +115,10 @@ test("handoff holds unsafe text metadata paths and links without rewriting", asy
   }
   for (const changes of [{ title: "mailto:owner" }, { sources: [{ ref: "url:https://example.invalid" }] }, { sources: [{ ref: "file:README.md", extra: "/tmp/private" }] }]) {
     const record = await add(s, changes);
-    await assert.rejects(build(s, [record.recordId]), { code: "DEVCTX_HANDOFF_UNSAFE" });
+    await assert.rejects(build(s, [record.recordId]), { code: "DEVTWIN_HANDOFF_UNSAFE" });
   }
   const badActor = await add(s, {}, { recordedBy: { actor: "human", runId: "mailto:owner" } });
-  await assert.rejects(build(s, [badActor.recordId]), { code: "DEVCTX_HANDOFF_UNSAFE" });
+  await assert.rejects(build(s, [badActor.recordId]), { code: "DEVTWIN_HANDOFF_UNSAFE" });
 });
 
 test("handoff body bytes can be independently recovered and hashed", async (t) => {
@@ -134,20 +134,20 @@ test("handoff body bytes can be independently recovered and hashed", async (t) =
   }
   for (const body of ["a\rb", "a\u0085b", "a\u2028b", "a\u2029b"]) {
     const a = await add(s, { body });
-    await assert.rejects(build(s, [a.recordId]), { code: "DEVCTX_HANDOFF_UNSAFE" });
+    await assert.rejects(build(s, [a.recordId]), { code: "DEVTWIN_HANDOFF_UNSAFE" });
   }
 });
 
 test("handoff refuses corrupt snapshots and selected-content overflow", async (t) => {
   const s = await seedCommittedProject(t), big = await add(s, { body: "x".repeat(32768) });
-  await assert.rejects(build(s, [big.recordId]), { code: "DEVCTX_LIMIT" });
+  await assert.rejects(build(s, [big.recordId]), { code: "DEVTWIN_LIMIT" });
   const unicode = await add(s, { body: "界".repeat(10500) });
-  await assert.rejects(build(s, [unicode.recordId]), { code: "DEVCTX_LIMIT" });
+  await assert.rejects(build(s, [unicode.recordId]), { code: "DEVTWIN_LIMIT" });
   const ids = [];
   for (let i = 0; i < 13; i++) ids.push((await add(s)).recordId);
-  await assert.rejects(build(s, ids), { code: "DEVCTX_LIMIT" });
+  await assert.rejects(build(s, ids), { code: "DEVTWIN_LIMIT" });
   await writeFile(join(s.dataRoot, "scopes/acme/projects/acme.atlas/records", big.recordId, "body.md"), "corrupt");
-  await assert.rejects(build(s, [ids[0]]), { code: "DEVCTX_INTEGRITY" });
+  await assert.rejects(build(s, [ids[0]]), { code: "DEVTWIN_INTEGRITY" });
 });
 
 test("handoff freshness uses resolved worktree source hashes and explicit evaluation date", async (t) => {
@@ -170,7 +170,7 @@ test("handoff freshness uses resolved worktree source hashes and explicit evalua
   const unverified = await add(s, { sources: [{ ref: "file:README.md" }] });
   assert.ok((await build(s, [unverified.recordId])).model.records[0].freshness.includes("unverified-source"));
   const invalid = await add(s, { revisitAfter: "2026-02-30" });
-  await assert.rejects(build(s, [invalid.recordId]), { code: "DEVCTX_HANDOFF_UNSAFE" });
+  await assert.rejects(build(s, [invalid.recordId]), { code: "DEVTWIN_HANDOFF_UNSAFE" });
   const linked = join(s.reposDir, "beacon");
   await fixtureGit(s.repo, ["worktree", "add", "-q", "-b", "other", linked]);
   await writeFile(join(linked, "README.md"), "Linked worktree\n");

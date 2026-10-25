@@ -1,25 +1,25 @@
 ---
 title: Configuration
-description: Reference for the pilot file, the live config, init preferences, scope configuration, the personal profile and the environment variables devctx reads.
+description: Reference for the pilot file, the live config, init preferences, scope configuration, the personal profile and the environment variables devtwin reads.
 ---
 
-devctx has no global configuration file. Everything is driven by one JSON file you pass with `--pilot`: either a **pilot file** for a disposable setup, or the **live config** at `~/.devctx/live.json`. The JSON schemas live in the kit's `schemas/` folder.
+devtwin has no global configuration file. Everything is driven by one JSON file you pass with `--pilot`: either a **pilot file** for a disposable setup, or the **live config** at `~/.devtwin/live.json`. The JSON schemas live in the kit's `schemas/` folder.
 
 ## Pilot file
 
-A pilot file declares the only places devctx may write and the repositories it may read. It is a write fence for the CLI, not a sandbox for your whole agent.
+A pilot file declares the only places devtwin may write and the repositories it may read. It is a write fence for the CLI, not a sandbox for your whole agent.
 
 ```json
 {
   "schemaVersion": 1,
-  "pilotRoot": "/private/tmp/devctx-demo/pilot",
-  "configRoot": "/private/tmp/devctx-demo/pilot/config",
-  "dataRoot": "/private/tmp/devctx-demo/pilot/data",
-  "stateRoot": "/private/tmp/devctx-demo/pilot/state",
-  "inputsRoot": "/private/tmp/devctx-demo/pilot/inputs",
-  "agentHomes": ["/private/tmp/devctx-demo/pilot/homes/demo"],
-  "repos": ["/private/tmp/devctx-demo/pilot/repos/atlas"],
-  "forbidden": ["/Users/<you>/src/developer-context-kit"]
+  "pilotRoot": "/private/tmp/devtwin-demo/pilot",
+  "configRoot": "/private/tmp/devtwin-demo/pilot/config",
+  "dataRoot": "/private/tmp/devtwin-demo/pilot/data",
+  "stateRoot": "/private/tmp/devtwin-demo/pilot/state",
+  "inputsRoot": "/private/tmp/devtwin-demo/pilot/inputs",
+  "agentHomes": ["/private/tmp/devtwin-demo/pilot/homes/demo"],
+  "repos": ["/private/tmp/devtwin-demo/pilot/repos/atlas"],
+  "forbidden": ["/Users/<you>/src/devtwin"]
 }
 ```
 
@@ -30,10 +30,10 @@ A pilot file declares the only places devctx may write and the repositories it m
 | `configRoot` | path | Required. Scopes, project bindings, registry, `user.json`, personal profile. |
 | `dataRoot` | path | Required. Records, proposals, drafts, digests, exports, skill workspaces and staging. |
 | `stateRoot` | path | Required. Locks, run journals, approvals, stack state. |
-| `inputsRoot` | path | Required. Where you put files devctx reads: `--body-file`, `--candidate`, seeded templates, hubs. |
+| `inputsRoot` | path | Required. Where you put files devtwin reads: `--body-file`, `--candidate`, seeded templates, hubs. |
 | `agentHomes` | path[] | Required (may be empty). Fake agent homes that `agents install --home` may target. Must be empty in a live config. |
 | `repos` | path[] | Required (may be empty). Repositories that may be onboarded. |
-| `forbidden` | path[] | Required (may be empty). Extra paths devctx must never touch, such as custom agent folders. |
+| `forbidden` | path[] | Required (may be empty). Extra paths devtwin must never touch, such as custom agent folders. |
 | `live` | object | Only in a live config. See below. |
 
 No other keys are allowed.
@@ -42,11 +42,11 @@ No other keys are allowed.
 
 - All paths must be absolute and canonical (no symlinked components). On macOS use `pwd -P` or `realpath`, because `/tmp` is a symlink to `/private/tmp`.
 - In a disposable pilot, the five roots, `agentHomes` and `repos` must all be strictly inside `pilotRoot`, and none may overlap another. In a live config, `repos` and the skill folders are instead outside the store.
-- Nothing may touch a protected path: `~/.claude`, `~/.codex`, `~/.agents`, `~/.gemini`, `~/.cursor`, `~/.commandcode`, `$CLAUDE_CONFIG_DIR`, `$CODEX_HOME`, `~/.config/devctx`, `~/.local/share/devctx`, `~/.local/state/devctx`, `~/.local/state/personal-os`, or the kit checkout itself.
+- Nothing may touch a protected path: `~/.claude`, `~/.codex`, `~/.agents`, `~/.gemini`, `~/.cursor`, `~/.commandcode`, `$CLAUDE_CONFIG_DIR`, `$CODEX_HOME`, `~/.config/devtwin`, `~/.local/share/devtwin`, `~/.local/state/devtwin`, `~/.local/state/personal-os`, or the kit checkout itself.
 - The private roots must not be inside a Git worktree.
-- Changing the pilot file changes its digest. Some stored receipts are bound to that digest and will then refuse with `DEVCTX_GATE_REQUIRED`.
+- Changing the pilot file changes its digest. Some stored receipts are bound to that digest and will then refuse with `DEVTWIN_GATE_REQUIRED`.
 
-A violation fails with `DEVCTX_GATE_REQUIRED` and `details.field` naming the offending key (and `details.protected` naming the protected path, if any).
+A violation fails with `DEVTWIN_GATE_REQUIRED` and `details.field` naming the offending key (and `details.protected` naming the protected path, if any).
 
 ## Live config
 
@@ -55,11 +55,11 @@ The live config is a pilot file with a `live` block. `live init` writes it; you 
 ```json
 {
   "schemaVersion": 1,
-  "pilotRoot": "/Users/<you>/.devctx/store",
-  "configRoot": "/Users/<you>/.devctx/store/config",
-  "dataRoot": "/Users/<you>/.devctx/store/data",
-  "stateRoot": "/Users/<you>/.devctx/store/state",
-  "inputsRoot": "/Users/<you>/.devctx/store/inputs",
+  "pilotRoot": "/Users/<you>/.devtwin/store",
+  "configRoot": "/Users/<you>/.devtwin/store/config",
+  "dataRoot": "/Users/<you>/.devtwin/store/data",
+  "stateRoot": "/Users/<you>/.devtwin/store/state",
+  "inputsRoot": "/Users/<you>/.devtwin/store/inputs",
   "agentHomes": [],
   "repos": ["/Users/<you>/src/atlas"],
   "forbidden": [],
@@ -70,7 +70,7 @@ The live config is a pilot file with a `live` block. `live init` writes it; you 
       "claude": "/Users/<you>/.claude/skills",
       "codex": "/Users/<you>/.agents/skills"
     },
-    "kitRoot": "/Users/<you>/.devctx/kit",
+    "kitRoot": "/Users/<you>/.devtwin/kit",
     "kitCommit": "<40-character commit>"
   }
 }
@@ -84,7 +84,7 @@ The live config is a pilot file with a `live` block. `live init` writes it; you 
 | `kitRoot` | The kit clone live commands must run from. |
 | `kitCommit` | The commit that clone must be detached at, clean. 40 or 64 hex characters. |
 
-Live mode relaxes the fence for exactly these named skill folders (only `devctx-*` entries inside them) and the listed repositories (read-only). The approved digest is stored at `store/state/live/approved-config.json`; a `live.json` that differs from it is refused.
+Live mode relaxes the fence for exactly these named skill folders (only `devtwin-*` entries inside them) and the listed repositories (read-only). The approved digest is stored at `store/state/live/approved-config.json`; a `live.json` that differs from it is refused.
 
 ## Init preferences
 
@@ -116,7 +116,7 @@ Capped at 2,048 bytes. The personal profile overrides any field it also sets.
 
 ### Policies
 
-`--policy <pol_id>=<hub id>:<relative path>[:required]` names a policy file inside a hub. Policy text is added to briefs for that scope. A `required` policy that cannot be read fails the brief with `DEVCTX_POLICY_UNAVAILABLE`.
+`--policy <pol_id>=<hub id>:<relative path>[:required]` names a policy file inside a hub. Policy text is added to briefs for that scope. A `required` policy that cannot be read fails the brief with `DEVTWIN_POLICY_UNAVAILABLE`.
 
 ```sh
 --policy 'pol_security=team-notes:policies/security.md:required'
@@ -157,9 +157,9 @@ The bundled catalog `catalog/stack-sources.json` maps item names (and aliases su
 
 | Variable | Read by | Effect |
 | --- | --- | --- |
-| `DEVCTX_KIT` | Bundled skills | Absolute path of the kit checkout. The skills refuse to run without it. The CLI itself does not read it. |
+| `DEVTWIN_KIT` | Bundled skills | Absolute path of the kit checkout. The skills refuse to run without it. The CLI itself does not read it. |
 | `CLAUDE_CONFIG_DIR` | CLI | If set, Claude's skill folder is `$CLAUDE_CONFIG_DIR/skills`, and the directory is protected. |
 | `CODEX_HOME` | CLI | Protected. It does not change where Codex skills are installed; live previews warn `CODEX_HOME_IGNORED`. |
 | `HOME` | CLI | Used for protected paths. In live mode it must equal the live config's `home`. |
 
-devctx reads no token or credential from the environment today.
+devtwin reads no token or credential from the environment today.

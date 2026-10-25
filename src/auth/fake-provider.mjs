@@ -1,4 +1,4 @@
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 export function createFakeProvider(initial) {
   const calls = [];
   let identity = { accountId: initial.accountId, workspaceId: initial.workspaceId, actorRef: initial.actorRef, verified: initial.verified ?? true };
@@ -6,7 +6,7 @@ export function createFakeProvider(initial) {
 }
 export function fakeSecretResolver(map) {
   return (ref) => {
-    if (!ref.startsWith("fake:")) throw new DevctxError("GATE_REQUIRED", "Real providers are a future authorized milestone");
+    if (!ref.startsWith("fake:")) throw new DevtwinError("GATE_REQUIRED", "Real providers are a future authorized milestone");
     return map[ref.slice(5)];
   };
 }

@@ -58,10 +58,10 @@ test("profile cap accepts exactly 4096 canonical bytes and refuses 4097 with the
   assert.equal(Buffer.byteLength(canonicalJson(exact)), 4096);
   assert.equal(Buffer.byteLength(canonicalJson(over)), 4097);
   assert.equal(validateProfile(exact), exact);
-  await assert.rejects(planProfile(p.roots, { profile: over }), (error) => error.code === "DEVCTX_LIMIT" && error.details.size === 4097 && error.details.cap === 4096);
+  await assert.rejects(planProfile(p.roots, { profile: over }), (error) => error.code === "DEVTWIN_LIMIT" && error.details.size === 4097 && error.details.cap === 4096);
   await apply(p, exact);
   const snapshot = await treeSnapshot(p.configRoot);
-  await assert.rejects(applyProfile(p.roots, { profile: over, fingerprint: "sha256:" + "0".repeat(64) }, { now }), { code: "DEVCTX_LIMIT" });
+  await assert.rejects(applyProfile(p.roots, { profile: over, fingerprint: "sha256:" + "0".repeat(64) }, { now }), { code: "DEVTWIN_LIMIT" });
   assert.equal(await treeSnapshot(p.configRoot), snapshot);
 });
 test("profile with every field skipped is a valid empty profile", () => {
@@ -71,21 +71,21 @@ test("profile with every field skipped is a valid empty profile", () => {
 });
 test("profile refuses unknown keys and invalid field values", () => {
   for (const bad of [null, [], { extra: 1 }, { workingPreferences: { mood: "x" } }, { workingPreferences: { diagrams: "always" } }, { stackCurrent: ["a", "a"] }, { stackCurrent: ["line\nbreak"] }, { workKind: 5 }, { writing: { formality: { team: "loud" } } }, { writing: { length: "epic" } }, { stackKnown: Array.from({ length: 41 }, (_, i) => "s" + i) }]) {
-    assert.throws(() => validateProfile(bad), { code: "DEVCTX_INVALID_INPUT" });
+    assert.throws(() => validateProfile(bad), { code: "DEVTWIN_INVALID_INPUT" });
   }
 });
 test("profile note matching the GitHub-token pattern is refused and nothing is written", async (t) => {
   const p = await makePilot(t);
   const note = "use gh" + "p_" + "A".repeat(36) + " for releases";
-  await assert.rejects(planProfile(p.roots, { profile: { workingPreferences: { notes: [note] } } }), { code: "DEVCTX_SENSITIVE_CONTENT" });
-  await assert.rejects(applyProfile(p.roots, { profile: { workingPreferences: { notes: [note] } }, fingerprint: "sha256:" + "0".repeat(64) }, { now }), { code: "DEVCTX_SENSITIVE_CONTENT" });
+  await assert.rejects(planProfile(p.roots, { profile: { workingPreferences: { notes: [note] } } }), { code: "DEVTWIN_SENSITIVE_CONTENT" });
+  await assert.rejects(applyProfile(p.roots, { profile: { workingPreferences: { notes: [note] } }, fingerprint: "sha256:" + "0".repeat(64) }, { now }), { code: "DEVTWIN_SENSITIVE_CONTENT" });
   await assert.rejects(access(dirOf(p)));
 });
 test("profile refuses a key named api_key anywhere", async (t) => {
   const p = await makePilot(t);
   const key = ["api", "key"].join("_");
   for (const profile of [{ [key]: "x" }, { workingPreferences: { [key]: "x" } }, { writing: { formality: { [key]: "formal" } } }]) {
-    await assert.rejects(planProfile(p.roots, { profile }), { code: "DEVCTX_INVALID_INPUT" });
+    await assert.rejects(planProfile(p.roots, { profile }), { code: "DEVTWIN_INVALID_INPUT" });
   }
   await assert.rejects(access(dirOf(p)));
 });
@@ -95,22 +95,22 @@ test("profile apply with a fingerprint computed against revision 1 when revision
   const stalePlan = await planProfile(p.roots, { profile: { workKind: "three" } });
   await apply(p, { workKind: "two" });
   const snapshot = await treeSnapshot(p.configRoot);
-  await assert.rejects(applyProfile(p.roots, { profile: { workKind: "three" }, fingerprint: stalePlan.fingerprint }, { now }), { code: "DEVCTX_STALE_VERSION" });
+  await assert.rejects(applyProfile(p.roots, { profile: { workKind: "three" }, fingerprint: stalePlan.fingerprint }, { now }), { code: "DEVTWIN_STALE_VERSION" });
   assert.equal(await treeSnapshot(p.configRoot), snapshot);
   assert.equal((await readProfile(p.roots)).generation, 2);
 });
 test("profile apply without a fingerprint or with a mismatched one writes nothing", async (t) => {
   const p = await makePilot(t);
   const plan = await planProfile(p.roots, { profile: { workKind: "one" } });
-  await assert.rejects(applyProfile(p.roots, { profile: { workKind: "one" } }, { now }), { code: "DEVCTX_PLAN_REQUIRED" });
-  await assert.rejects(applyProfile(p.roots, { profile: { workKind: "other" }, fingerprint: plan.fingerprint }, { now }), { code: "DEVCTX_PLAN_MISMATCH" });
+  await assert.rejects(applyProfile(p.roots, { profile: { workKind: "one" } }, { now }), { code: "DEVTWIN_PLAN_REQUIRED" });
+  await assert.rejects(applyProfile(p.roots, { profile: { workKind: "other" }, fingerprint: plan.fingerprint }, { now }), { code: "DEVTWIN_PLAN_MISMATCH" });
   await assert.rejects(access(dirOf(p)));
 });
 test("profile refuses a config root that is a Git worktree with the copy-or-export remedy", async (t) => {
   const p = await makePilot(t);
   await mkdir(p.configRoot, { mode: 0o700 });
   await fixtureGit(p.configRoot, ["init", "-q"]);
-  const check = (error) => error.code === "DEVCTX_PATH_UNSAFE" && /copy or export/.test(error.details.remedy);
+  const check = (error) => error.code === "DEVTWIN_PATH_UNSAFE" && /copy or export/.test(error.details.remedy);
   await assert.rejects(planProfile(p.roots, { profile: {} }), check);
   await assert.rejects(applyProfile(p.roots, { profile: {}, fingerprint: "sha256:" + "0".repeat(64) }, { now }), check);
   await assert.rejects(access(dirOf(p)));
@@ -124,10 +124,10 @@ test("profile interrupted apply keeps the previous revision current and requires
   const current = await readProfile(p.roots);
   assert.equal(current.generation, 1);
   assert.deepEqual(current.profile, { workKind: "one" });
-  await assert.rejects(planProfile(p.roots, { profile: { workKind: "three" } }), { code: "DEVCTX_RECOVERY_REQUIRED" });
+  await assert.rejects(planProfile(p.roots, { profile: { workKind: "three" } }), { code: "DEVTWIN_RECOVERY_REQUIRED" });
   const retry = await planProfile(p.roots, { profile: { workKind: "two" } }).catch((error) => error);
-  assert.equal(retry.code, "DEVCTX_RECOVERY_REQUIRED");
-  await assert.rejects(applyProfile(p.roots, { profile: { workKind: "two" }, fingerprint: plan.fingerprint }, { now }), (error) => error.code === "DEVCTX_RECOVERY_REQUIRED" && error.details.generation === 2);
+  assert.equal(retry.code, "DEVTWIN_RECOVERY_REQUIRED");
+  await assert.rejects(applyProfile(p.roots, { profile: { workKind: "two" }, fingerprint: plan.fingerprint }, { now }), (error) => error.code === "DEVTWIN_RECOVERY_REQUIRED" && error.details.generation === 2);
   assert.equal(await readFile(join(dirOf(p), "v2.json"), "utf8"), orphan);
   assert.equal((await readProfile(p.roots)).generation, 1);
 });

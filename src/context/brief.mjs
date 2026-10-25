@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
 import { digest, canonicalJson } from "../storage/canonical.mjs";
 import { assertInPilot } from "../config/pilot.mjs";
@@ -54,7 +54,7 @@ export async function buildBrief(roots, pilot, { scope, cwd }) {
       }
     } catch { reason = "unavailable"; }
     if (reason) {
-      if (policy.required) throw new DevctxError("POLICY_UNAVAILABLE", "Required policy unavailable", { policyId: policy.id, reason });
+      if (policy.required) throw new DevtwinError("POLICY_UNAVAILABLE", "Required policy unavailable", { policyId: policy.id, reason });
       policyReceipt.unavailableIds.push(policy.id);
       continue;
     }
@@ -62,7 +62,7 @@ export async function buildBrief(roots, pilot, { scope, cwd }) {
     (policy.required ? required : optional).push(entry);
   }
   const requiredBytes = required.reduce((n, p) => n + Buffer.byteLength(p.text), 0);
-  if (required.length > BRIEF_LIMITS.maxItems || requiredBytes + profileBytes > BRIEF_LIMITS.maxBodyBytes) throw new DevctxError("LIMIT", "Required policies exceed brief budget", { requiredPolicyIds: required.map((p) => p.id), items: required.length, bytes: requiredBytes, profileBytes });
+  if (required.length > BRIEF_LIMITS.maxItems || requiredBytes + profileBytes > BRIEF_LIMITS.maxBodyBytes) throw new DevtwinError("LIMIT", "Required policies exceed brief budget", { requiredPolicyIds: required.map((p) => p.id), items: required.length, bytes: requiredBytes, profileBytes });
   let bytes = 0;
   for (const entry of required) { policies.push(entry); policyReceipt.selected.push({ id: entry.id, sha256: entry.sha256 }); bytes += Buffer.byteLength(entry.text); }
   bytes += profileBytes; // charged after required policies and before records; never counted as an item

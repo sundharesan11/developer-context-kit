@@ -1,7 +1,7 @@
 import { constants, lstatSync, realpathSync, openSync, closeSync, fstatSync, readSync, writeSync, fsyncSync, mkdirSync, renameSync, unlinkSync } from "node:fs";
 import { dirname, join, relative, isAbsolute, sep } from "node:path";
 import { randomBytes } from "node:crypto";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 export const SEGMENT = /^[a-z0-9][a-z0-9._-]{0,127}$/;
 export const isWithin = (child, parent) => {
   const r = relative(parent, child);
@@ -9,12 +9,12 @@ export const isWithin = (child, parent) => {
 };
 export const overlaps = (a, b) => isWithin(a, b) || isWithin(b, a);
 export function safeJoin(root, ...segments) {
-  if (!isAbsolute(root) || segments.some((s) => !SEGMENT.test(s) || s === "..")) throw new DevctxError("PATH_ESCAPE", "Unsafe path segment");
+  if (!isAbsolute(root) || segments.some((s) => !SEGMENT.test(s) || s === "..")) throw new DevtwinError("PATH_ESCAPE", "Unsafe path segment");
   return join(root, ...segments);
 }
 export function info(path) { try { return lstatSync(path); } catch (e) { if (e.code === "ENOENT" || e.code === "ENOTDIR") return null; throw e; } }
 export function checkNode(node, path, { directory = false } = {}) {
-  if (!node || node.isSymbolicLink() || (directory ? !node.isDirectory() : !node.isFile()) || node.uid !== process.getuid() || (!directory && node.nlink !== 1) || (node.mode & 0o077)) throw new DevctxError("PATH_UNSAFE", "Unsafe private path", { path });
+  if (!node || node.isSymbolicLink() || (directory ? !node.isDirectory() : !node.isFile()) || node.uid !== process.getuid() || (!directory && node.nlink !== 1) || (node.mode & 0o077)) throw new DevtwinError("PATH_UNSAFE", "Unsafe private path", { path });
   return node;
 }
 export function ensurePrivateDir(path) {
@@ -32,25 +32,25 @@ export function ensurePrivatePath(root, segments = []) {
 export async function readPrivateBytes(path, limit = 131072, { faults = {} } = {}) {
   let fd;
   try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); }
-  catch (e) { if (e.code === "ELOOP") throw new DevctxError("PATH_UNSAFE", "Unsafe private path"); throw e; }
+  catch (e) { if (e.code === "ELOOP") throw new DevtwinError("PATH_UNSAFE", "Unsafe private path"); throw e; }
   try {
     const before = checkNode(fstatSync(fd), path);
-    if (before.size > limit) throw new DevctxError("LIMIT", "Private file exceeds limit");
+    if (before.size > limit) throw new DevtwinError("LIMIT", "Private file exceeds limit");
     const buf = Buffer.alloc(before.size); let offset = 0;
     while (offset < buf.length) { const n = readSync(fd, buf, offset, buf.length - offset, offset); if (!n) break; offset += n; }
     if (faults.afterRead) await faults.afterRead();
     const after = fstatSync(fd);
-    if (offset !== before.size || before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw new DevctxError("INTEGRITY", "Private file changed");
+    if (offset !== before.size || before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw new DevtwinError("INTEGRITY", "Private file changed");
     return buf;
   } finally { closeSync(fd); }
 }
 export async function readPrivateText(path, limit = 131072) { return (await readPrivateBytes(path, limit)).toString("utf8"); }
-export async function readPrivateJson(path, limit) { try { return JSON.parse(await readPrivateText(path, limit)); } catch (e) { if (e instanceof SyntaxError) throw new DevctxError("INTEGRITY", "Invalid private JSON"); throw e; } }
+export async function readPrivateJson(path, limit) { try { return JSON.parse(await readPrivateText(path, limit)); } catch (e) { if (e instanceof SyntaxError) throw new DevtwinError("INTEGRITY", "Invalid private JSON"); throw e; } }
 // faults is a test seam: beforeWrite/beforeFsync run inside the write so a failure can be injected.
 export async function writeNewFile(path, content, { faults = {} } = {}) {
   let fd, own;
   try { fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600); }
-  catch (e) { if (e.code === "EEXIST") throw new DevctxError("CONFLICT", "Private file already exists"); throw e; }
+  catch (e) { if (e.code === "EEXIST") throw new DevtwinError("CONFLICT", "Private file already exists"); throw e; }
   try {
     own = fstatSync(fd);
     if (faults.beforeWrite) await faults.beforeWrite();
@@ -66,11 +66,11 @@ export async function writeNewFile(path, content, { faults = {} } = {}) {
 export function fsyncDir(path) {
   let fd;
   try { fd = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW); }
-  catch (e) { if (e.code === "ELOOP" || e.code === "ENOTDIR") throw new DevctxError("PATH_UNSAFE", "Unsafe private path"); throw e; }
+  catch (e) { if (e.code === "ELOOP" || e.code === "ENOTDIR") throw new DevtwinError("PATH_UNSAFE", "Unsafe private path"); throw e; }
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }
 export async function atomicReplace(path, content, { faults = {} } = {}) {
-  const temp = join(dirname(path), ".devctx-" + randomBytes(8).toString("hex") + ".tmp");
+  const temp = join(dirname(path), ".devtwin-" + randomBytes(8).toString("hex") + ".tmp");
   await writeNewFile(temp, content, { faults });
   try { if (faults.beforeRename) await faults.beforeRename(); renameSync(temp, path); }
   catch (error) { try { unlinkSync(temp); } catch { /* The original error matters more. */ } throw error; }

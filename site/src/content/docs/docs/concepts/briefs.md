@@ -1,15 +1,15 @@
 ---
 title: Briefs
-description: What a context brief contains, how devctx chooses and orders records, what the freshness labels mean, and how to hand a brief to an agent.
+description: What a context brief contains, how devtwin chooses and orders records, what the freshness labels mean, and how to hand a brief to an agent.
 ---
 
 A brief is the short, current view of a project that you give a session at the start. It holds the records that still apply, says how fresh each one is, and tells you what it left out.
 
 ```sh
-devctx context brief --pilot "$PILOT" --scope example --cwd "$PWD"
+devtwin context brief --pilot "$PILOT" --scope example --cwd "$PWD"
 ```
 
-You don't name the project. `devctx` works it out from the Git worktree that `--cwd` is in, within the scope you give. `--cwd` must be a real, canonical path; `"$PWD"` from inside the repository works on most setups, and `"$(pwd -P)"` always does.
+You don't name the project. `devtwin` works it out from the Git worktree that `--cwd` is in, within the scope you give. `--cwd` must be a real, canonical path; `"$PWD"` from inside the repository works on most setups, and `"$(pwd -P)"` always does.
 
 ## What's in a brief
 
@@ -40,7 +40,7 @@ You don't name the project. `devctx` works it out from the Git worktree that `--
 | `notice` | A reminder that stored context is evidence, not instructions. |
 | `worktree` | The worktree root, branch, commit and whether it has uncommitted changes. |
 | `warnings` | Worktree warnings, such as `DIRTY_WORKTREE`, `DETACHED_HEAD` or `NO_COMMITS`. |
-| `preferences` | Simple preferences set with `devctx init --preference`. |
+| `preferences` | Simple preferences set with `devtwin init --preference`. |
 | `profile` | Your [personal profile](/docs/guides/personal-harness/), or `null` if you haven't set one. |
 | `policies` | Policy text from local knowledge hubs configured for the scope. Empty unless you set them up. |
 | `records` | The current records, each with a `freshness` label. |
@@ -70,10 +70,10 @@ Each record in a brief gets a freshness label. Anything other than `current` mea
 
 | Label | Meaning |
 | --- | --- |
-| `current` | Nothing has changed that `devctx` can detect. |
+| `current` | Nothing has changed that `devtwin` can detect. |
 | `needs-revalidation` | A source file changed since the record was written, or a file source has no stored hash to compare. |
 | `source-missing` | A source file no longer exists or can't be read. |
-| `unbound-source` | The record cites a file that onboarding did not read for this project, so `devctx` can't check it. |
+| `unbound-source` | The record cites a file that onboarding did not read for this project, so `devtwin` can't check it. |
 | `different-branch` | The record applies to another branch than the one you're on. |
 | `different-revision` | The record applies to another commit than your current `HEAD`. |
 
@@ -90,10 +90,10 @@ Freshness tells you that evidence changed. It cannot tell you whether a record i
 
 ## Giving a brief to an agent
 
-`devctx` doesn't push context into a session by itself. You have two options:
+`devtwin` doesn't push context into a session by itself. You have two options:
 
 - **By hand.** Run `context brief`, pick what the task needs and paste it in.
-- **Through a skill.** Install the bundled skills and ask your agent to resume the project. The `devctx-resume` skill reads the brief, leads with stale records, disputes and unknowns, and asks which parts the task needs. See [Use it with coding agents](/docs/guides/coding-agents/).
+- **Through a skill.** Install the bundled skills and ask your agent to resume the project. The `devtwin-resume` skill reads the brief, leads with stale records, disputes and unknowns, and asks which parts the task needs. See [Use it with coding agents](/docs/guides/coding-agents/).
 
 Either way, frame the brief as context, not commands. A prompt that works well:
 
@@ -105,10 +105,10 @@ Record bodies and policy text are stored text, and some of it came from reposito
 
 ## When the brief can't find the project
 
-If the worktree isn't onboarded in that scope, you get `DEVCTX_PROJECT_UNBOUND` with a reason and a suggested fix:
+If the worktree isn't onboarded in that scope, you get `DEVTWIN_PROJECT_UNBOUND` with a reason and a suggested fix:
 
 ```json
-{"ok":false,"command":"context resolve","error":{"code":"DEVCTX_PROJECT_UNBOUND","message":"Worktree not bound in selected scope","details":{"reason":"not-bound-in-scope","remedy":"project onboard --scope other --repo <worktree>"}}}
+{"ok":false,"command":"context resolve","error":{"code":"DEVTWIN_PROJECT_UNBOUND","message":"Worktree not bound in selected scope","details":{"reason":"not-bound-in-scope","remedy":"project onboard --scope other --repo <worktree>"}}}
 ```
 
-`context resolve` takes the same options as `context brief` and returns only the project match, which is handy for checking this. See [Scopes and projects](/docs/concepts/scopes-and-projects/#how-devctx-finds-your-project).
+`context resolve` takes the same options as `context brief` and returns only the project match, which is handy for checking this. See [Scopes and projects](/docs/concepts/scopes-and-projects/#how-devtwin-finds-your-project).

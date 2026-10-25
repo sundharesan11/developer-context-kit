@@ -5,7 +5,7 @@
 Use an existing disposable pilot and the exact selected worktree. Set the variables to your own pilot paths and selected record IDs:
 
 ```sh
-node bin/devctx.mjs handoff export --pilot "$PILOT_FILE" \
+node bin/devtwin.mjs handoff export --pilot "$PILOT_FILE" \
   --scope acme --cwd "$ATLAS_REPO" \
   --record "$FACT_RECORD_ID" --record "$HANDOFF_RECORD_ID" \
   --as-of 2026-10-09T00:00:00.000Z \
@@ -16,7 +16,7 @@ There is no default selection, `--all`, brief import or root override. Missing, 
 
 The destination must be a new file directly inside `dataRoot/exports/handoffs/<scope>/<project>/`. Its basename is 1–64 lowercase ASCII letters, digits, dots, underscores or hyphens, starting with a letter or digit, followed by `.handoff.md`. All existing export directories and dataRoot must be private 0700 directories; output is 0600. The fence continues to refuse protected homes and toolkit paths. Existing files, aliases, noncanonical paths, foreign or unsafe directory modes and alternate roots are refused without automatic repair or overwrite. Exported packets are rejected by the package audit even if mistakenly allowlisted.
 
-Limits are 12 selected records and **32,768 UTF-8 bytes for the complete final packet**, including metadata and footer. Overflow fails with `DEVCTX_LIMIT` before creating export directories or a file. There is no truncation or budget-based omission of selected evidence.
+Limits are 12 selected records and **32,768 UTF-8 bytes for the complete final packet**, including metadata and footer. Overflow fails with `DEVTWIN_LIMIT` before creating export directories or a file. There is no truncation or budget-based omission of selected evidence.
 
 ## Evidence and exclusions
 
@@ -28,7 +28,7 @@ Selected unknowns and disputes are indexed with their titles and IDs and retain 
 
 ## Holds and source portability
 
-Unsafe selected text holds the whole packet; it is never rewritten or silently redacted. Credential-pattern hits return `DEVCTX_SENSITIVE_CONTENT`; nonportable text or malformed metadata returns `DEVCTX_HANDOFF_UNSAFE`. Selected body/title strings containing personal account refs or email-shaped text hold. Structured user/reviewer identities are explicitly excluded instead. File, commit, record and issue provenance can be retained. Unrecognized source metadata is excluded after its text is scanned.
+Unsafe selected text holds the whole packet; it is never rewritten or silently redacted. Credential-pattern hits return `DEVTWIN_SENSITIVE_CONTENT`; nonportable text or malformed metadata returns `DEVTWIN_HANDOFF_UNSAFE`. Selected body/title strings containing personal account refs or email-shaped text hold. Structured user/reviewer identities are explicitly excluded instead. File, commit, record and issue provenance can be retained. Unrecognized source metadata is excluded after its text is scanned.
 
 This first version conservatively holds URL sources and URL-bearing text, home/Windows paths, remote aliases, control characters, CR and non-LF line separators. All leading-slash tokens hold, including API route literals and HTML closing tags preceded by `<`; internal slashes such as `and/or` are permitted. Ordinary `Next action: review`, `Blockers: none`, `sha256:abc`, `commit:abc` and relative `file:README.md` prose remain allowed. Bodies are inert fenced text, not active Markdown links or HTML. Pattern checks are tripwires, not a confidentiality guarantee; encoded sensitive information and arbitrary confidential prose still require human review.
 

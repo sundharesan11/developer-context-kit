@@ -25,22 +25,22 @@ async function clientRepo(dir) {
 }
 // Live config around a pinned clone of the committed kit, so the CLI runs exactly as on the owner's machine.
 async function liveKit(t) {
-  const sb = await sandbox(t), home = join(sb, "home"), devctx = join(home, ".devctx"), store = join(devctx, "store"), kit = join(devctx, "kit");
+  const sb = await sandbox(t), home = join(sb, "home"), devtwin = join(home, ".devtwin"), store = join(devtwin, "store"), kit = join(devtwin, "kit");
   for (const rel of [".claude/skills", ".agents/skills"]) await mkdir(join(home, rel), { recursive: true });
   await mkdir(store, { recursive: true, mode: 0o700 });
   const head = (await fixtureGit(REPO_ROOT, ["rev-parse", "HEAD"])).trim();
-  await fixtureGit(devctx, ["clone", "-q", "--no-hardlinks", REPO_ROOT, kit]);
+  await fixtureGit(devtwin, ["clone", "-q", "--no-hardlinks", REPO_ROOT, kit]);
   await fixtureGit(kit, ["checkout", "-q", "--detach", head]);
   const client = await clientRepo(join(sb, "work"));
   const obj = { schemaVersion: 1, pilotRoot: store, configRoot: join(store, "config"), dataRoot: join(store, "data"), stateRoot: join(store, "state"), inputsRoot: join(store, "inputs"), agentHomes: [], repos: [client.repo, client.second], forbidden: [], live: { configId: "cfg_0123456789abcdef", home, skillDirs: { claude: join(home, ".claude/skills"), codex: join(home, ".agents/skills") }, kitRoot: kit, kitCommit: head } };
-  const path = join(devctx, "live.json");
+  const path = join(devtwin, "live.json");
   await writeFile(path, JSON.stringify(obj), { mode: 0o600 });
   await chmod(path, 0o600);
   const roots = rootsFromPilot(await loadPilot(path, { home, env: {}, kitRoot: kit, liveGate: { approval: false } }));
   ensureRoots(roots);
   await recordApprovedDigest(roots);
   const cli = (args) => {
-    const r = spawnSync(process.execPath, [join(kit, "bin/devctx.mjs"), ...args, "--pilot", path], { cwd: sb, encoding: "utf8", env: { PATH: process.env.PATH, HOME: home } });
+    const r = spawnSync(process.execPath, [join(kit, "bin/devtwin.mjs"), ...args, "--pilot", path], { cwd: sb, encoding: "utf8", env: { PATH: process.env.PATH, HOME: home } });
     return { status: r.status, json: JSON.parse(r.stdout) };
   };
   return { sb, home, store, kit, path, cli, ...client };
@@ -83,7 +83,7 @@ test("live onboarding of a dirty worktree warns instead of refusing and the seco
   assert.deepEqual(ok(f.cli(["context", "brief", "--scope", "example", "--cwd", f.repo])).warnings, [{ code: "DIRTY_WORKTREE" }]);
   const second = f.cli(["context", "resolve", "--scope", "example", "--cwd", f.second]);
   assert.equal(second.json.ok, false);
-  assert.equal(second.json.error.code, "DEVCTX_PROJECT_UNBOUND");
+  assert.equal(second.json.error.code, "DEVTWIN_PROJECT_UNBOUND");
   assert.equal(second.json.error.details.reason, "worktree-not-confirmed");
   assert.deepEqual(compareSnapshots(before, await snapshotRepo(f.repo)), []);
 });
@@ -192,13 +192,13 @@ test("repo snapshot records a symlink inside an ignored folder without following
 test("repo snapshot fails loudly when ignored folders exceed the node cap", async (t) => {
   const sb = await sandbox(t);
   const { repo } = await clientRepo(join(sb, "work"));
-  await assert.rejects(snapshotRepo(repo, { maxNodes: 1 }), (error) => error.code === "DEVCTX_SNAPSHOT_TOO_LARGE" && error.details.maxNodes === 1);
+  await assert.rejects(snapshotRepo(repo, { maxNodes: 1 }), (error) => error.code === "DEVTWIN_SNAPSHOT_TOO_LARGE" && error.details.maxNodes === 1);
   const out = join(sb, "snap.json");
   const run = (env) => spawnSync(process.execPath, [SNAPSHOT, "--repo", repo, "--out", out], { cwd: sb, encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
-  const capped = run({ DEVCTX_SNAPSHOT_MAX_NODES: "1" });
+  const capped = run({ DEVTWIN_SNAPSHOT_MAX_NODES: "1" });
   assert.equal(capped.status, 1, capped.stdout + capped.stderr);
-  assert.equal(JSON.parse(capped.stdout).error.code, "DEVCTX_SNAPSHOT_TOO_LARGE");
+  assert.equal(JSON.parse(capped.stdout).error.code, "DEVTWIN_SNAPSHOT_TOO_LARGE");
   await assert.rejects(stat(out), { code: "ENOENT" }, "no snapshot is written when the cap is exceeded");
-  assert.equal(run({ DEVCTX_SNAPSHOT_MAX_NODES: "nope" }).status, 1, "an invalid cap is refused, not ignored");
+  assert.equal(run({ DEVTWIN_SNAPSHOT_MAX_NODES: "nope" }).status, 1, "an invalid cap is refused, not ignored");
   assert.equal(run({}).status, 0);
 });

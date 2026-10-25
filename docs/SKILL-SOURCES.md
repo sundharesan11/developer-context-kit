@@ -6,14 +6,14 @@ The [reviewed source installation bridge](SKILL-BUILDER.md#third-party-source-pa
 
 Fixture tests cover installation, update, restoration of an older approved version and removal, with collision/edit protection and interrupted-write holds. Source targets are `.claude/skills` and `.agents/skills` below a pilot home. Personal B and the bundled installer also write Codex skills to `.agents/skills`; earlier `.codex/skills` copies are left untouched. These are sandbox filesystem layouts, not evidence of live discovery, real-source compatibility, twelve-source installation or an automatic updater. Source installation accepts at most 256 KiB total, below acquisition's 1 MiB cap.
 
-`node bin/devctx.mjs skill-sources catalog` lists twelve public recipes with installation status `unverified` and makes no network request. `node bin/devctx.mjs skill-sources check --source <id>` reads public GitHub release and commit metadata without a pilot fence; it writes nothing and does not install skills. The check uses unauthenticated GitHub API requests, which reveal the caller's IP to GitHub and are subject to [60 requests per hour](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api). A check can use up to eight requests, so checking all twelve sources can exceed that limit.
+`node bin/devtwin.mjs skill-sources catalog` lists twelve public recipes with installation status `unverified` and makes no network request. `node bin/devtwin.mjs skill-sources check --source <id>` reads public GitHub release and commit metadata without a pilot fence; it writes nothing and does not install skills. The check uses unauthenticated GitHub API requests, which reveal the caller's IP to GitHub and are subject to [60 requests per hour](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api). A check can use up to eight requests, so checking all twelve sources can exceed that limit.
 
 Pinned acquisition adds three commands. Copy only `sourceId`, `channel`, `tag` and `commit` from your own fresh check into `PIN_JSON`; choose exact repository-relative file paths in `FILES_JSON`, including any licenses/notices you need. Supply a valid disposable pilot as `PILOT_FILE`. These shell variables contain caller selections, not default package recipes:
 
 ```sh
-node bin/devctx.mjs skill-sources preview --source humanizer --pin-json "$PIN_JSON" --files-json "$FILES_JSON"
-node bin/devctx.mjs skill-sources stage --pilot "$PILOT_FILE" --source humanizer --pin-json "$PIN_JSON" --files-json "$FILES_JSON" --preview-hash "$PREVIEW_HASH"
-node bin/devctx.mjs skill-sources inspect --pilot "$PILOT_FILE" --run "$STAGE_ID"
+node bin/devtwin.mjs skill-sources preview --source humanizer --pin-json "$PIN_JSON" --files-json "$FILES_JSON"
+node bin/devtwin.mjs skill-sources stage --pilot "$PILOT_FILE" --source humanizer --pin-json "$PIN_JSON" --files-json "$FILES_JSON" --preview-hash "$PREVIEW_HASH"
+node bin/devtwin.mjs skill-sources inspect --pilot "$PILOT_FILE" --run "$STAGE_ID"
 ```
 
 Set `PREVIEW_HASH` from preview's `result.fingerprint` and `STAGE_ID` from stage's `result.runId`. For example, an explicit selection is `["SKILL.md","LICENSE"]`; preview refuses a missing file instead of choosing a substitute. A complete offline synthetic example, including a nested skill, is exercised with `node --test test/skill-acquisition.test.mjs test/skill-staging.test.mjs`; these tests make no live GitHub calls.

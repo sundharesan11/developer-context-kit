@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "devctx record v1",
+  "title": "devtwin record v1",
   "type": "object",
   "required": [
     "schemaVersion",

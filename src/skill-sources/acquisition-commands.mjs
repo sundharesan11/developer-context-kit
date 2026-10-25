@@ -1,10 +1,10 @@
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { getSource, loadBundledCatalog } from "./catalog.mjs";
 import { previewAcquisition } from "./github-package.mjs";
 import { stageAcquisition, inspectAcquisition } from "./staging.mjs";
 
 const selectionOptions = {source: {type: "string"}, "pin-json": {type: "string"}, "files-json": {type: "string"}};
-const usage = () => { throw new DevctxError("USAGE", "Missing or malformed acquisition option"); };
+const usage = () => { throw new DevtwinError("USAGE", "Missing or malformed acquisition option"); };
 function json(value, limit) {
   if (typeof value !== "string" || Buffer.byteLength(value, "utf8") > limit) usage();
   try { return JSON.parse(value); } catch { usage(); }

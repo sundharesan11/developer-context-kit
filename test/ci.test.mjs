@@ -38,7 +38,7 @@ test("CI evaluates both Node versions without claiming Linux support and checks 
   for (const value of ["macos-15", "ubuntu-24.04", "'22.13.0'", "'26.4.0'",
     "Linux evaluation (unsupported)", "Linux minimum evaluation (unsupported)",
     "npm test", "npm run check:package", "scripts/acceptance.mjs",
-    "$RUNNER_TEMP/devctx-ci.XXXXXX", "pwd -P", "fresh-agent-smoke", "deferred",
+    "$RUNNER_TEMP/devtwin-ci.XXXXXX", "pwd -P", "fresh-agent-smoke", "deferred",
     "git status --porcelain --untracked-files=all",
     "git diff --check 4b825dc642cb6eb9a060e54bf8d69288fbee4904 HEAD"]) {
     assert.ok(text.includes(value), value);
@@ -49,7 +49,7 @@ test("CI evaluates both Node versions without claiming Linux support and checks 
 });
 
 test("acceptance forbidden path overlapping the pilot fails preflight without fixture writes", async (t) => {
-  const parent = canonicalTemp(t, "devctx-acc-overlap-"), pilotRoot = join(parent, "pilot"), report = join(parent, "report.json");
+  const parent = canonicalTemp(t, "devtwin-acc-overlap-"), pilotRoot = join(parent, "pilot"), report = join(parent, "report.json");
   const r = runAcceptance(["--pilot-root", pilotRoot, "--report", report, "--forbidden", parent]);
   assert.notEqual(r.status, 0);
   assert.equal(r.out.ok, false);
@@ -59,7 +59,7 @@ test("acceptance forbidden path overlapping the pilot fails preflight without fi
 });
 
 test("acceptance forbidden option rejects relative non-canonical and missing values", async (t) => {
-  const parent = canonicalTemp(t, "devctx-acc-usage-"), other = canonicalTemp(t, "devctx-acc-other-");
+  const parent = canonicalTemp(t, "devtwin-acc-usage-"), other = canonicalTemp(t, "devtwin-acc-other-");
   for (const value of ["relative/dir", other + "/../" + other.split("/").at(-1), other + "/", join(other, "missing"), "--report"]) {
     const pilotRoot = join(parent, "pilot"), report = join(parent, "report.json");
     const r = runAcceptance(["--pilot-root", pilotRoot, "--report", report, "--forbidden", value]);
@@ -72,7 +72,7 @@ test("acceptance forbidden option rejects relative non-canonical and missing val
 });
 
 test("acceptance records every extra forbidden path in its report", async (t) => {
-  const parent = canonicalTemp(t, "devctx-acc-report-"), first = canonicalTemp(t, "devctx-acc-forbid1-"), second = canonicalTemp(t, "devctx-acc-forbid2-");
+  const parent = canonicalTemp(t, "devtwin-acc-report-"), first = canonicalTemp(t, "devtwin-acc-forbid1-"), second = canonicalTemp(t, "devtwin-acc-forbid2-");
   const report = join(parent, "report.json");
   const r = runAcceptance(["--pilot-root", join(parent, "pilot"), "--report", report, "--forbidden", first, "--forbidden", second]);
   assert.equal(r.status, 0);

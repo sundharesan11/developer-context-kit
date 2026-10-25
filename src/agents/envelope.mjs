@@ -1,5 +1,5 @@
 import { resolve, isAbsolute } from "node:path";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { overlaps, isWithin } from "../storage/fsx.mjs";
 import { digest } from "../storage/canonical.mjs";
 import { resolveContext } from "../context/resolve.mjs";
@@ -8,8 +8,8 @@ export const ENVELOPE_NOTICE = "Auditable task contract, not an enforced capabil
 const OPS = new Set(["read", "edit-files", "run-tests", "propose-record"]);
 export async function buildEnvelope(roots, input, { now = () => new Date() } = {}) {
   const resolved = await resolveContext(roots, { scope: input.scope, cwd: input.cwd });
-  for (const path of input.allowedOutputPaths ?? []) if (!isAbsolute(path) || resolve(path) !== path || !isWithin(path, resolved.worktree.root) || [roots.configRoot, roots.dataRoot, roots.stateRoot].some((root) => overlaps(path, root))) throw new DevctxError("PATH_ESCAPE", "Output path outside bound worktree");
-  for (const op of input.allowedOperations ?? []) if (!OPS.has(op)) throw new DevctxError("GATE_REQUIRED", "Operation unavailable");
+  for (const path of input.allowedOutputPaths ?? []) if (!isAbsolute(path) || resolve(path) !== path || !isWithin(path, resolved.worktree.root) || [roots.configRoot, roots.dataRoot, roots.stateRoot].some((root) => overlaps(path, root))) throw new DevtwinError("PATH_ESCAPE", "Output path outside bound worktree");
+  for (const op of input.allowedOperations ?? []) if (!OPS.has(op)) throw new DevtwinError("GATE_REQUIRED", "Operation unavailable");
   const createdAt = now().toISOString(), expiresAt = new Date(now().getTime() + (input.ttlMinutes ?? 240) * 60000).toISOString();
   const brief = await buildBrief(roots, roots.pilot, { scope: input.scope, cwd: input.cwd });
   const value = { schemaVersion: 1, runId: input.runId, parentRunId: input.parentRunId, taskId: input.taskId, scope: input.scope, project: resolved.project, cwd: input.cwd, worktree: resolved.worktree, sourceRevision: resolved.worktree.head, inputRefs: brief.records.map((r) => ({ id: r.id, recordHash: r.recordHash })), allowedOutputPaths: input.allowedOutputPaths ?? [], allowedOperations: input.allowedOperations ?? [], constraints: input.constraints ?? [], deliverable: input.deliverable, verificationCommands: input.verificationCommands ?? [], freshness: { createdAt, expiresAt, briefHash: brief.briefHash }, notice: ENVELOPE_NOTICE };

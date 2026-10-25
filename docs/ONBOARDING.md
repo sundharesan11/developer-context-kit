@@ -9,15 +9,15 @@ Run the shell blocks below in order, in the same macOS shell, from the toolkit c
 The setup block creates a private temporary root, one tiny Git repository, and a pilot file. It does not reuse your Git identity or change global Git configuration.
 
 ```sh
-export DEVCTX_DEMO="$(mktemp -d /tmp/devctx-onboard.XXXXXX)"
-export DEVCTX_DEMO="$(cd "$DEVCTX_DEMO" && pwd -P)"
+export DEVTWIN_DEMO="$(mktemp -d /tmp/devtwin-onboard.XXXXXX)"
+export DEVTWIN_DEMO="$(cd "$DEVTWIN_DEMO" && pwd -P)"
 node --input-type=module <<'NODE'
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-const root = process.env.DEVCTX_DEMO;
-if (!root || !root.startsWith('/private/tmp/devctx-onboard.')) {
+const root = process.env.DEVTWIN_DEMO;
+if (!root || !root.startsWith('/private/tmp/devtwin-onboard.')) {
   throw new Error('Use the fresh macOS temporary directory from the previous step');
 }
 const repo = join(root, 'repos/atlas');
@@ -58,8 +58,8 @@ writeFileSync(join(root, 'pilot.json'), JSON.stringify(pilot, null, 2) + '\n', {
 });
 console.log('Created synthetic pilot at ' + root);
 NODE
-export PILOT="$DEVCTX_DEMO/pilot.json"
-export DEMO_REPO="$DEVCTX_DEMO/repos/atlas"
+export PILOT="$DEVTWIN_DEMO/pilot.json"
+export DEMO_REPO="$DEVTWIN_DEMO/repos/atlas"
 ```
 
 The pilot defines allowed roots. It is a CLI write fence, not isolation for the whole agent process. Do not replace these paths with a real project or agent home.
@@ -71,10 +71,10 @@ A *scope* groups related projects, such as projects for one organization. A *pro
 Preview, inspect the output, then apply each operation:
 
 ```sh
-node bin/devctx.mjs init --pilot "$PILOT"
-node bin/devctx.mjs init --pilot "$PILOT" --apply
-node bin/devctx.mjs scope add --pilot "$PILOT" --scope example
-node bin/devctx.mjs scope add --pilot "$PILOT" --scope example --apply
+node bin/devtwin.mjs init --pilot "$PILOT"
+node bin/devtwin.mjs init --pilot "$PILOT" --apply
+node bin/devtwin.mjs scope add --pilot "$PILOT" --scope example
+node bin/devtwin.mjs scope add --pilot "$PILOT" --scope example --apply
 ```
 
 These two operations use explicit `--apply`, not onboarding's fingerprint contract.
@@ -82,7 +82,7 @@ These two operations use explicit `--apply`, not onboarding's fingerprint contra
 ## 3. Preview the project
 
 ```sh
-node bin/devctx.mjs project onboard \
+node bin/devtwin.mjs project onboard \
   --pilot "$PILOT" --scope example --project example.atlas \
   --repo "$DEMO_REPO" --environment staging \
   --request-id req_demo_onboard_01 --accept all
@@ -105,7 +105,7 @@ read -r PLAN_FINGERPRINT
 Apply the same request and selections:
 
 ```sh
-node bin/devctx.mjs project onboard \
+node bin/devtwin.mjs project onboard \
   --pilot "$PILOT" --scope example --project example.atlas \
   --repo "$DEMO_REPO" --environment staging \
   --request-id req_demo_onboard_01 --accept all \
@@ -127,14 +127,14 @@ A later onboarding of the same worktree retires earlier records by default. The 
 
 Add `--keep-previous` to the preview and to the apply to retire nothing. The preview then shows `retire: []`.
 
-The default request ID is derived from the command inputs, not from source contents. After sources change, onboard again with a new `--request-id`. If an interrupted apply is retried after its plan changed, apply refuses with `DEVCTX_CONFLICT` and the remedy "re-run project onboard with a new --request-id". Follow that remedy; do not delete staged files.
+The default request ID is derived from the command inputs, not from source contents. After sources change, onboard again with a new `--request-id`. If an interrupted apply is retried after its plan changed, apply refuses with `DEVTWIN_CONFLICT` and the remedy "re-run project onboard with a new --request-id". Follow that remedy; do not delete staged files.
 
 ## 5. Resolve and read context
 
 ```sh
-node bin/devctx.mjs context resolve \
+node bin/devtwin.mjs context resolve \
   --pilot "$PILOT" --scope example --cwd "$DEMO_REPO"
-node bin/devctx.mjs context brief \
+node bin/devtwin.mjs context brief \
   --pilot "$PILOT" --scope example --cwd "$DEMO_REPO"
 ```
 
@@ -145,7 +145,7 @@ Resolve identifies `example.atlas`. The brief contains bounded records, evidence
 Preview this synthetic decision:
 
 ```sh
-node bin/devctx.mjs record add \
+node bin/devtwin.mjs record add \
   --pilot "$PILOT" --scope example --project example.atlas \
   --kind decision --title "Use server-side search" \
   --body "For this fictional demo, filter on the server because the list can grow." \
@@ -155,12 +155,12 @@ node bin/devctx.mjs record add \
 After reviewing it, write the record and read the brief again:
 
 ```sh
-node bin/devctx.mjs record add \
+node bin/devtwin.mjs record add \
   --pilot "$PILOT" --scope example --project example.atlas \
   --kind decision --title "Use server-side search" \
   --body "For this fictional demo, filter on the server because the list can grow." \
   --request-id req_demo_decision_01 --apply
-node bin/devctx.mjs context brief \
+node bin/devtwin.mjs context brief \
   --pilot "$PILOT" --scope example --cwd "$DEMO_REPO"
 git -C "$DEMO_REPO" status --short
 ```

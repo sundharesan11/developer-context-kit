@@ -16,7 +16,7 @@ test("root-bound lock rejects missing pilot before creating lock parent", async 
   const lock = join(p.stateRoot, "locks", "registry.lock");
   const roots = { configRoot: p.configRoot, dataRoot: p.dataRoot, stateRoot: p.stateRoot };
   let called = false;
-  await assert.rejects(withPilotLock(roots, lock, {}, async () => { called = true; }, { destinations: [p.dataRoot] }), { code: "DEVCTX_GATE_REQUIRED" });
+  await assert.rejects(withPilotLock(roots, lock, {}, async () => { called = true; }, { destinations: [p.dataRoot] }), { code: "DEVTWIN_GATE_REQUIRED" });
   assert.equal(called, false);
   await assert.rejects(lstat(join(p.stateRoot, "locks")), { code: "ENOENT" });
 });
@@ -26,7 +26,7 @@ test("root-bound lock refuses escaped state root before touching outside", async
   await mkdir(outside);
   await symlink(outside, p.stateRoot);
   let called = false;
-  await assert.rejects(withPilotLock(p.roots, join(p.stateRoot, "locks", "registry.lock"), {}, async () => { called = true; }, { destinations: [p.dataRoot] }), (e) => ["DEVCTX_GATE_REQUIRED", "DEVCTX_PATH_UNSAFE"].includes(e.code));
+  await assert.rejects(withPilotLock(p.roots, join(p.stateRoot, "locks", "registry.lock"), {}, async () => { called = true; }, { destinations: [p.dataRoot] }), (e) => ["DEVTWIN_GATE_REQUIRED", "DEVTWIN_PATH_UNSAFE"].includes(e.code));
   assert.equal(called, false);
   assert.deepEqual(await readdir(outside), []);
 });
@@ -36,13 +36,13 @@ test("concurrent writers serialize; a foreign lock is never broken", async (t) =
   await Promise.all([withLock(lock, {}, work("a")), withLock(lock, {}, work("b"))]);
   assert.ok(order.join("") === "aabb" || order.join("") === "bbaa");
   await writeFile(lock, JSON.stringify({ pid: 999999, host: "elsewhere" }), { mode: 0o600 });
-  await assert.rejects(withLock(lock, {}, async () => 1, { waitMs: 100 }), { code: "DEVCTX_BUSY" });
+  await assert.rejects(withLock(lock, {}, async () => 1, { waitMs: 100 }), { code: "DEVTWIN_BUSY" });
   assert.equal((await describeLock(lock)).pid, 999999);
 });
 test("fingerprint mismatch is refused", () => {
   const plan = finalizePlan({ kind: "x", writes: [1] });
-  assert.throws(() => assertFingerprint(plan, "sha256:00"), { code: "DEVCTX_PLAN_MISMATCH" });
-  assert.throws(() => assertFingerprint(plan, undefined), { code: "DEVCTX_PLAN_REQUIRED" });
+  assert.throws(() => assertFingerprint(plan, "sha256:00"), { code: "DEVTWIN_PLAN_MISMATCH" });
+  assert.throws(() => assertFingerprint(plan, undefined), { code: "DEVTWIN_PLAN_REQUIRED" });
   assert.doesNotThrow(() => assertFingerprint(plan, plan.fingerprint));
 });
 test("request hash ignores order and non-request fields; deterministic id is stable and payload-bound", () => {
@@ -67,7 +67,7 @@ test("U4 describeLock does not follow a symlinked lock file and a foreign symlin
   await writeFile(target, JSON.stringify({ pid: process.pid, host: "elsewhere" }), { mode: 0o600 });
   await symlink(target, lock);
   assert.deepEqual(await describeLock(lock), { unreadable: true, alive: false });
-  await assert.rejects(withLock(lock, {}, async () => 1, { waitMs: 50 }), { code: "DEVCTX_BUSY" });
+  await assert.rejects(withLock(lock, {}, async () => 1, { waitMs: 50 }), { code: "DEVTWIN_BUSY" });
   assert.ok((await lstat(lock)).isSymbolicLink());
 });
 test("U4 onboarding replay writes a run receipt lost after registry publish", async (t) => {
@@ -83,7 +83,7 @@ test("U4 onboarding replay writes a run receipt lost after registry publish", as
   assert.deepEqual(JSON.parse(await readFile(receiptPath, "utf8")), receipt);
   assert.deepEqual(await applyOnboard(s.roots, s.pilot, s.input, opts), replay);
   await writeFile(receiptPath, JSON.stringify({ ...receipt, committedGeneration: 99 }) + "\n", { mode: 0o600 });
-  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, opts), { code: "DEVCTX_RECOVERY_REQUIRED" });
+  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, opts), { code: "DEVTWIN_RECOVERY_REQUIRED" });
 });
 test("U4 onboarding replay restores an empty or truncated run receipt left by a hard kill", async (t) => {
   const s = await onboardFixture(t);
@@ -99,7 +99,7 @@ test("U4 onboarding replay restores an empty or truncated run receipt left by a 
     assert.equal((await lstat(receiptPath)).mode & 0o777, 0o600);
   }
 });
-// A pid that was alive a moment ago and has been reaped, as a killed devctx process leaves behind.
+// A pid that was alive a moment ago and has been reaped, as a killed devtwin process leaves behind.
 const deadPid = () => { const r = spawnSync(process.execPath, ["-e", ""]); assert.equal(r.status, 0); return r.pid; };
 const lockRecord = (pid, host = hostname()) => JSON.stringify({ pid, host, owner: { kind: "install", runId: "run_killed0001" }, startedAt: "2026-10-07T00:00:00.000Z" });
 async function plantLock(p, name, record) {
@@ -112,7 +112,7 @@ const release = (p, lock, extra = []) => runCli(["locks", "release", "--pilot", 
 test("locks release: a stale install lock blocks recover until an approved release removes it", async (t) => {
   const p = await makePilot(t), record = lockRecord(deadPid()), path = await plantLock(p, "install", record);
   const recovery = await planRecovery(p.roots, p.pilot);
-  await assert.rejects(applyRecovery(p.roots, p.pilot, { fingerprint: recovery.fingerprint }), { code: "DEVCTX_BUSY" });
+  await assert.rejects(applyRecovery(p.roots, p.pilot, { fingerprint: recovery.fingerprint }), { code: "DEVTWIN_BUSY" });
   const preview = await release(p, "install");
   assert.equal(preview.code, 0, JSON.stringify(preview.json));
   const plan = preview.json.result;
@@ -124,7 +124,7 @@ test("locks release: a stale install lock blocks recover until an approved relea
   assert.equal(plan.lockHash, sha256(Buffer.from(record)));
   assert.equal(await readFile(path, "utf8"), record);
   const missing = await release(p, "install", ["--apply"]);
-  assert.equal(missing.json.error.code, "DEVCTX_PLAN_REQUIRED");
+  assert.equal(missing.json.error.code, "DEVTWIN_PLAN_REQUIRED");
   const applied = await release(p, "install", ["--apply", "--plan-fingerprint", plan.fingerprint]);
   assert.equal(applied.code, 0, JSON.stringify(applied.json));
   assert.deepEqual([applied.json.result.released, applied.json.result.lock], [true, "install"]);
@@ -132,20 +132,20 @@ test("locks release: a stale install lock blocks recover until an approved relea
   assert.equal((await applyRecovery(p.roots, p.pilot, { fingerprint: recovery.fingerprint })).applied, true);
   const none = await release(p, "install");
   assert.deepEqual([none.json.result.release, none.json.result.reason, none.json.result.holder], [false, "no-lock", null]);
-  assert.equal((await release(p, "install", ["--apply", "--plan-fingerprint", none.json.result.fingerprint])).json.error.code, "DEVCTX_NOT_FOUND");
+  assert.equal((await release(p, "install", ["--apply", "--plan-fingerprint", none.json.result.fingerprint])).json.error.code, "DEVTWIN_NOT_FOUND");
 });
 test("locks release refuses a running owner, another host and a lock changed after preview", async (t) => {
   const p = await makePilot(t);
   const live = await plantLock(p, "live", lockRecord(process.pid));
   const alive = (await release(p, "live")).json.result;
   assert.deepEqual([alive.release, alive.reason, alive.holder.alive], [false, "owner-running", true]);
-  assert.equal((await release(p, "live", ["--apply", "--plan-fingerprint", alive.fingerprint])).json.error.code, "DEVCTX_BUSY");
+  assert.equal((await release(p, "live", ["--apply", "--plan-fingerprint", alive.fingerprint])).json.error.code, "DEVTWIN_BUSY");
   assert.equal(await readFile(live, "utf8"), lockRecord(process.pid));
   await rm(live);
   const other = await plantLock(p, "live", lockRecord(deadPid(), "another-host.invalid"));
   const foreign = (await release(p, "live")).json.result;
   assert.deepEqual([foreign.release, foreign.reason], [false, "other-host"]);
-  assert.equal((await release(p, "live", ["--apply", "--plan-fingerprint", foreign.fingerprint])).json.error.code, "DEVCTX_GATE_REQUIRED");
+  assert.equal((await release(p, "live", ["--apply", "--plan-fingerprint", foreign.fingerprint])).json.error.code, "DEVTWIN_GATE_REQUIRED");
   assert.ok((await lstat(other)).isFile());
   await rm(other);
   const stale = await plantLock(p, "install", lockRecord(deadPid()));
@@ -153,8 +153,8 @@ test("locks release refuses a running owner, another host and a lock changed aft
   assert.equal(before.release, true);
   await writeFile(stale, lockRecord(deadPid()).replace("2026-10-07", "2026-10-08"), { mode: 0o600 });
   const changed = await release(p, "install", ["--apply", "--plan-fingerprint", before.fingerprint]);
-  assert.equal(changed.json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal(changed.json.error.code, "DEVTWIN_PLAN_MISMATCH");
   assert.ok((await lstat(stale)).isFile());
-  assert.equal((await release(p, "nope")).json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.equal((await release(p, "nope")).json.error.code, "DEVTWIN_INVALID_INPUT");
   assert.ok((await runCli(["help"])).json.result.commands.includes("locks release"));
 });
