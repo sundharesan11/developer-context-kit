@@ -7,7 +7,19 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 devtwin is a local command-line tool that keeps what you know about a project, and how you like to work, in one private place on your machine. It then hands that context to whichever coding agent you open next.
 
-The idea is to clone the developer, not just the repository. A repository tells an agent what the code is. It rarely says why a decision was made, what is still unknown, or where the last session stopped. `devtwin` keeps that knowledge between sessions and between agents.
+The idea is to clone the developer, not just the repository. A repository tells an agent what the code is. It rarely says why a decision was made, what is still unknown, or where the last session stopped. devtwin keeps that knowledge between sessions and between agents.
+
+## Your first brief in five minutes
+
+You need Git and Node.js 22.13 or later. Clone the kit and check that it runs:
+
+```sh
+git clone https://github.com/sundharesan11/devtwin.git
+cd devtwin
+node bin/devtwin.mjs version
+```
+
+Then follow the [Quickstart](/docs/getting-started/quickstart/). It builds a throwaway repository in a temporary folder, onboards it and prints its brief: the short, source-linked summary you give an agent at the start of a session. If you just want to see the result, its [fast path](/docs/getting-started/quickstart/#fast-path) does everything in one paste.
 
 ## What it gives you
 
@@ -21,42 +33,43 @@ The idea is to clone the developer, not just the repository. A repository tells 
 		re-explaining the project.
 	</Card>
 	<Card title="The right account per organization" icon="random">
-		Identity routing will pick the right account for each organization you work for. It is coming; the
-		guide explains what exists today.
+		Identity routing will pick the right GitHub and Slack account for each organization you work for. The
+		guide covers the design and what exists today.
 	</Card>
 	<Card title="Your own harness" icon="puzzle">
-		Keep a private personal profile and turn generic skill templates into your own private skills.
+		Keep a private personal profile, watch release announcements for your stack, and turn generic skill
+		templates into your own private skills.
 	</Card>
 </CardGrid>
 
-## Your data stays on your disk
-
-The kit you clone is public code: the CLI, schemas, generic templates and tests. Everything you add, such as project records, your profile and drafts, lives in separate private folders outside that clone, at file mode `0600`. Nothing is synchronized from your private store into the public kit, and nothing is sent to a hosted service.
-
-`devtwin` also never writes into the project repositories it reads. Onboarding reads a few files, such as the README and package manifest, and stores what it learns in your private store.
-
 ## How you use it
 
-1. **Onboard** a repository. `devtwin` previews what it found; you approve the exact plan.
-2. **Read a brief** at the start of a session and give it to your agent.
+1. **Onboard** a repository. devtwin reads a few files, such as the README and package manifest, and shows you what it would record. You approve that exact plan.
+2. **Read a brief** at the start of a session and give it to your agent, or let the bundled `devtwin-resume` skill fetch it.
 3. **Record** decisions and findings as you work, so the next session has them.
 4. **Export a handoff** when you want to pass selected records to someone else.
 
 Every write is previewed first and applied only when you ask. See [How it works](/docs/concepts/how-it-works/) for the full picture.
 
-:::caution[Experimental]
-`devtwin` is an early, experimental release. It is not published to npm yet: you run it from a Git checkout with `node bin/devtwin.mjs`. It requires Node.js 22.13 or later and is developed and tested on macOS. Read the [limitations](/docs/security/limitations/) before you put real client data in it.
+## Your data stays on your disk
+
+The kit you clone is public code: the CLI, schemas, generic templates and tests. Everything you add, such as project records, your profile and drafts, lives in separate private folders outside that clone, with private file modes. Nothing is synchronized from your private store into the public kit, and nothing is sent to a hosted service.
+
+devtwin also never writes into the project repositories it reads. What it learns goes into your private store, not into the repository.
+
+:::note[Before you start]
+devtwin runs from a Git checkout with `node bin/devtwin.mjs`; it is not on npm yet. It needs Node.js 22.13 or later, and macOS is the reference platform. [Limitations](/docs/security/limitations/) lists what it does not do yet.
 :::
 
 ## Where to go next
 
 <CardGrid>
-	<LinkCard title="Installation" description="Clone the kit, check requirements and set up a devtwin alias." href="/docs/getting-started/installation/" />
-	<LinkCard title="Quickstart" description="Onboard a throwaway project and read your first brief in about ten minutes." href="/docs/getting-started/quickstart/" />
-	<LinkCard title="How it works" description="The flow from repository to brief, and the safety rails around it." href="/docs/concepts/how-it-works/" />
+	<LinkCard title="Quickstart" description="Onboard a throwaway project and read your first brief." href="/docs/getting-started/quickstart/" />
+	<LinkCard title="Installation" description="Requirements, the self-check and a devtwin alias." href="/docs/getting-started/installation/" />
+	<LinkCard title="How devtwin compares" description="AGENTS.md and CLAUDE.md, built-in agent memory, and devtwin side by side." href="/docs/concepts/comparison/" />
 	<LinkCard title="Use it with coding agents" description="Install the bundled skills for Claude Code and Codex." href="/docs/guides/coding-agents/" />
 	<LinkCard title="Personal harness" description="Set up your profile and make private skills from templates." href="/docs/guides/personal-harness/" />
-	<LinkCard title="Identity routing" description="The right account per organization: what is planned and what exists." href="/docs/guides/identity-routing/" />
+	<LinkCard title="FAQ" description="Short answers to the questions people ask first." href="/docs/project/faq/" />
 </CardGrid>
 
 The source is on [GitHub](https://github.com/sundharesan11/devtwin) under the Apache-2.0 license.
