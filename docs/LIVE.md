@@ -2,7 +2,7 @@
 
 This runbook turns on live mode on one machine. Live mode runs the kit against a real private store and the real Claude and Codex skill folders. It onboards one real repository, read-only. Follow the steps in order. Every write is a separate owner approval.
 
-Live mode is implemented. The owner ran steps 1 to 15 and 17 on one machine on 2026-10-25 at kit commit `b95ff72`, and they passed: live init, store init, scope add and read-only onboarding of one real client repository with identical before and after-onboarding snapshots; bundled install for Claude and Codex (three skills each, no conflicts); fresh `claude -p` and `codex exec` sessions from a neutral folder that listed the bundled skills (then named `devctx-*`), resolved the project and read the brief with an identical brief hash; and uninstall, `rollback-check` `ok` and reinstall. Step 16 (interactive sessions) is still the owner's to run, and step 14's kit export is not yet in the shell profile. That activation predates the rename to devtwin; a setup made under the old name moves with [Migrating from devctx](MIGRATING.md). See the [roadmap](ROADMAP.md).
+Live mode is implemented. The owner ran steps 1 to 15 and 17 on one machine on 2026-10-25 at kit commit `b95ff72`, and they passed. They covered live init, store init, scope add and read-only onboarding of one real client repository, with identical snapshots before and after onboarding. They covered bundled install for Claude and Codex (three skills each, no conflicts). Fresh `claude -p` and `codex exec` sessions from a neutral folder listed the bundled skills (then named `devctx-*`), resolved the project and read the brief with an identical brief hash. Uninstall, `rollback-check` `ok` and reinstall also passed. Step 16 (interactive sessions) is still the owner's to run, and step 14's kit export is not yet in the shell profile. That activation predates the rename to devtwin; a setup made under the old name moves with [Migrating from devctx](MIGRATING.md). See the [roadmap](ROADMAP.md).
 
 ## What live mode changes
 
@@ -233,7 +233,7 @@ Never use --apply and never edit files.
 
 Claude, with read tools and only the exact shell commands the checks need. Never widen these to `node` or `git -C` prefixes: those would let the session run any script or Git command, including writes to the repository. A command outside the list is refused, which fails the check safely.
 
-Pipe the prompt on stdin. `--allowedTools` takes several values, so a prompt placed after it is read as another tool rule, and `claude -p` then fails with "Input must be provided either through stdin or as a prompt argument".
+Pipe the prompt on stdin. `--allowedTools` takes several values, so a prompt placed after it is read as another tool rule. Then `claude -p` fails with "Input must be provided either through stdin or as a prompt argument".
 
 A session can run the CLI through the kit's absolute real path instead of the literal `"$DEVTWIN_KIT"` form. The list therefore names both forms of exactly the two read-only commands. Replace `<kit real path>` with the output of `realpath "$KIT"`.
 
@@ -305,7 +305,7 @@ node "$KIT/bin/devtwin.mjs" agents recover --pilot "$LIVE_CONFIG" --apply --plan
 
 Recovery removes an interrupted create, completes an interrupted update from the run folder's copies, and finishes an interrupted remove. It never rolls an update back. It always matches the journal's hashes. A file that matches neither is reported as `hold` and left alone, and the run stays blocked.
 
-To close a run that is stuck on a hold, or whose journal cannot be read, preview and apply a release. Release finishes every action it safely can, then closes the run and leaves the held files where they are. Those files then count as foreign: the kit never touches them again, so inspect and remove them by hand if they are leftovers. A crash right after a skill folder was created can leave an empty `devtwin-*` folder that blocks later installs for that agent; check that it is empty, then remove it with `rmdir`.
+To close a run that is stuck on a hold, or whose journal cannot be read, preview and apply a release. Release finishes every action it safely can, then closes the run and leaves the held files where they are. Those files then count as foreign: the kit never touches them again, so inspect and remove them by hand if they are leftovers. A crash right after a skill folder was created can leave an empty `devtwin-*` folder that blocks later installs for that agent. Check that it is empty, then remove it with `rmdir`.
 
 ```sh
 node "$KIT/bin/devtwin.mjs" agents recover --pilot "$LIVE_CONFIG" --release
@@ -333,14 +333,14 @@ Cursor also reads `~/.agents/skills`, so it will see the bundled skills. They be
 
 ## What the approved digest does not do
 
-The approved digest catches accidental edits to `live.json`. It does not stop deliberate same-user tampering: the same user can rewrite the live config and the digest together. The kit is not a sandbox; see the [security model](SECURITY-MODEL.md). If a live config change was interrupted, the previous live config can stay approved alongside the new one until the next approved live config change; finish or redo the change to clear it.
+The approved digest catches accidental edits to `live.json`. It does not stop deliberate same-user tampering: the same user can rewrite the live config and the digest together. The kit is not a sandbox; see the [security model](SECURITY-MODEL.md). If a live config change was interrupted, the previous live config can stay approved alongside the new one until the next approved live config change. Finish or redo the change to clear it.
 
 ## If the store is lost
 
 Without the store, installed `devtwin-*` entries have no matching journal and become unowned. The kit then refuses to update or remove them. Remove them by hand:
 
 1. List the entries: `ls -la ~/.claude/skills ~/.agents/skills | grep devtwin-`.
-2. For each entry, check that it is a real directory, not a link, that it holds only `SKILL.md` and `.devtwin-owned.json`, and that the receipt's `kind` is `skill-bundled` and its `configId` is your old live config's.
+2. Check each entry. It must be a real directory, not a link, and hold only `SKILL.md` and `.devtwin-owned.json`. The receipt's `kind` must be `skill-bundled` and its `configId` must be your old live config's.
 3. Move each checked entry into a private holding folder, such as one made with `mkdir -m 700 ~/.devtwin/removed`. Do not delete it yet. Leave alone any entry that fails a check.
 4. Move the old `live.json` aside too. `live init` refuses an existing live config or a non-empty store.
 5. Start again from step 6.

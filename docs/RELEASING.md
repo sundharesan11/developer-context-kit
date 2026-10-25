@@ -7,7 +7,7 @@ Nothing here authorizes changing repository visibility, pushing branches, publis
 ## Before making the repository public
 
 - [ ] **Rights and attribution:** confirm authority to license all included work under Apache-2.0; review the copyright holder in NOTICE; inventory copied or derived third-party material and retain its terms.
-- [ ] **History and privacy:** review all history and refs that will become public, not just the current tree. Inspect issues, pull requests, attachments, artifacts and screenshots too. If a credential was exposed, revoke or rotate it; removing a file is not sufficient.
+- [ ] **History and privacy:** review all history and refs that will become public, not only the current tree. Inspect issues, pull requests, attachments, artifacts and screenshots too. If a credential was exposed, revoke or rotate it; removing a file is not sufficient.
 - [ ] **Candidate selection:** review and merge the intended commits into the release branch. Verify that the GitHub default branch contains the documented commands and guides.
 - [ ] **Fresh checks:** run the full suite, package audit, acceptance harness and documented onboarding from the selected commit. Record platform, Node version and exact commit with the results.
 - [ ] **Private security channel:** choose a verified private contact while the repository is private. GitHub private vulnerability reporting is a public-repository feature: enable and verify it as part of an approved visibility change, before announcing the public alpha.
@@ -25,7 +25,7 @@ These are distinct checks. A successful secret scan cannot establish ownership.
 2. Inventory copied or derived code, templates, prose and assets. Record source, license and required attribution. References to upstream skill repositories do not transfer their licensing rights to this toolkit.
 3. Fetch the refs intended for publication and scan reachable history as well as the current tree. For example, use `gitleaks git . --log-opts=--all --redact=100` with the scanner installed, and retain detailed findings outside the checkout.
 4. Review commit messages, author/committer identities, filenames, client references, private URLs and documents manually. Secret scanners can miss these. Review issues, pull requests, release assets and Actions artifacts too.
-5. Record the commit/refs, tools, date, findings and unresolved decisions privately. If sensitive history is found, stop publication and agree on remediation. Do not rewrite shared history or force-push without approval.
+5. Record the commit/refs, tools, date, findings and unresolved decisions privately. If you find sensitive history, stop publication and agree on remediation. Do not rewrite shared history or force-push without approval.
 
 An empty scanner report means no matches under that scanner's rules, not “safe to publish.” If an actual secret is found, rotate it before planning history cleanup.
 
@@ -33,7 +33,7 @@ An empty scanner report means no matches under that scanner's rules, not “safe
 
 While the repository is private, agree on a real private contact route with invited collaborators. Do not invent an inbox in SECURITY.md or make the repository public merely to unlock a reporting feature.
 
-Once a visibility change is approved, an administrator can open **Settings → Advanced Security → Private vulnerability reporting → Enable**. Verify that **Security → Advisories** exposes **Report a vulnerability**, confirm maintainer notification settings, then update SECURITY.md. Do not submit a fake vulnerability report just to test the form.
+Once a visibility change is approved, an administrator can open **Settings → Advanced Security → Private vulnerability reporting → Enable**. Verify that **Security → Advisories** exposes **Report a vulnerability**, confirm maintainer notification settings, then update SECURITY.md. Do not submit a fake vulnerability report to test the form.
 
 GitHub documents this feature for public repositories in its [configuration guide](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository). This checklist does not enable it.
 
@@ -46,6 +46,7 @@ node --version
 git rev-parse HEAD
 npm test
 npm run check:package
+npm run check:writing
 git diff --check
 ```
 

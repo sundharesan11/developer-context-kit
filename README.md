@@ -24,7 +24,7 @@ A repository tells an agent what the code is. It rarely says why a decision was 
 ![Project sources are previewed through the CLI, approved into private stores, and read as briefs or selected handoffs. New observations return through explicit record operations.](docs/assets/architecture.svg)
 
 1. **Read.** devtwin scans a bounded set of repository files (README, agent instructions, manifests) and Git metadata. It never writes to the repository.
-2. **Review.** Every write is a preview first. You approve the exact plan fingerprint before anything is stored.
+2. **Review.** Every write is a preview first. You approve the exact plan fingerprint before devtwin stores anything.
 3. **Keep private.** Records live in local stores outside the repository, with private file modes.
 4. **Brief.** `context brief` returns at most 12 items and 24 KiB, with sources, freshness and unknowns.
 5. **Learn.** New decisions go back in as records, or out as a [selected-record handoff](docs/HANDOFF.md).

@@ -5,7 +5,8 @@
   "license": "Apache-2.0",
   "scripts": {
     "test": "node scripts/run-tests.mjs",
-    "check:package": "node scripts/check-package.mjs"
+    "check:package": "node scripts/check-package.mjs",
+    "check:writing": "node scripts/check-writing.mjs"
   },
   "type": "module",
   "engines": {

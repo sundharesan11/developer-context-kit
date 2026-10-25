@@ -49,7 +49,7 @@ Records are immutable, and a record ID is derived from its scope, project and re
 1. Run `doctor`. Its `bundles` check fails with a count of corrupt records.
 2. `handoff export` for that project fails with `INTEGRITY` and names the corrupt record IDs.
 3. Inspect `dataRoot/scopes/<scope>/projects/<project>/records/<record-id>/` locally. Keep the files; do not edit, rename or delete them, and do not paste their content into a public issue.
-4. Decide with the owner what happened. The CLI has no repair or quarantine command, and a corrupt record cannot be superseded through `record supersede`.
+4. Decide with the owner what happened. The CLI has no repair or quarantine command, and `record supersede` cannot supersede a corrupt record.
 
 ### Record schema v2
 

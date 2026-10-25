@@ -4,13 +4,13 @@ Status snapshot: 2026-10-25. This is a reviewed local pilot with an implemented 
 
 Last recorded CI evidence: [Pilot CI](CI.md) run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four lanes (macOS 15 and Ubuntu 24.04, each with Node 26.4.0 and 22.13.0) passed. That run is evidence for `8f1133a` only. A CI run for `b95ff72` is pending. Linux and the Node 22.13.0 floor remain evaluation lanes; support for them is not claimed.
 
-Local evidence at `b95ff72` (macOS, Node 26.12.1, not CI): 498 of 498 tests across 44 files, a clean package audit, and 33 acceptance checks with 32 passed and one `fresh-agent-smoke` deferred.
+Local evidence at `b95ff72` (macOS, Node 26.12.1, not CI): 498 of 498 tests across 44 files and a clean package audit. Acceptance ran 33 checks: 32 passed and one `fresh-agent-smoke` deferred.
 
 Skill-builder A/B, the source catalog, pinned acquisition, reviewed disposable source installation, portable selected-record handoff and live mode are implemented. Live mode passed its first activation on the owner's machine on 2026-10-25 at `b95ff72`; see [Live activation](LIVE.md). The public-alpha documentation adds a guided first run, architecture and release checklist. The core carries Apache-2.0; publication still needs the gates in [Releasing](RELEASING.md).
 
 ## What works in the pilot
 
-The pilot provides scoped project onboarding, immutable context records, decisions and supersession, bounded context briefs, advisory agent handoffs, disposable skill installation, fake-provider identity checks, private learning proposals and a read-only doctor. These are tool-level checks, not proof of real-agent behavior.
+The pilot provides scoped project onboarding, immutable context records, decisions and supersession, and bounded context briefs. It also provides advisory agent handoffs, disposable skill installation, fake-provider identity checks, private learning proposals and a read-only doctor. These are tool-level checks, not proof of real-agent behavior.
 
 The toolkit is licensed under Apache-2.0. The npm package remains marked private to prevent accidental publication. Owner rights/history clearance and the explicit public-release decision remain open. There is no live connector or send operation and no automatic migration. Installation files alone do not prove discovery by an agent.
 
@@ -41,7 +41,7 @@ The owner deferred priority 1 on 2026-10-16, so priority 2 was built first. On 2
 Frozen: bug fixes only. Milestone C is delivery priority 7. The approved design is [skill-builder.md](plans/skill-builder.md).
 
 1. **A: private creation tooling implemented.** Requirements → approved design → immutable draft → validation. The conversational skill and live behavior evaluation remain deferred.
-2. **B: disposable installation implemented and reviewed.** Approved generic/personal packages only, using owned copies and conflict-preserving removal. Plans bind content, validation and prior installed state. Byte edits, path-role changes and case-only renames are preserved/refused. Real homes remain gated.
+2. **B: disposable installation implemented and reviewed.** Approved generic/personal packages only, using owned copies and conflict-preserving removal. Plans bind content, validation and prior installed state. Installation preserves byte edits and refuses path-role changes and case-only renames. Real homes remain gated.
 3. **C: clean export, not implemented.** Explicit file selection and privacy/rights review. Export preparation is not publication.
 
 Live-model behavior evaluation needs an approved provider/account and synthetic fixture scope. Report it deferred when not run. Static format checks and scripted approval tests cannot demonstrate useful clarification, routing or writing quality. Fresh-session discovery is a separate activation check.
@@ -77,7 +77,7 @@ The six residuals recorded by the bounded pilot review are resolved and merged t
 - Resolved: the CLI install → uninstall → reinstall journal-ID collision was fixed and reviewed in B, with fresh generated IDs, exclusive run directories and regression tests.
 - Resolved: agent-home writes now require the installer's named target home, which must be listed in `pilot.agentHomes`; other mutators cannot write any agent home. The acceptance harness accepts repeated `--forbidden <path>` options and records them in its report. See [Security model](SECURITY-MODEL.md).
 - Resolved: unexpected Git query failures, including timeouts and refused repositories, fail closed with `GIT_QUERY_FAILED`. Only exit 128 with "not a git repository" means "not a repository". The tests that prove filters and hooks do not run during discovery remain. See [Agent protocol](AGENT-PROTOCOL.md).
-- Resolved: failed writes remove their own partial or temporary file, lock handles always close, run receipts are fsynced and restored on replay and Git output, remote count and remote URL length are bounded with `LIMIT`. SHA-256 is the file-identity authority; `mtimeMs` is informational. See [Storage](STORAGE.md).
+- Resolved: failed writes remove their own partial or temporary file, and lock handles always close. Run receipts are fsynced and restored on replay. Git output, remote count and remote URL length are bounded with `LIMIT`. SHA-256 is the file-identity authority; `mtimeMs` is informational. See [Storage](STORAGE.md).
 - Resolved: public record APIs refuse caller-supplied operation IDs. Records that falsely claim an onboarding operation, or carry malformed, self-referencing or cyclic supersession, are reported as corrupt. This is a same-user local tool, not a security boundary against a malicious process with the same filesystem access. See [Storage](STORAGE.md).
 - Resolved: re-onboarding a worktree retires earlier auto-created records that the new onboarding re-creates, unless `--keep-previous` is given. See [Guided onboarding](ONBOARDING.md).
 

@@ -21,13 +21,13 @@ Last verified run: run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. Al
 
 Commit IDs from `6a90cbf` onward were rewritten on 2026-10-25 to remove a client name from the history. File contents at each tip are unchanged, and `8f1133a` keeps its ID. The live activation ran at `b95ff72` under its earlier ID.
 
-A CI run for `b95ff72` is pending. The local run at `b95ff72` (macOS, Node 26.12.1) passed 498 of 498 tests across 44 files and the package audit, and acceptance reported 33 checks: 32 passed and one `fresh-agent-smoke` deferred. That is local evidence, not a CI result. Later commits, including branch work, need their own run before anyone cites their counts.
+A CI run for `b95ff72` is pending. The local run at `b95ff72` (macOS, Node 26.12.1) passed 498 of 498 tests across 44 files and the package audit. Acceptance reported 33 checks: 32 passed and one `fresh-agent-smoke` deferred. That is local evidence, not a CI result. Later commits, including branch work, need their own run before anyone cites their counts.
 
 ## What each job does
 
 1. Check out the event revision without leaving Git credentials in repository configuration.
 2. Set up the selected Node version and report the environment.
-3. Audit the exact source/package allowlist before running tests.
+3. Audit the exact source/package allowlist and the [writing rules](WRITING.md) before running tests.
 4. Run the full required-test suite.
 5. Create a fresh canonical pilot under the runner's temporary directory, outside the checkout.
 6. Run acceptance and verify 33 checks: 32 passed plus exactly one deferred `fresh-agent-smoke`. The harness also checks the required IDs.
@@ -48,7 +48,7 @@ The pins were resolved from the upstream tag refs on 2026-10-11. Updating them r
 
 Open the repository's **Actions → Pilot CI** page. Confirm the branch and commit, then inspect every matrix job and its conclusion. A push receipt proves only that Git accepted the commit, not that CI passed.
 
-For local checks, run `npm test`, `npm run check:package`, and the [acceptance demo](GETTING-STARTED.md). If `actionlint` is installed, also run `actionlint .github/workflows/ci.yml`; it is a development validator, not a runtime dependency. Static contract tests do not replace GitHub's workflow execution.
+For local checks, run `npm test`, `npm run check:package`, `npm run check:writing` and the [acceptance demo](GETTING-STARTED.md). If `actionlint` is installed, also run `actionlint .github/workflows/ci.yml`; it is a development validator, not a runtime dependency. Static contract tests do not replace GitHub's workflow execution.
 
 GitHub-hosted jobs can consume the account's Actions allowance for a private repository. This workflow does not change billing or repository settings. New pushes cancel older runs for the same workflow/ref; pull-request merge refs are separate.
 

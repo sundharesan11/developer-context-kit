@@ -1,0 +1,14 @@
+[
+  {
+    "file": "docs/ROADMAP.md",
+    "rule": "sentence-length",
+    "excerpt": "The create-from-template path (`skill template-list`, `skill template-seed`, `skill template-verify` and the templates under `templates/skills/`) may be built as part of the personal harness layer; it adds no install, export, validation ...",
+    "reason": "Pinned verbatim by test/docs.test.mjs as the recorded freeze exception; splitting it would break the contract the test checks."
+  },
+  {
+    "file": "docs/SKILL-BUILDER.md",
+    "rule": "sentence-length",
+    "excerpt": "The create-from-template path (`skill template-list`, `skill template-seed`, `skill template-verify` and the templates under `templates/skills/`) may be built as part of the personal harness layer; it adds no install, export, validation ...",
+    "reason": "Pinned verbatim by test/docs.test.mjs as the recorded freeze exception; splitting it would break the contract the test checks."
+  }
+]

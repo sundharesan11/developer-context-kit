@@ -44,7 +44,7 @@ node bin/devtwin.mjs profile apply --pilot "$PILOT_FILE" --work 'Backend service
 
 ## The setup skill
 
-`skills/devtwin-setup` conducts first-run setup. It checks `DEVTWIN_KIT` and the pilot path like the other bundled skills, and stops without creating anything if the pilot file is missing or `init` has not run. It asks at most five skippable questions, previews the full profile with `profile plan`, and lists the templates with `skill template-list`. It runs `profile apply` only after explicit approval from the user in the session for the plan just shown. A fingerprint an agent passes back is not consent. It creates no skill unless you ask.
+`skills/devtwin-setup` conducts first-run setup. It checks `DEVTWIN_KIT` and the pilot path like the other bundled skills, and stops without creating anything if the pilot file is missing or `init` has not run. It asks at most five skippable questions, previews the full profile with `profile plan`, and lists the templates with `skill template-list`. It runs `profile apply` only after explicit approval from the user in the session for the plan it showed last. A fingerprint an agent passes back is not consent. It creates no skill unless you ask.
 
 `devtwin-setup` is not yet in the bundled installer, so `agents install` does not install it. Live-mode activation passed on 2026-10-25; the installer wiring (U9 of the harness plan) is not built yet. Until then, you can read its `SKILL.md` in the kit checkout.
 
@@ -169,7 +169,7 @@ Personal state lives under the pilot's private roots, outside the clone:
 | Seeded template files | a directory under `inputsRoot` |
 | Skill workspaces | the skill builder's private workspace root |
 
-`npm run check:package` applies a private-state pattern to every tracked or unignored file and to the package dry run. It fails on `profile/`, `digests/`, `drafts/`, `stack/` and `skill-templates/` paths (and the existing records, operations, proposals, staging, runs and locks paths) at the repository root or under `data/`, `state/`, `config/`, `inputs/` or `private/`, including below `scopes/<scope>/`. `templates/skills/` and kit source such as `src/profile/` are allowed. Home-directory paths, non-example emails and terms from a denylist you keep outside the repository (`--denylist <file>`) also fail.
+`npm run check:package` applies a private-state pattern to every tracked or unignored file and to the package dry run. It fails on `profile/`, `digests/`, `drafts/`, `stack/` and `skill-templates/` paths, and on the existing records, operations, proposals, staging, runs and locks paths. These fail at the repository root or under `data/`, `state/`, `config/`, `inputs/` or `private/`, including below `scopes/<scope>/`. `templates/skills/` and kit source such as `src/profile/` are allowed. Home-directory paths, non-example emails and terms from a denylist you keep outside the repository (`--denylist <file>`) also fail.
 
 **Versioning your private instance.** The kit does not sync anything. To keep history of your profile, digests or template-made skills, copy them or export them (for example `profile export`) into a separate private repository or dotfiles manager. The private roots themselves must stay outside Git, so never `git init` in them: the profile routes refuse to write inside a Git worktree.
 

@@ -29,6 +29,7 @@
   "docs/SKILL-BUILDER.md",
   "docs/SKILL-SOURCES.md",
   "docs/STORAGE.md",
+  "docs/WRITING.md",
   "docs/assets/architecture.svg",
   "docs/plans/2026-10-14-001-fix-needs-update-audit-items-plan.md",
   "docs/plans/2026-10-16-001-feat-live-activation-plan.md",
@@ -56,9 +57,11 @@
   "schemas/registry.schema.json",
   "scripts/acceptance.mjs",
   "scripts/check-package.mjs",
+  "scripts/check-writing.mjs",
   "scripts/package-allowlist.json",
   "scripts/repo-snapshot.mjs",
   "scripts/run-tests.mjs",
+  "scripts/writing-allowlist.json",
   "site/.gitignore",
   "site/astro.config.mjs",
   "site/package-lock.json",
@@ -209,6 +212,7 @@
   "src/storage/plan.mjs",
   "src/storage/runs.mjs",
   "src/storage/source-read.mjs",
+  "src/writing/ste.mjs",
   "templates/client-profile.md",
   "templates/skills/slack-update/candidate/SKILL.md",
   "templates/skills/slack-update/design.json",
@@ -287,5 +291,6 @@
   "test/stack-digest.test.mjs",
   "test/stack-feed.test.mjs",
   "test/stack-fetch.test.mjs",
-  "test/stack-plan.test.mjs"
+  "test/stack-plan.test.mjs",
+  "test/writing.test.mjs"
 ]
