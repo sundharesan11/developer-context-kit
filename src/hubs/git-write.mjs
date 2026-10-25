@@ -117,9 +117,16 @@ function resetToRemote(binding) {
   required(hubGit(binding, ["reset", "-q", "--hard", remoteRef(binding)]), "reset");
   required(hubGit(binding, ["clean", "-fdq"]), "clean");
 }
+// A removal of a file that is already gone (for example an own note that an earlier item deleted) stages nothing and
+// does not fail. When nothing is staged at all, no commit is made and the push sends nothing new.
 async function commit(roots, binding, writes, message) {
   await writeFiles(roots, binding, writes);
-  required(hubGit(binding, ["add", "-A", "--", ...writes.map((w) => w.rel)]), "add");
+  const adds = writes.filter((w) => w.content !== null).map((w) => w.rel), removes = writes.filter((w) => w.content === null).map((w) => w.rel);
+  if (adds.length) required(hubGit(binding, ["add", "-A", "--", ...adds]), "add");
+  if (removes.length) required(hubGit(binding, ["rm", "-q", "--cached", "--ignore-unmatch", "--", ...removes]), "rm");
+  const staged = hubGit(binding, ["diff", "--cached", "--quiet"]);
+  if (staged.ok) return;
+  if (staged.status !== 1) required(staged, "diff");
   required(hubGit(binding, [...identity(binding), "commit", "-q", "--no-verify", "-m", message]), "commit");
 }
 // U12 (KTD3): the predecessor check for a replacement. It reads the fetched remote branch, never the clone's work tree,

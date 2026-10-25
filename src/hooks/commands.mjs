@@ -4,15 +4,22 @@ import { isAbsolute, join } from "node:path";
 import { SCOPE_ID } from "../identity/ids.mjs";
 import { readIndex, findRepoRoot, readCommonDir, resolveRepo } from "../lessons/index.mjs";
 import { matchLessons } from "../lessons/match.mjs";
-import { repoPaths } from "./paths.mjs";
 import { readPilotBytes, receiptProblem, writeKitReceipt } from "./receipt.mjs";
 import { ownerAction, denyOutput } from "./owner-block.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
-import { sessionKey, readSession, writeSession, removeSession, pruneSessions, logBudget, logHook, budgetReport } from "./session.mjs";
+import { pilotDigest } from "../config/pilot.mjs";
+import { readHubBinding } from "../config/store.mjs";
+import { isolationTerms } from "../records/isolation.mjs";
+import { postFromHook, reportNotes, readNotesCache, NOTE_NOTICE } from "../notes/post.mjs";
+import { repoPaths, isEditCall } from "./paths.mjs";
+import { sessionKey, readSession, writeSession, removeSession, pruneSessions, logBudget, logHook, budgetReport, readNoteState, writeNoteState } from "./session.mjs";
 // U7: `devtwin hook --event <event> --agent <agent> --pilot <path>` (KTD6, KTD8, KTD17, KTD22, KTD23). It reads the
 // agent's JSON payload on stdin and prints the agent's additionalContext JSON, or nothing. It never loads or checks the
 // full pilot: it reads stateRoot from the pilot file and trusts the kit receipt. It takes no lock, never rebuilds the
 // index, makes no network call and never returns a permission decision. Every failure exits 0 with no output.
+// U13: a pre-tool or post-tool edit call in a hub-bound project posts a "working on" note to the outbox under the
+// standing note consent (src/notes/post.mjs), and any tool call with paths reports a colleague's matching note. Note
+// failures are logged and never stop lesson delivery.
 // U8: on pre-tool, the owner-action block (owner-block.mjs) runs first. When it denies, the call prints only that deny,
 // with no lessons. It needs no receipt and no valid pilot. Every other call goes on to the lesson path unchanged.
 const EVENTS = { "session-start": "SessionStart", "user-prompt": "UserPromptSubmit", "pre-tool": "PreToolUse", "post-tool": "PostToolUse", "pre-compact": "PreCompact", "post-compact": "PostCompact" };
@@ -101,7 +108,7 @@ async function deliver(stateRoot, { agent, key, found, matches, now }) {
   const text = [head, ...sent.map((m) => "- " + m.line), ...(overflow ? [overflow] : [])].join("\n");
   return { text, lines: sent.length, overflow: overflow ? 1 : 0, next: { ...state, delivered: [...state.delivered, ...sent.map((m) => m.id)], lines: state.lines + sent.length, overflowed: state.overflowed || Boolean(overflow) } };
 }
-async function respond({ stateRoot, pilotPath, pilotBytes, agent, event, payload, kitRoot, now }) {
+async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, payload, kitRoot, now }) {
   const adapter = ADAPTERS[agent];
   if (payload.hook_event_name !== undefined && payload.hook_event_name !== event) throw new Quiet("event-mismatch");
   const sessionId = payload.session_id;
@@ -129,11 +136,39 @@ async function respond({ stateRoot, pilotPath, pilotBytes, agent, event, payload
   } else {
     const paths = repoPaths(agent, payload, { cwd: found.cwd, root: found.root });
     if (!paths.length) return null;
+    const notes = await noteStep({ stateRoot, pilot, agent, key, found, paths, edit: isEditCall(agent, payload), now });
     matches = matchLessons(found.index, { paths, project, now });
+    const lessons = matches.length ? await deliver(stateRoot, { agent, key, found, matches, now }) : null;
+    if (!lessons && !notes) return null;
+    return { text: [lessons?.text, notes?.text].filter(Boolean).join("\n"), lines: lessons?.lines ?? 0, overflow: lessons?.overflow ?? 0, notes: notes?.count ?? 0, next: lessons?.next, noteNext: notes?.next, key };
   }
   if (!matches.length) return null;
   const out = await deliver(stateRoot, { agent, key, found, matches, now });
   return out && { ...out, key };
+}
+// The roots for the note path, from the pilot the receipt vouches for. The full pilot load (with its Git checks) ran
+// at `hook verify`; this keeps assertWritable's fence check, which reads no Git.
+const hookRoots = (pilot, path) => ({ configRoot: pilot.configRoot, dataRoot: pilot.dataRoot, stateRoot: pilot.stateRoot, pilot: Object.freeze({ ...pilot, path, _context: {}, digest: pilotDigest(pilot), warnings: [] }) });
+// U13: post on an edit call, then report matching colleague notes. Posting writes its state at once, so the six-note
+// cap holds even when the output fails; the report state is written after the output, as for lessons.
+async function noteStep({ stateRoot, pilot, agent, key, found, paths, edit, now }) {
+  const at = now.toISOString(), log = (code) => logHook(stateRoot, { at, agent, event: edit ? "note-post" : "note-report", code });
+  try {
+    if (!pilot) return null;
+    const roots = hookRoots(pilot.value, pilot.path);
+    const binding = await readHubBinding(roots, found.repo.scope);
+    if (binding?.status !== "joined" || binding.delivery !== "on") return null;
+    let state = await readNoteState(stateRoot, agent, key);
+    if (!state) { log("note-state-corrupt"); return null; }
+    if (edit) {
+      const post = await postFromHook({ roots, binding, state, paths, root: found.root, sessionKey: key, terms: () => isolationTerms(roots), now });
+      if (post.code) log(post.code);
+      if (post.note) log("note-queued");
+      if (post.state !== state) { await writeNoteState(stateRoot, key, post.state, now); state = post.state; }
+    }
+    const report = reportNotes({ notes: await readNotesCache(roots, binding), binding, state, paths, now });
+    return report.lines.length ? { text: [NOTE_NOTICE, ...report.lines].join("\n"), count: report.lines.length, next: report.state } : null;
+  } catch (error) { log("note-" + String(error?.code ?? "internal").replace(/^DEVTWIN_/, "").toLowerCase()); return null; }
 }
 export async function runHook(args, { stdin = process.stdin, stdout = process.stdout, now = () => new Date(), kitRoot } = {}) {
   let values;
@@ -141,12 +176,12 @@ export async function runHook(args, { stdin = process.stdin, stdout = process.st
   catch { return 0; }
   const event = EVENTS[values.event], agent = values.agent;
   if (!event || !Object.hasOwn(ADAPTERS, agent) || !values.pilot) return 0;
-  let stateRoot = null, pilotPath = null, pilotBytes = null;
+  let stateRoot = null, pilotPath = null, pilotBytes = null, pilot = null;
   const at = now();
   try {
     pilotPath = realpathSync(values.pilot); pilotBytes = readPilotBytes(pilotPath);
-    const pilot = JSON.parse(pilotBytes.toString("utf8"));
-    if (typeof pilot?.stateRoot === "string" && isAbsolute(pilot.stateRoot)) stateRoot = pilot.stateRoot;
+    const value = JSON.parse(pilotBytes.toString("utf8"));
+    if (typeof value?.stateRoot === "string" && isAbsolute(value.stateRoot)) { stateRoot = value.stateRoot; pilot = { value, path: pilotPath }; }
   } catch { stateRoot = null; }
   try {
     const payload = await readPayload(stdin);
@@ -160,12 +195,14 @@ export async function runHook(args, { stdin = process.stdin, stdout = process.st
       }
     }
     if (!stateRoot) return 0;
-    const result = await respond({ stateRoot, pilotPath, pilotBytes, agent, event, payload, kitRoot, now: at });
+    const result = await respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, payload, kitRoot, now: at });
     if (!result) return 0;
-    // Output first, then state: a write that fails after output can only repeat a lesson, never hide one.
+    // Output first, then state: a write that fails after output can only repeat a lesson or a note, never hide one.
     stdout.write(JSON.stringify(ADAPTERS[agent].output(event, result.text)) + "\n");
     if (result.next) await writeSession(stateRoot, result.key, result.next, at);
-    logBudget(stateRoot, { at: at.toISOString(), agent, session: result.key, event, bytes: Buffer.byteLength(result.text), lines: result.lines, overflow: result.overflow });
+    if (result.noteNext) await writeNoteState(stateRoot, result.key, result.noteNext, at);
+    // Note report bytes count in bytes; notes counts the note lines.
+    logBudget(stateRoot, { at: at.toISOString(), agent, session: result.key, event, bytes: Buffer.byteLength(result.text), lines: result.lines, overflow: result.overflow, ...(result.notes ? { notes: result.notes } : {}) });
   } catch (error) {
     if (stateRoot) logHook(stateRoot, { at: at.toISOString(), agent, event, code: error instanceof Quiet ? error.code : error?.code ?? "internal" });
   }

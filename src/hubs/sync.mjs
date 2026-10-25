@@ -2,6 +2,7 @@
 // hub-sync lock, fetches with a timeout, drains the outbox, reads the clone through src/hubs/read.mjs and rebuilds
 // the lesson index with the hub as a source. A failed fetch keeps the old clone and the last sync time. U12: it also
 // records replacements of this developer's own lessons as notices (src/lessons/supersede.mjs).
+// U13: it writes the notes cache that the hook reads (src/notes/post.mjs).
 import { join } from "node:path";
 import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
@@ -12,6 +13,7 @@ import { canonicalJson } from "../storage/canonical.mjs";
 import { isolationTerms } from "../records/isolation.mjs";
 import { rebuildIndex } from "../lessons/index.mjs";
 import { recordNotices } from "../lessons/supersede.mjs";
+import { writeNotesCache } from "../notes/post.mjs";
 import { HUB_SCHEMA_VERSION, readHub, readHubManifest } from "./read.mjs";
 import { hubGit, withHubLock, hubStateDir, drainOutbox, listOutbox } from "./git-write.mjs";
 
@@ -86,12 +88,15 @@ export async function syncHub(roots, scope, { now = () => new Date(), job = fals
     let notices;
     try { notices = read.readOnly ? { added: 0, pending: null } : await recordNotices(roots, binding, read, { now }); }
     catch (error) { notices = { added: 0, pending: null, problem: error.code ?? "DEVTWIN_INTERNAL" }; }
+    // U13: the active notes, cached for the hook, which reads no Git. A failed cache write is reported, not fatal.
+    let notesCache = "written";
+    try { await writeNotesCache(roots, binding, read.notes); } catch (error) { notesCache = error.code ?? "DEVTWIN_INTERNAL"; }
     const index = await rebuildIndex(roots, binding.scope);
     const state = { lastAttemptAt: at, lastSyncedAt: fetched ? at : previous?.lastSyncedAt ?? binding.joinedAt, lastResult: fetched ? "ok" : "fetch-failed" };
     await writeSyncState(roots, binding.hubId, state);
     const age = syncAge(state, now());
     return { scope: binding.scope, hubId: binding.hubId, fetched, readOnly, lastSyncedAt: state.lastSyncedAt, hoursSinceSync: age.hours, warning: age.warning,
-      outbox, lessons: read.lessons.length, notes: read.notes.length, expiredNotes: read.expiredNotes, refused: read.refused,
+      outbox, lessons: read.lessons.length, notes: read.notes.length, expiredNotes: read.expiredNotes, notesCache, refused: read.refused,
       tombstones: { removed: read.removed, ignored: read.ignoredTombstones },
       supersession: { superseded: read.superseded.map((x) => x.id), contested: read.contested, ignored: read.ignoredSupersessions }, notices, warnings: read.warnings, index: { written: index.written, fingerprint: index.fingerprint, counts: index.counts } };
   });

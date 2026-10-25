@@ -5,6 +5,9 @@ import { normalizeRelPath } from "../lessons/match.mjs";
 // content or runs Git. A path outside the root, or one that cannot be made relative, is dropped.
 const MAX_PATHS = 64, MAX_TOKENS = 256, MAX_COMMAND_BYTES = 65536;
 const CLAUDE_FILE_TOOLS = new Set(["Read", "Edit", "Write", "MultiEdit", "NotebookEdit"]);
+// U13: the tool calls that edit files. Only these post a "working on" note.
+const CLAUDE_EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+export const isEditCall = (agent, payload) => agent === "claude" ? CLAUDE_EDIT_TOOLS.has(payload?.tool_name) : agent === "codex" && payload?.tool_name === "apply_patch";
 const CLAUDE_DIR_TOOLS = new Set(["Glob", "Grep"]);
 const SHELL_TOOLS = new Set(["Bash", "shell", "local_shell", "exec_command"]);
 const PATCH_LINE = /^\*\*\* (?:Update File|Add File|Delete File|Move to): (.+?)\s*$/;

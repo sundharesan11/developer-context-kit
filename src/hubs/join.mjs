@@ -70,7 +70,7 @@ function hubRootFor(roots, requested) {
   return requested ?? approved[0];
 }
 const canonical = (path) => { const at = deepestExisting(path); return join(realpathSync(at), relative(at, path)); };
-const noteConsentText = "Notes: while you work, devtwin may post a short note to this hub with at most " + NOTE_RULES.maxPaths + " repo-relative paths, one line in the form \"" + NOTE_RULES.lineFormat + "\", your handle and the time. A note expires after " + NOTE_RULES.expiryHours + " hours. The line is built from the branch name and changed areas, never from your prompts.";
+export const NOTE_CONSENT_TEXT = "Notes: while you work, devtwin may post a short note to this hub with at most " + NOTE_RULES.maxPaths + " repo-relative paths, one line in the form \"" + NOTE_RULES.lineFormat + "\", your handle and the time. A note expires after " + NOTE_RULES.expiryHours + " hours. The line is built from the branch name and changed areas, never from your prompts.";
 
 // Preview: the binding and consent to record. It checks that the remote answers (git ls-remote) and writes nothing.
 export async function planJoin(roots, input) {
@@ -88,13 +88,13 @@ export async function planJoin(roots, input) {
   return finalizePlan({
     kind: "hub-join", scope, remote, host, handle: input.handle, actorRef: "handle:" + input.handle, email: input.email, sshCommand: input.sshCommand ?? null,
     hubRoot, clone, binding: hubBindingPath(roots, scope),
-    noteConsent: { rules: NOTE_RULES, rulesDigest: NOTE_RULES_DIGEST, text: noteConsentText },
+    noteConsent: { rules: NOTE_RULES, rulesDigest: NOTE_RULES_DIGEST, text: NOTE_CONSENT_TEXT },
     offer: { step: "job-hub-sync", command: "hub schedule --scope " + scope, offSwitch: HUB_SYNC_OFF_SWITCH }
   });
 }
 const joinDialog = (plan) => ({ title: "Join an organization hub", body: [
   "Scope: " + plan.scope, "Remote: " + plan.remote, "Handle: " + plan.handle + " (commits as " + plan.email + ")",
-  "SSH command: " + (plan.sshCommand ?? "default ssh"), "Local copy: " + plan.clone, "", noteConsentText,
+  "SSH command: " + (plan.sshCommand ?? "default ssh"), "Local copy: " + plan.clone, "", NOTE_CONSENT_TEXT,
   "", "Accepted lessons you publish later go to this hub. Anyone with push access to it can add files."
 ].join("\n") });
 function cloneArgs(remote, target) {
@@ -170,6 +170,9 @@ export async function applyLeave(roots, { scope }, { fingerprint, now = () => ne
     const outbox = join(hubStateDir(roots, binding.hubId), "outbox");
     assertWritable(roots, [outbox]);
     rmSync(outbox, { recursive: true, force: true });
+    const notesCache = join(hubStateDir(roots, binding.hubId), "notes.json");
+    assertWritable(roots, [notesCache]);
+    rmSync(notesCache, { force: true });
     await writeHubBinding(roots, { ...binding, status: "left", delivery: "off", noteConsent: null, jobs: { hubSync: { enabled: false, label: hubSyncLabel(binding.scope), plist: null, installedAt: null } }, leftAt: now().toISOString() });
     const index = await rebuildIndex(roots, binding.scope);
     return { left: true, scope: binding.scope, hubId: binding.hubId, cloneRemoved: Boolean(node), job, index: { written: index.written, counts: index.counts } };
