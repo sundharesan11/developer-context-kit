@@ -10,11 +10,11 @@ It is manual. Nothing runs on a schedule.
 ## The four steps
 
 ```sh
-node bin/devtwin.mjs stack plan    --pilot "$PILOT"
-node bin/devtwin.mjs stack approve --pilot "$PILOT" --plan-fingerprint '<fingerprint>'
-node bin/devtwin.mjs stack check   --pilot "$PILOT"
-node bin/devtwin.mjs stack digest  --pilot "$PILOT" --scope example
-node bin/devtwin.mjs stack digest  --pilot "$PILOT" --scope example --apply --plan-fingerprint '<digest fingerprint>'
+devtwin stack plan    --pilot "$PILOT"
+devtwin stack approve --pilot "$PILOT" --plan-fingerprint '<fingerprint>'
+devtwin stack check   --pilot "$PILOT"
+devtwin stack digest  --pilot "$PILOT" --scope example
+devtwin stack digest  --pilot "$PILOT" --scope example --apply --plan-fingerprint '<digest fingerprint>'
 ```
 
 | Step | Network | Writes |
@@ -30,7 +30,7 @@ node bin/devtwin.mjs stack digest  --pilot "$PILOT" --scope example --apply --pl
 With a profile whose current stack is `node=>=22:high` and `react`:
 
 ```sh
-node bin/devtwin.mjs stack plan --pilot "$PILOT"
+devtwin stack plan --pilot "$PILOT"
 ```
 
 ```json
@@ -55,7 +55,7 @@ Each item is resolved against the bundled catalog `catalog/stack-sources.json`, 
 ## 2. Approve
 
 ```sh
-node bin/devtwin.mjs stack approve --pilot "$PILOT" --plan-fingerprint 'sha256:b568…'
+devtwin stack approve --pilot "$PILOT" --plan-fingerprint 'sha256:b568…'
 ```
 
 ```json
@@ -71,7 +71,7 @@ Run `stack plan` again any time; its `approval` field says whether the stored ap
 ## 3. Check
 
 ```sh
-node bin/devtwin.mjs stack check --pilot "$PILOT"
+devtwin stack check --pilot "$PILOT"
 ```
 
 `stack check` fetches from the approved hosts only and returns structured findings. It writes nothing. If anything differs from the stored approval, it fails with `DEVTWIN_APPROVAL_REQUIRED` before making any request.
@@ -79,13 +79,13 @@ node bin/devtwin.mjs stack check --pilot "$PILOT"
 ## 4. Digest
 
 ```sh
-node bin/devtwin.mjs stack digest --pilot "$PILOT" --scope example
+devtwin stack digest --pilot "$PILOT" --scope example
 ```
 
 The preview runs the watch, renders a Markdown digest, and writes only a pending file. Review it, then apply its fingerprint:
 
 ```sh
-node bin/devtwin.mjs stack digest --pilot "$PILOT" --scope example --apply --plan-fingerprint '<digest fingerprint>'
+devtwin stack digest --pilot "$PILOT" --scope example --apply --plan-fingerprint '<digest fingerprint>'
 ```
 
 Apply makes no request. It writes the dated digest and records the reported entries as seen, so the next digest lists them as previously reported.
@@ -118,7 +118,7 @@ The default group, `announcements`, covers vendor changelog feeds and GitHub rel
 Add your own sources for a declared item:
 
 ```sh
-node bin/devtwin.mjs stack plan --pilot "$PILOT" \
+devtwin stack plan --pilot "$PILOT" \
   --feed 'react=https://react.dev/rss.xml' \
   --map 'react=github:facebook/react'
 ```

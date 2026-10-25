@@ -52,6 +52,7 @@ export default defineConfig({
 					label: 'Concepts',
 					items: [
 						'docs/concepts/how-it-works',
+						'docs/concepts/comparison',
 						'docs/concepts/records',
 						'docs/concepts/briefs',
 						'docs/concepts/scopes-and-projects',
@@ -88,7 +89,7 @@ export default defineConfig({
 				},
 				{
 					label: 'Project',
-					items: ['docs/project/contributing', 'docs/project/roadmap'],
+					items: ['docs/project/faq', 'docs/project/roadmap', 'docs/project/contributing'],
 				},
 				{
 					label: 'Ask DeepWiki',

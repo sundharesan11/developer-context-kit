@@ -43,7 +43,7 @@ The whole profile is capped at 4,096 bytes of canonical JSON (`DEVTWIN_LIMIT` be
 ### Read it
 
 ```sh
-node bin/devtwin.mjs profile show --pilot "$PILOT"
+devtwin profile show --pilot "$PILOT"
 ```
 
 ```json
@@ -55,7 +55,7 @@ node bin/devtwin.mjs profile show --pilot "$PILOT"
 ### Preview a change
 
 ```sh
-node bin/devtwin.mjs profile plan --pilot "$PILOT" \
+devtwin profile plan --pilot "$PILOT" \
   --work 'Backend services' \
   --preference 'explanationStyle=concise' --preference 'autonomy=ask-first' \
   --stack-current 'node=>=22:high' --stack-current 'react' \
@@ -81,7 +81,7 @@ How flags combine: the plan starts from your current profile. Each flag you pass
 Pass exactly the same flags plus the reviewed fingerprint:
 
 ```sh
-node bin/devtwin.mjs profile apply --pilot "$PILOT" \
+devtwin profile apply --pilot "$PILOT" \
   --work 'Backend services' \
   --preference 'explanationStyle=concise' --preference 'autonomy=ask-first' \
   --stack-current 'node=>=22:high' --stack-current 'react' \
@@ -135,7 +135,7 @@ A template contains no personal data and no scripts, and is never installed by `
 ### 1. List templates
 
 ```sh
-node bin/devtwin.mjs skill template-list
+devtwin skill template-list
 ```
 
 No pilot needed. Each template lists its placeholders, which are required, and their defaults.
@@ -143,13 +143,13 @@ No pilot needed. Each template lists its placeholders, which are required, and t
 ### 2. Create a private workspace
 
 ```sh
-node bin/devtwin.mjs skill workspace-create --pilot "$PILOT" --audience personal --workspace ws_example01
+devtwin skill workspace-create --pilot "$PILOT" --audience personal --workspace ws_example01
 ```
 
 ### 3. Render the template
 
 ```sh
-node bin/devtwin.mjs skill template-seed --pilot "$PILOT" \
+devtwin skill template-seed --pilot "$PILOT" \
   --audience personal --workspace ws_example01 \
   --template writing --set 'skill-name=draft-my-notes'
 ```
@@ -169,7 +169,7 @@ After you review the rendered files, write them **unchanged** into a new directo
 ### 5. Verify the bytes
 
 ```sh
-node bin/devtwin.mjs skill template-verify --pilot "$PILOT" \
+devtwin skill template-verify --pilot "$PILOT" \
   --audience personal --workspace ws_example01 \
   --template writing --set 'skill-name=draft-my-notes' \
   --dir /absolute/path/to/pilot/inputs/seeded-writing \
@@ -197,8 +197,8 @@ Installing a template-made skill into your real agent homes is not available yet
 The `writing` and `slack-update` skills never send anything. When you want to keep a draft, save it privately:
 
 ```sh
-node bin/devtwin.mjs draft save --pilot "$PILOT" --scope example --body-file /absolute/path/to/pilot/inputs/draft.md
-node bin/devtwin.mjs draft save --pilot "$PILOT" --scope example --body-file /absolute/path/to/pilot/inputs/draft.md \
+devtwin draft save --pilot "$PILOT" --scope example --body-file /absolute/path/to/pilot/inputs/draft.md
+devtwin draft save --pilot "$PILOT" --scope example --body-file /absolute/path/to/pilot/inputs/draft.md \
   --apply --plan-fingerprint '<fingerprint>'
 ```
 

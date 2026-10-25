@@ -25,7 +25,7 @@ REPO=/absolute/path/to/atlas
 ## 1. Preview the onboarding
 
 ```sh
-node bin/devtwin.mjs project onboard \
+devtwin project onboard \
   --pilot "$PILOT" --scope example --project example.atlas \
   --repo "$REPO" --environment staging \
   --request-id req_atlas_onboard_01 --accept all
@@ -88,7 +88,7 @@ Changing the selection changes the plan, so preview again with the new `--accept
 Repeat every preview flag unchanged and add `--apply --plan-fingerprint`:
 
 ```sh
-node bin/devtwin.mjs project onboard \
+devtwin project onboard \
   --pilot "$PILOT" --scope example --project example.atlas \
   --repo "$REPO" --environment staging \
   --request-id req_atlas_onboard_01 --accept all \
@@ -113,8 +113,8 @@ The request ID is the idempotency key. Retrying the exact same approved request 
 Resolve the worktree to its project, then read the brief:
 
 ```sh
-node bin/devtwin.mjs context resolve --pilot "$PILOT" --scope example --cwd "$REPO"
-node bin/devtwin.mjs context brief   --pilot "$PILOT" --scope example --cwd "$REPO"
+devtwin context resolve --pilot "$PILOT" --scope example --cwd "$REPO"
+devtwin context brief   --pilot "$PILOT" --scope example --cwd "$REPO"
 ```
 
 `context resolve` returns `"state":"bound"`, the `project`, and the `worktree` (`root`, `branch`, `head`, `dirty`). The brief lists the records you accepted with their freshness. See [Briefs](/docs/concepts/briefs/).

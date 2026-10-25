@@ -71,6 +71,8 @@ devtwin version
 
 The rest of these docs use `devtwin` in examples. If you skip the alias, run `node bin/devtwin.mjs` from the checkout instead.
 
+When you later set up [live mode](/docs/guides/live-mode/), point the alias at the pinned kit clone, `~/.devtwin/kit`. Live commands refuse to run from any other checkout.
+
 :::caution[Don't install it globally]
 Do not run `npm install -g` or `npm link` for this checkout, and do not install an unrelated npm package that happens to be called `devtwin`. Run the CLI from your clone.
 :::
