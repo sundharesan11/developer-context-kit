@@ -262,6 +262,7 @@
   "test/pilot.test.mjs",
   "test/profile-cli.test.mjs",
   "test/profile.test.mjs",
+  "test/records-v2.test.mjs",
   "test/records.test.mjs",
   "test/redact.test.mjs",
   "test/repair-regressions.test.mjs",

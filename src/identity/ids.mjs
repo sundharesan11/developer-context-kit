@@ -12,11 +12,15 @@ export function assertProjectId(id, scope) { if (typeof id !== "string" || id.le
 export function assertAgent(id) { if (typeof id !== "string" || !AGENT_ID.test(id)) invalid(); return id; }
 export function assertActorRef(id) { if (typeof id !== "string" || !ACTOR_REF.test(id)) invalid(); return id; }
 const hex = (text) => createHash("sha256").update(text).digest("hex").slice(0, 24);
+const checkRequestId = (requestId) => { if (typeof requestId !== "string" || !/^req_[a-z0-9_-]{8,64}$/.test(requestId)) invalid(); };
 function checkRequest({ scope, project, requestId }) {
   assertScopeId(scope); assertProjectId(project, scope);
-  if (typeof requestId !== "string" || !/^req_[a-z0-9_-]{8,64}$/.test(requestId)) invalid();
+  checkRequestId(requestId);
 }
 // Record IDs are derived, never trusted from disk: readBundle recomputes recordIdFor from the stored scope, project and requestId.
 export const recordIdFor = (value) => { checkRequest(value); return "rec_" + hex(value.scope + "\0" + value.project + "\0" + value.requestId); };
+// Personal and org IDs start with a NUL tag. A project ID input always starts with a scope, so the forms cannot collide.
+export const personalRecordIdFor = ({ requestId }) => { checkRequestId(requestId); return "rec_" + hex("\0personal\0" + requestId); };
+export const orgRecordIdFor = ({ scope, requestId }) => { assertScopeId(scope); checkRequestId(requestId); return "rec_" + hex("\0org\0" + scope + "\0" + requestId); };
 // Operation IDs are stamped only by onboarding (commitOnboardingBundle); public record APIs refuse them and readSnapshot trusts one only when its manifest lists the record.
 export const operationIdFor = (value) => { checkRequest(value); return "op_" + digest({ scope: value.scope, project: value.project, requestId: value.requestId }).slice(7, 31); };

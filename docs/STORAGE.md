@@ -51,6 +51,15 @@ Records are immutable, and a record ID is derived from its scope, project and re
 3. Inspect `dataRoot/scopes/<scope>/projects/<project>/records/<record-id>/` locally. Keep the files; do not edit, rename or delete them, and do not paste their content into a public issue.
 4. Decide with the owner what happened. The CLI has no repair or quarantine command, and a corrupt record cannot be superseded through `record supersede`.
 
+### Record schema v2
+
+New records use schema 2. Readers accept schema 1 and 2, and a schema 1 record is never rewritten.
+
+- **Kinds.** Schema 2 adds the kinds `lesson` and `preference`.
+- **Class.** `class` is `fact` or `lesson`. A fact stays in its project. A `lesson` record always has class `lesson`.
+- **Reach.** The top-level `reach` is `personal`, `project` or `org`. A fact has project reach, and a preference never has project reach. The project store accepts project reach only. `applicability.level` keeps its schema 1 values.
+- **Match.** `match` holds `paths`, `packages` and `topics`, at most 20, 20 and 10 distinct entries. Paths are repo-relative globs that use `*` and `?`. They follow the `file:` source rules: no absolute path, no `..` and no denied file such as `.env*` or `*.pem`.
+
 ## File identity and interrupted writes
 
 SHA-256 of the exact bytes is the authority for source identity. A bound source must also match its device, inode, size and ancestor chain. The stored `mtimeMs` is kept for compatibility and is informational only; it is never compared across reads. Within one read, a change in size, modification time or change time during the read is refused as a changed file.
