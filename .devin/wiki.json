@@ -1,13 +1,13 @@
 {
   "repo_notes": [
     {
-      "content": "devtwin (CLI: devtwin) is a local, zero-dependency Node.js (>=22.13, ESM .mjs) CLI that keeps project context between coding-agent sessions. The owner's vision is to 'clone the developer': (1) project context, decisions and handoffs stored as private, source-linked, reviewable records OUTSIDE the project repository, read back as bounded briefs at session start; (2) the same context for every coding agent (Claude Code, Codex) through bundled skills; (3) organization identity routing, where each scope binds its own GitHub and Slack accounts; (4) a personal harness: a private profile plus skill templates the user turns into their own private skills. Entry point: bin/devtwin.mjs -> src/cli.mjs, which dispatches '<group> <action>' commands to src/<area>/commands.mjs modules. Every command prints a JSON envelope {ok, command, result | error} (schemas/envelope.schema.json)."
+      "content": "devtwin (CLI: devtwin) is a local, zero-dependency Node.js (>=22.13, ESM .mjs) CLI that keeps project context between coding-agent sessions. The owner's vision is to 'clone the developer': (1) project context, decisions and handoffs stored as private, source-linked, reviewable records OUTSIDE the project repository, read back as bounded briefs at session start; (2) the same context for every coding agent (Claude Code, Codex) through bundled skills; (3) organization identity routing, where each scope binds its own GitHub and Slack accounts; (4) a personal harness: a private profile plus skill templates the user turns into their own private skills. Entry point: bin/devtwin.mjs -> src/cli.mjs, which dispatches '<group> <action>' commands to src/<area>/commands.mjs modules. Every command prints a JSON envelope {ok, command, result | error} (schemas/envelope.schema.json). The product was renamed from devctx (Developer Context Kit); docs/MIGRATING.md and src/config/legacy.mjs cover the one-transition compatibility and 'live migrate'. The CLI is run from a checkout (node bin/devtwin.mjs); it is not published to npm yet."
     },
     {
       "content": "Key boundary: the public kit (this repository: code, schemas, generic templates, tests) never contains private data. Pilot configuration, project records, profiles, drafts and operation receipts live under separate private roots described in docs/STORAGE.md. Stateful commands require an explicit pilot file (disposable pilot) or a live config (one real machine). Writes use preview -> approval (plan fingerprint) -> apply. Records are superseded, never silently overwritten, and carry source hashes (file:, commit:, issue: sources) so briefs can report freshness. When documenting, explain these invariants and point to the tests in test/*.test.mjs that enforce them."
     },
     {
-      "content": "Documentation map: user-facing docs live in site/src/content/docs/docs/** (Astro + Starlight site in site/). Maintainer contracts live in docs/*.md. docs/plans/** and docs/research/** are design history; use them for rationale but describe current behaviour from src/ and tests, and clearly label anything that exists only in a plan (for example organization identity routing beyond the auth library in src/auth/) as planned. Ignore site/samples/** (design mockups). Prefer concrete file paths and function names; keep pages concise."
+      "content": "Documentation map: user-facing docs live in site/src/content/docs/docs/** (Astro + Starlight site in site/). Maintainer contracts live in docs/*.md (index: docs/README.md). The site is published at https://sundharesan11.github.io/devtwin/ with docs under /devtwin/docs/. docs/plans/** and docs/research/** are design history; use them for rationale but describe current behaviour from src/ and tests, and clearly label anything that exists only in a plan (for example organization identity routing beyond the auth library in src/auth/) as planned. Ignore site/samples/** (design mockups). Prefer concrete file paths and function names; keep pages concise."
     }
   ],
   "pages": [
@@ -27,7 +27,7 @@
     {
       "title": "Configuration, Pilots and Live Mode",
       "parent": "Architecture",
-      "purpose": "src/config: pilot files, live config, roots, registry, store and doctor; schemas/pilot.schema.json and registry.schema.json; the difference between disposable pilots and live mode."
+      "purpose": "src/config: pilot files, live config, roots, registry, store and doctor; schemas/pilot.schema.json and registry.schema.json; the difference between disposable pilots and live mode; 'live migrate' from a devctx-era setup (src/config/migrate.mjs, docs/MIGRATING.md)."
     },
     {
       "title": "Storage Layout",

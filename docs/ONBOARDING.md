@@ -179,6 +179,6 @@ This manual evaluation is not proof of native skill discovery. For a bounded Mar
 
 ## What a real client onboarding will need
 
-Before real-project use is supported, collect an approved scope and repository binding, selected source documents, objectives, environments, known commands, owners, decisions, unknowns and sharing rules. Store secrets separately and record references only when the relevant adapter supports them.
+Real repositories are onboarded through a live config ([Live activation](LIVE.md)). Before you start, collect an approved scope and repository binding, selected source documents, objectives, environments, known commands, owners, decisions, unknowns and sharing rules. Store secrets separately and record references only when the relevant adapter supports them.
 
 The remaining work follows the [roadmap](ROADMAP.md) order: organization identity routing, session start and end hooks, then selective migration. Private backup and restore is deferred. Account selection comes with organization identity routing. Do not move client context into this public repository while waiting for those features.
