@@ -1,21 +1,21 @@
 ---
-import { GITHUB_URL, DOCS } from '../../site';
+import { GITHUB_URL, DOCS, INSTALL_CMD } from '../../site';
 import DitherBand from './DitherBand.astro';
 ---
 <section class="final" aria-labelledby="final-title">
   <DitherBand />
   <div class="wrap reveal">
     <h2 id="final-title" data-decode>Your next session starts where <span style="color:var(--accent)">you</span> left off.</h2>
-    <p>Give every agent your context, your accounts and your habits — and keep all of it on your disk.</p>
+    <p>Give every agent your decisions, your commands and your habits — and keep every byte of it on your disk.</p>
     <div class="hero-actions">
-      <!-- TODO: confirm install command at release -->
       <div class="install" role="group" aria-label="Install command">
-        <span><span class="prompt" aria-hidden="true">$ </span>npx devtwin init</span>
-        <button class="copy" type="button" data-copy="npx devtwin init">Copy</button>
+        <span class="install-line"><span class="prompt" aria-hidden="true">$ </span>{INSTALL_CMD}</span>
+        <button class="copy" type="button" data-copy={INSTALL_CMD}>Copy</button>
       </div>
-      <!-- TODO: confirm the GitHub org/user (sundharesan11) at release -->
-      <a class="btn btn-primary" href={GITHUB_URL}>Star on GitHub</a>
-      <a class="btn btn-ghost" href={DOCS.home}>Read the docs <span aria-hidden="true">→</span></a>
+      <div class="action-btns">
+        <a class="btn btn-primary" href={GITHUB_URL}>Star on GitHub</a>
+        <a class="btn btn-ghost" href={DOCS.home}>Read the docs <span aria-hidden="true">→</span></a>
+      </div>
     </div>
   </div>
 </section>

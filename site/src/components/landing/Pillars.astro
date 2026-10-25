@@ -8,17 +8,20 @@ const kitTree = `<span class="d">devtwin/</span>
 ├─ skills/
 │  ├─ devtwin-resume/
 │  ├─ devtwin-record/
-│  └─ devtwin-onboard/
-├─ templates/
+│  ├─ devtwin-onboard/
+│  └─ devtwin-setup/
+├─ templates/skills/
 └─ LICENSE  <span class="muted">Apache-2.0</span>`;
 const dataTree = `<span class="d">~/.devtwin/</span>  <span class="muted">0700</span>
-├─ profile/
-├─ scopes/
-│  ├─ acme/
-│  │  └─ acme.atlas/
-│  └─ globex/
-├─ skills/  <span class="muted">yours</span>
-└─ exports/handoffs/`;
+├─ live.json
+├─ kit/  <span class="muted">pinned clone</span>
+└─ store/
+   ├─ config/  <span class="muted">scopes, profile</span>
+   ├─ data/scopes/
+   │  ├─ acme/
+   │  └─ globex/
+   ├─ data/exports/
+   └─ state/`;
 // Each tree line gets its own span so the trees can print in line by line (motion on only).
 const lines = (tree: string) =>
 	tree.split('\n').map((l, i) => `<span class="ln" style="--i:${i}">${l}</span>`).join('\n');
@@ -28,7 +31,7 @@ const lines = (tree: string) =>
     <div class="intro reveal">
       <div class="kicker">What devtwin is</div>
       <h2 class="h2" id="pillars-title" data-words>A second you, <span class="soft">in every session.</span></h2>
-      <p>Agents read your code. They don't know why the queue moved to SQS, which test command actually works, where you stopped yesterday, or which GitHub account belongs to this client. devtwin does — and hands it over the moment a session starts.</p>
+      <p>Agents read your code. They don't know why the queue moved to SQS, which test command actually works, what must never change, or where you stopped yesterday. You do. devtwin writes that down once, with sources, and hands it to every session that follows.</p>
     </div>
 
     <!-- Pillar 1 -->
@@ -38,8 +41,8 @@ const lines = (tree: string) =>
         <h3 id="p1">Context that carries over — with receipts.</h3>
         <p>Decisions, facts, constraints, commands, unknowns and handoffs live as records outside the repo. Every record points at where it came from, gets reviewed before an agent sees it, and is superseded — never silently overwritten.</p>
         <ul class="ticks">
-          <li><span><b>Source-linked.</b> A file range, a commit, an issue — hashed, so drift shows.</span></li>
-          <li><span><b>Reviewed first.</b> Agents <code>record propose</code>; you approve.</span></li>
+          <li><span><b>Source-linked.</b> A file, a commit, an issue or a URL. Files are hashed, so drift shows.</span></li>
+          <li><span><b>Reviewed first.</b> Agents <code>record propose</code>; you <code>record publish</code>.</span></li>
           <li><span><b>History kept.</b> <code>record supersede</code> links old to new.</span></li>
         </ul>
         <a class="p-more" href={DOCS.records}>How records work <span aria-hidden="true">→</span></a>
@@ -49,7 +52,7 @@ const lines = (tree: string) =>
           <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">Review · acme.atlas</span><span class="right"><span class="pill acc">3 proposed</span></span></div>
           <div class="review">
             <div class="queue" role="list" aria-label="Proposed records">
-              <h5>Proposed</h5>
+              <h4>Proposed</h4>
               <span class="q-item on" role="listitem">Cursor pagination for /tasks<small>decision · by agent</small></span>
               <span class="q-item" role="listitem">Integration tests need Docker<small>constraint · by agent</small></span>
               <span class="q-item" role="listitem">Who owns the v1 webhook?<small>unknown · by you</small></span>
@@ -59,15 +62,14 @@ const lines = (tree: string) =>
               <h4>Use cursor pagination for /tasks</h4>
               <p>Offset paging skipped rows under concurrent inserts. Cursor on <span class="mono" style="font-size:12.5px;color:#c9d0de">(created_at, id)</span>; page size capped at 100.</p>
               <div class="srcs">
-                <div class="src-row"><span class="k">file</span><span class="v">src/api/tasks.ts:40–88</span><span class="h">sha 3e1f…</span></div>
+                <div class="src-row"><span class="k">file</span><span class="v">src/api/tasks.ts</span><span class="h">sha 3e1f…</span></div>
                 <div class="src-row"><span class="k">commit</span><span class="v">9f2c1ab · switch list to cursor</span><span class="h">main</span></div>
-                <div class="src-row"><span class="k">issue</span><span class="v">#148 · duplicate tasks on page 2</span><span class="h">open</span></div>
+                <div class="src-row"><span class="k">issue</span><span class="v">ATLAS-148 · duplicate tasks on page 2</span><span class="h">open</span></div>
               </div>
-              <div class="supers">supersedes <s>dec_7Q2 · “offset paging is fine for v1”</s></div>
+              <div class="supers">supersedes <s>rec_7a2f… · “offset paging is fine for v1”</s></div>
               <div class="rec-act">
-                <span class="btn btn-primary btn-sm" aria-hidden="true">Approve</span>
-                <span class="btn btn-ghost btn-sm" aria-hidden="true">Edit</span>
-                <span class="btn btn-ghost btn-sm" aria-hidden="true">Reject</span>
+                <span class="rec-cmd"><span class="acc">$</span> devtwin record publish --apply</span>
+                <span class="pill ok">you approve</span>
               </div>
             </div>
           </div>
@@ -80,7 +82,7 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>02</span> Every agent</div>
         <h3 id="p2">Claude Code today. Codex tomorrow. Same brief.</h3>
-        <p>At session start the agent loads a bounded brief — the few things that matter for this project, ranked and cited. Switch tools mid-week and nothing is lost: every agent reads the same reviewed context.</p>
+        <p>At session start the agent loads a bounded brief — the things that matter for this project, ordered by kind and cited to their sources. Switch tools mid-week and nothing is lost: Claude Code and Codex read the same reviewed context.</p>
         <ul class="ticks">
           <li><span><code>devtwin-resume</code> loads the brief into the session.</span></li>
           <li><span><code>devtwin-record</code> captures a decision as you make it.</span></li>
@@ -103,11 +105,11 @@ const lines = (tree: string) =>
             <div class="brief">
               <div class="brief-h"><span><b>acme.atlas</b> <span class="muted">· brief · 2026-10-24</span></span><span class="muted">14 records · 3.1 KB</span></div>
               <div class="bsec"><h4>Decisions</h4>
-                <div class="brow"><span class="dot"></span><span>Cursor pagination for /tasks</span><span class="src">#148 · 9f2c1ab</span></div>
+                <div class="brow"><span class="dot"></span><span>Cursor pagination for /tasks</span><span class="src">ATLAS-148 · 9f2c1ab</span></div>
                 <div class="brow"><span class="dot"></span><span>Jobs go through SQS, not Redis streams</span><span class="src">ADR-0007</span></div>
               </div>
               <div class="bsec"><h4>Constraints</h4>
-                <div class="brow"><span class="dot"></span><span>Workers never write to billing tables</span><span class="src">#212</span></div>
+                <div class="brow"><span class="dot"></span><span>Workers never write to billing tables</span><span class="src">ATLAS-212</span></div>
               </div>
               <div class="bsec"><h4>Commands</h4>
                 <div class="brow"><span class="dot c"></span><span>npm test -- --runInBand</span><span class="src">package.json</span></div>
@@ -129,10 +131,10 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>03</span> Accounts</div>
         <h3 id="p3">The right account, in every org.</h3>
-        <p>Work for two companies? Bind each scope to its own GitHub and Slack accounts. Open a project and devtwin resolves its org — the agent acts as that org's you, with that org's credentials.</p>
+        <p>Work for two companies? Each one is its own scope, with its own projects and its own records. Identity routing binds each scope to its own GitHub and Slack account, so the project — not whatever you happen to be logged into — decides who the agent acts as.</p>
         <ul class="ticks">
-          <li><span><b>Automatic.</b> <code>context resolve</code> picks the identity from the project.</span></li>
-          <li><span><b>Refused on mismatch.</b> A globex token never touches an acme repo.</span></li>
+          <li><span><b>Scoped by repo.</b> <code>context resolve</code> maps the working tree to its scope and project.</span></li>
+          <li><span><b>Verified, or refused.</b> The live identity must match the binding — a mismatch is refused.</span></li>
           <li><span><b>Kept apart.</b> Credentials never live in records or briefs.</span></li>
         </ul>
         <a class="p-more" href={DOCS.identityRouting}>Route identities per org <span aria-hidden="true">→</span></a>
@@ -169,10 +171,10 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>04</span> Your harness</div>
         <h3 id="p4">Make it yours. Then make more.</h3>
-        <p>Clone the kit, set up a private profile, and turn templates into your own private skills. The kit ships the patterns; your profile supplies the taste.</p>
+        <p>devtwin is also a template for your own harness. Set up a small private profile and turn generic skill templates into private skills of your own. The kit ships the patterns; your profile supplies the taste.</p>
         <ul class="ticks">
           <li><span><b>Stack watch.</b> Vendor announcements that touch what you build — a new Claude model, an auth-provider release.</span></li>
-          <li><span><b>Slack updates.</b> Drafts in your voice from what actually changed.</span></li>
+          <li><span><b>Slack updates.</b> Drafts in your voice, saved for you to send.</span></li>
           <li><span><b>Writing style.</b> Your rules, applied by every agent.</span></li>
         </ul>
         <a class="p-more" href={DOCS.personalHarness}>Build your personal harness <span aria-hidden="true">→</span></a>
@@ -185,19 +187,19 @@ const lines = (tree: string) =>
               <span class="tpl-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff8a3d" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 16 0"/><path d="M8 12a4 4 0 0 1 8 0"/><circle cx="12" cy="12" r="1.5" fill="#ff8a3d"/></svg></span>
               <h4>Stack-update watch</h4>
               <p>Announcements filtered by the dependencies in your projects.</p>
-              <code>template-seed stack-watch</code>
+              <code>--template stack-watch</code>
             </div>
             <div class="tpl">
               <span class="tpl-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a6b0c4" stroke-width="2" stroke-linecap="round"><path d="M4 5h16v11H9l-5 4z"/></svg></span>
               <h4>Slack update draft</h4>
               <p>A weekly update from records and handoffs, in your tone.</p>
-              <code>template-seed slack-update</code>
+              <code>--template slack-update</code>
             </div>
             <div class="tpl">
               <span class="tpl-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a6b0c4" stroke-width="2" stroke-linecap="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></span>
               <h4>Writing style</h4>
               <p>Your voice for docs, PRs and messages.</p>
-              <code>template-seed writing</code>
+              <code>--template writing</code>
             </div>
             <div class="tpl add">
               <span class="tpl-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a6b0c4" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
@@ -206,10 +208,10 @@ const lines = (tree: string) =>
             </div>
           </div>
           <div class="digest">
-            <div class="cmd"><span class="p">$</span> devtwin stack digest</div>
-            <div><span class="acc">●</span> New Claude model available <span class="muted">— you use @anthropic-ai/sdk in 3 projects</span></div>
-            <div><span class="acc">●</span> Auth provider SDK major release <span class="muted">— matches acme.atlas</span></div>
-            <div class="muted">2 relevant · 31 skipped as unrelated</div>
+            <div class="cmd"><span class="p">$</span> devtwin stack digest --scope acme</div>
+            <div><span class="acc">●</span> New Claude model release <span class="muted">— project acme.atlas</span></div>
+            <div><span class="acc">●</span> Auth provider SDK major release <span class="muted">— your stack</span></div>
+            <div class="muted">previously reported, not repeated: 31</div>
           </div>
         </div>
       </div>
@@ -220,11 +222,11 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>05</span> Local-first</div>
         <h3 id="p5">Yours. On your disk.</h3>
-        <p>The public kit and your private data live in separate places. Records, profiles and exports stay on your machine with private permissions. Nothing syncs anywhere — your repos stay untouched.</p>
+        <p>The public kit and your private data live in separate places. Records, profiles and exports stay on your machine in 0700 folders and 0600 files. Nothing syncs anywhere, and onboarding only ever reads your repos.</p>
         <ul class="ticks">
           <li><span><b>Public kit, private data.</b> Update the kit without touching your context.</span></li>
           <li><span><b>No account, no server.</b> Plain files you can read, back up and diff.</span></li>
-          <li><span><b><code>devtwin doctor</code></b> checks the boundaries for you.</span></li>
+          <li><span><b><code>devtwin doctor</code></b> checks roots, locks and bound repos for you.</span></li>
         </ul>
         <a class="p-more" href={DOCS.whereDataLives}>Where your data lives <span aria-hidden="true">→</span></a>
       </div>
@@ -232,18 +234,18 @@ const lines = (tree: string) =>
         <div class="frame-in">
           <div class="disk">
             <div>
-              <h5><span class="pill">public</span> the kit</h5>
+              <h4><span class="pill">public</span> the kit</h4>
 <div class="tree" set:html={lines(kitTree)} />
             </div>
             <div>
-              <h5><span class="pill acc">private</span> your data</h5>
+              <h4><span class="pill acc">private</span> your data</h4>
 <div class="tree" set:html={lines(dataTree)} />
             </div>
           </div>
           <div class="disk-foot">
             <span class="cmd"><span class="acc">$</span> devtwin doctor</span>
-            <span class="pill ok">kit and data separate</span>
-            <span class="pill ok">no secrets in records</span>
+            <span class="pill ok">roots private</span>
+            <span class="pill ok">bound repos unchanged</span>
           </div>
         </div>
       </div>
