@@ -498,5 +498,15 @@
   "writing check allows 26 words outside procedures but not in a numbered step",
   "writing check flags passive voice and future tense only in procedures",
   "writing allowlist suppresses a reviewed finding and reports a stale entry",
-  "writing check runs in CI and as an npm script"
+  "writing check runs in CI and as an npm script",
+  "lesson match returns the index line for a matching path glob or package import (AE1)",
+  "lesson match returns nothing for unrelated paths packages and words (AE2)",
+  "lesson match orders path then package then topic matches and newest first",
+  "superseded tombstoned proposed and disputed lessons never match",
+  "lesson match marks a lesson past its revisit date stale, revisit",
+  "lesson glob matcher handles double star question mark and dotfiles and refuses dot-dot escapes",
+  "lesson index records the linked worktree common directory and resolves it to the parent project",
+  "lesson index rebuild is idempotent and private",
+  "lesson show returns the body fenced claimed and capped",
+  "lesson matching on a 500-lesson index takes under 50 ms"
 ]
