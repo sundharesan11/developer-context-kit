@@ -7,7 +7,7 @@ import CliReadout from './CliReadout.astro';
     <div class="intro reveal">
       <div class="kicker">The CLI</div>
       <h2 class="h2" id="cmds-title" data-words>A small, sharp CLI.</h2>
-      <p>Every command previews first and applies when you say so. Agents call the same commands through bundled skills.</p>
+      <p>Every change is previewed first and written only when you pass <code>--apply</code>. Every command answers in one line of JSON, and agents call the same commands through the bundled <code>devtwin-*</code> skills.</p>
     </div>
     <CliReadout />
     <div class="cmds reveal">
