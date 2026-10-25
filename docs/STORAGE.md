@@ -58,7 +58,7 @@ New records use schema 2. Readers accept schema 1 and 2, and a schema 1 record i
 - **Kinds.** Schema 2 adds the kinds `lesson` and `preference`.
 - **Class.** `class` is `fact` or `lesson`. A fact stays in its project. A `lesson` record always has class `lesson`.
 - **Reach.** The top-level `reach` is `personal`, `project` or `org`. A fact has project reach, and a preference never has project reach. The project store accepts project reach only. `applicability.level` keeps its schema 1 values.
-- **Match.** `match` holds `paths`, `packages` and `topics`, at most 20, 20 and 10 distinct entries. Paths are repo-relative globs that use `*` and `?`. They follow the `file:` source rules: no absolute path, no `..` and no denied file such as `.env*` or `*.pem`.
+- **Match.** `match` holds `paths`, `packages` and `topics`, at most 20, 20 and 10 distinct entries. Paths are repo-relative globs that use `*`, `?` and `**`. They follow the `file:` source rules: no absolute path, no `..` and no denied file such as `.env*` or `*.pem`.
 
 ### Personal and org homes
 
@@ -76,6 +76,18 @@ Personal and org records have their own homes. They need no registry entry or pr
 - **Outbound.** Text is checked for credential patterns, then for the names of every scope in the config. The names are the scope ID, the display name, each project ID, each binding root path and each remote host. A name matches only as a whole word, in any case. `github.com`, `gitlab.com`, `bitbucket.org` and any host found in two or more scopes are left out. A personal record is checked against every scope. An org record is checked against every other scope. A match fails with `ISOLATION`.
 - **Hub proposals.** A hub proposal keeps its own project check as a plain substring match. It is then checked against every other scope.
 - **Inbound.** Another person's text has control, format and bidi characters removed. Its body is capped at 2,400 bytes, about 600 tokens. It is then fenced and labelled as claimed by the author's handle.
+
+### Lesson match index
+
+`lesson index --scope <scope>` builds one index file per scope at `stateRoot/lessons/<scope>.json`. The folder is 0700 and the file is 0600. The file is written by atomic replace under `stateRoot/locks/lessons_<scope>.lock`.
+
+- **Sources.** The index reads the scope's project records, its org records and the personal store. It keeps only lessons and preferences that have a `match` block and an effective status of `observed` or `confirmed`. Superseded, proposed and disputed records are left out.
+- **Entries.** Each entry holds the record ID, reach, scope, project, title, a one-line summary, the claimed author, the revisit date, the `match` block and the record hash.
+- **Path map.** The index also maps each bound root to its scope and project, with the root's Git common directory. A linked worktree resolves to its parent project through that directory.
+- **Fingerprint.** The `fingerprint` is the digest of the rest of the file. A rebuild writes only when the fingerprint changes, so the same records always give the same bytes.
+- **Cache write.** The file is a cache of record data that a rebuild can replace at any time. For this reason, `lesson index` writes it with no preview and no plan fingerprint. It writes nothing outside `stateRoot`.
+
+Globs match one path segment per `/`. `*` matches any run of characters in a segment and `?` matches one character. A `**` segment matches zero or more segments. A wildcard does not match a leading dot, so a dotfile matches only a pattern that starts with a literal dot. A path with `..` never matches.
 
 ## File identity and interrupted writes
 
