@@ -152,3 +152,8 @@ test("context brief orders a v2 lesson after project facts", async (t) => {
   assert.ok(ids.includes(lesson.recordId));
   assert.ok(ids.indexOf(fact.recordId) < ids.indexOf(lesson.recordId));
 });
+
+test("a draft without sources or tags validates instead of throwing", () => {
+  const { sources, tags, ...bare } = lessonDraft();
+  assert.equal(validateDraft(bare, { recordedBy: human }).kind, "lesson");
+});
