@@ -50,9 +50,18 @@ The approved write classes in a live config ([Live-mode exceptions](LIVE.md#live
 
 - The four classes are `hubRoot`, `instructionTargets`, `hookTargets` and `launchAgents`. Each path has a fixed shape. A hub root is a folder inside the home. An instruction target is `CLAUDE.md`, `AGENTS.md` or a `devtwin*.md` file in the Claude or Codex folder. A hook target is `settings.json` or `hooks.json` in those folders. A launch agent is a `devtwin.<name>.plist` file in `~/Library/LaunchAgents`. Every other path stays refused.
 - The classes are covered by the approved config digest, so an accidental change is refused with `GATE_REQUIRED`. As for the rest of the live config, this does not stop deliberate same-user tampering.
+- Only `live write-classes` changes the classes, through a preview and an apply with its fingerprint. The new config passes every fence check before its digest is approved. The devtwin hook denies its `--apply` from an agent shell, as for the other owner actions.
 - The fence accepts a class path only when the caller names that class. A record, draft or onboarding write cannot reach a class path.
 - A disposable pilot can list classes too. Its file targets must have the same shapes inside a listed fake agent home, and its hub folders must be inside `pilotRoot`.
-- No command edits a class file yet. The shared edit step limits edits to developer-owned files to the devtwin marker block or devtwin's own JSON entries. The prior bytes are backed up byte for byte in the run folder first. The file is read without following links and checked again immediately before the replace, but the same-user residual race between that check and the rename remains.
+- Only `agents install --hooks` and `agents uninstall --hooks` edit a class file, and only the `hookTargets` files. The shared edit step limits edits to developer-owned files to the devtwin marker block or devtwin's own JSON entries. The prior bytes are backed up byte for byte in the run folder first. The file is read without following links and checked again immediately before the replace, but the same-user residual race between that check and the rename remains.
+
+## Setup
+
+`setup status`, `setup plan --step <id>` and `setup apply --step <id>` (and the `devtwin setup` terminal loop) add no write location. Each step wraps an existing command and its preview, and its apply needs the fingerprint of that preview.
+
+- The steps that run an owner action are `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude` and `hooks-codex`. The devtwin hook denies `setup apply` for these steps from an agent shell, and denies the `devtwin setup` terminal loop.
+- The terminal loop refuses to run without a terminal. A terminal prompt protects against accidents. It is not proof that the owner is present.
+- The `sandbox` step reads the project scan and writes no agent setting. Env example files are read only when the source reader allows them, and only their key names are kept. Accepted recommendations become personal preference records in the store.
 
 ## Portable handoff boundary
 

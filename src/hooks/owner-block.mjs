@@ -11,8 +11,22 @@ export const OWNER_ACTIONS = Object.freeze([
   { words: ["pref", "accept"] }, { words: ["instructions", "apply"] },
   { words: ["live", "migrate"], apply: true }, { words: ["record", "publish"], apply: true },
   { words: ["agents", "install"], apply: true }, { words: ["agents", "uninstall"], apply: true },
-  { words: ["live", "set-kit"], apply: true }, { words: ["live", "add-repo"], apply: true }, { words: ["live", "init"], apply: true }
+  { words: ["live", "set-kit"], apply: true }, { words: ["live", "add-repo"], apply: true }, { words: ["live", "init"], apply: true },
+  { words: ["live", "write-classes"], apply: true }
 ].map((action) => Object.freeze({ ...action, words: Object.freeze(action.words) })));
+// U9: setup steps whose apply runs an owner action above (src/setup/steps.mjs marks them owner: true). "setup apply"
+// naming one of them is denied, and so is the "setup" terminal loop, which can apply them. setup status, setup plan
+// and setup apply for any other step stay allowed.
+export const OWNER_SETUP_STEPS = Object.freeze(["skills-claude", "skills-codex", "write-classes-hooks", "hooks-claude", "hooks-codex"]);
+const SETUP_READS = ["status", "plan", "apply"];
+function setupAction(words) {
+  if (!words.includes("setup")) return null;
+  if (words.includes("apply")) {
+    const step = OWNER_SETUP_STEPS.find((id) => words.includes(id));
+    return step ? "setup apply --step " + step : null;
+  }
+  return SETUP_READS.some((word) => words.includes(word)) ? null : "setup";
+}
 export const DENY_REASON = "devtwin: this command runs an owner-only devtwin action. An agent may not run it. Ask your developer to run it themselves in their own terminal.";
 // Codex sends shell commands as text or as an argv array; both are read as one text.
 function commandText(input) {
@@ -32,7 +46,7 @@ export function ownerAction(agent, payload) {
   const adjacent = (a, b) => words.some((word, i) => word === a && words[i + 1] === b);
   // An adjacent route pair, or both words anywhere: a wrapper such as xargs or a variable can split the pair.
   const found = OWNER_ACTIONS.find(({ words: [a, b], apply: needsApply }) => (!needsApply || apply) && (adjacent(a, b) || (words.includes(a) && words.includes(b))));
-  return found ? found.words.join(" ") + (found.apply ? " --apply" : "") : null;
+  return found ? found.words.join(" ") + (found.apply ? " --apply" : "") : setupAction(words);
 }
 // Both agents read the same PreToolUse deny shape.
 export const denyOutput = () => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: DENY_REASON } });

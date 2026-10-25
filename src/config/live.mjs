@@ -3,7 +3,8 @@ import { randomBytes } from "node:crypto";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DevtwinError } from "../errors.mjs";
-import { checkLiveConfig, loadPilot, rootsFromPilot, recordApprovedDigest, approvedDigestPath, skillDirsFor } from "./pilot.mjs";
+import { checkLiveConfig, loadPilot, rootsFromPilot, recordApprovedDigest, approvedDigestPath, skillDirsFor, WRITE_CLASSES } from "./pilot.mjs";
+import { canonicalJson } from "../storage/canonical.mjs";
 import { ensureRoots, validateRoot } from "./roots.mjs";
 import { info, checkNode, ensurePrivateDir, writeNewFile, atomicReplace, fsyncDir } from "../storage/fsx.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
@@ -143,6 +144,23 @@ const setWriteClasses = (writeClasses) => (before) => {
   if (writeClasses !== undefined && (!writeClasses || typeof writeClasses !== "object" || Array.isArray(writeClasses))) invalid("writeClasses");
   return { after: { ...before, writeClasses }, details: { writeClasses: { from: before.writeClasses ?? null, to: writeClasses ?? null } } };
 };
+// The CLI edit (live write-classes): each named class is replaced by its listed paths, each cleared class is removed,
+// and every other class is kept. The result goes through setWriteClasses, so the same fence checks and approval apply.
+const editWriteClasses = ({ set, clear }) => (before, pilot) => {
+  if (!set || typeof set !== "object" || Array.isArray(set) || !Array.isArray(clear)) invalid("writeClasses");
+  const names = [...Object.keys(set), ...clear];
+  if (!names.length || new Set(names).size !== names.length || names.some((name) => !WRITE_CLASSES.includes(name))) invalid("writeClasses");
+  const next = { ...(before.writeClasses ?? {}) };
+  for (const name of clear) delete next[name];
+  for (const [name, paths] of Object.entries(set)) {
+    if (!Array.isArray(paths) || !paths.length || paths.some((path) => typeof path !== "string")) invalid("writeClasses." + name);
+    next[name] = [...new Set(paths)];
+  }
+  const ordered = Object.fromEntries(WRITE_CLASSES.filter((name) => Object.hasOwn(next, name)).map((name) => [name, next[name]]));
+  const writeClasses = Object.keys(ordered).length ? ordered : undefined;
+  if (canonicalJson(writeClasses ?? null) === canonicalJson(before.writeClasses ?? null)) invalid("writeClasses");
+  return setWriteClasses(writeClasses)(before, pilot);
+};
 const preview = async (promise) => ({ preview: true, ...(await promise) });
 export const planLiveAddRepo = (input, ctx) => preview(planChange("live-add-repo", input, ctx, addRepo(input.repo)).then((r) => r.plan));
 export const applyLiveAddRepo = (input, ctx, options) => applyChange("live-add-repo", input, ctx, addRepo(input.repo), undefined, options);
@@ -151,3 +169,5 @@ export const applyLiveSetKit = (input, ctx, options) => applyChange("live-set-ki
 export const previewLiveInit = (input, ctx) => ({ preview: true, ...planLiveInit(input, ctx) });
 export const planLiveSetWriteClasses = (input, ctx) => preview(planChange("live-set-write-classes", input, ctx, setWriteClasses(input.writeClasses)).then((r) => r.plan));
 export const applyLiveSetWriteClasses = (input, ctx, options) => applyChange("live-set-write-classes", input, ctx, setWriteClasses(input.writeClasses), undefined, options);
+export const planLiveEditWriteClasses = (input, ctx) => preview(planChange("live-set-write-classes", input, ctx, editWriteClasses(input)).then((r) => r.plan));
+export const applyLiveEditWriteClasses = (input, ctx, options) => applyChange("live-set-write-classes", input, ctx, editWriteClasses(input), undefined, options);
