@@ -14,6 +14,7 @@ import { RUN_ID } from "../storage/runs.mjs";
 import { assertPackageRel, PACKAGE_LIMITS } from "../skill-builder/validate.mjs";
 import { loadLocalRevision, loadLocalDecision } from "../skill-builder/workspace.mjs";
 import { AGENT_HOMES, SKILL_NAMES } from "./install.mjs";
+import { LEGACY_SKILL_PREFIX } from "../config/legacy.mjs";
 
 const marker = ".devtwin-owned.json";
 const receiptKeys = ["schemaVersion", "kind", "skill", "version", "audience", "workspace", "revision", "packageDigest", "files", "runId"].sort();
@@ -55,7 +56,7 @@ export async function planPackageInstall(roots, selection, { revisionId, content
   if (!["install", "uninstall"].includes(mode) || (mode === "install" ? !contentDecisionId : !!contentDecisionId)) throw new DevtwinError("INVALID_INPUT", "Invalid local action");
   const chosen = agentsCheck(agents);
   const { manifest, files, validation } = await loadLocalRevision(roots, selection, revisionId, { requireValidation: mode === "install" });
-  if (SKILL_NAMES.includes(manifest.name) || manifest.name.startsWith("devtwin-")) throw new DevtwinError("CONFLICT", "Bundled skill name reserved");
+  if (SKILL_NAMES.includes(manifest.name) || manifest.name.startsWith("devtwin-") || manifest.name.startsWith(LEGACY_SKILL_PREFIX)) throw new DevtwinError("CONFLICT", "Bundled skill name reserved");
   if (mode === "install") {
     const content = await loadLocalDecision(roots, selection, contentDecisionId, "approve-content");
     if (content.revision !== revisionId || content.packageDigest !== manifest.packageDigest || content.personalGenericNonConfidential !== true || content.responseText !== `Approved content ${manifest.packageDigest} as personal generic non-confidential`) throw new DevtwinError("STALE_VERSION", "Content approval stale");

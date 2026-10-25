@@ -1,5 +1,6 @@
 import {join, posix} from "node:path";
 import {DevtwinError} from "../errors.mjs";
+import {LEGACY_SKILL_PREFIX, LEGACY_RECEIPT} from "../config/legacy.mjs";
 import {digest, sha256} from "../storage/canonical.mjs";
 import {readPrivateBytes} from "../storage/fsx.mjs";
 import {assertSourceRel, isDeniedRel} from "../storage/source-read.mjs";
@@ -28,7 +29,7 @@ function paths(values, {nonempty = false} = {}) {
 }
 export function validateSourceMapping(value) {
   if (!exact(value, ["schemaVersion", "name", "skillRoot", "files", "requiredPaths", "licensePaths", "noticePaths", "dependencies", "compatibility", "review"]) || value.schemaVersion !== 1) fail();
-  if (typeof value.name !== "string" || !SKILL_NAME.test(value.name) || value.name.length > 64 || value.name.startsWith("devtwin-") || ["synced", "anthropic-skills"].includes(value.name)) fail();
+  if (typeof value.name !== "string" || !SKILL_NAME.test(value.name) || value.name.length > 64 || value.name.startsWith("devtwin-") || value.name.startsWith(LEGACY_SKILL_PREFIX) || ["synced", "anthropic-skills"].includes(value.name)) fail();
   if (typeof value.skillRoot !== "string") fail();
   if (value.skillRoot) sourcePath(value.skillRoot);
   if (!Array.isArray(value.files) || !value.files.length || value.files.length > 24) fail();
@@ -42,7 +43,7 @@ export function validateSourceMapping(value) {
     const inside = !prefix || file.source.startsWith(prefix);
     const expected = inside ? file.source.slice(prefix.length) : posix.basename(file.source);
     if (file.target !== expected || !inside && (!legalSources.has(file.source) || !legal.test(file.target))) fail();
-    if (file.target === ".devtwin-owned.json") fail();
+    if (file.target === ".devtwin-owned.json" || file.target === LEGACY_RECEIPT) fail();
     return {...file};
   }).sort((a, b) => a.source.localeCompare(b.source, "en"));
   const skill = prefix + "SKILL.md";

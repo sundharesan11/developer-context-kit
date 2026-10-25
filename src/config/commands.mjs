@@ -41,3 +41,13 @@ export const liveSetKitCommand = {
     return values.apply ? (await live()).applyLiveSetKit(input, ctx) : (await live()).planLiveSetKit(input, ctx);
   }
 };
+// Copies a live setup made under the former devctx name to a new live config folder. --pilot names the new live config,
+// --from the legacy one. It runs from the new kit; see docs/MIGRATING.md.
+export const liveMigrateCommand = {
+  options: { ...liveOptions, from: { type: "string" } },
+  async run(values, ctx) {
+    const input = liveInput(values, { from: values.from });
+    const migrate = await import("./migrate.mjs");
+    return values.apply ? migrate.applyLiveMigrate(input, ctx) : migrate.previewLiveMigrate(input, ctx);
+  }
+};

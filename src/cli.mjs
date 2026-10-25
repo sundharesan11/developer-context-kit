@@ -26,6 +26,7 @@ export const COMMANDS = {
   "live init": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveInitCommand },
   "live add-repo": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveAddRepoCommand },
   "live set-kit": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveSetKitCommand },
+  "live migrate": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveMigrateCommand },
   "record add": { load: async () => (await import("./records/commands.mjs")).recordAddCommand },
   "record supersede": { load: async () => (await import("./records/commands.mjs")).recordSupersedeCommand },
   "record propose": { load: async () => (await import("./records/commands.mjs")).recordProposeCommand },

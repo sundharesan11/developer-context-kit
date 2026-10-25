@@ -19,7 +19,7 @@ See [Use with coding agents](/docs/guides/coding-agents/) to install them.
 
 Before its first CLI call in a session, every skill checks:
 
-1. `DEVTWIN_KIT` is set to an absolute path whose real path is **outside** the current repository.
+1. `DEVTWIN_KIT` is set to an absolute path whose real path is **outside** the current repository. If only the legacy `DEVCTX_KIT` is set, the skill uses it for the session and tells you it is deprecated; see [Migrate from devctx](/docs/guides/migrate-from-devctx/).
 2. The kit contains `bin/devtwin.mjs` and a `package.json` named `devtwin`.
 3. You confirm the kit's real path, once per session.
 4. You confirm the pilot path, once per session. The skill offers `~/.devtwin/live.json` or takes a disposable pilot path from you. It refuses a pilot inside the current repository or the kit.

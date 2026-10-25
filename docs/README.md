@@ -11,6 +11,7 @@ Start with a disposable synthetic project. Live mode for one real machine is imp
 | How do preview, approval and context work? | [Guided onboarding](ONBOARDING.md) |
 | Where does each part fit? | [Architecture](ARCHITECTURE.md) |
 | How do I activate it on my machine? | [Live activation](LIVE.md) |
+| I set it up under the old devctx name. How do I move? | [Migrating from devctx](MIGRATING.md) |
 | How do I set up my personal profile, skill templates and announcement watch? | [Personal harness](HARNESS.md) |
 | What works and what remains? | [Roadmap](ROADMAP.md) and [Limitations](LIMITATIONS.md) |
 

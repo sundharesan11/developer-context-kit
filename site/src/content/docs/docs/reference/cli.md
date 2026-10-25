@@ -187,6 +187,20 @@ Moves the live config to a new kit clone and commit. Run it from the new clone.
 | `--commit <sha>` | Required. 40 or 64 hex characters. |
 | `--apply --plan-fingerprint <fp>` | Write. |
 
+### `live migrate`
+
+Copies a live setup made under the old devctx name to a new live config folder. Run it from the new kit clone. It never changes or deletes the old folder. See [Migrate from devctx](/docs/guides/migrate-from-devctx/).
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. Path of the new live config, inside an existing private 0700 folder that holds only the kit. |
+| `--from <file>` | Required. Path of the legacy live config, such as `~/.devctx/live.json`. |
+| `--apply --plan-fingerprint <fp>` | Write. |
+
+```sh
+node "$HOME/.devtwin/kit/bin/devtwin.mjs" live migrate --pilot "$HOME/.devtwin/live.json" --from "$HOME/.devctx/live.json"
+```
+
 ## Projects and context
 
 ### `project onboard`

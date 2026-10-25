@@ -2,6 +2,7 @@ import { DevtwinError } from "../errors.mjs";
 import { randomBytes } from "node:crypto";
 import { planInstall, applyInstall, installStatus, planRecovery, applyRecovery } from "./install.mjs";
 import { rollbackCheck } from "./inventory.mjs";
+import { envNotes } from "../config/legacy.mjs";
 const options = { home: { type: "string" }, agent: { type: "string", multiple: true }, apply: { type: "boolean" }, "plan-fingerprint": { type: "string" }, "run-id": { type: "string" } };
 const agents = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
 const command = (mode) => ({ options, async run(values, ctx) {
@@ -12,7 +13,11 @@ const command = (mode) => ({ options, async run(values, ctx) {
 } });
 export const agentsInstallCommand = command("install");
 export const agentsUninstallCommand = command("uninstall");
-export const agentsStatusCommand = { options: { home: { type: "string" } }, run: (values, ctx) => installStatus(ctx.roots, ctx.pilot, { targetHome: values.home }) };
+// Status also reports a legacy DEVCTX_KIT in the environment, as notes, so the owner can update the shell profile.
+export const agentsStatusCommand = { options: { home: { type: "string" } }, async run(values, ctx) {
+  const status = await installStatus(ctx.roots, ctx.pilot, { targetHome: values.home }), notes = envNotes(ctx.env ?? process.env);
+  return notes.length ? { ...status, notes } : status;
+} };
 // Previews recovery of interrupted bundled installs; --apply with the previewed fingerprint is the approval.
 // --release also closes runs whose entries are held or whose journal is unreadable, leaving their files in place.
 export const agentsRecoverCommand = { options: { apply: { type: "boolean" }, release: { type: "boolean" }, "plan-fingerprint": { type: "string" } }, async run(values, ctx) {

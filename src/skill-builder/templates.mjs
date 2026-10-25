@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DevtwinError } from "../errors.mjs";
+import { LEGACY_SKILL_PREFIX } from "../config/legacy.mjs";
 import { PROJECT_ID } from "../identity/ids.mjs";
 import { assertInPilot } from "../config/pilot.mjs";
 import { loadScope } from "../config/store.mjs";
@@ -134,7 +135,7 @@ function render({ meta, files }, filled) {
   }
   const name = JSON.parse(out.find((f) => f.path === "design.json").content).name;
   if (typeof name !== "string" || !SKILL_NAME.test(name) || name.length > 64) invalid("Invalid skill name", { template: meta.name });
-  if (name.startsWith("devtwin-") || bundledNames().includes(name)) invalid("Reserved skill name", { name });
+  if (name.startsWith("devtwin-") || name.startsWith(LEGACY_SKILL_PREFIX) || bundledNames().includes(name)) invalid("Reserved skill name", { name });
   // Same frontmatter rules as validatePackage, so a value that would fail draft-validate fails here.
   if (parseFrontmatter(out.find((f) => f.path === "candidate/SKILL.md").content).meta.name !== name) invalid("Candidate name differs from design name", { template: meta.name });
   return out;
