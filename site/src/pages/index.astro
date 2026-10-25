@@ -9,7 +9,6 @@ import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/500.css';
 import '../styles/landing.css';
 import '../styles/motion.css';
-import { withBase } from '../site';
 
 import Nav from '../components/landing/Nav.astro';
 import Hero from '../components/landing/Hero.astro';
@@ -20,17 +19,16 @@ import OpenSource from '../components/landing/OpenSource.astro';
 import FinalCta from '../components/landing/FinalCta.astro';
 import CommandMarquee from '../components/landing/CommandMarquee.astro';
 import Footer from '../components/landing/Footer.astro';
+import SeoHead from '../components/landing/SeoHead.astro';
 ---
 
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>devtwin — Clone the developer</title>
-<meta name="description" content="devtwin is an open-source, local-first CLI and harness that carries your project context, decisions and accounts into every coding-agent session.">
-<meta name="color-scheme" content="dark">
-<link rel="icon" href={withBase("/favicon.svg")} type="image/svg+xml">
+<SeoHead
+  title="devtwin — Clone the developer"
+  description="devtwin is an open-source, local-first CLI that gives Claude Code and Codex your project decisions, constraints, commands and handoffs as a reviewed, cited brief."
+/>
 <!-- Motion gate, before first paint: motion is on unless prefers-reduced-motion asks otherwise. -->
 <script is:inline>(function(){var r=document.documentElement,on=!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);r.classList.add('js',on?'m-on':'m-off')})();</script>
 </head>

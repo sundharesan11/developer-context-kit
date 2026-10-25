@@ -1,0 +1,62 @@
+---
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter-tight/600.css';
+import '@fontsource/inter-tight/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '../styles/landing.css';
+import '../styles/motion.css';
+import { withBase, GITHUB_URL, DOCS } from '../site';
+import SeoHead from '../components/landing/SeoHead.astro';
+import HeroGrid from '../components/landing/HeroGrid.astro';
+import CrtGlass from '../components/landing/CrtGlass.astro';
+
+// GitHub Pages serves this page for any missing path, so every link is absolute.
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+<SeoHead title="Page not found — devtwin" description="This page does not exist. Head back to devtwin or read the docs." noindex />
+<script is:inline>(function(){var r=document.documentElement,on=!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);r.classList.add('js',on?'m-on':'m-off')})();</script>
+</head>
+<body class="nf-body">
+<header class="nav">
+  <div class="wrap nav-capsule">
+    <a class="brand" href={withBase('/')} aria-label="devtwin home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="2.6" fill="#ff8a3d"/><circle cx="7" cy="7" r="5.6" fill="none" stroke="#ff8a3d" stroke-opacity=".45" stroke-width="1.2"/></svg>
+      </span>
+      devtwin
+    </a>
+    <div class="nav-cta">
+      <a class="btn btn-ghost btn-sm" href={DOCS.home}>Docs</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero nf" aria-labelledby="nf-title">
+    <HeroGrid />
+    <div class="wrap">
+      <div class="hero-copy">
+        <p class="nf-code" aria-hidden="true"><span class="acc">$</span> devtwin context resolve <span class="nf-err">→ DEVTWIN_PROJECT_UNBOUND</span></p>
+        <h1 id="nf-title" data-decode>Nothing on <em>record.</em></h1>
+        <p class="lede">This page doesn't exist, or it moved when the docs were reorganised. No context lost — pick up from one of these.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href={withBase('/')}>Back to devtwin <span aria-hidden="true">→</span></a>
+          <a class="btn btn-ghost" href={DOCS.home}>Read the docs</a>
+          <a class="btn btn-ghost" href={GITHUB_URL}>View on GitHub</a>
+        </div>
+      </div>
+    </div>
+    <CrtGlass />
+  </section>
+</main>
+
+<script>
+  import '../scripts/motion.ts';
+</script>
+</body>
+</html>
