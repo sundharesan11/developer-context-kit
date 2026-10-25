@@ -90,6 +90,45 @@ node "$KIT/bin/devtwin.mjs" hub leave --pilot "$LIVE_CONFIG" --scope <scope> --a
 
 Run the apply only with explicit approval from the owner. After the owner dialog, `hub leave` revokes the note consent, removes the hub sync job, turns delivery off and deletes the clone. It discards the items that are still in the outbox. Records in the personal store, the org home and the projects stay. What you already pushed stays in the hub.
 
+## Publish a lesson
+
+A lesson reaches the hub only when the owner accepts a proposal, or copies a personal lesson, in their own terminal. Agents write proposals with `lesson propose`. See [Agent protocol](AGENT-PROTOCOL.md#propose-a-lesson).
+
+```sh
+node "$KIT/bin/devtwin.mjs" lesson proposals --pilot "$LIVE_CONFIG" --scope <scope>
+node "$KIT/bin/devtwin.mjs" lesson edit --pilot "$LIVE_CONFIG" --id <prop_id> --summary "<do or do not line>"
+node "$KIT/bin/devtwin.mjs" lesson reject --pilot "$LIVE_CONFIG" --id <prop_id>
+node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> --target hub
+node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> --target hub --apply --plan-fingerprint '<fingerprint>'
+```
+
+Each command previews first. Run each apply only with explicit approval from the owner. `lesson edit` takes `--title`, `--summary`, `--body`, `--body-file`, and `--path`, `--package` and `--topic`, which replace the whole `match` block. Its preview shows the new lesson.
+
+`--target` selects where the lesson goes:
+
+| Target | Writes | Owner dialog |
+| --- | --- | --- |
+| `hub` | One file in the scope's hub | Yes |
+| `hub+general` | The hub file and a record in your personal store | Yes |
+| `project` | A lesson record in the proposal's project, or in `--project` | No |
+| `general` | A record in your personal store | No |
+
+- **Dialog.** For `hub` and `hub+general`, the apply shows a macOS dialog with the exact lesson text: the title, the do or don't line, the body and the match rules. Nothing is written until you click Approve. A denied or dismissed dialog writes nothing: no commit, no outbox item and no personal record, and the proposal stays pending. A lesson too long to show in full fails with `LIMIT`. Shorten it with `lesson edit`.
+- **General.** Your personal store follows you to every organization. For this reason, a general target is checked against the names of every scope, also the lesson's own scope. The default target, `hub`, writes no personal copy.
+- **Org copy.** The hub file is the organization's copy of the lesson. Accept writes no second copy to the org home in the store.
+- **Identity.** The lesson ID is `lsn_` and a hash of the hub ID, your handle, the request ID and the creation time. The author is your claimed handle. The file's `localRecordHash` points back to the accepted draft. The full local record is never published.
+- **Push.** Accept publishes one file and pushes it. A rejected push fetches, rebases and checks again, three tries in all. After the last try, the lesson goes to the outbox, and `hub status` counts it. The next `hub sync` pushes it.
+- **Index.** After an accept, devtwin rebuilds the lesson index of the scope. A personal record is in every scope's index, so a general target rebuilds all of them.
+
+### Copy a personal lesson to another hub
+
+```sh
+node "$KIT/bin/devtwin.mjs" lesson copy --pilot "$LIVE_CONFIG" --id <personal-record-id> --to-scope <scope>
+node "$KIT/bin/devtwin.mjs" lesson copy --pilot "$LIVE_CONFIG" --id <personal-record-id> --to-scope <scope> --apply --plan-fingerprint '<fingerprint>'
+```
+
+Run the apply only with explicit approval from the owner. `lesson copy` publishes a lesson from your personal store to the hub of the target scope. It first checks the lesson against the names of every scope but the target, and fails with `ISOLATION` before the dialog. It then shows the owner dialog with the exact lesson text, and publishes through the same push and outbox path as accept.
+
 ## Owner actions
 
-`hub join`, `hub leave --apply` and `hub schedule --apply` are owner actions. The devtwin hook denies them from an agent shell, also through terminal wrappers, and each one shows the owner dialog. The previews of `hub leave` and `hub schedule` stay open to agents. A stale `hub-sync` lock is released with `locks release --lock hub-sync`.
+`hub join`, `hub leave --apply`, `hub schedule --apply`, `lesson accept` and `lesson copy` are owner actions. The devtwin hook denies them from an agent shell, also through terminal wrappers, and each one shows the owner dialog. The previews of `hub leave` and `hub schedule` stay open to agents. A stale `hub-sync` lock is released with `locks release --lock hub-sync`.

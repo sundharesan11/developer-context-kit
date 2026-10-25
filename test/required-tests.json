@@ -552,5 +552,16 @@
   "hub-sync launchd plist runs hub sync every 10 minutes through the launchctl seam",
   "hub outbox drain re-runs isolation and drops a stale note",
   "hub two fixture machines exchange a lesson and a note through one bare repo with only the sync job running",
-  "setup hub-join and job-hub-sync steps join the hub and install the job through the owner dialog"
+  "setup hub-join and job-hub-sync steps join the hub and install the job through the owner dialog",
+  "lesson propose then accept to the hub after dialog approval reaches a colleague through hub sync",
+  "lesson accept to the hub with the dialog dismissed publishes nothing and keeps the proposal pending",
+  "lesson accept through a terminal wrapper from a hooked agent shell is denied before the dialog",
+  "lesson propose refuses a fourth proposal in one session",
+  "lesson accept with a rejected push after three tries lands in the outbox and hub status shows it",
+  "lesson accept as hub+general also writes the personal store",
+  "lesson propose refuses another scope's project name",
+  "lesson propose refuses a credential pattern",
+  "lesson copy publishes a personal lesson to another scope's hub only after the isolation check and dialog",
+  "lesson publish paths never write to a hub without an approved owner dialog",
+  "lesson edit reject and the local targets work without a dialog"
 ]

@@ -95,7 +95,11 @@ test("hook delivers a lesson for a package named in the prompt before any edit",
   const s = await store(t);
   const start = await hook(s, "claude", "session-start", await payload("claude-session-start", s.repo));
   assert.equal(start.json.hookSpecificOutput.hookEventName, "SessionStart");
-  assert.equal(start.context, "devtwin hook live: 1 lesson for example.atlas. Index lines arrive when work matches.");
+  assert.match(start.context, /^devtwin hook live: 1 lesson for example\.atlas\. Index lines arrive when work matches\. Session ID for lesson propose: ses_[a-f0-9]{24}\.$/);
+  // The tag is the same for every start of one session, and differs between sessions and agents.
+  const tag = /ses_[a-f0-9]{24}/.exec(start.context)[0];
+  assert.equal(/ses_[a-f0-9]{24}/.exec((await hook(s, "claude", "session-start", await payload("claude-session-start", s.repo))).context)[0], tag);
+  assert.notEqual(/ses_[a-f0-9]{24}/.exec((await hook(s, "claude", "session-start", await payload("claude-session-start", s.repo, { session_id: "s-other" }))).context)[0], tag);
   assert.ok(Buffer.byteLength(start.context) <= 400);
   for (const agent of ["claude", "codex"]) {
     const prompt = await hook(s, agent, "user-prompt", await payload(agent + "-user-prompt", s.repo));

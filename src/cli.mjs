@@ -35,6 +35,12 @@ export const COMMANDS = {
   "lesson match": { load: async () => (await import("./lessons/commands.mjs")).lessonMatchCommand },
   "lesson show": { load: async () => (await import("./lessons/commands.mjs")).lessonShowCommand },
   "lesson index": { load: async () => (await import("./lessons/commands.mjs")).lessonIndexCommand },
+  "lesson propose": { load: async () => (await import("./lessons/commands.mjs")).lessonProposeCommand },
+  "lesson proposals": { load: async () => (await import("./lessons/commands.mjs")).lessonProposalsCommand },
+  "lesson edit": { load: async () => (await import("./lessons/commands.mjs")).lessonEditCommand },
+  "lesson reject": { load: async () => (await import("./lessons/commands.mjs")).lessonRejectCommand },
+  "lesson accept": { load: async () => (await import("./lessons/commands.mjs")).lessonAcceptCommand },
+  "lesson copy": { load: async () => (await import("./lessons/commands.mjs")).lessonCopyCommand },
   // The agent hook route prints the agent's own JSON, not the CLI envelope, and skips the full pilot load (KTD6).
   hook: { hook: true, load: async () => import("./hooks/commands.mjs") },
   "hook verify": { load: async () => (await import("./hooks/commands.mjs")).hookVerifyCommand },
@@ -147,6 +153,8 @@ export async function main(argv, options = {}) {
     }
     const context = { roots, pilot, now, home, env, kitRoot, templateRoot, ownerDialog, launchctl };
     if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
+    // --body-file - reads the lesson body from stdin.
+    if (command === "lesson propose" || command === "lesson edit") context.stdin = stdin;
     if (command.startsWith("stack ")) Object.assign(context, { stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (COMMANDS[command].interactive === true) return await impl.run(values, { ...context, stdin, stdout });
     const result = await impl.run(values, context);
