@@ -88,6 +88,28 @@ async function openNoticeCount(stateRoot, scope) {
   }
   return count;
 }
+// U14: the IDs of hub lessons whose valid tombstone this machine has seen, from stateRoot/hubs/<hubId>/tombstones.json
+// that hub sync writes. A stored index built before that sync can still list them; the hook drops them. A damaged
+// memory file drops every hub entry (fail closed).
+async function removedHubLessons(stateRoot, scope) {
+  let names;
+  try { names = readdirSync(join(stateRoot, "hubs")); } catch { return new Set(); }
+  const ids = new Set();
+  for (const name of names.filter((n) => /^[a-z][a-z0-9-]{1,63}$/.test(n)).sort()) {
+    let value;
+    try { value = await readPrivateJson(join(stateRoot, "hubs", name, "tombstones.json"), 1 << 20); }
+    catch (error) { if (error.code === "ENOENT") continue; return null; }
+    if (value?.schemaVersion !== 1 || !Array.isArray(value.removed)) return null;
+    if (value.scope === scope) for (const entry of value.removed) ids.add(entry?.id);
+  }
+  return ids;
+}
+async function dropRemoved(stateRoot, found) {
+  if (found.status !== "bound") return found;
+  const removed = await removedHubLessons(stateRoot, found.repo.scope);
+  const entries = found.index.entries.filter((e) => e.source !== "hub" || (removed !== null && !removed.has(e.id)));
+  return entries.length === found.index.entries.length ? found : { ...found, index: { ...found.index, entries } };
+}
 function startLine(found, key, notices = 0) {
   if (found.status === "ambiguous") return "devtwin hook: this folder is bound in more than one scope, so lessons are off.";
   const session = " Session ID for lesson propose: " + sessionTag(key) + ".";
@@ -123,7 +145,7 @@ async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, 
     return { text: "devtwin hook: kit not verified (" + problem + "); run `devtwin hook verify`. Lessons are off.", lines: 0, overflow: 0, key };
   }
   if (event === "SessionStart") pruneSessions(stateRoot, now);
-  const found = await locate(stateRoot, payload.cwd);
+  const found = await dropRemoved(stateRoot, await locate(stateRoot, payload.cwd));
   if (found.status === "ambiguous") logHook(stateRoot, { at, agent, event, code: "ambiguous-root" });
   if (event === "SessionStart") return { text: startLine(found, key, found.status === "bound" ? await openNoticeCount(stateRoot, found.repo.scope) : 0), lines: 0, overflow: 0, key };
   if (found.status !== "bound") return null;

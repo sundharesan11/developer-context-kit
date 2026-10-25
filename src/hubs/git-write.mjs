@@ -29,7 +29,9 @@ export const HUB_GIT_TIMEOUT_MS = 30_000;
 // Used when the hub has no SSH command of its own: no prompts, and a bounded connect time.
 export const DEFAULT_SSH_COMMAND = "ssh -o BatchMode=yes -o ConnectTimeout=15";
 const HARDEN = ["-c", "protocol.allow=never", "-c", "protocol.ssh.allow=always", "-c", "core.symlinks=false", "-c", "submodule.recurse=false", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "-c", "pull.rebase=false"];
-const MAX_WRITES = 20, OUTBOX_LIMIT = 500, OUTBOX_FILE_BYTES = 262144;
+// U14: a commit adds at most MAX_WRITES files and removes at most MAX_REMOVES (the expired-note cleanup batch).
+export const MAX_WRITES = 20, MAX_REMOVES = 200;
+const OUTBOX_LIMIT = 500, OUTBOX_FILE_BYTES = 262144;
 const KINDS = ["lesson", "note", "tombstone"];
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 const OUTBOX_ID = /^obx_[a-f0-9]{24}$/;
@@ -81,7 +83,7 @@ function requireWritable(binding) {
   if (binding.readOnly) throw new DevtwinError("HUB_READ_ONLY", "Hub uses a newer format; devtwin does not write to it", { hubId: binding.hubId });
 }
 async function checkWrites(binding, writes) {
-  if (!Array.isArray(writes) || !writes.length || writes.length > MAX_WRITES) throw new DevtwinError("INVALID_INPUT", "Invalid hub writes", { field: "writes" });
+  if (!Array.isArray(writes) || !writes.length || writes.filter((w) => w?.content !== null).length > MAX_WRITES || writes.filter((w) => w?.content === null).length > MAX_REMOVES) throw new DevtwinError("INVALID_INPUT", "Invalid hub writes", { field: "writes" });
   if (new Set(writes.map((w) => w?.rel)).size !== writes.length) throw new DevtwinError("INVALID_INPUT", "Duplicate hub write", { field: "writes" });
   for (const write of writes) await checkWrite(binding, write);
 }

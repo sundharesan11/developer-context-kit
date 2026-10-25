@@ -5,6 +5,7 @@ import { assertWritable } from "../config/pilot.mjs";
 import { readRegistry } from "../config/registry.mjs";
 import { loadScope, readBindingVersion, readHubBinding } from "../config/store.mjs";
 import { readHub, hubRecords } from "../hubs/read.mjs";
+import { readTombstoneMemory } from "../hubs/published.mjs";
 import { readPrivateJson, ensurePrivatePath, atomicReplace, info } from "../storage/fsx.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { canonicalJson, digest } from "../storage/canonical.mjs";
@@ -50,7 +51,10 @@ export const SOURCES = [
   { name: "hub", async read(roots, scope) {
     const binding = await readHubBinding(roots, scope);
     if (!binding || binding.status !== "joined" || binding.delivery !== "on") return { records: [], unavailable: [] };
-    const read = await readHub(binding.clone);
+    // U14: a lesson whose valid tombstone this machine has seen stays out. A damaged memory gives no hub lessons.
+    let seen;
+    try { seen = await readTombstoneMemory(roots, binding); } catch (error) { return { records: [], unavailable: [{ source: "hub", code: failure(error) }] }; }
+    const read = await readHub(binding.clone, { seen });
     if (read.readOnly) return { records: [], unavailable: [{ source: "hub", code: "DEVTWIN_HUB_SCHEMA_NEWER" }] };
     return { records: hubRecords(binding, read), unavailable: [] };
   } }
