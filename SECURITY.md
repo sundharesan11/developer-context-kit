@@ -1,6 +1,6 @@
 # Security reporting
 
-devtwin is an experimental local pilot. There is no stable supported release or response-time commitment yet.
+devtwin is pre-release software that runs locally. There is no stable supported release or response-time commitment yet.
 
 ## Report privately
 
@@ -14,7 +14,7 @@ A useful private report includes the affected commit, environment, expected boun
 
 ## Know the boundary
 
-The pilot fence restricts CLI destinations to explicit disposable roots. It is not operating-system isolation and does not restrict other tools running as the same user.
+The pilot fence restricts CLI destinations to the roots an explicit pilot file names: disposable roots, or the private store, skill folders and read-only repositories of a live config. It is not operating-system isolation and does not restrict other tools running as the same user.
 
 Never put credentials in records, proposals, plans or command arguments. Private file modes are not encryption. Redaction checks and package allowlists are incomplete defenses, not permission to publish unchecked material.
 
