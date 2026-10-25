@@ -8,13 +8,30 @@ import { readPrivateJson, readPrivateText, ensurePrivatePath, atomicReplace, che
 const SESSION_BYTES = 65536, MAX_DELIVERED = 512;
 const LOG_ROTATE_BYTES = 4 << 20, LOG_READ_BYTES = 8 << 20;
 const SESSION_MAX_AGE_MS = 14 * 24 * 3600 * 1000, TEMP_MAX_AGE_MS = 3600 * 1000;
-const KEY = /^[a-f0-9]{64}$/, TEMP = /^\.devtwin-[a-f0-9]{16}\.tmp$/;
+const KEY = /^[a-f0-9]{64}$/, STATE_FILE = /^[a-f0-9]{64}(?:\.notes)?\.json$/, TEMP = /^\.devtwin-[a-f0-9]{16}\.tmp$/;
 export const hooksDir = (stateRoot) => join(stateRoot, "hooks");
 export const sessionsDir = (stateRoot) => join(stateRoot, "hooks", "sessions");
 export const budgetLogPath = (stateRoot) => join(stateRoot, "hooks", "budget.jsonl");
 export const hookLogPath = (stateRoot) => join(stateRoot, "hooks", "hook.log");
 export const sessionKey = (agent, sessionId) => createHash("sha256").update(agent + "\0" + sessionId).digest("hex");
 const sessionPath = (stateRoot, key) => join(sessionsDir(stateRoot), key + ".json");
+// U13: the session's note state sits in its own file, <key>.notes.json, so compaction (which removes <key>.json) does
+// not reset the six-note cap.
+const noteStatePath = (stateRoot, key) => join(sessionsDir(stateRoot), key + ".notes.json");
+const MAX_NOTE_AREAS = 256, MAX_REPORTED = 64;
+const strings = (list, max) => Array.isArray(list) && list.length <= max && list.every((x) => typeof x === "string");
+const validNotes = (s, agent) => s?.schemaVersion === 1 && s.agent === agent && Number.isInteger(s.posted) && s.posted >= 0 && strings(s.areas, MAX_NOTE_AREAS) && strings(s.reported, MAX_REPORTED);
+// The note state, a fresh one when none exists, or null for a damaged file (the caller then posts and reports nothing).
+export async function readNoteState(stateRoot, agent, key) {
+  try {
+    const state = await readPrivateJson(noteStatePath(stateRoot, key), SESSION_BYTES);
+    return validNotes(state, agent) ? state : null;
+  } catch (error) { return error.code === "ENOENT" ? { schemaVersion: 1, agent, posted: 0, areas: [], reported: [] } : null; }
+}
+export async function writeNoteState(stateRoot, key, state, now) {
+  ensurePrivatePath(stateRoot, ["hooks", "sessions"]);
+  await atomicReplace(noteStatePath(stateRoot, key), JSON.stringify({ ...state, areas: state.areas.slice(-MAX_NOTE_AREAS), reported: state.reported.slice(-MAX_REPORTED), updatedAt: now.toISOString() }) + "\n");
+}
 const fresh = (agent) => ({ schemaVersion: 1, agent, delivered: [], lines: 0, overflowed: false });
 const valid = (s, agent) => s?.schemaVersion === 1 && s.agent === agent && Array.isArray(s.delivered) && s.delivered.length <= MAX_DELIVERED && s.delivered.every((id) => typeof id === "string") && Number.isInteger(s.lines) && s.lines >= 0 && typeof s.overflowed === "boolean";
 // The session state, a fresh state when none exists, or { corrupt: true } for a damaged file (such as one cut short
@@ -34,14 +51,14 @@ export async function writeSession(stateRoot, key, state, now) {
 export function removeSession(stateRoot, key) {
   try { unlinkSync(sessionPath(stateRoot, key)); return true; } catch (error) { if (error.code !== "ENOENT") throw error; return false; }
 }
-// Session files untouched for 14 days and temp files left by a killed write more than an hour ago are removed.
+// Session files (lesson and note state) untouched for 14 days and temp files left by a killed write more than an hour ago are removed.
 export function pruneSessions(stateRoot, now) {
   const dir = sessionsDir(stateRoot);
   let names;
   try { names = readdirSync(dir); } catch { return 0; }
   let removed = 0;
   for (const name of names) {
-    const limit = TEMP.test(name) ? TEMP_MAX_AGE_MS : KEY.test(name.replace(/\.json$/, "")) && name.endsWith(".json") ? SESSION_MAX_AGE_MS : null;
+    const limit = TEMP.test(name) ? TEMP_MAX_AGE_MS : STATE_FILE.test(name) ? SESSION_MAX_AGE_MS : null;
     if (limit === null) continue;
     const node = info(join(dir, name));
     if (node?.isFile() && now.getTime() - node.mtimeMs > limit) { try { unlinkSync(join(dir, name)); removed++; } catch { /* Another call removed it. */ } }

@@ -64,7 +64,8 @@ The full guide is [HUB.md](HUB.md).
 - Hub remotes are SSH only. HTTPS, `git://`, `file://`, local paths, transport helpers and a password in the remote are refused. Hub Git calls allow only the SSH transport, keep global config, hooks and filters off, and pass the handle and email as per-command config.
 - Hub content is untrusted input. Clones keep symlinks off and use no submodules. Each hub file is read through the no-follow, regular-file, size-capped reader, and only when Git's index lists it as a regular file. File size, file count and JSON depth have caps. Lesson text reaches agents only as fenced, attributed data.
 - Outbound hub items pass the sensitive-content check and the all-scope name check before they are queued and again when they are pushed. devtwin never force-pushes.
-- `hub join`, `hub leave --apply` and `hub schedule --apply` are owner actions. The devtwin hook denies them from agent shells, and each shows a macOS dialog with the exact content. The dialog text reaches `osascript` only as arguments, never as script text. Without a desktop session, the dialog denies.
+- "Working on" notes are the one item that leaves the machine with no per-item yes, under the note consent that `hub join` or `note consent` records. Only the hook edit path posts one, at most six per session; no command posts a note. The line is built from the branch name and the areas only, and the checks above run before the note is queued. Colleague notes reach agents only as fenced, attributed data.
+- `hub join`, `hub leave --apply`, `hub schedule --apply`, `note revoke --apply` and `note consent --apply` are owner actions. The devtwin hook denies them from agent shells, and each shows a macOS dialog with the exact content. The dialog text reaches `osascript` only as arguments, never as script text. Without a desktop session, the dialog denies.
 
 ## Setup
 
