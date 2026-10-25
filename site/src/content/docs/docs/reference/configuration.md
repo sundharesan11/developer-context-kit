@@ -42,7 +42,7 @@ No other keys are allowed.
 
 - All paths must be absolute and canonical (no symlinked components). On macOS use `pwd -P` or `realpath`, because `/tmp` is a symlink to `/private/tmp`.
 - In a disposable pilot, the five roots, `agentHomes` and `repos` must all be strictly inside `pilotRoot`, and none may overlap another. In a live config, `repos` and the skill folders are instead outside the store.
-- Nothing may touch a protected path: `~/.claude`, `~/.codex`, `~/.agents`, `~/.gemini`, `~/.cursor`, `~/.commandcode`, `$CLAUDE_CONFIG_DIR`, `$CODEX_HOME`, `~/.config/devtwin`, `~/.local/share/devtwin`, `~/.local/state/devtwin`, `~/.local/state/personal-os`, or the kit checkout itself.
+- Nothing may touch a protected path: `~/.claude`, `~/.codex`, `~/.agents`, `~/.gemini`, `~/.cursor`, `~/.commandcode`, `$CLAUDE_CONFIG_DIR`, `$CODEX_HOME`, `~/.config/devtwin`, `~/.local/share/devtwin`, `~/.local/state/devtwin`, the former defaults `~/.config/devctx`, `~/.local/share/devctx` and `~/.local/state/devctx` (kept protected during the rename transition), `~/.local/state/personal-os`, or the kit checkout itself.
 - The private roots must not be inside a Git worktree.
 - Changing the pilot file changes its digest. Some stored receipts are bound to that digest and will then refuse with `DEVTWIN_GATE_REQUIRED`.
 
@@ -157,7 +157,8 @@ The bundled catalog `catalog/stack-sources.json` maps item names (and aliases su
 
 | Variable | Read by | Effect |
 | --- | --- | --- |
-| `DEVTWIN_KIT` | Bundled skills | Absolute path of the kit checkout. The skills refuse to run without it. The CLI itself does not read it. |
+| `DEVTWIN_KIT` | Bundled skills | Absolute path of the kit checkout. The skills refuse to run without it. The CLI does not use it to find the kit; `agents status` and `live migrate` only check it to report a leftover legacy variable. |
+| `DEVCTX_KIT` | Bundled skills, CLI notes | Legacy name, read for one transition. The skills fall back to it only when `DEVTWIN_KIT` is unset. `agents status` and `live migrate` add a `LEGACY_KIT_ENV` note while it is set. See [Migrate from devctx](/docs/guides/migrate-from-devctx/). |
 | `CLAUDE_CONFIG_DIR` | CLI | If set, Claude's skill folder is `$CLAUDE_CONFIG_DIR/skills`, and the directory is protected. |
 | `CODEX_HOME` | CLI | Protected. It does not change where Codex skills are installed; live previews warn `CODEX_HOME_IGNORED`. |
 | `HOME` | CLI | Used for protected paths. In live mode it must equal the live config's `home`. |

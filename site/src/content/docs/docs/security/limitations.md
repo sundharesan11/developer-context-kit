@@ -16,7 +16,7 @@ devtwin is an early, local-first tool. This page lists its honest limits in one 
 
 - **No backup, restore or sync.** Losing `~/.devtwin` (or a pilot's roots) loses every record, decision, journal and piece of evidence, and leaves installed skills unowned. Back up the folder yourself until backup and restore ships.
 - Onboarding copies some repository text (README summary, declared commands, environment names) into the store. It is protected only by mode 0700 and your disk encryption. A lost laptop can expose it.
-- No multi-device synchronization and no migration from an existing personal setup yet.
+- No multi-device synchronization, and no import from other personal setups yet. `live migrate` only moves a live setup made under devtwin's former name; see [Migrate from devctx](/docs/guides/migrate-from-devctx/).
 
 ## Security boundary
 
@@ -30,7 +30,7 @@ See the [security model](/docs/security/security-model/).
 ## Agents and sessions
 
 - **No automatic session hooks.** Nothing injects the brief when a session starts or records a handoff when it ends. You or a skill pull context explicitly.
-- **Fresh-session discovery is not proven.** Installing skill files does not prove a new Claude Code or Codex session finds and uses them. Live-mode activation on a real machine is still being verified.
+- **Fresh-session discovery is proven narrowly.** The first live activation, on one machine with one repository, showed fresh non-interactive Claude Code and Codex sessions finding the skills and resolving the project. Interactive sessions have not been checked yet, and one machine is not broad compatibility. Installing skill files alone does not prove a session uses them.
 - Cursor reads `~/.agents/skills` and will see the skills, but is untested.
 - `devtwin-setup` is not yet installed by `agents install`.
 - CLI records are attributed to `actor: "human"` with a fixed run ID, whoever runs the command. `record publish --apply` always acts as the controller; the CLI does not check who is running it.

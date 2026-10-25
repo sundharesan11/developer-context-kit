@@ -9,7 +9,7 @@ sidebar:
 ---
 
 :::note[Coming soon]
-Identity routing is designed but **not shipped**. None of the `account` or `connect` commands on this page exist in the CLI today; `node bin/devtwin.mjs help` does not list them. This page describes the intended design and workflow so you can see where devtwin is going. Names and details may change before release. Track progress on the [roadmap](/docs/project/roadmap/).
+Identity routing is designed but **not shipped**. None of the `account` or `connect` commands on this page exist in the CLI today; `devtwin help` does not list them. This page describes the intended design and workflow so you can see where devtwin is going. Names and details may change before release. Track progress on the [roadmap](/docs/project/roadmap/).
 :::
 
 ## The problem
