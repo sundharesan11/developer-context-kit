@@ -75,7 +75,7 @@ Skill-source acquisition never clones, extracts archives, or runs upstream code.
 devtwin cannot see or control what happens after an agent reads a brief:
 
 - The agent host may send the context you give it to its model provider.
-- Other tools the agent has — shells, MCP servers, `gh`, Git — bypass devtwin entirely.
+- Other tools the agent has, such as shells, MCP servers, `gh` and Git, bypass devtwin entirely.
 - Installed skill files alone do not prove an agent discovers or follows them.
 
 ## Handoff packets

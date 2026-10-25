@@ -85,7 +85,7 @@ connect read|draft --scope S --cwd W --provider P
 
 ### You approve bindings at your own terminal
 
-Adding or removing an account will be a previewed plan applied with its fingerprint **and** a short code you type at an interactive terminal. When standard input is not a terminal — as in an agent's shell — the apply refuses with `CONFIRMATION_REQUIRED` before writing anything. A fingerprint an agent can read is not your consent.
+Adding or removing an account will be a previewed plan applied with its fingerprint **and** a short code you type at an interactive terminal. When standard input is not a terminal, as in an agent's shell, the apply refuses with `CONFIRMATION_REQUIRED` before writing anything. A fingerprint an agent can read is not your consent.
 
 ## Intended workflow
 

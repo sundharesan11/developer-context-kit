@@ -38,7 +38,7 @@ devtwin refuses rather than guesses. When a check fails, it has not written anyt
 | `DEVTWIN_PLAN_MISMATCH` | The fingerprint does not match the plan built now: flags differ, or sources or state changed since preview. For onboarding, the request ID may already have been applied with another plan. | Preview again with the same flags and review the new fingerprint. |
 | `DEVTWIN_STALE_VERSION` | Something you based the change on moved: a superseded record's hash (`Target changed`), the registry generation, your profile since preview, an approval or validation receipt, or a file during apply. | Re-read the current state, preview again, and approve the new plan. |
 | `DEVTWIN_APPROVAL_REQUIRED` | An approval is missing or doesn't match: `confirmed` without `--reviewer`, a stack check that differs from the stored approval, a non-canonical approval response, or hub records that aren't confirmed. | Provide the missing approval, or re-approve the current plan. For the stack watch, run `stack plan` and `stack approve` again. |
-| `DEVTWIN_CONFLICT` | A request ID was reused with different inputs, `init` or `scope add` differs from what exists, a live config already exists, or an onboarding plan has a blocking conflict. | Use a fresh request ID, or review what already exists. For an interrupted onboarding, follow the remedy: "re-run project onboard with a new --request-id". |
+| `DEVTWIN_CONFLICT` | A request ID was reused with different inputs, `init` or `scope add` differs from what exists, a live config already exists, or an onboarding plan has a blocking conflict. | Use a fresh request ID, or review what already exists. For an interrupted onboarding, follow the remedy: `re-run project onboard with a new --request-id`. |
 
 ## Projects and records
 

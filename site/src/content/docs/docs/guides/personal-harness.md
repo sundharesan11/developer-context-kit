@@ -3,7 +3,7 @@ title: Personal harness
 description: Set up your private personal profile, run first-run setup with devtwin-setup, and turn the generic skill templates into your own private skills.
 ---
 
-devtwin can act as your personal harness. You keep the kit checkout generic and store everything about *you* — your working preferences, your stack, your drafts and your own skills — under the pilot's private roots, outside the checkout and outside every repository.
+devtwin can act as your personal harness. You keep the kit checkout generic and store everything about *you* (your working preferences, your stack, your drafts and your own skills) under the pilot's private roots, outside the checkout and outside every repository.
 
 This guide covers three pieces:
 

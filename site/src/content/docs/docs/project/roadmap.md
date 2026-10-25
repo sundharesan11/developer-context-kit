@@ -26,7 +26,7 @@ devtwin is an early local tool, not yet a packaged release. The order below favo
 | --- | --- | --- |
 | 1 | **Backup and restore** of private state, with recovery guidance and upgrade compatibility. | Planned. Deferred so live activation could be proven first. |
 | 2 | **Live activation** on a real machine: fresh Claude Code and Codex sessions finding the skills, with rollback verified. | Implemented. First activation on a real machine passed on 2026-10-25, including fresh non-interactive Claude Code and Codex sessions. Interactive sessions are still to be checked. |
-| — | **[Identity routing](/docs/guides/identity-routing/)**: bind each scope to its own GitHub and Slack accounts; read and draft first, sending later. | Designed, sequenced after live activation. |
+| After 2 | **[Identity routing](/docs/guides/identity-routing/)**: bind each scope to its own GitHub and Slack accounts; read and draft first, sending later. | Designed, sequenced after live activation. |
 | 3 | **Session start and end hooks**: resume and handoff adapters with a reviewable worker lifecycle. | Planned. |
 | 4 | **Selective migration** from an existing personal setup: dry-run mapping, approved records only. | Planned. |
 | 5 | **More connectors** beyond GitHub and Slack, with account and workspace verification. | Planned. |
