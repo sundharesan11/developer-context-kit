@@ -38,8 +38,8 @@ const lines = (tree: string) =>
     <article class="pillar" id="context" aria-labelledby="p1">
       <div class="p-copy reveal">
         <div class="p-num"><span>01</span> Project context</div>
-        <h3 id="p1">Context that carries over — with receipts.</h3>
-        <p>Decisions, facts, constraints, commands, unknowns and handoffs live as records outside the repo. Every record points at where it came from, gets reviewed before an agent sees it, and is superseded — never silently overwritten.</p>
+        <h3 id="p1">Context that carries over, with receipts.</h3>
+        <p>Decisions, facts, constraints, commands, unknowns and handoffs live as records outside the repo. Every record points at where it came from, gets reviewed before an agent sees it, and is superseded, never silently overwritten.</p>
         <ul class="ticks">
           <li><span><b>Source-linked.</b> A file, a commit, an issue or a URL. Files are hashed, so drift shows.</span></li>
           <li><span><b>Reviewed first.</b> Agents <code>record propose</code>; you <code>record publish</code>.</span></li>
@@ -82,7 +82,7 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>02</span> Every agent</div>
         <h3 id="p2">Claude Code today. Codex tomorrow. Same brief.</h3>
-        <p>At session start the agent loads a bounded brief — the things that matter for this project, ordered by kind and cited to their sources. Switch tools mid-week and nothing is lost: Claude Code and Codex read the same reviewed context.</p>
+        <p>At session start the agent loads a bounded brief: the things that matter for this project, ordered by kind and cited to their sources. Switch tools mid-week and nothing is lost: Claude Code and Codex read the same reviewed context.</p>
         <ul class="ticks">
           <li><span><code>devtwin-resume</code> loads the brief into the session.</span></li>
           <li><span><code>devtwin-record</code> captures a decision as you make it.</span></li>
@@ -118,7 +118,7 @@ const lines = (tree: string) =>
                 <div class="brow"><span class="dot q"></span><span>Is the v1 webhook still called by mobile?</span><span class="src">open</span></div>
               </div>
               <div class="bsec"><h4>Last handoff</h4>
-                <div class="brow"><span class="dot"></span><span>Retry backoff half done — src/jobs/retry.ts</span><span class="src">yesterday</span></div>
+                <div class="brow"><span class="dot"></span><span>Retry backoff half done · src/jobs/retry.ts</span><span class="src">yesterday</span></div>
               </div>
             </div>
           </div>
@@ -131,10 +131,10 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>03</span> Accounts</div>
         <h3 id="p3">The right account, in every org.</h3>
-        <p>Work for two companies? Each one is its own scope, with its own projects and its own records. Identity routing binds each scope to its own GitHub and Slack account, so the project — not whatever you happen to be logged into — decides who the agent acts as.</p>
+        <p>Work for two companies? Each one is its own scope, with its own projects and its own records. Identity routing binds each scope to its own GitHub and Slack account, so the project, not whatever you happen to be logged into, decides who the agent acts as.</p>
         <ul class="ticks">
           <li><span><b>Scoped by repo.</b> <code>context resolve</code> maps the working tree to its scope and project.</span></li>
-          <li><span><b>Verified, or refused.</b> The live identity must match the binding — a mismatch is refused.</span></li>
+          <li><span><b>Verified, or refused.</b> The live identity must match the binding. A mismatch is refused.</span></li>
           <li><span><b>Kept apart.</b> Credentials never live in records or briefs.</span></li>
         </ul>
         <a class="p-more" href={DOCS.identityRouting}>Route identities per org <span aria-hidden="true">→</span></a>
@@ -173,7 +173,7 @@ const lines = (tree: string) =>
         <h3 id="p4">Make it yours. Then make more.</h3>
         <p>devtwin is also a template for your own harness. Set up a small private profile and turn generic skill templates into private skills of your own. The kit ships the patterns; your profile supplies the taste.</p>
         <ul class="ticks">
-          <li><span><b>Stack watch.</b> Vendor announcements that touch what you build — a new Claude model, an auth-provider release.</span></li>
+          <li><span><b>Stack watch.</b> Vendor announcements that touch what you build: a new Claude model, an auth-provider release.</span></li>
           <li><span><b>Slack updates.</b> Drafts in your voice, saved for you to send.</span></li>
           <li><span><b>Writing style.</b> Your rules, applied by every agent.</span></li>
         </ul>
@@ -209,8 +209,8 @@ const lines = (tree: string) =>
           </div>
           <div class="digest">
             <div class="cmd"><span class="p">$</span> devtwin stack digest --scope acme</div>
-            <div><span class="acc">●</span> New Claude model release <span class="muted">— project acme.atlas</span></div>
-            <div><span class="acc">●</span> Auth provider SDK major release <span class="muted">— your stack</span></div>
+            <div><span class="acc">●</span> New Claude model release <span class="muted">· project acme.atlas</span></div>
+            <div><span class="acc">●</span> Auth provider SDK major release <span class="muted">· your stack</span></div>
             <div class="muted">previously reported, not repeated: 31</div>
           </div>
         </div>
