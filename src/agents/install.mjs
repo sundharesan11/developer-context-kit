@@ -11,11 +11,12 @@ import { readPrivateJson, readPrivateBytes, writeNewFile, atomicReplace, ensureP
 import { withPilotLock } from "../storage/lock.mjs";
 import { RUN_ID } from "../storage/runs.mjs";
 import { recordInventory, INVENTORY } from "./inventory.mjs";
+import { isHookKind, isHookJournal, hookJournalFinished, hookRecoveryFor } from "./hooks-install.mjs";
 import { LEGACY_SKILL_NAMES, LEGACY_SKILL_PREFIX, LEGACY_RECEIPT, isLegacySkill } from "../config/legacy.mjs";
 export const AGENT_HOMES = { claude: ".claude/skills", codex: ".agents/skills" };
 // Earlier releases wrote Codex skills here. Status reports leftovers; nothing ever acts on them.
 export const LEGACY_HOMES = { codex: ".codex/skills" };
-export const SKILL_NAMES = ["devtwin-onboard", "devtwin-resume", "devtwin-record"];
+export const SKILL_NAMES = ["devtwin-onboard", "devtwin-resume", "devtwin-record", "devtwin-capture"];
 const SKILL = "SKILL.md", RECEIPT = ".devtwin-owned.json", KIND = "skill-bundled", FILE_LIMIT = 1048576;
 // Entries installed under the former name keep their legacy receipt file. They are only ever removed, never written.
 const receiptOf = (skill) => isLegacySkill(skill) ? LEGACY_RECEIPT : RECEIPT;
@@ -77,12 +78,14 @@ const bundledFor = (pilot, j) => j?.kind === KIND && j.configId === configIdOf(p
 const isCompleted = (j, entry) => j.completed.some((e) => canonicalJson(e) === canonicalJson(entry));
 const finished = (j) => j.closed === true || j.intended.every((e) => isCompleted(j, e));
 const journalBytes = (journal) => canonicalJson(journal) + "\n";
-// Runs that block a new apply: this live config's unfinished bundled runs, unreadable journals, and in the pilot legacy unkinded ones.
+// Runs that block a new apply: this live config's unfinished bundled skill and hook runs, unreadable journals, and in
+// the pilot legacy unkinded ones.
 async function incompleteRuns(pilot) {
   const runs = [];
   for (const { id, journal } of await readJournals(pilot.stateRoot)) {
     if (journal === null) runs.push({ id, journal });
     else if (bundledFor(pilot, journal)) { if (!wellFormed(id, journal) || !finished(journal)) runs.push({ id, journal }); }
+    else if (isHookKind(journal) && journal.configId === configIdOf(pilot)) { if (!isHookJournal(pilot, id, journal) || !hookJournalFinished(journal)) runs.push({ id, journal }); }
     else if (!pilot.live && journal.kind === undefined && !(Array.isArray(journal.intended) && Array.isArray(journal.completed) && journal.completed.length >= journal.intended.length)) runs.push({ id, journal });
   }
   return runs;
@@ -263,6 +266,16 @@ export async function planRecovery(roots, pilot, { release = false } = {}) {
   const actions = [], unstarted = [], runs = [];
   for (const { id, journal } of await incompleteRuns(pilot)) {
     runs.push(id);
+    // A hook run: each started, unfinished file edit is checked against the journal's before and after hashes.
+    if (isHookJournal(pilot, id, journal)) {
+      const recovered = recoveredIndexes(journal);
+      for (const [index, entry] of journal.intended.entries()) {
+        if (journal.completed.includes(index) || recovered.has(index)) continue;
+        if (!journal.started.includes(index)) { unstarted.push({ runId: id, index, hook: true, agent: entry.agent, path: entry.path }); continue; }
+        actions.push({ runId: id, index, hook: true, agent: entry.agent, path: entry.path, ...hookRecoveryFor(entry) });
+      }
+      continue;
+    }
     if (!ourJournal(pilot, id, journal)) { actions.push({ runId: id, index: null, op: "hold", reason: "unreadable-journal", journalHash: hashOf(join(roots.stateRoot, "runs", id, "journal.json")) }); continue; }
     const copies = join(roots.stateRoot, "runs", id, "copies"), recovered = recoveredIndexes(journal), created = Array.isArray(journal.created) ? journal.created : [];
     for (const [index, entry] of journal.intended.entries()) {
@@ -277,7 +290,7 @@ export async function planRecovery(roots, pilot, { release = false } = {}) {
 async function closeRun(roots, pilot, id, journal, recovery) {
   const path = join(roots.stateRoot, "runs", id, "journal.json");
   assertWritable(roots, [path]);
-  if (!ourJournal(pilot, id, journal)) {
+  if (!ourJournal(pilot, id, journal) && !isHookJournal(pilot, id, journal)) {
     const kept = join(roots.stateRoot, "runs", id, "journal.released.json");
     assertWritable(roots, [kept]);
     if (info(kept)) throw new DevtwinError("CONFLICT", "Released journal already exists", { runId: id });
@@ -299,6 +312,15 @@ export async function applyRecovery(roots, pilot, { fingerprint, release = false
       if (action.op === "hold") continue;
       const journal = journals.get(action.runId), entry = journal.intended[action.index];
       const journalPath = join(roots.stateRoot, "runs", action.runId, "journal.json");
+      // A hook entry changes no file here: a finished edit is marked complete, an unapplied one only recorded.
+      if (action.hook) {
+        assertWritable(roots, [journalPath]);
+        if (hookRecoveryFor(entry).op !== action.op) throw new DevtwinError("STALE_VERSION", "Hook file changed during recovery");
+        if (action.op === "hook-complete") journal.completed.push(action.index);
+        journal.recovered = [...(Array.isArray(journal.recovered) ? journal.recovered : []), { index: action.index, op: action.op, planFingerprint: fingerprint }];
+        await atomicReplace(journalPath, journalBytes(journal));
+        continue;
+      }
       const R = receiptOf(entry.skill);
       assertWritable(roots, [...entryPaths(entry.path, entry.skill), journalPath], { targetHome: entry.root });
       if (action.op === "complete-update") {
@@ -348,6 +370,7 @@ export async function installStatus(roots, pilot, { targetHome }) {
     incomplete = [];
     for (const { id, journal: j } of await readJournals(roots.stateRoot)) {
       if (j?.kind === KIND && j.closed === true) continue;
+      if (isHookJournal(pilot, id, j) && hookJournalFinished(j)) continue;
       if (j === null || !Array.isArray(j.intended) || !Array.isArray(j.completed) || j.completed.length < j.intended.length) incomplete.push(id);
     }
   }

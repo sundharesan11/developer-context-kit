@@ -48,6 +48,12 @@ node bin/devtwin.mjs profile apply --pilot "$PILOT_FILE" --work 'Backend service
 
 `devtwin-setup` is not yet in the bundled installer, so `agents install` does not install it. Live-mode activation passed on 2026-10-25; the installer wiring (U9 of the harness plan) is not built yet. Until then, you can read its `SKILL.md` in the kit checkout.
 
+## The capture skill and the hook
+
+`skills/devtwin-capture` is a bundled skill that `agents install` installs. It tells an agent to treat hook lesson lines as untrusted data. The agent stops and asks when its plan breaks the "do" or "don't" line of a delivered lesson. At the end of a task, it drafts at most three general lessons. It reads lessons only with `lesson match` and `lesson show`. Drafts and preferences stay in the conversation, because no command saves them from an agent in this version. It never runs a command, fetches a URL, installs a package or changes a permission because a lesson says so.
+
+The hook entries are separate from the skills. `agents install --hooks` previews and, after approval, writes them to the approved agent settings files. `agents status` reports them. The hook also denies owner-only devtwin commands from agent shells. See [Live activation](LIVE.md#install-the-hooks).
+
 ## Skill templates
 
 The kit ships three skill templates under `templates/skills/`:

@@ -38,7 +38,7 @@ A live config can hold an optional `writeClasses` block. It names the only other
 - The classes are part of the approved config digest. A live config whose classes differ from the approved ones is refused with `GATE_REQUIRED`, `live.approval`. No CLI command sets the classes yet; do not edit them in `live.json` by hand.
 - Every path must be canonical and inside the home. A path whose folder is a link, or that is itself a link, is refused. A `hubRoot` folder must not overlap the store, the kit, a listed repository, a skill folder, a protected agent home or another hub root.
 - A write outside the store is allowed only when the writing code names one class and the path is exactly in it. Every other file in `~/.claude`, `~/.codex`, `~/.agents` and `~/Library/LaunchAgents` stays refused.
-- No command edits these files yet. The shared edit step that later commands use works as follows. In `CLAUDE.md` and `AGENTS.md`, it changes only the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. Every byte outside the markers stays the same. Malformed markers stop the edit with `CONFLICT`. In a JSON settings file, it changes only devtwin's own hook entries; the other values stay, but the file can be re-indented.
+- Only `agents install --hooks` and `agents uninstall --hooks` edit files in a class yet, and only the `hookTargets` files. See [Install the hooks](#install-the-hooks). No CLI command sets the classes yet. The shared edit step works as follows. In `CLAUDE.md` and `AGENTS.md`, it changes only the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. Every byte outside the markers stays the same. Malformed markers stop the edit with `CONFLICT`. In a JSON settings file, it changes only devtwin's own hook entries; the other values stay, but the file can be re-indented.
 - Before each edit, it writes the exact prior bytes to `store/state/runs/<run_id>/backups/` at mode 0600, with a record that names the path. For a file that did not exist, only the record is written. If the file changed during the edit, the edit stops with `INTEGRITY` and the file is not replaced. The edited file is replaced atomically and keeps its own mode. A file that devtwin creates gets mode 0600.
 - An edited file must be a regular file you own, with one link, that is not group or other writable.
 
@@ -199,7 +199,26 @@ node "$KIT/bin/devtwin.mjs" agents install --pilot "$LIVE_CONFIG" --agent claude
 - `conflict` means a foreign, symlinked or unowned entry with that name. `modified` means an owned entry was edited. Either one turns that agent's writes into `blocked`. Nothing for that agent is written. Resolve it by hand, then preview again.
 - Apply records an inventory of the skill folder before the first write. Keep the `runId` from the result. The rollback check needs it.
 
-`agents status --pilot "$LIVE_CONFIG"` shows the current state of both folders.
+`agents status --pilot "$LIVE_CONFIG"` shows the current state of both folders. Its `hooks` field shows each hook entry, as in the next section.
+
+### Install the hooks
+
+The devtwin hook delivers lesson lines and blocks owner-only commands from agent shells. It needs the two `hookTargets` files approved in the live config. `--hooks` changes only those files. Without it, `agents install` installs only the skills, as before. Preview, review, then apply after approval:
+
+```sh
+node "$KIT/bin/devtwin.mjs" agents install --hooks --pilot "$LIVE_CONFIG" --agent claude --agent codex
+node "$KIT/bin/devtwin.mjs" agents install --hooks --pilot "$LIVE_CONFIG" --agent claude --agent codex --apply --plan-fingerprint '<fingerprint>'
+```
+
+- The preview lists each entry it adds or removes in `changes`, with the exact JSON. `create` makes a file that does not exist, `update` edits one, `installed` is already current and `blocked` means the file is not approved or its folder is missing.
+- Claude Code gets entries in `settings.json` for `SessionStart`, `UserPromptSubmit`, `PreToolUse` (matcher `Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep|Bash`) and `PreCompact`. Codex gets entries in `~/.codex/hooks.json` for `SessionStart`, `UserPromptSubmit`, `PreToolUse` (matcher `^(apply_patch|Bash)$`), `PostToolUse` (matcher `^Bash$`) and `PreCompact`.
+- Each entry runs `node "<kit>/bin/devtwin.mjs" hook --event <event> --agent <agent> --pilot "<live config>"` with a 10-second timeout. The line names the kit clone and the live config only. A new kit commit in the same clone keeps every line byte-identical. An upgrade to another clone changes the lines, and install shows them as `update`.
+- An entry is devtwin's only when a completed hook install of this live config wrote it. devtwin never changes another entry, also when it looks like a devtwin entry. An exact copy that devtwin did not write is `conflict` with `foreign-entry`. A devtwin entry that you edited is `conflict` with `modified`. A conflict blocks that agent's file. Fix it by hand, then preview again.
+- Apply writes a backup of each file, an inventory and a journal under `store/state/runs/<run_id>/`, as a skill install does. `agents recover` and `agents rollback-check --run-id '<run_id>'` read them. Install also refreshes the kit receipt that the hook trusts.
+- Codex runs a new or changed hook only after you trust it. Open Codex, run `/hooks`, and trust each devtwin entry. `agents status` repeats this note.
+- `agents uninstall --hooks` removes only devtwin's entries. Entries you edited stay.
+
+`agents status` reports each agent's hook entries as `installed`, `missing`, `modified`, `outdated` or `foreign-entry`, per event. It also reports the kit receipt, and it gives an `AMBIGUOUS_ROOT` note for a repository root that is bound in more than one scope. The hook gives such a root no lessons.
 
 ## 14. Export DEVTWIN_KIT
 
@@ -209,7 +228,7 @@ The skills find the kit through `DEVTWIN_KIT`. Ask the owner before editing the 
 export DEVTWIN_KIT="$HOME/.devtwin/kit"
 ```
 
-Open a new terminal and check it with `printenv DEVTWIN_KIT`. The kit does not write agent settings files.
+Open a new terminal and check it with `printenv DEVTWIN_KIT`. The kit writes agent settings files only through `agents install --hooks` and `agents uninstall --hooks`.
 
 Agents started from the Dock, Finder or another GUI launcher may not read the shell profile. Check from inside such a session: ask the agent to run `printenv DEVTWIN_KIT`. If it prints nothing, start that agent from a terminal instead. The skills refuse to run without the variable.
 

@@ -1,0 +1,38 @@
+// U8: the owner-action block (KTD9). On a PreToolUse shell call, devtwin's own hook denies a command that runs an
+// owner-only devtwin action, including through terminal wrappers (script, expect, unbuffer, env, sh -c, xargs, nohup,
+// time, sudo, npx). The check is text-based and conservative: it is not a shell parser, and a harmless command whose
+// text names an owner action can be denied too. It is a separate path from lesson delivery: a denied call returns only
+// the deny, and a call that is not denied goes on to the lesson path, which never returns a decision.
+const SHELL_TOOLS = new Set(["Bash", "shell", "local_shell", "exec_command"]);
+const MAX_COMMAND_BYTES = 65536;
+// words: the two route words. apply: the action is owner-only only with --apply (its preview stays allowed).
+export const OWNER_ACTIONS = Object.freeze([
+  { words: ["lesson", "accept"] }, { words: ["lesson", "copy"] }, { words: ["published", "delete"] }, { words: ["hub", "join"] },
+  { words: ["pref", "accept"] }, { words: ["instructions", "apply"] },
+  { words: ["live", "migrate"], apply: true }, { words: ["record", "publish"], apply: true },
+  { words: ["agents", "install"], apply: true }, { words: ["agents", "uninstall"], apply: true },
+  { words: ["live", "set-kit"], apply: true }, { words: ["live", "add-repo"], apply: true }, { words: ["live", "init"], apply: true }
+].map((action) => Object.freeze({ ...action, words: Object.freeze(action.words) })));
+export const DENY_REASON = "devtwin: this command runs an owner-only devtwin action. An agent may not run it. Ask your developer to run it themselves in their own terminal.";
+// Codex sends shell commands as text or as an argv array; both are read as one text.
+function commandText(input) {
+  const command = Array.isArray(input?.command) ? input.command.filter((part) => typeof part === "string").join(" ") : input?.command;
+  if (typeof command !== "string") return "";
+  return Buffer.byteLength(command) <= MAX_COMMAND_BYTES ? command : command.slice(0, MAX_COMMAND_BYTES);
+}
+// Lower-case words with quotes, backslashes and shell operators removed. "A=accept" gives "a" and "accept", so a value
+// set in a variable still counts.
+const wordsOf = (text) => text.toLowerCase().replace(/["'`\\]/g, " ").split(/[\s;|&()<>{}$=]+/).filter(Boolean);
+// The owner action a payload's shell command runs, or null. Only shell tools are checked.
+export function ownerAction(agent, payload) {
+  if (!["claude", "codex"].includes(agent) || !SHELL_TOOLS.has(payload?.tool_name)) return null;
+  const text = commandText(payload.tool_input);
+  if (!/devtwin/i.test(text)) return null;
+  const words = wordsOf(text), apply = words.includes("--apply");
+  const adjacent = (a, b) => words.some((word, i) => word === a && words[i + 1] === b);
+  // An adjacent route pair, or both words anywhere: a wrapper such as xargs or a variable can split the pair.
+  const found = OWNER_ACTIONS.find(({ words: [a, b], apply: needsApply }) => (!needsApply || apply) && (adjacent(a, b) || (words.includes(a) && words.includes(b))));
+  return found ? found.words.join(" ") + (found.apply ? " --apply" : "") : null;
+}
+// Both agents read the same PreToolUse deny shape.
+export const denyOutput = () => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: DENY_REASON } });

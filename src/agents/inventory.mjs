@@ -5,6 +5,7 @@ import { sha256, canonicalJson } from "../storage/canonical.mjs";
 import { readPrivateJson, writeNewFile, info, isWithin } from "../storage/fsx.mjs";
 import { RUN_ID } from "../storage/runs.mjs";
 import { LEGACY_SKILL_PREFIX } from "../config/legacy.mjs";
+import { HOOK_INVENTORY, hookRollbackCheck } from "./hooks-install.mjs";
 // The pre-apply inventory of each target skill folder. Rollback is evidence, not automation: nothing here restores anything.
 export const INVENTORY = "inventory.json";
 const OWNED = ["devtwin-", LEGACY_SKILL_PREFIX], WALK_LIMIT = 10000, FILE_LIMIT = 16 * 1048576, INVENTORY_LIMIT = 16 * 1048576;
@@ -81,6 +82,8 @@ export async function rollbackCheck(roots, pilot, { runId }) {
   const path = join(roots.stateRoot, "runs", runId, INVENTORY);
   if (!info(path)) throw new DevtwinError("NOT_FOUND", "Install inventory unavailable", { runId });
   const inventory = await readPrivateJson(path, INVENTORY_LIMIT);
+  // A hook install run keeps a hook-file inventory under the same name; its check compares devtwin's hook entries.
+  if (inventory?.kind === HOOK_INVENTORY) return hookRollbackCheck(pilot, inventory, runId);
   if (!wellFormed(inventory, runId)) throw new DevtwinError("INTEGRITY", "Invalid install inventory", { runId });
   if (inventory.configId !== (pilot.live?.configId ?? null)) throw new DevtwinError("GATE_REQUIRED", "Inventory belongs to another live config", { runId });
   if (inventory.mode !== "install") throw new DevtwinError("INVALID_INPUT", "Rollback check needs an install run", { runId });
