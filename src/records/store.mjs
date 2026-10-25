@@ -125,7 +125,7 @@ export async function readSnapshot(roots, scope, project) {
   const directory = join(dirFor(roots, scope, project), "records");
   let ids;
   try { ids = (await readdir(directory)).sort(); } catch (error) { if (error.code === "ENOENT") ids = []; else throw error; }
-  const records = [], corrupt = [];
+  const corrupt = [];
   let hiddenUncommitted = 0;
   const published = new Set(committed.registry.operations.map((op) => op.operationId));
   const claims = await operationBundles(roots, scope, project, committed.registry.operations);
@@ -136,11 +136,19 @@ export async function readSnapshot(roots, scope, project) {
       if (record.operationId && !published.has(record.operationId)) { hiddenUncommitted++; continue; }
       const hash = recordHash(record);
       if (record.operationId && claims.get(record.operationId)?.get(id) !== hash) throw new DevtwinError("INTEGRITY", "Unlisted operation claim");
-      if (!Array.isArray(record.supersedes) || record.supersedes.some((x) => typeof x !== "string" || !RECORD_ID.test(x) || x === id) || new Set(record.supersedes).size !== record.supersedes.length) throw new DevtwinError("INTEGRITY", "Invalid supersession");
+      assertSupersedesShape(record);
       candidates.push({ ...record, body, recordHash: hash, effective: record.status, supersededBy: [] });
     } catch { corrupt.push({ id, code: "DEVTWIN_INTEGRITY" }); }
   }
-  const cyclic = cycleMembers(candidates);
+  return { ...resolveSupersession(candidates, corrupt), hiddenUncommitted };
+}
+// supersedes must list distinct record IDs other than the record's own.
+export function assertSupersedesShape(record) {
+  if (!Array.isArray(record.supersedes) || record.supersedes.some((x) => typeof x !== "string" || !RECORD_ID.test(x) || x === record.id) || new Set(record.supersedes).size !== record.supersedes.length) throw new DevtwinError("INTEGRITY", "Invalid supersession");
+}
+// Shared by the project, personal and org readers. Cycle members join corrupt; the rest get effective and supersededBy.
+export function resolveSupersession(candidates, corrupt = []) {
+  const records = [], cyclic = cycleMembers(candidates);
   for (const r of candidates) if (cyclic.has(r.id)) corrupt.push({ id: r.id, code: "DEVTWIN_INTEGRITY" }); else records.push(r);
   corrupt.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const byId = new Map(records.map((r) => [r.id, r]));
@@ -148,7 +156,7 @@ export async function readSnapshot(roots, scope, project) {
     const predecessor = byId.get(id);
     if (predecessor) { predecessor.effective = "superseded"; predecessor.supersededBy.push(r.id); }
   }
-  return { records, corrupt, hiddenUncommitted };
+  return { records, corrupt };
 }
 export async function addRecord(roots, input, options = {}) {
   assertPublicInput(input);
