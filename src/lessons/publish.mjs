@@ -7,6 +7,11 @@
 //            hub+general  the hub file and a personal-store record, after the all-scope isolation check
 //            project      a project lesson record in the proposal's project; local, no dialog
 //            general      a personal-store record only; local, no dialog, the all-scope isolation check still runs
+//
+// U12: a replacement proposal (lesson supersede-propose) accepts to the hub target only. Its hub file names the
+// predecessor as supersedes: [{ id, hash }]. The predecessor is checked against the local clone at preview and on the
+// fetched remote branch before the commit and after every rebase. STALE_VERSION drops the local commit, queues
+// nothing and leaves the proposal pending with the reason in lastAttempt.
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -20,9 +25,10 @@ import { isolationTerms, assertOutboundClean } from "../records/isolation.mjs";
 import { addPersonalRecord, readPersonalSnapshot } from "../records/personal.mjs";
 import { addRecord, requireCommittedProject } from "../records/store.mjs";
 import { renderHubLesson } from "../hubs/read.mjs";
-import { publishToHub, hubGit } from "../hubs/git-write.mjs";
+import { publishToHub, hubGit, checkRemoteSupersession } from "../hubs/git-write.mjs";
 import { rebuildIndex } from "./index.mjs";
-import { checkLesson, lessonBody, lessonDraft, lessonText, requirePending, proposalHash, markAccepted, withProposalLock } from "./propose.mjs";
+import { checkLesson, lessonBody, lessonDraft, lessonText, requirePending, proposalHash, markAccepted, markAttempt, withProposalLock } from "./propose.mjs";
+import { checkLocalSupersession } from "./supersede.mjs";
 
 export const TARGETS = Object.freeze(["hub", "hub+general", "project", "general"]);
 export const leavesMachine = (target) => target === "hub" || target === "hub+general";
@@ -41,10 +47,10 @@ async function writableBinding(roots, scope) {
 }
 // The hub file for a lesson. localRecordHash points back to the local record or the accepted proposal draft; the
 // full local record is never published.
-function hubFile(binding, { requestId, createdAt, lesson, localRecordHash }) {
+function hubFile(binding, { requestId, createdAt, lesson, localRecordHash, supersedes = null }) {
   const id = hubLessonId({ hubId: binding.hubId, handle: binding.handle, requestId, createdAt });
-  const meta = { schemaVersion: 1, id, author: binding.actorRef, title: lesson.title, match: lesson.match, createdAt, localRecordHash };
-  return { hubId: binding.hubId, scope: binding.scope, author: binding.actorRef, lessonId: id, rel: "lessons/" + id + ".md", content: renderHubLesson(meta, lessonBody(lesson)) };
+  const meta = { schemaVersion: 1, id, author: binding.actorRef, title: lesson.title, match: lesson.match, createdAt, localRecordHash, ...(supersedes ? { supersedes } : {}) };
+  return { hubId: binding.hubId, scope: binding.scope, author: binding.actorRef, lessonId: id, rel: "lessons/" + id + ".md", content: renderHubLesson(meta, lessonBody(lesson)), ...(supersedes ? { supersedes } : {}) };
 }
 const matchLine = (match) => ["paths", "packages", "topics"].filter((key) => match[key].length).map((key) => key + ": " + match[key].join(", ")).join("; ");
 // The owner dialog shows the exact lesson text. A lesson too long to show in full is refused, never cut.
@@ -54,8 +60,10 @@ function lessonDialog(title, header, lesson) {
   if (shown.endsWith("\u2026") && [...shown].length >= DIALOG_LIMITS.bodyChars) throw new DevtwinError("LIMIT", "Lesson too long to show in the owner dialog; shorten it with lesson edit", { maxChars: DIALOG_LIMITS.bodyChars });
   return content;
 }
-const acceptDialog = (plan) => lessonDialog("Publish a lesson to an organization hub", [
-  "Scope: " + plan.scope, "Hub: " + plan.hub.hubId, "Author: " + plan.hub.author,
+const replacesLines = (replaces) => replaces ? ["Replaces lesson: " + replaces.title + " [" + replaces.id + "], claimed by " + replaces.author,
+  "The replaced lesson stops reaching agents once this one is on the hub, and its author is told."] : [];
+const acceptDialog = (plan) => lessonDialog(plan.replaces ? "Publish a replacement lesson to an organization hub" : "Publish a lesson to an organization hub", [
+  "Scope: " + plan.scope, "Hub: " + plan.hub.hubId, "Author: " + plan.hub.author, ...replacesLines(plan.replaces),
   plan.target === "hub+general" ? "Also saves it to your personal store, which every organization's sessions read." : "Hub only. Your personal store does not get a copy.",
   "Everyone with access to this hub can read it. Git history keeps the text."
 ], plan.lesson);
@@ -71,12 +79,20 @@ export async function planAccept(roots, { id, target, scope, project }) {
   const proposal = await requirePending(roots, id);
   if (scope !== undefined && assertScopeId(scope) !== proposal.scope) throw new DevtwinError("CONFLICT", "Proposal belongs to another scope", { scope: proposal.scope });
   const lesson = await checkLesson(roots, proposal.scope, proposal.lesson);
+  if (proposal.supersedes && target !== "hub") throw new DevtwinError("INVALID_INPUT", "A replacement lesson goes to the hub only", { field: "target", allowed: ["hub"] });
   if (general(target)) assertOutboundClean(lessonText(lesson), await isolationTerms(roots));
   const requestId = requestIdFor("lsn", { proposalId: id, revision: proposal.revision, target });
   const plan = { kind: "lesson-accept", proposalId: id, proposalHash: proposalHash(proposal), revision: proposal.revision, scope: proposal.scope, target, requestId, lesson, dialog: leavesMachine(target) };
   if (leavesMachine(target)) {
     const binding = await writableBinding(roots, proposal.scope);
-    plan.hub = hubFile(binding, { requestId, createdAt: proposal.createdAt, lesson, localRecordHash: digest(lessonDraft(lesson)) });
+    let supersedes = null;
+    if (proposal.supersedes) {
+      await checkLocalSupersession(binding, proposal.supersedes);
+      supersedes = [{ id: proposal.supersedes.id, hash: proposal.supersedes.hash }];
+      plan.supersedes = supersedes;
+      plan.replaces = { id: proposal.supersedes.id, title: proposal.supersedes.title, author: proposal.supersedes.author };
+    }
+    plan.hub = hubFile(binding, { requestId, createdAt: proposal.createdAt, lesson, localRecordHash: digest(lessonDraft(lesson)), supersedes });
     plan.createdAt = proposal.createdAt;
   }
   if (general(target)) plan.personalRecordId = personalRecordIdFor({ requestId });
@@ -93,10 +109,14 @@ export async function planAccept(roots, { id, target, scope, project }) {
   if (final.dialog) acceptDialog(final);
   return final;
 }
-// Publishes one lesson file. The precondition runs before the commit and after each rebase: the file must not be there.
+// Publishes one lesson file. The precondition runs before the commit and after each rebase: the file must not be there,
+// and for a replacement the predecessor must be there unchanged with no other replacement (U12).
 async function publishLesson(roots, binding, hub, { now, createdAt }) {
   // The check reads the fetched remote branch, not the clone's work tree, which holds the new file after a rebase.
-  const preconditions = async () => { if (hubGit(binding, ["cat-file", "-e", "refs/remotes/origin/" + binding.branch + ":" + hub.rel]).ok) throw new DevtwinError("CONFLICT", "Hub already has this lesson", { lessonId: hub.lessonId }); };
+  const preconditions = async () => {
+    if (hubGit(binding, ["cat-file", "-e", "refs/remotes/origin/" + binding.branch + ":" + hub.rel]).ok) throw new DevtwinError("CONFLICT", "Hub already has this lesson", { lessonId: hub.lessonId });
+    if (hub.supersedes) checkRemoteSupersession(binding, { lessonId: hub.lessonId, supersedes: hub.supersedes });
+  };
   const result = await publishToHub(roots, binding, { writes: [{ rel: hub.rel, content: hub.content }], message: "Add lesson " + hub.lessonId, preconditions, now, kind: "lesson", createdAt });
   return { lessonId: hub.lessonId, hubId: hub.hubId, pushed: result.pushed, ...(result.pushed ? { commit: result.commit, attempts: result.attempts } : { reason: result.reason, queued: result.queued }) };
 }
@@ -134,7 +154,13 @@ export async function applyAccept(roots, input, { fingerprint, now = () => new D
       const added = await addRecord(roots, { scope: plan.scope, project: plan.project, requestId: plan.requestId, recordedBy, draft: { ...lessonDraft(plan.lesson, { reach: "project", status: "observed" }), applicability: { level: "project" } } }, { now });
       result.project = { project: plan.project, recordId: added.recordId, recordHash: added.recordHash };
     }
-    if (binding) result.hub = await publishLesson(roots, binding, plan.hub, { now, createdAt: plan.createdAt });
+    if (binding) {
+      try { result.hub = await publishLesson(roots, binding, plan.hub, { now, createdAt: plan.createdAt }); }
+      catch (error) {
+        if (error.code === "DEVTWIN_STALE_VERSION" && plan.supersedes) await markAttempt(roots, proposal, plan.proposalHash, { code: error.code, reason: error.details?.reason ?? null, ...(error.details?.successorId ? { successorId: error.details.successorId } : {}) }, { now });
+        throw error;
+      }
+    }
     await markAccepted(roots, proposal, plan.proposalHash, result, { now });
     return result;
   });

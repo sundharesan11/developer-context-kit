@@ -48,7 +48,7 @@ export const lessonShowCommand = { options, async run(values, ctx) {
   const found = await findLesson(ctx.roots, scope, values.id);
   if (!found) throw new DevtwinError("NOT_FOUND", "No effective lesson with this ID", { id: values.id });
   const { entry, body } = found;
-  return { id: entry.id, kind: entry.kind, reach: entry.reach, scope: entry.scope, project: entry.project, claimedBy: entry.claimedBy, revisitAfter: entry.revisitAfter, stale: isStale(entry, ctx.now()), recordHash: entry.recordHash, text: renderInbound(entry.title + "\n\n" + body, { handle: entry.claimedBy }) };
+  return { id: entry.id, kind: entry.kind, reach: entry.reach, scope: entry.scope, project: entry.project, claimedBy: entry.claimedBy, revisitAfter: entry.revisitAfter, stale: isStale(entry, ctx.now()), ...(entry.contested ? { contested: true } : {}), recordHash: entry.recordHash, text: renderInbound(entry.title + "\n\n" + body, { handle: entry.claimedBy }) };
 } };
 // Rebuilds stateRoot/lessons/<scope>.json. The file is a cache of record data, so the write needs no plan fingerprint.
 export const lessonIndexCommand = { options: { scope: { type: "string" } }, run: (values, ctx) => rebuildIndex(ctx.roots, assertScopeId(values.scope)) };
@@ -111,6 +111,24 @@ export const lessonAcceptCommand = { options: { ...planOptions, target: { type: 
   if (!values.apply) return publish.planAccept(ctx.roots, input);
   needPlan(values);
   return publish.applyAccept(ctx.roots, input, { fingerprint: values["plan-fingerprint"], now: ctx.now, ctx });
+} };
+// U12: lesson supersede-propose (agent-callable, like propose) and lesson notices. The notices list is open to agents;
+// --ack previews, and --ack --apply with the plan fingerprint is an owner action that the hook denies from agent shells.
+export const lessonSupersedeProposeCommand = { options: { ...lessonOptions, predecessor: { type: "string" } }, async run(values, ctx) {
+  const { proposeSupersede } = await import("./supersede.mjs");
+  const lesson = { title: values.title, summary: values.summary ?? null, text: await bodyFrom(values, ctx) ?? "", match: matchFrom(values) ?? {} };
+  return proposeSupersede(ctx.roots, { session: values.session, scope: values.scope, project: values.project ?? null, predecessor: values.predecessor, lesson }, { now: ctx.now, apply: values.apply ?? false });
+} };
+export const lessonNoticesCommand = { options: { scope: { type: "string" }, id: { type: "string" }, ack: { type: "boolean" }, apply: { type: "boolean" }, "plan-fingerprint": { type: "string" } }, async run(values, ctx) {
+  const supersede = await import("./supersede.mjs");
+  if (!values.ack) {
+    if (values.apply) throw new DevtwinError("USAGE", "lesson notices applies only with --ack");
+    return supersede.listNotices(ctx.roots, { scope: values.scope });
+  }
+  const input = { scope: values.scope, id: values.id };
+  if (!values.apply) return supersede.planNoticeAck(ctx.roots, input);
+  needPlan(values);
+  return supersede.applyNoticeAck(ctx.roots, input, { fingerprint: values["plan-fingerprint"], now: ctx.now });
 } };
 export const lessonCopyCommand = { options: { ...planOptions, "to-scope": { type: "string" } }, async run(values, ctx) {
   const publish = await import("./publish.mjs");

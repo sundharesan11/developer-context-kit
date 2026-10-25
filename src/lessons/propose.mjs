@@ -87,17 +87,20 @@ export const withProposalLock = (roots, kind, action) => withPilotLock(roots, pr
 
 // lesson propose. Without apply it checks everything and writes nothing. The ID comes from the content, so the
 // same draft in the same session is one proposal.
-export async function proposeLesson(roots, { session, scope, project = null, lesson }, { now = () => new Date(), apply = false } = {}) {
+// U12: supersedes, when given, is { id, hash, title, author, hubId } for the hub lesson this proposal replaces
+// (src/lessons/supersede.mjs). A replacement counts toward the same three-per-session cap.
+export async function proposeLesson(roots, { session, scope, project = null, lesson, supersedes = null }, { now = () => new Date(), apply = false } = {}) {
   if (typeof session !== "string" || !SESSION_ID.test(session)) invalid("session");
   assertScopeId(scope);
   await loadScope(roots, scope);
   if (project !== null) assertProjectId(project, scope);
   const clean = await checkLesson(roots, scope, lesson);
-  const proposalId = "prop_" + digest({ session, scope, project, lesson: clean }).slice(7, 31), path = proposalPath(roots, proposalId);
+  const replaces = supersedes ? { supersedes } : {};
+  const proposalId = "prop_" + digest({ session, scope, project, lesson: clean, ...replaces }).slice(7, 31), path = proposalPath(roots, proposalId);
   const count = async () => (await readAll(roots)).filter((p) => p.session === session && p.proposalId !== proposalId).length;
   const existing = info(path) !== null;
   if (!existing && await count() >= PROPOSALS_PER_SESSION) throw new DevtwinError("LIMIT", "At most three lesson proposals per session", { max: PROPOSALS_PER_SESSION, session });
-  if (!apply) return { preview: true, proposalId, session, scope, project, lesson: clean, path, existing };
+  if (!apply) return { preview: true, proposalId, session, scope, project, lesson: clean, ...replaces, path, existing };
   assertWritable(roots, [path]);
   return withProposalLock(roots, "lesson-propose", async () => {
     if (info(path)) return { proposalId, path, created: false, state: (await readProposal(roots, proposalId)).state };
@@ -105,12 +108,12 @@ export async function proposeLesson(roots, { session, scope, project = null, les
     if (all.filter((p) => p.session === session).length >= PROPOSALS_PER_SESSION) throw new DevtwinError("LIMIT", "At most three lesson proposals per session", { max: PROPOSALS_PER_SESSION, session });
     if (all.length >= MAX_PROPOSALS) throw new DevtwinError("LIMIT", "Too many lesson proposals", { max: MAX_PROPOSALS });
     const at = now().toISOString();
-    const value = { schemaVersion: 1, proposalId, session, scope, project, lesson: clean, state: "pending", review: "unreviewed", revision: 0, createdAt: at, updatedAt: at, outcome: null };
+    const value = { schemaVersion: 1, proposalId, session, scope, project, lesson: clean, ...replaces, state: "pending", review: "unreviewed", revision: 0, createdAt: at, updatedAt: at, outcome: null };
     assertWritable(roots, [path]);
     ensurePrivatePath(roots.dataRoot, ["lesson-proposals"]);
     await writeNewFile(path, canonicalJson(value) + "\n");
     fsyncDir(proposalsDir(roots));
-    return { proposalId, path, created: true, state: "pending" };
+    return { proposalId, path, created: true, state: "pending", ...replaces };
   });
 }
 
@@ -119,7 +122,8 @@ export async function proposeLesson(roots, { session, scope, project = null, les
 export async function listProposals(roots, { scope, all = false } = {}) {
   if (scope !== undefined) assertScopeId(scope);
   const proposals = (await readAll(roots)).filter((p) => (all || p.state === "pending") && (scope === undefined || p.scope === scope));
-  return { proposals: proposals.map((p) => ({ id: p.proposalId, state: p.state, scope: p.scope, project: p.project, session: p.session, revision: p.revision, createdAt: p.createdAt, updatedAt: p.updatedAt, title: p.lesson.title, summary: p.lesson.summary, body: p.lesson.text, match: p.lesson.match, outcome: p.outcome })) };
+  return { proposals: proposals.map((p) => ({ id: p.proposalId, state: p.state, scope: p.scope, project: p.project, session: p.session, revision: p.revision, createdAt: p.createdAt, updatedAt: p.updatedAt, title: p.lesson.title, summary: p.lesson.summary, body: p.lesson.text, match: p.lesson.match, outcome: p.outcome,
+    ...(p.supersedes ? { supersedes: p.supersedes } : {}), ...(p.lastAttempt ? { lastAttempt: p.lastAttempt } : {}) })) };
 }
 
 // lesson reject: preview, then apply with the plan fingerprint. The file stays as "rejected", so it still counts
@@ -161,3 +165,7 @@ export async function applyEdit(roots, input, { fingerprint, now = () => new Dat
 // Accept marks the proposal after its writes. Called from src/lessons/publish.mjs only, which holds the proposal lock.
 export const markAccepted = (roots, proposal, expectHash, outcome, { now = () => new Date() } = {}) =>
   replaceProposal(roots, expectHash, { ...proposal, state: "accepted", review: "accepted", updatedAt: now().toISOString(), outcome });
+// U12: a replacement whose publish failed with STALE_VERSION stays pending and records why. Called from
+// src/lessons/publish.mjs only, which holds the proposal lock.
+export const markAttempt = (roots, proposal, expectHash, attempt, { now = () => new Date() } = {}) =>
+  replaceProposal(roots, expectHash, { ...proposal, lastAttempt: { ...attempt, at: now().toISOString() }, updatedAt: now().toISOString() });

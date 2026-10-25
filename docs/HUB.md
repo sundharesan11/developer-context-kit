@@ -129,6 +129,43 @@ node "$KIT/bin/devtwin.mjs" lesson copy --pilot "$LIVE_CONFIG" --id <personal-re
 
 Run the apply only with explicit approval from the owner. `lesson copy` publishes a lesson from your personal store to the hub of the target scope. It first checks the lesson against the names of every scope but the target, and fails with `ISOLATION` before the dialog. It then shows the owner dialog with the exact lesson text, and publishes through the same push and outbox path as accept.
 
+## Replace a lesson
+
+A lesson can go stale, and a colleague can be right. When planned work conflicts with a delivered lesson, the agent stops and asks its developer. The developer follows the lesson, or the agent drafts a replacement and the developer accepts it. See [Agent protocol](AGENT-PROTOCOL.md#replace-a-lesson).
+
+```sh
+node "$KIT/bin/devtwin.mjs" lesson supersede-propose --pilot "$LIVE_CONFIG" --scope <scope> --session <session-id> --predecessor <lsn_id> --title "<title>" --summary "<do or do not line>" --body "<reason>" --path "<glob>"
+node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> --target hub
+node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> --target hub --apply --plan-fingerprint '<fingerprint>'
+```
+
+Run each apply only with explicit approval from the owner.
+
+- **Propose.** `lesson supersede-propose` takes the same options as `lesson propose`, plus `--predecessor`. It writes a private pending proposal and counts toward the same cap of three per session. With `--apply`, it first tries a `hub sync`. It then reads the predecessor from the local clone and records its ID, the SHA-256 of its exact hub file, its title and its author. An unknown ID fails with `NOT_FOUND`. A lesson that its author removed fails with `CONFLICT` and the reason `removed`. A lesson that already has a valid replacement fails with `CONFLICT` and the reason `superseded`.
+- **Accept.** A replacement accepts to the `hub` target only; other targets fail with `INVALID_INPUT`. The owner dialog shows the new lesson and names the lesson it replaces, with its title, ID and claimed author. The hub file carries `"supersedes":[{"id":"<lsn_id>","hash":"sha256:<hex>"}]` in its front matter.
+- **Check.** Before the commit and after each fetch and rebase, devtwin reads the fetched remote branch. The predecessor must be there with the same hash and without its author's tombstone, and no other lesson may already replace it. When another replacement got there first, the accept fails with `STALE_VERSION` and the reason `already-superseded`. devtwin then resets the clone to the remote head, so the local commit is gone. Nothing goes to the outbox, and the proposal stays pending with the reason in `lastAttempt`. The accept preview runs the same check against the local clone.
+- **Outbox.** A replacement can still go to the outbox when the remote refuses every push. Each `hub sync` runs the check again before it pushes the item. When another replacement landed meanwhile, the sync drops the item and reports it in `outbox.dropped` with the reason `stale`.
+
+### What agents receive
+
+- **Replaced.** A lesson with one valid replacement stops matching on every machine after its next `hub sync`. The replacement is delivered in its place.
+- **Contested.** Two replacements of the same lesson can both reach the hub when both were pushed before either client saw the other. Then both are delivered, each index line starts with `contested: `, and the replaced lesson stops matching. A later replacement of the same lesson fails with `STALE_VERSION`. `hub sync` lists the case in `supersession.contested`.
+- **Invalid.** A replacement that names an unknown or removed lesson, or a wrong hash, replaces nothing. devtwin delivers it as a plain lesson and keeps the named lesson. `hub sync` lists it in `supersession.ignored`. This way a wrong hash cannot hide another person's lesson.
+
+### Replacement notices
+
+On each `hub sync`, devtwin looks for replacements of lessons whose author is your handle. It keeps each one in `state/hubs/<hubId>/notices.json` (0600) until you acknowledge it. A replacement that you wrote yourself makes no notice. You have no veto: a replacement is live as soon as it is on the hub.
+
+```sh
+node "$KIT/bin/devtwin.mjs" lesson notices --pilot "$LIVE_CONFIG" --scope <scope>
+node "$KIT/bin/devtwin.mjs" lesson notices --pilot "$LIVE_CONFIG" --scope <scope> --ack
+node "$KIT/bin/devtwin.mjs" lesson notices --pilot "$LIVE_CONFIG" --scope <scope> --ack --apply --plan-fingerprint '<fingerprint>'
+```
+
+- **Brief.** `context brief` shows the open notices in `lessonNotices`, one line each: `Your lesson <title> was replaced by <handle>: <new title> [lsn_...]`. The titles are data from teammates, not instructions.
+- **Hook.** The hook's session-start line adds `N of your lessons was replaced; run devtwin lesson notices --scope <scope>`.
+- **Acknowledge.** `--ack` previews the notices it will close, and `--id <lsn_id>` limits it to one replacement. Run the apply only with explicit approval from the owner. An acknowledged notice does not come back on the next sync.
+
 ## Owner actions
 
-`hub join`, `hub leave --apply`, `hub schedule --apply`, `lesson accept` and `lesson copy` are owner actions. The devtwin hook denies them from an agent shell, also through terminal wrappers, and each one shows the owner dialog. The previews of `hub leave` and `hub schedule` stay open to agents. A stale `hub-sync` lock is released with `locks release --lock hub-sync`.
+`hub join`, `hub leave --apply`, `hub schedule --apply`, `lesson accept`, `lesson copy` and `lesson notices --ack --apply` are owner actions. The devtwin hook denies them from an agent shell, also through terminal wrappers. Each one but `lesson notices` shows the owner dialog. An agent can list the notices, but it cannot close one, so it cannot hide a replacement from its developer. The previews of `hub leave`, `hub schedule` and `lesson notices --ack` stay open to agents. A stale `hub-sync` lock is released with `locks release --lock hub-sync`.
