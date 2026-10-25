@@ -30,7 +30,7 @@ Any other target is refused with `DEVTWIN_GATE_REQUIRED`.
 Preview for one or both agents:
 
 ```sh
-node bin/devtwin.mjs agents install --pilot "$PILOT" --home "$AGENT_HOME" --agent claude --agent codex
+devtwin agents install --pilot "$PILOT" --home "$AGENT_HOME" --agent claude --agent codex
 ```
 
 The preview lists one action per agent and skill:
@@ -49,11 +49,13 @@ The preview lists one action per agent and skill:
 | `conflict` | A foreign, symlinked or unowned entry already has that name. |
 | `modified` | An owned entry was edited by hand. |
 | `blocked` | Live mode only: another entry for this agent is in conflict, so none of this agent's writes run. |
+| `remove` | An owned skill from before the rename (reason `legacy-name`) that its `devtwin-*` successor replaces. See [Migrate from devctx](/docs/guides/migrate-from-devctx/). |
+| `preserve` | A pre-rename entry devtwin won't touch, such as one you edited. Check it and remove it by hand. |
 
 Apply only the fingerprint you reviewed:
 
 ```sh
-node bin/devtwin.mjs agents install --pilot "$PILOT" --home "$AGENT_HOME" --agent claude --agent codex \
+devtwin agents install --pilot "$PILOT" --home "$AGENT_HOME" --agent claude --agent codex \
   --apply --plan-fingerprint 'sha256:e310…'
 ```
 
@@ -70,7 +72,7 @@ A `conflict` or `modified` entry is never overwritten. Resolve it by hand (move 
 ## Check state
 
 ```sh
-node bin/devtwin.mjs agents status --pilot "$PILOT" --home "$AGENT_HOME"
+devtwin agents status --pilot "$PILOT" --home "$AGENT_HOME"
 ```
 
 With a disposable pilot, `--home` is required. In live mode, omit it. Status shows each skill's current action status, any interrupted runs under `incomplete`, and `legacy`: old `devtwin-*` copies under `.codex/skills` from earlier pilot installs. devtwin never touches legacy copies; remove them by hand once you have checked they are old.
@@ -80,8 +82,8 @@ With a disposable pilot, `--home` is required. In live mode, omit it. Status sho
 Uninstall works the same way: preview, then apply the fingerprint.
 
 ```sh
-node bin/devtwin.mjs agents uninstall --pilot "$PILOT" --home "$AGENT_HOME" --agent claude
-node bin/devtwin.mjs agents uninstall --pilot "$PILOT" --home "$AGENT_HOME" --agent claude \
+devtwin agents uninstall --pilot "$PILOT" --home "$AGENT_HOME" --agent claude
+devtwin agents uninstall --pilot "$PILOT" --home "$AGENT_HOME" --agent claude \
   --apply --plan-fingerprint '<fingerprint>'
 ```
 
@@ -92,7 +94,7 @@ Only entries whose receipt matches a completed install in this store are removed
 After uninstalling, compare the skill folders with the inventory taken just before the install run:
 
 ```sh
-node bin/devtwin.mjs agents rollback-check --pilot "$PILOT" --run-id run_714a64446eccd535dd38b17b
+devtwin agents rollback-check --pilot "$PILOT" --run-id run_714a64446eccd535dd38b17b
 ```
 
 A clean result:
@@ -109,8 +111,8 @@ The check is read-only. Any difference in `devtwin-*` entries fails with `DEVTWI
 If an install, update or uninstall stopped part way, `agents status` reports `RECOVERY_REQUIRED` with the run IDs, and new applies are blocked. Preview and apply a recovery:
 
 ```sh
-node bin/devtwin.mjs agents recover --pilot "$PILOT"
-node bin/devtwin.mjs agents recover --pilot "$PILOT" --apply --plan-fingerprint '<fingerprint>'
+devtwin agents recover --pilot "$PILOT"
+devtwin agents recover --pilot "$PILOT" --apply --plan-fingerprint '<fingerprint>'
 ```
 
 Recovery removes an interrupted create, completes an interrupted update from saved copies, and finishes an interrupted remove. A file that matches neither the old nor the new hash is reported as `hold` and left alone.
@@ -122,8 +124,8 @@ To close a run that is stuck on a hold or has an unreadable journal, add `--rele
 A killed command can leave `state/locks/install.lock` (or `live.lock`) behind, and later commands fail with `DEVTWIN_BUSY`. Preview the release first; it shows the recorded owner:
 
 ```sh
-node bin/devtwin.mjs locks release --pilot "$PILOT" --lock install
-node bin/devtwin.mjs locks release --pilot "$PILOT" --lock install --apply --plan-fingerprint '<fingerprint>'
+devtwin locks release --pilot "$PILOT" --lock install
+devtwin locks release --pilot "$PILOT" --lock install --apply --plan-fingerprint '<fingerprint>'
 ```
 
 Apply removes the lock only if it belongs to this machine, its owner process is gone, and the file has not changed since the preview. Never delete journals or receipts by hand.

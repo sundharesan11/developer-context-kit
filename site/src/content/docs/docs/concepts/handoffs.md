@@ -56,6 +56,8 @@ devtwin handoff export --pilot "$PILOT" --scope example --cwd "$REPO" \
 | `--out` | A new file directly inside `<dataRoot>/exports/handoffs/<scope>/<project>/`. The name is 1 to 64 lowercase letters, digits, `.`, `_` or `-`, starting with a letter or digit, and ends in `.handoff.md`. An existing file is never overwritten; the export fails with `DEVTWIN_CONFLICT`. |
 | `--cwd` | The worktree to export from. It finds the project, and freshness is checked against this worktree. |
 
+Let devtwin create the `exports/handoffs/...` folders. If you create them yourself with default permissions (for example with a plain `mkdir -p`), the export is held with `DEVTWIN_PATH_UNSAFE`.
+
 The whole packet, including its header and footer, must fit in 32,768 bytes. A larger packet fails with `DEVTWIN_LIMIT` and nothing is written; nothing is truncated.
 
 ### What's in the packet

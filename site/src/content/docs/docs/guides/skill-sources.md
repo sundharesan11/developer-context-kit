@@ -15,7 +15,7 @@ Both install only into a **disposable pilot's** agent homes today. Neither runs 
 ## The catalog
 
 ```sh
-node bin/devtwin.mjs skill-sources catalog
+devtwin skill-sources catalog
 ```
 
 The catalog lists twelve public collections, each with its repository, license, and an installation status of `unverified`. It needs no pilot and makes no network request.
@@ -40,7 +40,7 @@ A catalog entry references an upstream project. It is not a reviewed installatio
 ## Check a source's latest release
 
 ```sh
-node bin/devtwin.mjs skill-sources check --source humanizer
+devtwin skill-sources check --source humanizer
 ```
 
 `check` reads public GitHub release and commit metadata and resolves the latest stable release to a commit. It writes nothing and installs nothing. Pass `--prior-lock-json '<json>'` to compare against a release you recorded earlier.
@@ -57,15 +57,15 @@ Copy `sourceId`, `channel`, `tag` and `commit` from your own `check` result into
 PIN_JSON='{"sourceId":"humanizer","channel":"stable-release","tag":"<tag>","commit":"<commit>"}'
 FILES_JSON='["SKILL.md","LICENSE"]'
 
-node bin/devtwin.mjs skill-sources preview --source humanizer --pin-json "$PIN_JSON" --files-json "$FILES_JSON"
+devtwin skill-sources preview --source humanizer --pin-json "$PIN_JSON" --files-json "$FILES_JSON"
 ```
 
 Preview makes two metadata requests and writes nothing. It refuses a missing file instead of picking a substitute. Then stage with the preview's `fingerprint`:
 
 ```sh
-node bin/devtwin.mjs skill-sources stage --pilot "$PILOT" --source humanizer \
+devtwin skill-sources stage --pilot "$PILOT" --source humanizer \
   --pin-json "$PIN_JSON" --files-json "$FILES_JSON" --preview-hash '<preview fingerprint>'
-node bin/devtwin.mjs skill-sources inspect --pilot "$PILOT" --run '<stage runId>'
+devtwin skill-sources inspect --pilot "$PILOT" --run '<stage runId>'
 ```
 
 `stage` downloads only the selected files, verifies each one's Git object hash and SHA-256, and writes them to a fresh private directory under the pilot's `dataRoot/skill-sources/staging/`. `inspect` is offline and re-verifies the receipt and files.
@@ -100,7 +100,7 @@ Write a mapping that names every staged file exactly once, plus license and noti
 This example intentionally cannot be approved: after you have inspected the content and upstream requirements, set the review fields to `user-reviewed` and each compatibility value to `user-reviewed-sandbox` (or `unsupported`).
 
 ```sh
-node bin/devtwin.mjs skill-sources package-review --pilot "$PILOT" --run '<stage runId>' --mapping-json "$MAPPING_JSON"
+devtwin skill-sources package-review --pilot "$PILOT" --run '<stage runId>' --mapping-json "$MAPPING_JSON"
 ```
 
 The review separates blocking `holds` from `disclosures`. Missing dependencies, unreviewed selected hosts, binary content and unsupported paths are held.
@@ -108,7 +108,7 @@ The review separates blocking `holds` from `disclosures`. Missing dependencies, 
 ### 2. Approve the content
 
 ```sh
-node bin/devtwin.mjs skill-sources content-approve --pilot "$PILOT" --run '<stage runId>' \
+devtwin skill-sources content-approve --pilot "$PILOT" --run '<stage runId>' \
   --mapping-json "$MAPPING_JSON" --package-digest '<package digest>' \
   --decision dc_content01 --interaction-ref 'user:<reference>' \
   --response 'Approved source content <package digest> with caller-supplied-unverified pin'
@@ -117,16 +117,16 @@ node bin/devtwin.mjs skill-sources content-approve --pilot "$PILOT" --run '<stag
 ### 3. Plan, approve and apply the install
 
 ```sh
-node bin/devtwin.mjs skill-sources local-plan --pilot "$PILOT" --content-decision dc_content01 \
+devtwin skill-sources local-plan --pilot "$PILOT" --content-decision dc_content01 \
   --home "$AGENT_HOME" --agent-json '["claude","codex"]' --mode install
-node bin/devtwin.mjs skill-sources local-approve --pilot "$PILOT" --content-decision dc_content01 \
+devtwin skill-sources local-approve --pilot "$PILOT" --content-decision dc_content01 \
   --home "$AGENT_HOME" --agent-json '["claude","codex"]' --mode install \
   --decision dc_install01 --plan-fingerprint '<fingerprint>' \
   --interaction-ref 'user:<reference>' --response 'Approved source install <fingerprint>'
-node bin/devtwin.mjs skill-sources local-apply --pilot "$PILOT" --content-decision dc_content01 \
+devtwin skill-sources local-apply --pilot "$PILOT" --content-decision dc_content01 \
   --home "$AGENT_HOME" --agent-json '["claude","codex"]' --mode install \
   --decision dc_install01 --plan-fingerprint '<fingerprint>'
-node bin/devtwin.mjs skill-sources local-status --pilot "$PILOT" --content-decision dc_content01 \
+devtwin skill-sources local-status --pilot "$PILOT" --content-decision dc_content01 \
   --home "$AGENT_HOME" --agent-json '["claude","codex"]' --mode install
 ```
 
@@ -160,10 +160,10 @@ This is a strict subset, not a full YAML parser. Helpers in `scripts/` are never
 Only an intact `personal` revision with a passing validation can be installed, and only into one of the pilot's `agentHomes`. Names starting with `devtwin-` are reserved.
 
 ```sh
-node bin/devtwin.mjs skill content-approve --pilot "$PILOT" --audience personal --workspace ws_example01 \
+devtwin skill content-approve --pilot "$PILOT" --audience personal --workspace ws_example01 \
   --revision rv_example01 --decision dc_content01 --interaction-ref 'user:<reference>' \
   --response 'Approved content <package digest> as personal generic non-confidential'
-node bin/devtwin.mjs skill local-plan --pilot "$PILOT" --mode install --audience personal --workspace ws_example01 \
+devtwin skill local-plan --pilot "$PILOT" --mode install --audience personal --workspace ws_example01 \
   --revision rv_example01 --content-decision dc_content01 --home "$AGENT_HOME" --agent claude --agent codex
 ```
 
