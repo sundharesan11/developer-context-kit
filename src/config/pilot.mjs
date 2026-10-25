@@ -7,6 +7,7 @@ import { isWithin, overlaps, info, readPrivateJson, ensurePrivatePath, atomicRep
 import { gitQuery } from "../identity/git.mjs";
 import { validateRoot, deepestExisting } from "./roots.mjs";
 import { DevtwinError } from "../errors.mjs";
+import { LEGACY_SKILL_PREFIX, LEGACY_DEFAULT_ROOTS } from "./legacy.mjs";
 // The running kit. Tests inject context.kitRoot; production derives it from this file.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const members = ["configRoot", "dataRoot", "stateRoot", "inputsRoot"];
@@ -37,6 +38,8 @@ export function protectedPaths({ home = homedir(), env = process.env, kitRoot = 
     { label: "default-config", path: join(home, ".config/devtwin") },
     { label: "default-data", path: join(home, ".local/share/devtwin") },
     { label: "default-state", path: join(home, ".local/state/devtwin") },
+    // The former devctx default roots stay protected for the transition.
+    ...LEGACY_DEFAULT_ROOTS.map((rel) => ({ label: "legacy-" + rel.split("/").slice(-2).join("-"), path: join(home, rel) })),
     { label: "personal-os-state", path: join(home, ".local/state/personal-os") },
     { label: "kit-checkout", path: kitRoot }
   ];
@@ -171,10 +174,12 @@ export function assertInPilot(pilot, path, field) {
   if (field === "inputsRoot" ? !isWithin(path, pilot.inputsRoot) : !pilot[field]?.includes(path)) fail(field);
   validateRoot(path, field);
 }
-// In live mode the target is a named skill folder, never itself a destination: only devtwin-* entries inside it.
+// In live mode the target is a named skill folder, never itself a destination: only devtwin-* entries inside it,
+// and legacy devctx-* entries, which the installer only ever removes.
 function inTarget(pilot, target, path) {
   if (!isWithin(comparable(path), comparable(target))) return false;
-  return !pilot.live || relative(comparable(target), comparable(path)).split(sep)[0].startsWith("devtwin-");
+  const top = relative(comparable(target), comparable(path)).split(sep)[0];
+  return !pilot.live || top.startsWith("devtwin-") || top.startsWith(LEGACY_SKILL_PREFIX);
 }
 export function assertWritable(roots, destinations, { targetHome } = {}) {
   const pilot = roots?.pilot;

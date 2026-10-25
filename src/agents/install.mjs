@@ -11,17 +11,21 @@ import { readPrivateJson, readPrivateBytes, writeNewFile, atomicReplace, ensureP
 import { withPilotLock } from "../storage/lock.mjs";
 import { RUN_ID } from "../storage/runs.mjs";
 import { recordInventory, INVENTORY } from "./inventory.mjs";
+import { LEGACY_SKILL_NAMES, LEGACY_SKILL_PREFIX, LEGACY_RECEIPT, isLegacySkill } from "../config/legacy.mjs";
 export const AGENT_HOMES = { claude: ".claude/skills", codex: ".agents/skills" };
 // Earlier releases wrote Codex skills here. Status reports leftovers; nothing ever acts on them.
 export const LEGACY_HOMES = { codex: ".codex/skills" };
 export const SKILL_NAMES = ["devtwin-onboard", "devtwin-resume", "devtwin-record"];
 const SKILL = "SKILL.md", RECEIPT = ".devtwin-owned.json", KIND = "skill-bundled", FILE_LIMIT = 1048576;
+// Entries installed under the former name keep their legacy receipt file. They are only ever removed, never written.
+const receiptOf = (skill) => isLegacySkill(skill) ? LEGACY_RECEIPT : RECEIPT;
+const KNOWN_SKILLS = [...SKILL_NAMES, ...LEGACY_SKILL_NAMES];
 const WRITES = ["create", "update", "remove"];
 const KIT = fileURLToPath(new URL("../..", import.meta.url));
 const configIdOf = (pilot) => pilot.live?.configId ?? null;
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const lockPath = (roots) => join(roots.stateRoot, "locks", "install.lock");
-const entryPaths = (path) => [path, join(path, SKILL), join(path, RECEIPT)];
+const entryPaths = (path, skill) => [path, join(path, SKILL), join(path, receiptOf(skill))];
 const receiptBytes = (receipt) => canonicalJson(receipt) + "\n";
 // Live sources come from the live config's kit, which loadPilot has proven is the running kit at the pinned commit.
 function source(pilot, skill) {
@@ -67,7 +71,7 @@ async function readJournals(stateRoot) {
   }
   return found;
 }
-const wellFormed = (id, j) => j.schemaVersion === 2 && j.runId === id && Array.isArray(j.intended) && Array.isArray(j.started) && Array.isArray(j.completed) && j.intended.every((e) => isObject(e) && WRITES.includes(e.status) && typeof e.path === "string" && typeof e.root === "string" && SKILL_NAMES.includes(e.skill));
+const wellFormed = (id, j) => j.schemaVersion === 2 && j.runId === id && Array.isArray(j.intended) && Array.isArray(j.started) && Array.isArray(j.completed) && j.intended.every((e) => isObject(e) && WRITES.includes(e.status) && typeof e.path === "string" && typeof e.root === "string" && KNOWN_SKILLS.includes(e.skill));
 const bundledFor = (pilot, j) => j?.kind === KIND && j.configId === configIdOf(pilot);
 // Completion is by entry, not position: recovery may complete a later entry while an earlier one is held.
 const isCompleted = (j, entry) => j.completed.some((e) => canonicalJson(e) === canonicalJson(entry));
@@ -83,6 +87,8 @@ async function incompleteRuns(pilot) {
   }
   return runs;
 }
+// Read-only, for live migrate: runs that would block an apply in this pilot.
+export const incompleteInstallRuns = async (pilot) => (await incompleteRuns(pilot)).map((r) => r.id);
 // An entry is owned only when its receipt matches a completed journal entry for this live config at this path.
 function ledger(pilot, journals) {
   const byRun = new Map(journals.filter(({ id, journal }) => bundledFor(pilot, journal) && wellFormed(id, journal)).map(({ id, journal }) => [id, journal]));
@@ -103,16 +109,17 @@ async function observe(pilot, owned, dir, skill, mode) {
   if (st.isSymbolicLink()) return { status: "conflict", reason: "symlink" };
   if (!st.isDirectory()) return { status: "conflict", reason: "not-directory" };
   const foreign = (reason) => ({ status: mode === "install" ? "conflict" : "preserve", reason });
-  if (!info(join(dir, RECEIPT))) return foreign("foreign-entry");
+  const RCPT = receiptOf(skill);
+  if (!info(join(dir, RCPT))) return foreign("foreign-entry");
   let receipt, rawReceipt;
-  try { rawReceipt = await readPrivateBytes(join(dir, RECEIPT), FILE_LIMIT); receipt = JSON.parse(rawReceipt.toString("utf8")); } catch { return foreign("unowned-receipt"); }
+  try { rawReceipt = await readPrivateBytes(join(dir, RCPT), FILE_LIMIT); receipt = JSON.parse(rawReceipt.toString("utf8")); } catch { return foreign("unowned-receipt"); }
   if (!receiptShape(pilot, receipt, skill) || !owned(receipt, dir)) return foreign("unowned-receipt");
-  if (canonicalJson(readdirSync(dir).sort()) !== canonicalJson([RECEIPT, SKILL])) return { status: "modified", reason: "extra-files", receipt };
+  if (canonicalJson(readdirSync(dir).sort()) !== canonicalJson([RCPT, SKILL].sort())) return { status: "modified", reason: "extra-files", receipt };
   let body;
   try { body = await readPrivateBytes(join(dir, SKILL), FILE_LIMIT); } catch { return { status: "modified", reason: "unsafe-file", receipt }; }
   if (sha256(body) !== receipt.files[SKILL]) return { status: "modified", reason: "edited", receipt };
-  const old = { [SKILL]: sha256(body), [RECEIPT]: sha256(rawReceipt) };
-  if (mode === "uninstall") return { status: "remove", receipt, old };
+  const old = { [SKILL]: sha256(body), [RCPT]: sha256(rawReceipt) };
+  if (mode === "uninstall" || isLegacySkill(skill)) return { status: "remove", receipt, old };
   return { status: receipt.files[SKILL] === sha256(source(pilot, skill)) ? "installed" : "update", receipt, old };
 }
 export async function planInstall(pilot, { targetHome, agents, mode = "install" }) {
@@ -120,14 +127,25 @@ export async function planInstall(pilot, { targetHome, agents, mode = "install" 
   const roots = skillRoots(pilot, targetHome, agents);
   const owned = ledger(pilot, await readJournals(pilot.stateRoot));
   const actions = [];
-  for (const { agent, dir, root } of roots) for (const skill of SKILL_NAMES) {
-    const path = join(dir, skill), seen = await observe(pilot, owned, path, skill, mode);
-    actions.push({ agent, skill, path, root, status: seen.status, ...(seen.reason ? { reason: seen.reason } : {}), prior: seen.receipt ? digest(seen.receipt) : null, ...(mode === "install" ? { hash: sha256(source(pilot, skill)) } : {}) });
+  for (const { agent, dir, root } of roots) {
+    for (const skill of SKILL_NAMES) {
+      const path = join(dir, skill), seen = await observe(pilot, owned, path, skill, mode);
+      actions.push({ agent, skill, path, root, status: seen.status, ...(seen.reason ? { reason: seen.reason } : {}), prior: seen.receipt ? digest(seen.receipt) : null, ...(mode === "install" ? { hash: sha256(source(pilot, skill)) } : {}) });
+    }
+    // Entries from the former devctx name: an owned, unedited one is removed by install (its devtwin successor replaces it)
+    // and by uninstall. Anything else under a legacy name is preserved and never blocks. Absent legacy names are not listed.
+    for (const skill of LEGACY_SKILL_NAMES) {
+      const path = join(dir, skill), seen = await observe(pilot, owned, path, skill, "uninstall");
+      if (seen.status === "absent") continue;
+      const status = seen.status === "remove" ? "remove" : "preserve";
+      const reason = seen.status === "remove" ? "legacy-name" : seen.status === "modified" ? "legacy-" + seen.reason : seen.reason;
+      actions.push({ agent, skill, path, root, status, reason, prior: seen.receipt ? digest(seen.receipt) : null });
+    }
   }
-  // Live: a conflict blocks only its own agent, and blocks all of that agent's writes.
+  // Live: a conflict blocks only its own agent, and blocks all of that agent's writes, legacy removals included.
   if (pilot.live && mode === "install") for (const { agent } of roots) {
     if (!actions.some((a) => a.agent === agent && ["conflict", "modified"].includes(a.status))) continue;
-    for (const a of actions) if (a.agent === agent && ["create", "update"].includes(a.status)) Object.assign(a, { status: "blocked", reason: "agent-conflict" });
+    for (const a of actions) if (a.agent === agent && ["create", "update", "remove"].includes(a.status)) Object.assign(a, { status: "blocked", reason: "agent-conflict" });
   }
   return finalizePlan({ kind: "skill-install", mode, targetHome: targetHome ?? null, configId: configIdOf(pilot), kitCommit: pilot.live?.kitCommit ?? null, agents: roots.map((r) => r.agent), actions });
 }
@@ -143,18 +161,18 @@ async function perform(pilot, entry, bytes, faults, created) {
     await faults.afterFolder?.(entry);
     await writeNewFile(join(path, SKILL), bytes.skill);
     await faults.afterSkill?.(entry);
-    await writeNewFile(join(path, RECEIPT), bytes.receipt);
+    await writeNewFile(join(path, receiptOf(entry.skill)), bytes.receipt);
     fsyncDir(path);
     await faults.afterReceipt?.(entry);
   } else if (status === "update") {
     await atomicReplace(join(path, SKILL), bytes.skill);
     await faults.afterSkill?.(entry);
-    await atomicReplace(join(path, RECEIPT), bytes.receipt);
+    await atomicReplace(join(path, receiptOf(entry.skill)), bytes.receipt);
     await faults.afterReceipt?.(entry);
   } else {
     await unlink(join(path, SKILL));
     await faults.afterSkill?.(entry);
-    await unlink(join(path, RECEIPT));
+    await unlink(join(path, receiptOf(entry.skill)));
     await faults.afterReceipt?.(entry);
     await rmdir(path);
     fsyncDir(dirname(path));
@@ -170,7 +188,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
     assertFingerprint(plan, fingerprint);
     const intended = plan.actions.filter((a) => WRITES.includes(a.status));
     if (!intended.length) return { applied: false, actions: plan.actions };
-    for (const a of intended) assertWritable(roots, [...entryPaths(a.path), journalPath, join(runDir, INVENTORY)], { targetHome: a.root });
+    for (const a of intended) assertWritable(roots, [...entryPaths(a.path, a.skill), journalPath, join(runDir, INVENTORY)], { targetHome: a.root });
     ensurePrivatePath(roots.stateRoot, ["runs"]);
     try { await mkdir(runDir, { mode: 0o700 }); }
     catch (error) { if (error.code === "EEXIST") throw new DevtwinError("CONFLICT", "Run ID already exists"); throw error; }
@@ -184,11 +202,11 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
     for (const [i, a] of intended.entries()) {
       const entry = { agent: a.agent, skill: a.skill, path: a.path, root: a.root, status: a.status, old: null, new: null, receipt: null }, own = {};
       if (a.status !== "create") {
-        const skill = await readPrivateBytes(join(a.path, SKILL), FILE_LIMIT), receipt = await readPrivateBytes(join(a.path, RECEIPT), FILE_LIMIT);
+        const skill = await readPrivateBytes(join(a.path, SKILL), FILE_LIMIT), receipt = await readPrivateBytes(join(a.path, receiptOf(a.skill)), FILE_LIMIT);
         if (digest(JSON.parse(receipt.toString("utf8"))) !== a.prior) throw new DevtwinError("STALE_VERSION", "Target changed during apply");
         await writeNewFile(join(copies, i + "-old-skill"), skill);
         await writeNewFile(join(copies, i + "-old-receipt"), receipt);
-        entry.old = { [SKILL]: sha256(skill), [RECEIPT]: sha256(receipt) };
+        entry.old = { [SKILL]: sha256(skill), [receiptOf(a.skill)]: sha256(receipt) };
       }
       if (a.status !== "remove") {
         own.skill = source(pilot, a.skill);
@@ -206,7 +224,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
     // Every journal write is a temp file renamed into place, so a crash never leaves a torn journal.
     await atomicReplace(journalPath, journalBytes(journal));
     for (const [i, entry] of entries.entries()) {
-      assertWritable(roots, [...entryPaths(entry.path), journalPath], { targetHome: entry.root });
+      assertWritable(roots, [...entryPaths(entry.path, entry.skill), journalPath], { targetHome: entry.root });
       if (entry.status === "remove") {
         const now = await observe(pilot, ledger(pilot, await readJournals(roots.stateRoot)), entry.path, entry.skill, "uninstall");
         if (now.status !== "remove") throw new DevtwinError("CONFLICT", "Installed skill changed before removal");
@@ -223,18 +241,18 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
 // Recovery works from the journal and the run folder copies only, never from the current kit.
 // A create may be undone only when the journal's created marker proves this run made the folder.
 function recoveryFor(entry, copies, index, created) {
-  const dirSt = info(entry.path), base = { agent: entry.agent, skill: entry.skill, path: entry.path, root: entry.root };
+  const R = receiptOf(entry.skill), dirSt = info(entry.path), base = { agent: entry.agent, skill: entry.skill, path: entry.path, root: entry.root };
   const hold = (reason, observed = {}) => ({ ...base, op: "hold", reason, observed });
   if (dirSt && (dirSt.isSymbolicLink() || !dirSt.isDirectory())) return hold("unmatched-entry");
-  if (entry.status === "create" && !created) return dirSt ? hold("uncreated-entry") : { ...base, op: "remove-create", present: false, observed: { [SKILL]: null, [RECEIPT]: null } };
+  if (entry.status === "create" && !created) return dirSt ? hold("uncreated-entry") : { ...base, op: "remove-create", present: false, observed: { [SKILL]: null, [R]: null } };
   const names = dirSt ? readdirSync(entry.path).sort() : [];
-  const observed = Object.fromEntries([SKILL, RECEIPT].map((name) => [name, dirSt ? hashOf(join(entry.path, name)) : null]));
-  if (names.some((name) => name !== SKILL && name !== RECEIPT)) return hold("unmatched-file", observed);
-  const matches = (allowed) => [SKILL, RECEIPT].every((name) => allowed(name).includes(observed[name]));
+  const observed = Object.fromEntries([SKILL, R].map((name) => [name, dirSt ? hashOf(join(entry.path, name)) : null]));
+  if (names.some((name) => name !== SKILL && name !== R)) return hold("unmatched-file", observed);
+  const matches = (allowed) => [SKILL, R].every((name) => allowed(name).includes(observed[name]));
   if (entry.status === "create") return matches((name) => [null, entry.new?.[name]]) ? { ...base, op: "remove-create", present: Boolean(dirSt), observed } : hold("unmatched-file", observed);
   if (entry.status === "remove") return matches((name) => [null, entry.old?.[name]]) ? { ...base, op: "finish-remove", present: Boolean(dirSt), observed } : hold("unmatched-file", observed);
   if (!dirSt || !matches((name) => [entry.old?.[name], entry.new?.[name]])) return hold("unmatched-file", observed);
-  for (const [name, kind] of [[SKILL, "skill"], [RECEIPT, "receipt"]]) if (hashOf(join(copies, index + "-new-" + kind)) !== entry.new[name]) return hold("copy-mismatch", observed);
+  for (const [name, kind] of [[SKILL, "skill"], [R, "receipt"]]) if (hashOf(join(copies, index + "-new-" + kind)) !== entry.new[name]) return hold("copy-mismatch", observed);
   return { ...base, op: "complete-update", observed };
 }
 const ourJournal = (pilot, id, journal) => journal !== null && bundledFor(pilot, journal) && wellFormed(id, journal);
@@ -281,10 +299,11 @@ export async function applyRecovery(roots, pilot, { fingerprint, release = false
       if (action.op === "hold") continue;
       const journal = journals.get(action.runId), entry = journal.intended[action.index];
       const journalPath = join(roots.stateRoot, "runs", action.runId, "journal.json");
-      assertWritable(roots, [...entryPaths(entry.path), journalPath], { targetHome: entry.root });
+      const R = receiptOf(entry.skill);
+      assertWritable(roots, [...entryPaths(entry.path, entry.skill), journalPath], { targetHome: entry.root });
       if (action.op === "complete-update") {
         const copies = join(roots.stateRoot, "runs", action.runId, "copies");
-        for (const [name, kind] of [[SKILL, "skill"], [RECEIPT, "receipt"]]) {
+        for (const [name, kind] of [[SKILL, "skill"], [R, "receipt"]]) {
           if (hashOf(join(entry.path, name)) === entry.new[name]) continue;
           const body = await readPrivateBytes(join(copies, action.index + "-new-" + kind), FILE_LIMIT);
           if (sha256(body) !== entry.new[name]) throw new DevtwinError("INTEGRITY", "Run folder copy changed");
@@ -292,7 +311,7 @@ export async function applyRecovery(roots, pilot, { fingerprint, release = false
         }
         journal.completed.push(entry);
       } else if (action.present && info(entry.path)) {
-        for (const name of [SKILL, RECEIPT]) if (info(join(entry.path, name))) await unlink(join(entry.path, name));
+        for (const name of [SKILL, R]) if (info(join(entry.path, name))) await unlink(join(entry.path, name));
         await rmdir(entry.path);
         fsyncDir(dirname(entry.path));
       }
@@ -317,7 +336,7 @@ function legacyEntries(home) {
   for (const [agent, rel] of Object.entries(LEGACY_HOMES)) {
     const dir = join(home, rel), st = info(dir);
     if (!st?.isDirectory() || st.isSymbolicLink()) continue;
-    for (const name of readdirSync(dir).sort()) if (name.startsWith("devtwin-")) found.push({ agent, skill: name, path: join(dir, name) });
+    for (const name of readdirSync(dir).sort()) if (name.startsWith("devtwin-") || name.startsWith(LEGACY_SKILL_PREFIX)) found.push({ agent, skill: name, path: join(dir, name) });
   }
   return found;
 }

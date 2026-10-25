@@ -68,6 +68,7 @@ export default defineConfig({
 						'docs/guides/personal-harness',
 						'docs/guides/stack-watch',
 						'docs/guides/live-mode',
+						'docs/guides/migrate-from-devctx',
 						'docs/guides/identity-routing',
 						'docs/guides/skill-sources',
 					],

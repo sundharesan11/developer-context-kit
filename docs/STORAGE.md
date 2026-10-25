@@ -72,6 +72,7 @@ A live config keeps its private state under `~/.devtwin`, at mode 0700. The live
 - An installed entry holds `SKILL.md` and a `.devtwin-owned.json` receipt (schema 2, kind `skill-bundled`) with the skill, config ID, run ID, kit commit and file hash. Ownership needs a matching completed journal in this store. The kit commit is provenance only.
 - An incomplete run blocks new applies until `agents recover` applies an approved recovery plan. Journals are written atomically. `agents recover --release` closes a run stuck on held entries or an unreadable journal and leaves the held files in place as foreign entries; an unreadable journal is kept as `journal.released.json`. Nothing is repaired automatically.
 - Activation evidence stays in `state/evidence/`, created by the owner.
+- A store copied by `live migrate` holds `state/live/migration.json`: the config ID, the legacy and new live config paths and digests, the new kit and the digest of the copied tree. Installed entries from the former devctx name keep their `.devctx-owned.json` receipt and stay owned until `agents install` or `agents uninstall` removes them. See [Migrating from devctx](MIGRATING.md).
 
 There is no backup. A lost store leaves installed entries unowned; [Live activation](LIVE.md) gives the manual removal steps.
 

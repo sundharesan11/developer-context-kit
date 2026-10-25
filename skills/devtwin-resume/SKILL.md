@@ -18,7 +18,7 @@ If the repository is not onboarded yet, use `devtwin-onboard` instead.
 
 Check all of these before the first CLI call. If any check fails, stop and ask the user.
 
-1. `DEVTWIN_KIT` is set. It must be an absolute path.
+1. `DEVTWIN_KIT` is set. It must be an absolute path. If it is not set but the legacy `DEVCTX_KIT` is, use the value of `DEVCTX_KIT` wherever these steps say `$DEVTWIN_KIT` for this session, apply every other check to that value, and tell the user once that `DEVCTX_KIT` is deprecated and should be renamed to `DEVTWIN_KIT` in their shell profile.
 2. Resolve its real path, for example with `realpath "$DEVTWIN_KIT"`. Resolve the real path of the current repository root too (`git rev-parse --show-toplevel`, or the working directory outside Git).
 3. The kit's real path must not be inside the current repository or worktree.
 4. The kit contains `bin/devtwin.mjs` and a `package.json` whose `name` is `devtwin`.

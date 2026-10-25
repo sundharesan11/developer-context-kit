@@ -12,32 +12,32 @@ import { gitQuery } from "../identity/git.mjs";
 // The running kit. Tests inject ctx.kitRoot; production derives it from this file, as pilot.mjs does.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const AGENTS = ["claude", "codex"];
-const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live"];
+export const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live"];
 const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 // Stands in for the config ID while a new config is validated; apply draws the real ID once.
 const PENDING_ID = "cfg_pending0000";
 const invalid = (field) => { throw new DevtwinError("INVALID_INPUT", "Invalid live config input", { field }); };
 const gate = (field, reason) => { throw new DevtwinError("GATE_REQUIRED", "Live config gate refused", { field, reason }); };
 const sorted = (values) => [...new Set(values)].sort();
-const rawOf = (pilot) => Object.fromEntries(KEYS.map((key) => [key, pilot[key]]));
-const configText = (raw) => JSON.stringify(raw, null, 2) + "\n";
+export const rawOf = (pilot) => Object.fromEntries(KEYS.map((key) => [key, pilot[key]]));
+export const configText = (raw) => JSON.stringify(raw, null, 2) + "\n";
 const lockPath = (roots) => join(roots.stateRoot, "locks", "live.lock");
 const gateContext = (ctx, liveGate) => ({ home: ctx.home, env: ctx.env, kitRoot: ctx.kitRoot, ...(liveGate ? { liveGate } : {}) });
-function configPath(path) {
+export function configPath(path) {
   if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path) gate("pilot", "path");
   return path;
 }
-function runningKit(ctx) {
+export function runningKit(ctx) {
   try { return realpathSync(ctx.kitRoot ?? KIT); } catch { return gate("live.kitRoot", "running-kit"); }
 }
 // The live config folder (~/.devtwin) is created by the owner at 0700 and is never created or chmodded here.
-function assertConfigDir(dir) {
+export function assertConfigDir(dir) {
   const node = info(dir);
   if (!node) throw new DevtwinError("PATH_UNSAFE", "Live config folder must exist and be private", { field: "configDir" });
   validateRoot(dir, "configDir");
   if (!node.isDirectory() || node.uid !== process.getuid() || (node.mode & 0o077)) throw new DevtwinError("PATH_UNSAFE", "Live config folder must exist and be private", { field: "configDir" });
 }
-function storeLayout(dir) {
+export function storeLayout(dir) {
   const pilotRoot = join(dir, "store");
   return { pilotRoot, configRoot: join(pilotRoot, "config"), dataRoot: join(pilotRoot, "data"), stateRoot: join(pilotRoot, "state"), inputsRoot: join(pilotRoot, "inputs") };
 }

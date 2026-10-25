@@ -153,6 +153,14 @@ test("bundled skills state the DEVTWIN_KIT validation and pilot-path rules", asy
   assert.match(await readBundledSkill("devtwin-record"), /attributed to "human"/);
   assert.match(await readBundledSkill("devtwin-resume"), /freshness/);
 });
+test("bundled skills fall back to the legacy DEVCTX_KIT for one transition and say it is deprecated", async () => {
+  for (const name of BUNDLED_SKILLS) {
+    const text = await readBundledSkill(name);
+    for (const phrase of ["the legacy `DEVCTX_KIT`", "apply every other check to that value", "`DEVCTX_KIT` is deprecated", "`DEVTWIN_KIT` in their shell profile"]) assert.ok(text.includes(phrase), name + ": " + phrase);
+  }
+  const guide = await readFile(join(import.meta.dirname, "..", "docs", "MIGRATING.md"), "utf8");
+  for (const phrase of ["live migrate", "export DEVTWIN_KIT", "remote set-url", "rm -rf ~/.devctx", "never changes or deletes"]) assert.ok(guide.includes(phrase), "MIGRATING.md: " + phrase);
+});
 test("devtwin-setup is instruction-only and names sending and publishing only as prohibited", async () => {
   assert.deepEqual(await readdir(join(import.meta.dirname, "..", "skills", "devtwin-setup")), ["SKILL.md"]);
   const text = await readBundledSkill("devtwin-setup");

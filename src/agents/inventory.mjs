@@ -4,9 +4,10 @@ import { DevtwinError } from "../errors.mjs";
 import { sha256, canonicalJson } from "../storage/canonical.mjs";
 import { readPrivateJson, writeNewFile, info, isWithin } from "../storage/fsx.mjs";
 import { RUN_ID } from "../storage/runs.mjs";
+import { LEGACY_SKILL_PREFIX } from "../config/legacy.mjs";
 // The pre-apply inventory of each target skill folder. Rollback is evidence, not automation: nothing here restores anything.
 export const INVENTORY = "inventory.json";
-const OWNED = "devtwin-", WALK_LIMIT = 10000, FILE_LIMIT = 16 * 1048576, INVENTORY_LIMIT = 16 * 1048576;
+const OWNED = ["devtwin-", LEGACY_SKILL_PREFIX], WALK_LIMIT = 10000, FILE_LIMIT = 16 * 1048576, INVENTORY_LIMIT = 16 * 1048576;
 const typeOf = (st) => st.isSymbolicLink() ? "link" : st.isDirectory() ? "dir" : st.isFile() ? "file" : "other";
 // Reads a regular file without following a symlink swapped in after lstat, and without blocking on a FIFO.
 function hashFile(path) {
@@ -26,7 +27,7 @@ function foreignEntry(path, name, st) {
   if (st.isSymbolicLink()) row.link = readlinkSync(path);
   return row;
 }
-// devtwin-* entries: every node with content hashes, never following a symlink.
+// devtwin-* (and legacy devctx-*) entries: every node with content hashes, never following a symlink.
 function walkOwned(dir, rel, rows) {
   const path = join(dir, rel), st = info(path);
   if (!st) return;
@@ -45,7 +46,7 @@ export function inventoryFolder(agent, dir) {
   for (const name of readdirSync(dir).sort()) {
     const path = join(dir, name), node = info(path);
     if (!node) continue;
-    if (name.startsWith(OWNED)) walkOwned(dir, name, devtwin);
+    if (OWNED.some((prefix) => name.startsWith(prefix))) walkOwned(dir, name, devtwin);
     else entries.push(foreignEntry(path, name, node));
   }
   return { agent, dir, existed: true, type: "dir", entries, devtwin };
@@ -66,7 +67,9 @@ function diff(before, now, key) {
   return out.sort((x, y) => (x[key] < y[key] ? -1 : x[key] > y[key] ? 1 : 0));
 }
 const wellFormed = (inv, runId) => inv?.schemaVersion === 1 && inv.kind === "skill-inventory" && inv.runId === runId && ["install", "uninstall"].includes(inv.mode) && Array.isArray(inv.folders)
-  && inv.folders.every((f) => typeof f?.agent === "string" && typeof f.dir === "string" && typeof f.existed === "boolean" && Array.isArray(f.entries) && Array.isArray(f.devtwin));
+  && inv.folders.every((f) => typeof f?.agent === "string" && typeof f.dir === "string" && typeof f.existed === "boolean" && Array.isArray(f.entries) && Array.isArray(ownedRows(f)));
+// Inventories recorded before the rename name the owned rows "devctx".
+const ownedRows = (folder) => folder.devtwin ?? folder.devctx;
 // A folder the inventory names must still be one this pilot may install into.
 function assertTarget(pilot, { agent, dir }) {
   const allowed = pilot.live ? Object.hasOwn(pilot.live.skillDirs, agent) && pilot.live.skillDirs[agent] === dir : (pilot.agentHomes ?? []).some((home) => isWithin(dir, home));
@@ -87,7 +90,7 @@ export async function rollbackCheck(roots, pilot, { runId }) {
     return {
       agent: before.agent, dir: before.dir, existedBefore: before.existed, existsNow: now.existed,
       folder: { before: before.type, now: now.type },
-      devtwin: diff(before.devtwin, now.devtwin, "path"),
+      devtwin: diff(ownedRows(before), now.devtwin, "path"),
       foreign: diff(before.entries, now.entries, "name")
     };
   });

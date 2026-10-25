@@ -2,7 +2,7 @@
 
 This runbook turns on live mode on one machine. Live mode runs the kit against a real private store and the real Claude and Codex skill folders. It onboards one real repository, read-only. Follow the steps in order. Every write is a separate owner approval.
 
-Live mode is implemented. The owner ran steps 1 to 15 and 17 on one machine on 2026-10-25 at kit commit `b95ff72`, and they passed: live init, store init, scope add and read-only onboarding of one real client repository with identical before and after-onboarding snapshots; bundled install for Claude and Codex (three skills each, no conflicts); fresh `claude -p` and `codex exec` sessions from a neutral folder that listed the `devtwin-*` skills, resolved the project and read the brief with an identical brief hash; and uninstall, `rollback-check` `ok` and reinstall. Step 16 (interactive sessions) is still the owner's to run, and step 14's `DEVTWIN_KIT` export is not yet in the shell profile. See the [roadmap](ROADMAP.md).
+Live mode is implemented. The owner ran steps 1 to 15 and 17 on one machine on 2026-10-25 at kit commit `b95ff72`, and they passed: live init, store init, scope add and read-only onboarding of one real client repository with identical before and after-onboarding snapshots; bundled install for Claude and Codex (three skills each, no conflicts); fresh `claude -p` and `codex exec` sessions from a neutral folder that listed the bundled skills (then named `devctx-*`), resolved the project and read the brief with an identical brief hash; and uninstall, `rollback-check` `ok` and reinstall. Step 16 (interactive sessions) is still the owner's to run, and step 14's kit export is not yet in the shell profile. That activation predates the rename to devtwin; a setup made under the old name moves with [Migrating from devctx](MIGRATING.md). See the [roadmap](ROADMAP.md).
 
 ## What live mode changes
 
@@ -20,7 +20,7 @@ A live config is a pilot file with a `live` block. It names the config ID, the h
 - Codex skills go to `~/.agents/skills`. Nothing is written to `~/.codex/skills`. `CODEX_HOME` does not change the target; the preview warns with `CODEX_HOME_IGNORED` when it is set.
 - Live commands run only from the kit the live config names. That clone must be clean and detached at the live config's commit. Otherwise every live command fails with `GATE_REQUIRED`.
 - The home is the process home. A run with a different `$HOME` is refused.
-- The live config changes only through `live init`, `live add-repo` and `live set-kit`. Each one records the approved config digest in `store/state/live/approved-config.json`. A live config that differs from the approved one is refused.
+- The live config changes only through `live init`, `live add-repo`, `live set-kit` and `live migrate` ([Migrating from devctx](MIGRATING.md)). Each one records the approved config digest in `store/state/live/approved-config.json`. A live config that differs from the approved one is refused.
 - Listed repositories are read-only. Onboarding never writes to them.
 - There is no backup. See [No backup](#no-backup).
 
@@ -307,7 +307,7 @@ An empty or unreadable lock file is refused. Make sure no devtwin command is run
 
 ## Leftover .codex/skills copies
 
-Earlier pilot installs wrote Codex skills to `.codex/skills`. `agents status` lists any `devtwin-*` entries there under `legacy`. The kit never touches them. The owner may remove them by hand after checking they are old copies.
+Earlier pilot installs wrote Codex skills to `.codex/skills`. `agents status` lists any `devtwin-*` or legacy `devctx-*` entries there under `legacy`. The kit never touches them. The owner may remove them by hand after checking they are old copies.
 
 ## Cursor
 

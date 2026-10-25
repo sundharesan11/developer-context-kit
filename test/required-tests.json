@@ -445,5 +445,16 @@
   "stack fetch refuses userinfo, an explicit port, a non-https scheme and an unresolvable host",
   "the stack plan and profile suggestions take stack entry parsing from profile validation, not a command module",
   "a --map override without a kind:identifier colon fails with INVALID_INPUT naming map",
-  "record add reads a valid body file inside inputsRoot"
+  "record add reads a valid body file inside inputsRoot",
+  "live migrate previews without writing, then copies the legacy store with its modes and rewritten paths and never touches the legacy folder",
+  "after live migrate, agents install replaces owned legacy devctx-* skills and preserves foreign and edited ones",
+  "agents uninstall removes owned legacy devctx-* entries, and rollback-check reads an inventory written under the old name",
+  "live migrate refuses a stale fingerprint, a non-empty target, a held legacy lock, an interrupted install and a kit inside the legacy folder",
+  "live migrate refuses a symlink in the legacy store and an unapproved legacy config",
+  "live migrate removes its own staging after a failure and discards a partial copy left by a crash",
+  "live migrate holds a staging folder that is not a clean partial copy",
+  "live migrate finishes a run that stopped after the store was renamed into place",
+  "DEVTWIN_KIT wins over the legacy DEVCTX_KIT, which is read for one transition and reported as deprecated",
+  "help lists live migrate",
+  "bundled skills fall back to the legacy DEVCTX_KIT for one transition and say it is deprecated"
 ]

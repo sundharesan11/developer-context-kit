@@ -178,6 +178,10 @@ Upgrade side by side, so the old clone keeps working until the new one is proven
 
 Installed skills stay owned across a kit change. Don't move or rename a clone after `live set-kit`. To go back, run `live set-kit` from the old clone with its commit.
 
+## Coming from devctx
+
+If you set up live mode under the old devctx name, move it with [Migrate from devctx](/docs/guides/migrate-from-devctx/) instead of starting again.
+
 ## Troubleshooting
 
 | Error | Likely cause |
