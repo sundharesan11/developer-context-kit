@@ -528,5 +528,13 @@
   "owner block denies devtwin owner-only actions run directly from an agent shell",
   "owner block denies owner-only actions through terminal wrappers",
   "owner block allows a live migrate preview and gives no decision for non-owner commands",
-  "owner block denies a Codex shell payload and keeps lesson delivery decision-free"
+  "owner block denies a Codex shell payload and keeps lesson delivery decision-free",
+  "setup runs every available step on a fixture home and reaches a working brief",
+  "setup terminal loop with injected answers applies a yes, skips a no, and passes the hub step in solo mode",
+  "setup re-run shows completed steps as done and changes nothing",
+  "setup previews show what, why and undo for each step before any write",
+  "setup terminal loop without a TTY refuses and points to the setup skill",
+  "live write-classes previews, applies, clears and refuses a path outside the allowed shapes",
+  "owner block denies live write-classes apply, owner setup steps and the setup loop from an agent shell",
+  "setup sandbox recommendations for a repository with a compose file include a container note and write nothing"
 ]

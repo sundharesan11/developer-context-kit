@@ -68,6 +68,45 @@ Live mode is implemented, and [Live activation](LIVE.md) is its runbook. Its fir
 
 The kit does not delete demo directories. Temporary directories can disappear after a reboot or system cleanup. Keep only synthetic data in them. Inspect the exact directory before manually disposing of it.
 
+## 5. Set up devtwin for real use
+
+After the live config exists and `init` has run ([Live activation](LIVE.md), steps 1 to 8), setup takes you through the rest. You can start it in two ways, and both show the same steps and the same consent screens:
+
+- Ask an agent in the kit checkout to set you up. The agent uses the `devtwin-setup` skill.
+- Run the terminal loop yourself, in your own terminal:
+
+```sh
+node bin/devtwin.mjs setup --pilot ~/.devtwin/live.json
+```
+
+For each step, setup shows what the step changes, why, how to undo it and the preview of the command that the step runs. Then it asks. Only `y` applies the step. A step that is done shows `done` and is not asked again. Without a terminal, the loop refuses and points to the skill.
+
+The same steps are available one at a time:
+
+```sh
+node bin/devtwin.mjs setup status --pilot ~/.devtwin/live.json
+node bin/devtwin.mjs setup plan --pilot ~/.devtwin/live.json --step profile --work 'Backend services'
+node bin/devtwin.mjs setup apply --pilot ~/.devtwin/live.json --step profile --work 'Backend services' --plan-fingerprint '<fingerprint>'
+```
+
+Give `setup apply` the same flags as the plan that you approved, and that plan's fingerprint.
+
+| Step | What it does |
+| --- | --- |
+| `live-folder` | Checks the live config and `init`. It only reads. |
+| `skills-claude`, `skills-codex` | Installs the bundled skills (`agents install`). |
+| `write-classes-hooks` | Approves the two hook settings files (`live write-classes`). |
+| `hooks-claude`, `hooks-codex` | Installs the hook entries (`agents install --hooks`). For Codex, trust each entry in `/hooks` after the install. |
+| `hook-verify` | Writes the kit receipt that the hook trusts (`hook verify`). |
+| `profile` | Writes your personal profile (`profile apply`). |
+| `starter-preferences` | Stores the starter preferences that you select (`--starter <id>`) in the personal store. |
+| `scope`, `first-project` | Adds a scope and onboards one repository (`scope add`, `project onboard`). |
+| `sandbox` | Recommends agent sandbox settings and a container setup for `--repo`. It writes no agent setting. Accepted recommendations (`--recommendation <id>`) become personal preferences. |
+
+The starter templates, the hub join and the scheduled jobs show as "not available yet". Without a hub, devtwin runs in solo mode.
+
+The skill, hook and write class steps are owner actions. The devtwin hook denies their `setup apply` from an agent shell, so the agent shows you the plan and you run the apply in your own terminal.
+
 ## If something fails
 
 | Symptom | What to check |

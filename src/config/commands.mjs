@@ -41,6 +41,17 @@ export const liveSetKitCommand = {
     return values.apply ? (await live()).applyLiveSetKit(input, ctx) : (await live()).planLiveSetKit(input, ctx);
   }
 };
+// Sets the approved write classes (KTD7). Each class flag replaces that class's paths; --clear removes a class; classes
+// not named stay as they are. The preview shows the classes before and after; --apply with its fingerprint approves.
+const CLASS_FLAGS = [["hub-root", "hubRoot"], ["instruction-target", "instructionTargets"], ["hook-target", "hookTargets"], ["launch-agent", "launchAgents"]];
+export const liveWriteClassesCommand = {
+  options: { ...liveOptions, ...Object.fromEntries(CLASS_FLAGS.map(([flag]) => [flag, { type: "string", multiple: true }])), clear: { type: "string", multiple: true } },
+  async run(values, ctx) {
+    const set = Object.fromEntries(CLASS_FLAGS.filter(([flag]) => values[flag] !== undefined).map(([flag, key]) => [key, asList(values[flag])]));
+    const input = liveInput(values, { set, clear: asList(values.clear) });
+    return values.apply ? (await live()).applyLiveEditWriteClasses(input, ctx) : (await live()).planLiveEditWriteClasses(input, ctx);
+  }
+};
 // Copies a live setup made under the former devctx name to a new live config folder. --pilot names the new live config,
 // --from the legacy one. It runs from the new kit; see docs/MIGRATING.md.
 export const liveMigrateCommand = {

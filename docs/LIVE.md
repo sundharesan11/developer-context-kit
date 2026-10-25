@@ -35,12 +35,26 @@ A live config can hold an optional `writeClasses` block. It names the only other
 | `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) and `~/.codex/hooks.json`. |
 | `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. |
 
-- The classes are part of the approved config digest. A live config whose classes differ from the approved ones is refused with `GATE_REQUIRED`, `live.approval`. No CLI command sets the classes yet; do not edit them in `live.json` by hand.
+- The classes are part of the approved config digest. A live config whose classes differ from the approved ones is refused with `GATE_REQUIRED`, `live.approval`. Set the classes only with `live write-classes` (see [Set the write classes](#set-the-write-classes)). Do not edit them in `live.json` by hand.
 - Every path must be canonical and inside the home. A path whose folder is a link, or that is itself a link, is refused. A `hubRoot` folder must not overlap the store, the kit, a listed repository, a skill folder, a protected agent home or another hub root.
 - A write outside the store is allowed only when the writing code names one class and the path is exactly in it. Every other file in `~/.claude`, `~/.codex`, `~/.agents` and `~/Library/LaunchAgents` stays refused.
-- Only `agents install --hooks` and `agents uninstall --hooks` edit files in a class yet, and only the `hookTargets` files. See [Install the hooks](#install-the-hooks). No CLI command sets the classes yet. The shared edit step works as follows. In `CLAUDE.md` and `AGENTS.md`, it changes only the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. Every byte outside the markers stays the same. Malformed markers stop the edit with `CONFLICT`. In a JSON settings file, it changes only devtwin's own hook entries; the other values stay, but the file can be re-indented.
+- Only `agents install --hooks` and `agents uninstall --hooks` edit files in a class yet, and only the `hookTargets` files. See [Install the hooks](#install-the-hooks). The shared edit step works as follows. In `CLAUDE.md` and `AGENTS.md`, it changes only the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. Every byte outside the markers stays the same. Malformed markers stop the edit with `CONFLICT`. In a JSON settings file, it changes only devtwin's own hook entries; the other values stay, but the file can be re-indented.
 - Before each edit, it writes the exact prior bytes to `store/state/runs/<run_id>/backups/` at mode 0600, with a record that names the path. For a file that did not exist, only the record is written. If the file changed during the edit, the edit stops with `INTEGRITY` and the file is not replaced. The edited file is replaced atomically and keeps its own mode. A file that devtwin creates gets mode 0600.
 - An edited file must be a regular file you own, with one link, that is not group or other writable.
+
+### Set the write classes
+
+`live write-classes` changes the approved classes. Each class flag replaces the paths of that class: `--hub-root`, `--instruction-target`, `--hook-target` and `--launch-agent`. Give a flag once for each path. `--clear <class>` removes a class. A class that you do not name stays as it is. Preview, review, then apply after approval:
+
+```sh
+node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --hook-target "$HOME/.claude/settings.json" --hook-target "$HOME/.codex/hooks.json"
+node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --hook-target "$HOME/.claude/settings.json" --hook-target "$HOME/.codex/hooks.json" --apply --plan-fingerprint '<fingerprint>'
+```
+
+- The preview shows `writeClasses` with `from` and `to`, and the config digest before and after. Nothing is written.
+- Apply records the new approved digest and then replaces `live.json`. The config ID stays.
+- A path that does not have the shape of its class is refused with `GATE_REQUIRED`. A request that changes nothing is refused with `INVALID_INPUT`.
+- This is an owner action. The devtwin hook denies `live write-classes --apply` from an agent shell.
 
 ## Placeholders
 
@@ -203,7 +217,7 @@ node "$KIT/bin/devtwin.mjs" agents install --pilot "$LIVE_CONFIG" --agent claude
 
 ### Install the hooks
 
-The devtwin hook delivers lesson lines and blocks owner-only commands from agent shells. It needs the two `hookTargets` files approved in the live config. `--hooks` changes only those files. Without it, `agents install` installs only the skills, as before. Preview, review, then apply after approval:
+The devtwin hook delivers lesson lines and blocks owner-only commands from agent shells. It needs the two `hookTargets` files approved in the live config, as [Set the write classes](#set-the-write-classes) shows. `--hooks` changes only those files. Without it, `agents install` installs only the skills, as before. Preview, review, then apply after approval:
 
 ```sh
 node "$KIT/bin/devtwin.mjs" agents install --hooks --pilot "$LIVE_CONFIG" --agent claude --agent codex

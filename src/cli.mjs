@@ -26,6 +26,7 @@ export const COMMANDS = {
   "live init": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveInitCommand },
   "live add-repo": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveAddRepoCommand },
   "live set-kit": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveSetKitCommand },
+  "live write-classes": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveWriteClassesCommand },
   "live migrate": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveMigrateCommand },
   "record add": { load: async () => (await import("./records/commands.mjs")).recordAddCommand },
   "record supersede": { load: async () => (await import("./records/commands.mjs")).recordSupersedeCommand },
@@ -38,6 +39,11 @@ export const COMMANDS = {
   hook: { hook: true, load: async () => import("./hooks/commands.mjs") },
   "hook verify": { load: async () => (await import("./hooks/commands.mjs")).hookVerifyCommand },
   "budget report": { load: async () => (await import("./hooks/commands.mjs")).budgetReportCommand },
+  // The terminal loop writes its own text to a terminal instead of the JSON envelope; without one it refuses.
+  setup: { interactive: true, load: async () => (await import("./setup/tty.mjs")).setupLoopCommand },
+  "setup status": { load: async () => (await import("./setup/commands.mjs")).setupStatusCommand },
+  "setup plan": { load: async () => (await import("./setup/commands.mjs")).setupPlanCommand },
+  "setup apply": { load: async () => (await import("./setup/commands.mjs")).setupApplyCommand },
   "project onboard": { load: async () => (await import("./onboarding/commands.mjs")).projectOnboardCommand },
   "profile show": { load: async () => (await import("./profile/commands.mjs")).profileShowCommand },
   "profile plan": { load: async () => (await import("./profile/commands.mjs")).profilePlanCommand },
@@ -136,6 +142,7 @@ export async function main(argv, options = {}) {
     const context = { roots, pilot, now, home, env, kitRoot, templateRoot };
     if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
     if (command.startsWith("stack ")) Object.assign(context, { stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
+    if (COMMANDS[command].interactive === true) return await impl.run(values, { ...context, stdin, stdout });
     const result = await impl.run(values, context);
     stdout.write(JSON.stringify({ ok: true, command, result }) + "\n");
     return 0;
