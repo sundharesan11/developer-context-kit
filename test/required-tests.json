@@ -563,5 +563,11 @@
   "lesson propose refuses a credential pattern",
   "lesson copy publishes a personal lesson to another scope's hub only after the isolation check and dialog",
   "lesson publish paths never write to a hub without an approved owner dialog",
-  "lesson edit reject and the local targets work without a dialog"
+  "lesson edit reject and the local targets work without a dialog",
+  "lesson supersede accepted and published appears in the author's next brief",
+  "lesson supersede concurrent replacements leave one winner and the second fails with STALE_VERSION after its rebase",
+  "lesson supersede raced double push shows both replacements as contested",
+  "lesson supersede-propose refuses an unknown or tombstoned predecessor and counts toward the session cap",
+  "lesson supersede accept with the dialog denied publishes nothing",
+  "hub outbox drain drops a queued replacement whose predecessor was superseded meanwhile"
 ]

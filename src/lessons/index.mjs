@@ -31,7 +31,8 @@ function latestEntries(registry, scope) {
   }
   return [...latest.values()].sort((a, b) => a.project < b.project ? -1 : 1);
 }
-// Sources give {records, unavailable}. Records carry body and effective, as the snapshot readers return them.
+// Sources give {records, unavailable}. A superseded hub lesson never reaches the hub source (src/hubs/read.mjs), and a
+// contested replacement keeps contested: true in its entry (U12). Records carry body and effective, as the snapshot readers return them.
 // The hub clone is the fourth source (U10). It reads the clone only while the scope is joined with delivery on, and a
 // hub with a newer schema version gives nothing. Its records name the author in recordedBy.actorRef, which claimedBy
 // then uses in place of the local user.
@@ -93,7 +94,7 @@ async function gather(roots, scope, { sources = SOURCES } = {}) {
     const live = read.records.filter(isLive);
     counts[source.name] = live.length;
     for (const r of live) {
-      entries.push({ id: r.id, kind: r.kind, reach: r.reach, source: source.name, scope: r.scope, project: r.project, title: r.title, summary: summaryOf(r), claimedBy: ACTOR_REF.test(r.recordedBy?.actorRef ?? "") ? r.recordedBy.actorRef : handle, revisitAfter: r.revisitAfter ?? null, createdAt: r.createdAt, recordHash: r.recordHash, match: r.match });
+      entries.push({ id: r.id, kind: r.kind, reach: r.reach, source: source.name, scope: r.scope, project: r.project, title: r.title, summary: summaryOf(r), claimedBy: ACTOR_REF.test(r.recordedBy?.actorRef ?? "") ? r.recordedBy.actorRef : handle, revisitAfter: r.revisitAfter ?? null, createdAt: r.createdAt, recordHash: r.recordHash, match: r.match, ...(r.contested ? { contested: true } : {}) });
       bodies.set(r.id, r.body);
     }
   }

@@ -11,6 +11,7 @@
 //   listOutbox(roots, binding) -> [item]          removeOutboxItem(roots, binding, id)
 //   drainOutbox(roots, binding, { now, terms }) -> { pushed: [id], dropped: [{ id, reason }], kept: [id] }
 //   withHubLock(roots, action)                    the hub-sync lock; publishToHub takes it unless locked is true
+//   checkRemoteSupersession(binding, { lessonId, supersedes })   U12: the predecessor check on the fetched remote branch
 import { join, dirname } from "node:path";
 import { mkdirSync, unlinkSync, readdirSync } from "node:fs";
 import { DevtwinError } from "../errors.mjs";
@@ -19,7 +20,7 @@ import { assertWritable } from "../config/pilot.mjs";
 import { info, writeNewFile, ensurePrivatePath, readPrivateJson, fsyncDir } from "../storage/fsx.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { readApprovedSource } from "../storage/source-read.mjs";
-import { canonicalJson, digest } from "../storage/canonical.mjs";
+import { canonicalJson, digest, sha256 } from "../storage/canonical.mjs";
 import { assertOutboundClean } from "../records/isolation.mjs";
 import { LESSON_REL, NOTE_REL, TOMBSTONE_REL, HUB_SCHEMA_VERSION, HUB_ID, parseHubLesson, parseHubNote, parseHubTombstone, readHubManifest } from "./read.mjs";
 
@@ -121,6 +122,44 @@ async function commit(roots, binding, writes, message) {
   required(hubGit(binding, ["add", "-A", "--", ...writes.map((w) => w.rel)]), "add");
   required(hubGit(binding, [...identity(binding), "commit", "-q", "--no-verify", "-m", message]), "commit");
 }
+// U12 (KTD3): the predecessor check for a replacement. It reads the fetched remote branch, never the clone's work tree,
+// so it sees what the push would land on. Each predecessor must be there with the named hash, must not carry its
+// author's tombstone, and no other lesson on the branch may already replace it with that hash. Any failure throws
+// STALE_VERSION; publishToHub then resets the clone to the remote head, so the local commit is dropped.
+const stale = (reason, details) => { throw new DevtwinError("STALE_VERSION", "Lesson replacement is stale", { reason, ...details }); };
+export function checkRemoteSupersession(binding, { lessonId, supersedes }) {
+  const ref = remoteRef(binding), own = "lessons/" + lessonId + ".md";
+  for (const { id, hash } of supersedes ?? []) {
+    const rel = "lessons/" + id + ".md";
+    const blob = hubGit(binding, ["cat-file", "blob", ref + ":" + rel]);
+    if (!blob.ok) stale("predecessor-missing", { predecessorId: id });
+    if (sha256(blob.stdout) !== hash) stale("predecessor-changed", { predecessorId: id });
+    const author = (() => { try { return parseHubLesson(blob.stdout).meta.author; } catch { return null; } })();
+    const stone = hubGit(binding, ["cat-file", "blob", ref + ":tombstones/" + id + ".json"]);
+    if (stone.ok) { try { if ("handle:" + parseHubTombstone(stone.stdout).handle === author) stale("predecessor-removed", { predecessorId: id }); } catch (error) { if (error.code === "DEVTWIN_STALE_VERSION") throw error; } }
+    // Lessons whose text names the predecessor ID; each is parsed to see whether it really replaces it.
+    const found = hubGit(binding, ["grep", "-l", "-F", "-e", id, ref, "--", "lessons/"]);
+    if (!found.ok && found.status !== 1) throw new DevtwinError("HUB_GIT_FAILED", "Hub Git step failed", { step: "grep" });
+    for (const line of found.ok ? found.stdout.split("\n").filter(Boolean) : []) {
+      const other = line.startsWith(ref + ":") ? line.slice(ref.length + 1) : null;
+      if (!other || other === own || other === rel || !LESSON_REL.test(other)) continue;
+      const read = hubGit(binding, ["cat-file", "blob", ref + ":" + other]);
+      let meta = null;
+      try { meta = read.ok ? parseHubLesson(read.stdout).meta : null; } catch { meta = null; }
+      if (meta?.supersedes?.some((x) => x.id === id && x.hash === hash)) stale("already-superseded", { predecessorId: id, successorId: meta.id });
+    }
+  }
+}
+// The supersedes list of a queued lesson write, or null when the item replaces nothing.
+function queuedSupersession(item) {
+  if (item.kind !== "lesson") return null;
+  for (const write of item.writes) {
+    if (write.content === null || !LESSON_REL.test(write.rel)) continue;
+    const { meta } = parseHubLesson(write.content);
+    if (meta.supersedes?.length) return { lessonId: meta.id, supersedes: meta.supersedes };
+  }
+  return null;
+}
 const REJECTED = /\[rejected\]|\[remote rejected\]|non-fast-forward|fetch first|failed to update ref|stale info/;
 
 // Commits the writes and pushes them. preconditions({ attempt }) runs before the first write and again after each
@@ -201,7 +240,9 @@ export const noteIsStale = (item, now) => {
   return now.getTime() >= created + (expires - created) / 2;
 };
 // Pushes queued items one by one. Each item passes the sensitive-content and all-scope checks again at push time
-// (KTD11), because a scope added after queueing must still be refused. The caller holds the hub-sync lock.
+// (KTD11), because a scope added after queueing must still be refused. A queued replacement re-runs the predecessor
+// check (U12) before its commit and after each rebase; when another replacement landed meanwhile, the item is
+// dropped with reason "stale". The caller holds the hub-sync lock.
 export async function drainOutbox(roots, binding, { now = () => new Date(), terms }) {
   const out = { pushed: [], dropped: [], kept: [] };
   if (binding.readOnly) return out;
@@ -217,7 +258,16 @@ export async function drainOutbox(roots, binding, { now = () => new Date(), term
       out.dropped.push({ id: item.id, reason: error.code === "DEVTWIN_ISOLATION" ? "isolation" : error.code === "DEVTWIN_SENSITIVE_CONTENT" ? "sensitive" : "invalid" });
       continue;
     }
-    const result = await publishToHub(roots, binding, { writes: item.writes, message: item.message, now, queue: false, locked: true, kind: item.kind });
+    const replacement = queuedSupersession(item);
+    const preconditions = replacement ? async () => checkRemoteSupersession(binding, replacement) : undefined;
+    let result;
+    try { result = await publishToHub(roots, binding, { writes: item.writes, message: item.message, preconditions, now, queue: false, locked: true, kind: item.kind }); }
+    catch (error) {
+      if (error.code !== "DEVTWIN_STALE_VERSION") throw error;
+      removeOutboxItem(roots, binding, item.id);
+      out.dropped.push({ id: item.id, reason: "stale" });
+      continue;
+    }
     if (result.pushed) { removeOutboxItem(roots, binding, item.id); out.pushed.push(item.id); }
     else { out.kept.push(item.id); offline = result.reason !== "rejected"; }
   }

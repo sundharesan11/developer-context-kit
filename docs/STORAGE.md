@@ -77,7 +77,9 @@ Personal and org records have their own homes. They need no registry entry or pr
 - **ID.** The proposal ID is `prop_` and a digest of the session ID, scope, project and lesson. The same draft in the same session is one proposal.
 - **Cap.** One session ID has at most three proposals. Rejected and accepted proposals still count.
 - **Changes.** `lesson edit` replaces the file by atomic replace with a new `revision`. `lesson reject` and `lesson accept` set the state to `rejected` or `accepted` and keep the file. Accept records what it wrote in `outcome`.
+- **Replacement.** A proposal from `lesson supersede-propose` also holds `supersedes`: the replaced hub lesson's ID, the SHA-256 of its hub file, its title, its author and the hub ID. The ID digest then covers it too. An accept that fails with `STALE_VERSION` keeps the proposal pending and writes the error code and reason to `lastAttempt`.
 - **Machine only.** No command sends a proposal to a hub or another machine. Only `lesson accept` publishes a lesson, after the owner dialog.
+- **Notices.** `hub sync` keeps replacements of your own hub lessons in `stateRoot/hubs/<hubId>/notices.json` (0600), written by atomic replace under the `hub-sync` lock. An acknowledged notice keeps its entry with `ackedAt`, so the next sync does not add it again. The file holds at most 200 entries; the oldest acknowledged entries go first.
 
 ### Isolation checks
 

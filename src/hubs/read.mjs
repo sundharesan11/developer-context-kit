@@ -51,6 +51,16 @@ export function parseHubManifest(text) {
   return { hubId: value.hubId, schemaVersion: value.schemaVersion };
 }
 
+// U12 (KTD3): a replacement names each predecessor's ID and the sha256 of its exact hub file, as [{ id, hash }].
+// Distinct IDs, never the lesson's own, at most MAX_SUPERSEDES entries. Any other shape makes the file invalid.
+export const MAX_SUPERSEDES = 5;
+function checkSupersedes(list, own) {
+  if (!Array.isArray(list) || !list.length || list.length > MAX_SUPERSEDES) bad();
+  for (const entry of list) {
+    if (!isObject(entry) || Object.keys(entry).length !== 2 || !LESSON_ID.test(entry.id ?? "") || entry.id === own || typeof entry.hash !== "string" || !HASH.test(entry.hash)) bad();
+  }
+  if (new Set(list.map((entry) => entry.id)).size !== list.length) bad();
+}
 // A hub lesson file: a front matter block of one JSON line between "---" lines, then the Markdown body.
 const LESSON_KEYS = ["schemaVersion", "id", "author", "title", "match", "createdAt", "revisitAfter", "localRecordHash", "supersedes"];
 function checkLessonMeta(meta) {
@@ -58,7 +68,8 @@ function checkLessonMeta(meta) {
   if (!LESSON_ID.test(meta.id ?? "") || typeof meta.author !== "string" || !ACTOR_REF.test(meta.author) || !meta.author.startsWith("handle:")) bad();
   if (!oneLine(meta.title, 200) || !isoTime(meta.createdAt)) bad();
   if (meta.revisitAfter !== undefined && meta.revisitAfter !== null && !(typeof meta.revisitAfter === "string" && DATE.test(meta.revisitAfter))) bad();
-  for (const key of ["localRecordHash", "supersedes"]) if (meta[key] !== undefined && meta[key] !== null && !(typeof meta[key] === "string" && HASH.test(meta[key]))) bad();
+  if (meta.localRecordHash !== undefined && meta.localRecordHash !== null && !(typeof meta.localRecordHash === "string" && HASH.test(meta.localRecordHash))) bad();
+  if (meta.supersedes !== undefined && meta.supersedes !== null) checkSupersedes(meta.supersedes, meta.id);
   try { validateMatch(meta.match ?? {}); } catch { bad(); }
   if (!["paths", "packages", "topics"].some((key) => meta.match?.[key]?.length)) bad();
   return meta;
@@ -106,6 +117,32 @@ export function applyTombstones(lessons, tombstones) {
   for (const stone of tombstones) if (!removed.includes(stone.value.id)) ignored.push({ rel: stone.rel, reason: lessons.some((l) => l.meta.id === stone.value.id) ? "handle-mismatch" : "no-lesson" });
   return { kept, removed, ignored };
 }
+// U12 (KTD3): supersession over the lessons left after tombstones. A replacement is valid when its predecessor is
+// one of those lessons and the named hash equals the sha256 of the predecessor's file. A predecessor with at least one
+// valid replacement stops delivering. When two or more valid replacements name the same predecessor, both were pushed
+// before either client saw the other (a later one fails with STALE_VERSION at publish), so each is marked contested.
+// An invalid supersession (unknown or removed predecessor, wrong hash) is ignored: the predecessor stays and the
+// replacement is delivered as a plain lesson, so a wrong hash can never hide another person's lesson.
+export function applySupersession(lessons) {
+  const byId = new Map(lessons.map((lesson) => [lesson.meta.id, lesson]));
+  const successors = new Map(), ignored = [];
+  for (const lesson of lessons) for (const entry of lesson.meta.supersedes ?? []) {
+    const predecessor = byId.get(entry.id);
+    const reason = !predecessor ? "no-lesson" : predecessor.sha256 !== entry.hash ? "hash-mismatch" : null;
+    if (reason) { ignored.push({ id: lesson.meta.id, predecessorId: entry.id, reason }); continue; }
+    if (!successors.has(entry.id)) successors.set(entry.id, []);
+    successors.get(entry.id).push(lesson);
+  }
+  const contestedIds = new Set(), superseded = [], contested = [];
+  for (const [id, list] of [...successors].sort(([x], [y]) => x < y ? -1 : 1)) {
+    const by = list.map((l) => ({ id: l.meta.id, title: l.meta.title, author: l.meta.author })).sort((x, y) => x.id < y.id ? -1 : 1);
+    const predecessor = byId.get(id).meta;
+    superseded.push({ id, title: predecessor.title, author: predecessor.author, sha256: byId.get(id).sha256, by });
+    if (by.length > 1) { contested.push({ predecessorId: id, successorIds: by.map((x) => x.id) }); for (const x of by) contestedIds.add(x.id); }
+  }
+  const kept = lessons.filter((lesson) => !successors.has(lesson.meta.id)).map((lesson) => contestedIds.has(lesson.meta.id) ? { ...lesson, contested: true } : lesson);
+  return { kept, superseded, contested, ignored };
+}
 
 // The modes Git's index records for each path, read from the local clone. 100644 and 100755 are regular files.
 function indexModes(clone) {
@@ -149,7 +186,7 @@ export async function readHub(clone, { now = new Date() } = {}) {
   const hub = parseHubManifest(manifestRead.text);
   if (hub.schemaVersion > HUB_SCHEMA_VERSION) {
     warnings.push({ code: "HUB_SCHEMA_NEWER", schemaVersion: hub.schemaVersion, supported: HUB_SCHEMA_VERSION, message: "This hub uses a newer format. devtwin reads nothing from it and writes nothing to it until the kit is upgraded." });
-    return { hub, readOnly: true, warnings, lessons: [], notes: [], tombstones: [], refused, removed: [], ignoredTombstones: [], expiredNotes: 0 };
+    return { hub, readOnly: true, warnings, lessons: [], notes: [], tombstones: [], refused, removed: [], ignoredTombstones: [], superseded: [], contested: [], ignoredSupersessions: [], expiredNotes: 0 };
   }
   const lessons = [], notes = [], stones = [];
   const lessonNames = names(clone, "lessons", refused);
@@ -198,14 +235,17 @@ export async function readHub(clone, { now = new Date() } = {}) {
     } catch { refused.push({ rel, reason: "invalid" }); }
   }
   const { kept, removed, ignored } = applyTombstones(lessons, stones);
-  return { hub, readOnly: false, warnings, lessons: kept, notes, tombstones: stones, refused, removed, ignoredTombstones: ignored, expiredNotes };
+  const replaced = applySupersession(kept);
+  return { hub, readOnly: false, warnings, lessons: replaced.kept, notes, tombstones: stones, refused, removed, ignoredTombstones: ignored,
+    superseded: replaced.superseded, contested: replaced.contested, ignoredSupersessions: replaced.ignored, expiredNotes };
 }
-// Hub lessons as index records: org reach in the binding's scope, attributed to the claimed author (KTD20).
+// Hub lessons as index records: org reach in the binding's scope, attributed to the claimed author (KTD20). A
+// superseded lesson is already gone from read.lessons; a contested replacement carries contested: true.
 export function hubRecords(binding, read) {
   return read.lessons.map((lesson) => ({
     schemaVersion: 2, id: lesson.meta.id, kind: "lesson", reach: "org", scope: binding.scope, project: null,
     title: lesson.meta.title, body: lesson.body, effective: "confirmed", status: "confirmed", match: { paths: [], packages: [], topics: [], ...lesson.meta.match },
     recordedBy: { actor: "human", actorRef: lesson.meta.author }, revisitAfter: lesson.meta.revisitAfter ?? null,
-    createdAt: lesson.meta.createdAt, recordHash: lesson.sha256 ?? sha256(lesson.body), hubId: binding.hubId
+    createdAt: lesson.meta.createdAt, recordHash: lesson.sha256 ?? sha256(lesson.body), hubId: binding.hubId, ...(lesson.contested ? { contested: true } : {})
   }));
 }

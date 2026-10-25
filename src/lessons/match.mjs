@@ -88,9 +88,10 @@ export const isStale = (entry, now) => {
   const due = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(entry.revisitAfter) ? entry.revisitAfter + "T00:00:00.000Z" : entry.revisitAfter);
   return Number.isFinite(due) && due <= now.getTime();
 };
-// About 60 tokens: "[stale, revisit: ]title: do or do not (claimed by handle) [id]". Title and summary are cut to fit.
-export function indexLine(entry, { stale = false } = {}) {
-  const prefix = stale ? "stale, revisit: " : "";
+// About 60 tokens: "[contested: ][stale, revisit: ]title: do or do not (claimed by handle) [id]". Title and summary
+// are cut to fit. "contested: " marks one of two replacements of the same lesson that raced to the hub (U12).
+export function indexLine(entry, { stale = false, contested = entry.contested === true } = {}) {
+  const prefix = (contested ? "contested: " : "") + (stale ? "stale, revisit: " : "");
   const suffix = " (claimed by " + capBytes(clean(entry.claimedBy), 64) + ") [" + entry.id + "]";
   const title = clean(entry.title), summary = clean(entry.summary);
   const text = summary && summary !== title ? title + ": " + summary : title;
@@ -113,7 +114,7 @@ export function matchLessons(index, { paths = [], packages = [], text = "", proj
     if (prompt && topicWords.some((test) => test(prompt, lowerPrompt))) matchedBy.push("topic");
     if (!matchedBy.length) continue;
     const stale = isStale(entry, now);
-    out.push({ id: entry.id, reach: entry.reach, scope: entry.scope, project: entry.project, matchedBy, stale, strength: STRENGTH[matchedBy[0]], createdAt: entry.createdAt, line: indexLine(entry, { stale }) });
+    out.push({ id: entry.id, reach: entry.reach, scope: entry.scope, project: entry.project, matchedBy, stale, ...(entry.contested === true ? { contested: true } : {}), strength: STRENGTH[matchedBy[0]], createdAt: entry.createdAt, line: indexLine(entry, { stale }) });
   }
   out.sort((a, b) => b.strength - a.strength || (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0) || (a.id < b.id ? -1 : 1));
   return out.map(({ strength, createdAt, ...rest }) => rest);

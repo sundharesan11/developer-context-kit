@@ -7,6 +7,7 @@ import { matchLessons } from "../lessons/match.mjs";
 import { repoPaths } from "./paths.mjs";
 import { readPilotBytes, receiptProblem, writeKitReceipt } from "./receipt.mjs";
 import { ownerAction, denyOutput } from "./owner-block.mjs";
+import { readPrivateJson } from "../storage/fsx.mjs";
 import { sessionKey, readSession, writeSession, removeSession, pruneSessions, logBudget, logHook, budgetReport } from "./session.mjs";
 // U7: `devtwin hook --event <event> --agent <agent> --pilot <path>` (KTD6, KTD8, KTD17, KTD22, KTD23). It reads the
 // agent's JSON payload on stdin and prints the agent's additionalContext JSON, or nothing. It never loads or checks the
@@ -66,12 +67,27 @@ const plural = (n, word) => n + " " + word + (n === 1 ? "" : "s");
 // U11 (KTD23): the session tag that `lesson propose --session` takes, so the three-proposal cap is per agent session.
 // It is derived from the session key, never the agent's raw session ID.
 export const sessionTag = (key) => "ses_" + key.slice(0, 24);
-function startLine(found, key) {
+// U12 (R17): open replacement notices for the scope, read from stateRoot/hubs/<hubId>/notices.json that hub sync
+// writes. Any problem counts as none: the brief and `lesson notices` stay the full view.
+async function openNoticeCount(stateRoot, scope) {
+  let names;
+  try { names = readdirSync(join(stateRoot, "hubs")); } catch { return 0; }
+  let count = 0;
+  for (const name of names.filter((n) => /^[a-z][a-z0-9-]{1,63}$/.test(n)).sort()) {
+    try {
+      const value = await readPrivateJson(join(stateRoot, "hubs", name, "notices.json"), 262144);
+      if (value?.schemaVersion === 1 && value.scope === scope && Array.isArray(value.notices)) count += value.notices.filter((n) => n && !n.ackedAt).length;
+    } catch { /* No notices for this hub. */ }
+  }
+  return count;
+}
+function startLine(found, key, notices = 0) {
   if (found.status === "ambiguous") return "devtwin hook: this folder is bound in more than one scope, so lessons are off.";
   const session = " Session ID for lesson propose: " + sessionTag(key) + ".";
   if (found.status !== "bound") return "devtwin hook live: this folder is not a bound project." + session;
   const count = found.index.entries.filter((e) => e.reach !== "project" || e.project === found.repo.project).length;
-  return "devtwin hook live: " + plural(count, "lesson") + " for " + found.repo.project + ". Index lines arrive when work matches." + session;
+  const replaced = notices ? " " + notices + " of your lessons " + (notices === 1 ? "was" : "were") + " replaced; run `devtwin lesson notices --scope " + found.repo.scope + "`." : "";
+  return "devtwin hook live: " + plural(count, "lesson") + " for " + found.repo.project + ". Index lines arrive when work matches." + replaced + session;
 }
 // The block an agent receives: the notice, at most four index lines per session and one overflow line at the cap.
 async function deliver(stateRoot, { agent, key, found, matches, now }) {
@@ -102,7 +118,7 @@ async function respond({ stateRoot, pilotPath, pilotBytes, agent, event, payload
   if (event === "SessionStart") pruneSessions(stateRoot, now);
   const found = await locate(stateRoot, payload.cwd);
   if (found.status === "ambiguous") logHook(stateRoot, { at, agent, event, code: "ambiguous-root" });
-  if (event === "SessionStart") return { text: startLine(found, key), lines: 0, overflow: 0, key };
+  if (event === "SessionStart") return { text: startLine(found, key, found.status === "bound" ? await openNoticeCount(stateRoot, found.repo.scope) : 0), lines: 0, overflow: 0, key };
   if (found.status !== "bound") return null;
   const project = found.repo.project;
   let matches;
