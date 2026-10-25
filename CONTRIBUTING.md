@@ -13,6 +13,7 @@ From the repository root:
 ```sh
 npm test
 npm run check:package
+npm run check:writing
 git diff --check
 ```
 

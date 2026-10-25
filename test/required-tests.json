@@ -489,5 +489,14 @@
   "a symlinked write-class target is refused",
   "hubRoot allows writes inside and refuses siblings",
   "write classes refuse unknown classes, duplicates and targets outside the agent folders",
-  "disposable pilot write classes stay exact and inside a listed agent home"
+  "disposable pilot write classes stay exact and inside a listed agent home",
+  "writing check passes a compliant paragraph",
+  "writing check fails a 31-word sentence and reports the file and line",
+  "writing check ignores text inside code fences",
+  "writing check ignores inline code, link URLs, frontmatter, comments, headings and tables",
+  "writing check flags a banned word with its line",
+  "writing check allows 26 words outside procedures but not in a numbered step",
+  "writing check flags passive voice and future tense only in procedures",
+  "writing allowlist suppresses a reviewed finding and reports a stale entry",
+  "writing check runs in CI and as an npm script"
 ]

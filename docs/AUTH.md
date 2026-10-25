@@ -18,7 +18,7 @@ Parsing a keychain or Bitwarden reference does not read the keychain or Bitwarde
 
 ## Account configuration
 
-`validateAccountConfig` checks one account object. The allowed keys are `id`, `provider`, `accountId`, `workspaceId`, `actorRef`, `secretRef` and `policy`. Any other key fails with `INVALID_INPUT`. So does any key, at any depth, named like a secret. Those names are `password`, `token`, `secret`, `api_key`, `private_key`, `access_key` or `credential` (case-insensitive, with `-` or `_`), and names ending in `_token`, `_secret` or `_password` (also with `-`) or in camelCase `Token`, `Secret` or `Password`, such as `refreshToken`.
+`validateAccountConfig` checks one account object. The allowed keys are `id`, `provider`, `accountId`, `workspaceId`, `actorRef`, `secretRef` and `policy`. Any other key fails with `INVALID_INPUT`. So does any key, at any depth, named like a secret. Those names are `password`, `token`, `secret`, `api_key`, `private_key`, `access_key` or `credential` (case-insensitive, with `-` or `_`). Names ending in `_token`, `_secret` or `_password` (also with `-`) also fail, and so do names ending in camelCase `Token`, `Secret` or `Password`, such as `refreshToken`.
 
 - `id`, `provider`, `accountId`, `workspaceId`, `actorRef` and `secretRef` must be non-empty strings.
 - `actorRef` must match the actor form `email:`, `github:`, `slack:`, `linear:` or `handle:` followed by up to 128 safe characters.
@@ -33,7 +33,7 @@ New scope configuration files are written with `accounts: []`. No command adds a
 
 Each `read` or `draft` call runs these checks in order:
 
-1. If `policy.read` (or `policy.draft`) is not `true`, it fails with `GATE_REQUIRED`. The provider is not called.
+1. If `policy.read` (or `policy.draft`) is not `true`, it fails with `GATE_REQUIRED`. It does not call the provider.
 2. It calls `provider.whoami()`. This happens on every call; a result is never cached.
 3. It fails with `AUTH_UNVERIFIED` when `whoami` throws or returns nothing, when `verified` is not `true` or when `actorRef`, `accountId` or `workspaceId` is missing.
 4. If `accountId`, `workspaceId` or `actorRef` is not exactly equal to the configured value, it fails with `AUTH_MISMATCH`.

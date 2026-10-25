@@ -32,6 +32,7 @@ Start with a disposable synthetic project. Move to the [live activation runbook]
 
 - [Contributing](../CONTRIBUTING.md): test commands and public-safe changes.
 - [Continuous integration](CI.md): job matrix, trust boundaries and run interpretation.
+- [Writing rules](WRITING.md): the STE-based rule subset, its check and the allowlist policy.
 - [Security reporting](../SECURITY.md): private vulnerability reporting.
 - [Release checklist](RELEASING.md): publication gates and evidence.
 - [Apache-2.0 license](../LICENSE) and [NOTICE](../NOTICE): toolkit terms and attribution.

@@ -44,7 +44,7 @@ You do, by hand:
 - Remove `~/.devctx` once everything checks out.
 - Remove leftover `devctx-*` entries in `~/.codex/skills`, if `agents status` lists any under `legacy`.
 
-`live migrate` refuses, rather than guesses, when the store is not at `<folder>/store`, when the new folder holds anything other than the new kit, or when the new kit sits inside the old folder.
+`live migrate` refuses rather than guesses in three cases. The store is not at `<folder>/store`, the new folder holds anything other than the new kit, or the new kit sits inside the old folder.
 
 ## Steps
 

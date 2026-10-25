@@ -18,15 +18,15 @@ Do not use this skill to read context. Use `devtwin-resume` for that.
 
 Check all of these before the first CLI call. If any check fails, stop and ask the user.
 
-1. `DEVTWIN_KIT` is set. It must be an absolute path. If it is not set but the legacy `DEVCTX_KIT` is, use the value of `DEVCTX_KIT` wherever these steps say `$DEVTWIN_KIT` for this session, apply every other check to that value, and tell the user once that `DEVCTX_KIT` is deprecated and should be renamed to `DEVTWIN_KIT` in their shell profile.
+1. `DEVTWIN_KIT` is set. It must be an absolute path. If it is not set but the legacy `DEVCTX_KIT` is, use the value of `DEVCTX_KIT` wherever these steps say `$DEVTWIN_KIT` for this session. Then apply every other check to that value. Tell the user once that `DEVCTX_KIT` is deprecated and that they should rename it to `DEVTWIN_KIT` in their shell profile.
 2. Resolve its real path, for example with `realpath "$DEVTWIN_KIT"`. Resolve the real path of the current repository root too (`git rev-parse --show-toplevel`, or the working directory outside Git).
 3. The kit's real path must not be inside the current repository or worktree.
 4. The kit contains `bin/devtwin.mjs` and a `package.json` whose `name` is `devtwin`.
 5. Show the user the kit's real path and ask them to confirm it. Do this once per session, before the first CLI call.
 6. Offer the live config `~/.devtwin/live.json` as the pilot path, or use a disposable pilot path the user supplies. Pass it as an absolute path, for example from `realpath ~/.devtwin/live.json`. Ask the user to confirm the pilot path once per session, before the first CLI call. Never guess another path or create one. Refuse a pilot path whose real path is inside the current repository or inside the kit checkout.
-7. The target repository's real path is listed in the pilot's `repos` array.
+7. The pilot's `repos` array lists the target repository's real path.
 8. The user states the scope explicitly. Pass it with `--scope`. Never infer it from a folder name.
-9. Check the kit commit. Read `kitCommit` from `.devtwin-owned.json` in the installed folder of this skill, such as `~/.claude/skills/devtwin-onboard` or `~/.agents/skills/devtwin-onboard`. Read the commit checked out at the kit with `git -C "$DEVTWIN_KIT" rev-parse HEAD`. Skip this check when there is no receipt or its `kitCommit` is `null`. If the two commits differ, warn the user that this installed skill came from a different kit commit than the one at `DEVTWIN_KIT`, and ask whether to continue. The owner can reinstall the skills from the current kit.
+9. Check the kit commit. Read `kitCommit` from `.devtwin-owned.json` in the installed folder of this skill, such as `~/.claude/skills/devtwin-onboard` or `~/.agents/skills/devtwin-onboard`. Read the commit checked out at the kit with `git -C "$DEVTWIN_KIT" rev-parse HEAD`. Skip this check when there is no receipt or its `kitCommit` is `null`. If the two commits differ, warn the user that this installed skill came from another kit commit than the one at `DEVTWIN_KIT`. Ask whether to continue. The owner can reinstall the skills from the current kit.
 
 Every call has this shape. Replace the placeholders and keep the quotes. Pass every placeholder in single quotes, as the examples below do, and write any `'` inside it as `'\''`. Never put a path or other free text in a double-quoted argument: the shell still expands `$` and backticks there.
 
@@ -61,7 +61,7 @@ Each call prints one JSON line: `{"ok": true, "command": ..., "result": ...}` or
    ```
 
 3. Show the user `result.candidates`, `unknowns`, `conflicts` and `repoWrites`. `repoWrites` must be empty. Ask which candidates to keep. The answer becomes `--accept all`, `--accept none` or a comma-separated list such as `--accept c01,c02`. If the selection changes, preview again with that selection.
-4. When re-onboarding, read `result.retire`: the record IDs and hashes (`id`, `recordHash`) of earlier records this plan will supersede. Before applying, show the user each retired record's kind and title. Find them by matching each `id` against `records[].id` in a `context brief` for the same worktree (see `devtwin-resume`); name any ID you cannot find. If the user wants to keep them, add `--keep-previous` and preview again.
+4. When re-onboarding, read `result.retire`: the record IDs and hashes (`id`, `recordHash`) of earlier records this plan supersedes. Before applying, show the user each retired record's kind and title. Find them by matching each `id` against `records[].id` in a `context brief` for the same worktree (see `devtwin-resume`); name any ID you cannot find. If the user wants to keep them, add `--keep-previous` and preview again.
 5. Show the user `result.fingerprint`. Apply only after they approve that exact value. Repeat every preview flag unchanged.
 
    ```sh

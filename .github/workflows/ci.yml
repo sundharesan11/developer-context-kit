@@ -55,6 +55,8 @@ jobs:
           git rev-parse HEAD
       - name: Audit release files and dry-run package
         run: npm run check:package
+      - name: Check STE-based writing rules
+        run: npm run check:writing
       - name: Run complete test suite
         run: npm test
       - name: Run disposable acceptance checks

@@ -18,15 +18,15 @@ If the repository is not onboarded yet, use `devtwin-onboard` instead.
 
 Check all of these before the first CLI call. If any check fails, stop and ask the user.
 
-1. `DEVTWIN_KIT` is set. It must be an absolute path. If it is not set but the legacy `DEVCTX_KIT` is, use the value of `DEVCTX_KIT` wherever these steps say `$DEVTWIN_KIT` for this session, apply every other check to that value, and tell the user once that `DEVCTX_KIT` is deprecated and should be renamed to `DEVTWIN_KIT` in their shell profile.
+1. `DEVTWIN_KIT` is set. It must be an absolute path. If it is not set but the legacy `DEVCTX_KIT` is, use the value of `DEVCTX_KIT` wherever these steps say `$DEVTWIN_KIT` for this session. Then apply every other check to that value. Tell the user once that `DEVCTX_KIT` is deprecated and that they should rename it to `DEVTWIN_KIT` in their shell profile.
 2. Resolve its real path, for example with `realpath "$DEVTWIN_KIT"`. Resolve the real path of the current repository root too (`git rev-parse --show-toplevel`, or the working directory outside Git).
 3. The kit's real path must not be inside the current repository or worktree.
 4. The kit contains `bin/devtwin.mjs` and a `package.json` whose `name` is `devtwin`.
 5. Show the user the kit's real path and ask them to confirm it. Do this once per session, before the first CLI call.
 6. Offer the live config `~/.devtwin/live.json` as the pilot path, or use a disposable pilot path the user supplies. Pass it as an absolute path, for example from `realpath ~/.devtwin/live.json`. Ask the user to confirm the pilot path once per session, before the first CLI call. Never guess another path or create one. Refuse a pilot path whose real path is inside the current repository or inside the kit checkout.
-7. The target repository's real path is listed in the pilot's `repos` array.
+7. The pilot's `repos` array lists the target repository's real path.
 8. The user states the scope explicitly. Pass it with `--scope`. Never infer it from a folder name.
-9. Check the kit commit. Read `kitCommit` from `.devtwin-owned.json` in the installed folder of this skill, such as `~/.claude/skills/devtwin-resume` or `~/.agents/skills/devtwin-resume`. Read the commit checked out at the kit with `git -C "$DEVTWIN_KIT" rev-parse HEAD`. Skip this check when there is no receipt or its `kitCommit` is `null`. If the two commits differ, warn the user that this installed skill came from a different kit commit than the one at `DEVTWIN_KIT`, and ask whether to continue. The owner can reinstall the skills from the current kit.
+9. Check the kit commit. Read `kitCommit` from `.devtwin-owned.json` in the installed folder of this skill, such as `~/.claude/skills/devtwin-resume` or `~/.agents/skills/devtwin-resume`. Read the commit checked out at the kit with `git -C "$DEVTWIN_KIT" rev-parse HEAD`. Skip this check when there is no receipt or its `kitCommit` is `null`. If the two commits differ, warn the user that this installed skill came from another kit commit than the one at `DEVTWIN_KIT`. Ask whether to continue. The owner can reinstall the skills from the current kit.
 
 Each call prints one JSON line: `{"ok": true, "command": ..., "result": ...}` or `{"ok": false, "command": ..., "error": ...}`. Error codes appear with a `DEVTWIN_` prefix, such as `DEVTWIN_GATE_REQUIRED`.
 

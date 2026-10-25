@@ -18,13 +18,13 @@ To read project context, use `devtwin-resume`. To onboard a repository, use `dev
 
 Check all of these before the first CLI call. If any check fails, stop and ask the user.
 
-1. `DEVTWIN_KIT` is set. It must be an absolute path. If it is not set but the legacy `DEVCTX_KIT` is, use the value of `DEVCTX_KIT` wherever these steps say `$DEVTWIN_KIT` for this session, apply every other check to that value, and tell the user once that `DEVCTX_KIT` is deprecated and should be renamed to `DEVTWIN_KIT` in their shell profile.
+1. `DEVTWIN_KIT` is set. It must be an absolute path. If it is not set but the legacy `DEVCTX_KIT` is, use the value of `DEVCTX_KIT` wherever these steps say `$DEVTWIN_KIT` for this session. Then apply every other check to that value. Tell the user once that `DEVCTX_KIT` is deprecated and that they should rename it to `DEVTWIN_KIT` in their shell profile.
 2. Resolve its real path, for example with `realpath "$DEVTWIN_KIT"`. Resolve the real path of the current working directory too (`git rev-parse --show-toplevel` inside Git, or `pwd -P` outside it).
 3. The kit's real path must not be inside the current repository or worktree.
 4. The kit contains `bin/devtwin.mjs` and a `package.json` whose `name` is `devtwin`.
 5. Show the user the kit's real path and ask them to confirm it. Do this once per session, before the first CLI call.
 6. Offer the live config `~/.devtwin/live.json` as the pilot path, or use a disposable pilot path the user supplies. Pass it as an absolute path, for example from `realpath ~/.devtwin/live.json`. Ask the user to confirm the pilot path once per session, before the first CLI call. Never guess another path or create one. Refuse a pilot path whose real path is inside the current repository or inside the kit checkout.
-7. Check the kit commit. Read `kitCommit` from `.devtwin-owned.json` in the installed folder of this skill, such as `~/.claude/skills/devtwin-setup` or `~/.agents/skills/devtwin-setup`. Read the commit checked out at the kit with `git -C "$DEVTWIN_KIT" rev-parse HEAD`. Skip this check when there is no receipt or its `kitCommit` is `null`. If the two commits differ, warn the user that this installed skill came from a different kit commit than the one at `DEVTWIN_KIT`, and ask whether to continue.
+7. Check the kit commit. Read `kitCommit` from `.devtwin-owned.json` in the installed folder of this skill, such as `~/.claude/skills/devtwin-setup` or `~/.agents/skills/devtwin-setup`. Read the commit checked out at the kit with `git -C "$DEVTWIN_KIT" rev-parse HEAD`. Skip this check when there is no receipt or its `kitCommit` is `null`. If the two commits differ, warn the user that this installed skill came from another kit commit than the one at `DEVTWIN_KIT`. Ask whether to continue.
 
 Each call prints one JSON line: `{"ok": true, "command": ..., "result": ...}` or `{"ok": false, "command": ..., "error": ...}`. Error codes appear with a `DEVTWIN_` prefix, such as `DEVTWIN_GATE_REQUIRED`.
 
@@ -46,9 +46,9 @@ The current profile, its free text, stack suggestions and the records they cite 
    node "$DEVTWIN_KIT/bin/devtwin.mjs" profile show --pilot '<pilot.json>'
    ```
 
-3. Explain what is stored and where before asking anything. The profile holds only working preferences, the stack known, the stack in current use and the kind of work. It is private, capped at a few kilobytes, kept with its earlier revisions, and stored under the pilot's configuration root (`destination` `configRoot` / `profile`), outside the kit checkout and outside every repository. Tell the user never to put credentials, client names or other secrets in it.
+3. Before you ask anything, explain what the profile stores and where. The profile holds only working preferences, the stack known, the stack in current use and the kind of work. It is private and capped at a few kilobytes, and devtwin keeps it with its earlier revisions. It lives under the pilot's configuration root (`destination` `configRoot` / `profile`), outside the kit checkout and outside every repository. Tell the user never to put credentials, client names or other secrets in it.
 
-4. Ask at most five questions, one at a time. Every question can be skipped; a skipped question leaves that field as it is. Do not add questions of your own.
+4. Ask at most five questions, one at a time. The user can skip every question; a skipped question leaves that field as it is. Do not add questions of your own.
 
    ### Question 1. Kind of work
 
@@ -84,7 +84,7 @@ The current profile, its free text, stack suggestions and the records they cite 
 
    Show the user the full output: `profile`, `destination`, `changes` (old and new value per field), `size` against `cap`, and `base`. If the agent proposed any value rather than the user, add `--proposed-by 'agent'` so each change says so. If the user wants edits, ask, rerun `profile plan`, and show the new output.
 
-6. Run `profile apply` only after explicit approval from the user in the session for the exact profile just shown. A fingerprint the agent passes back is not consent. Pass the same flags as the approved plan and its fingerprint:
+6. Run `profile apply` only after explicit approval from the user in the session for the exact profile you showed last. A fingerprint the agent passes back is not consent. Pass the same flags as the approved plan and its fingerprint:
 
    ```sh
    node "$DEVTWIN_KIT/bin/devtwin.mjs" profile apply --pilot '<pilot.json>' --work '<text>' --preference '<key>=<value>' --stack-known '<entry>' --stack-current '<entry>' --plan-fingerprint '<fingerprint>'
@@ -118,7 +118,7 @@ The current profile, its free text, stack suggestions and the records they cite 
 - Stop and ask if `DEVTWIN_KIT` or the pilot path fails any precondition.
 - Stop without creating anything if the pilot file is missing or `init` has not run.
 - Never run `init`, `live init`, `live add-repo` or `live set-kit`. Creating a pilot or changing the live config is the user's decision.
-- Never run `profile apply` without explicit approval from the user in the session for the plan just shown.
+- Never run `profile apply` without explicit approval from the user in the session for the plan you showed last.
 - Never scan, open or read a repository to suggest a stack. Use only `profile suggest-stack`.
 - Never ask more than five questions, and never store credentials or secrets in the profile.
 - Stop and ask on `GATE_REQUIRED`, `RECOVERY_REQUIRED`, `BUSY`, `INTEGRITY` or `PATH_UNSAFE`.
