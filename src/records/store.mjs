@@ -10,7 +10,7 @@ import { withPilotLock, scopeLockPath } from "../storage/lock.mjs";
 import { canonicalJson, digest, sha256 } from "../storage/canonical.mjs";
 import { REQUEST_ID } from "../storage/plan.mjs";
 import { recordIdFor, assertScopeId, assertProjectId, RECORD_ID } from "../identity/ids.mjs";
-import { buildRecord, validateRecord, validateDraft, recordHash } from "./schema.mjs";
+import { buildRecord, validateRecord, validateDraft, recordHash, assertProjectReach } from "./schema.mjs";
 import { assertNoSensitive, findForbiddenFields } from "./redact.mjs";
 const dirFor = (roots, scope, project) => join(roots.dataRoot, "scopes", scope, "projects", project);
 const recDir = (roots, scope, project, id) => join(dirFor(roots, scope, project), "records", id);
@@ -183,6 +183,7 @@ export async function proposeRecord(roots, input, { now = () => new Date() } = {
   assertScopeId(input.scope); assertProjectId(input.project, input.scope);
   if (!REQUEST_ID.test(input.requestId)) throw new DevtwinError("INVALID_ID", "Invalid request ID");
   validateDraft(input.draft, { recordedBy: input.recordedBy });
+  assertProjectReach(input.draft);
   if (Object.keys(input.recordedBy).some((key) => !["actor", "runId"].includes(key))) throw new DevtwinError("INVALID_INPUT", "Unexpected recorder field");
   const clean = { scope: input.scope, project: input.project, requestId: input.requestId, recordedBy: input.recordedBy, draft: input.draft };
   if (findForbiddenFields(clean).length) throw new DevtwinError("INVALID_INPUT", "Forbidden proposal field");

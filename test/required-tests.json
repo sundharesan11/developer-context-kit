@@ -456,5 +456,16 @@
   "live migrate finishes a run that stopped after the store was renamed into place",
   "DEVTWIN_KIT wins over the legacy DEVCTX_KIT, which is read for one transition and reported as deprecated",
   "help lists live migrate",
-  "bundled skills fall back to the legacy DEVCTX_KIT for one transition and say it is deprecated"
+  "bundled skills fall back to the legacy DEVCTX_KIT for one transition and say it is deprecated",
+  "v2 lesson draft with paths packages and topics validates and round-trips",
+  "v2 writers default class reach and match from the kind",
+  "v1 record reads unchanged next to v2 records in one snapshot",
+  "v2 reader refuses unknown schema versions and malformed v2 fields",
+  "match globs refuse absolute paths parent segments and denied files",
+  "preference with project reach is refused",
+  "v2 class reach and match caps and allowlists hold",
+  "project store refuses records whose reach is not project",
+  "v2 project lesson passes the handoff privacy check unchanged",
+  "personal and org record IDs are derived and distinct from project IDs",
+  "context brief orders a v2 lesson after project facts"
 ]

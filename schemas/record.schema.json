@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "devtwin record v1",
+  "title": "devtwin record v1 and v2",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -27,7 +27,10 @@
   "additionalProperties": false,
   "properties": {
     "schemaVersion": {
-      "const": 1
+      "enum": [
+        1,
+        2
+      ]
     },
     "id": {
       "type": "string"
@@ -39,7 +42,72 @@
       "type": "string"
     },
     "kind": {
-      "type": "string"
+      "enum": [
+        "brief",
+        "map",
+        "command",
+        "environment",
+        "constraint",
+        "fact",
+        "decision",
+        "experiment",
+        "unknown",
+        "handoff",
+        "lesson",
+        "preference"
+      ]
+    },
+    "class": {
+      "enum": [
+        "fact",
+        "lesson"
+      ]
+    },
+    "reach": {
+      "enum": [
+        "personal",
+        "project",
+        "org"
+      ]
+    },
+    "match": {
+      "type": "object",
+      "required": [
+        "paths",
+        "packages",
+        "topics"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "paths": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._/*?-]{1,200}$"
+          }
+        },
+        "packages": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 214,
+            "pattern": "^(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$"
+          }
+        },
+        "topics": {
+          "type": "array",
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,47}$"
+          }
+        }
+      }
     },
     "status": {
       "type": "string"
@@ -95,5 +163,44 @@
     "createdAt": {
       "type": "string"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": 2
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "class",
+          "reach",
+          "match"
+        ]
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "class"
+              ]
+            },
+            {
+              "required": [
+                "reach"
+              ]
+            },
+            {
+              "required": [
+                "match"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
 }
