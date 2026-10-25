@@ -13,7 +13,7 @@ The hub has one file per item:
 | `hub.json` | `{ "hubId": "<id>", "schemaVersion": 1 }` |
 | `lessons/<lsn_id>.md` | One lesson: a front matter line of JSON between two `---` lines, then the Markdown body |
 | `notes/<handle>/<note_id>.json` | One note: the area, one line, the handle, the time and the expiry |
-| `tombstones/<lsn_id>.json` | A request to remove a lesson, signed with a handle |
+| `tombstones/<lsn_id>.json` | A request to remove a lesson, signed with a handle. devtwin honors it only when the handle is the lesson's author |
 
 A developer adds or removes only their own files: their lessons, the notes in their own handle's folder and the tombstones they sign. devtwin refuses a write to any other path with `HUB_PATH_REFUSED`.
 
@@ -56,7 +56,7 @@ node "$KIT/bin/devtwin.mjs" hub sync --pilot "$LIVE_CONFIG" --scope <scope>
 node "$KIT/bin/devtwin.mjs" hub status --pilot "$LIVE_CONFIG" --scope <scope>
 ```
 
-`hub sync` takes the `hub-sync` lock and fetches with a time limit. It pushes the items in the outbox, reads the hub files and rebuilds the lesson index with the hub as a source. A hub whose `schemaVersion` is newer than this kit supports is read-only: devtwin reads no lessons or notes from it, writes nothing to it and shows `HUB_SCHEMA_NEWER`.
+`hub sync` takes the `hub-sync` lock and fetches with a time limit. It pushes the items in the outbox, deletes your own expired notes (see [Expired notes](#expired-notes)), reads the hub files and rebuilds the lesson index with the hub as a source. A hub whose `schemaVersion` is newer than this kit supports is read-only: devtwin reads no lessons or notes from it, writes nothing to it and shows `HUB_SCHEMA_NEWER`.
 
 When a push is rejected, devtwin fetches and rebases. It checks the item again and tries again, three times in all. It never force-pushes. After the last try, the item goes to the outbox in the store, at `state/hubs/<hubId>/outbox/`. Each sync tries the outbox again. Before each push, the item passes the sensitive-content check and the check against the names of every scope again. A note that is older than half its expiry is dropped instead of posted late.
 
@@ -149,7 +149,7 @@ Run each apply only with explicit approval from the owner.
 ### What agents receive
 
 - **Replaced.** A lesson with one valid replacement stops matching on every machine after its next `hub sync`. The replacement is delivered in its place.
-- **Contested.** Two replacements of the same lesson can both reach the hub when both were pushed before either client saw the other. Then both are delivered, each index line starts with `contested: `, and the replaced lesson stops matching. A later replacement of the same lesson fails with `STALE_VERSION`. `hub sync` lists the case in `supersession.contested`.
+- **Contested.** Two replacements of the same lesson can both reach the hub when both were pushed before either client saw the other. Then both are delivered, each index line starts with `contested: `, and the replaced lesson stops matching. A later replacement of the same lesson fails with `STALE_VERSION`. `hub sync` lists the case in `supersession.contested`. devtwin does not choose a winner. The contest ends when the author of one replacement deletes it with `published delete`: then the other replacement is the single successor. See [Published items](#published-items).
 - **Invalid.** A replacement that names an unknown or removed lesson, or a wrong hash, replaces nothing. devtwin delivers it as a plain lesson and keeps the named lesson. `hub sync` lists it in `supersession.ignored`. This way a wrong hash cannot hide another person's lesson.
 
 ### Replacement notices
@@ -175,7 +175,7 @@ A "working on" note tells colleagues that you are changing an area. Notes post w
 - **Line.** devtwin builds the line from the branch name and the areas only, in the form `<handle> on <branch> touching <area>, <area>`. The branch comes from the worktree's `.git/HEAD` file; a detached HEAD gives the short commit. Areas that do not fit in 200 characters stay in the note but not in the line. The line never holds prompt text or agent text.
 - **Checks.** Before the outbox, the line and the areas pass the sensitive-content check and the check against the names of every scope. A note that fails is skipped, and the hook log names the reason (`note-isolation` or `note-sensitive`). The checks run again when `hub sync` pushes the note.
 - **Delivery.** The hook only writes the note to the outbox. It takes no lock, runs no Git process and makes no network call. `hub sync` or the hub sync job pushes the note. A note that waits in the outbox for more than half its expiry is dropped.
-- **Expiry and replacement.** A note expires 72 hours after it is made. A newer note of yours replaces an older one of yours whose areas all fall in the new note: the same outbox item deletes the older file. devtwin deletes only files in your own handle's folder.
+- **Expiry and replacement.** A note expires 72 hours after it is made. A newer note of yours replaces an older one of yours whose areas all fall in the new note: the same outbox item deletes the older file. devtwin deletes only files in your own handle's folder. Each `hub sync` also deletes your expired notes; see [Expired notes](#expired-notes).
 - **Scope.** A note goes only to the hub of the project's own scope. A folder that is bound in more than one scope gets no notes.
 
 ### What agents receive
@@ -206,6 +206,34 @@ node "$KIT/bin/devtwin.mjs" note consent --pilot "$LIVE_CONFIG" --scope <scope> 
 - **Revoke.** `note revoke` previews. Run the apply only with explicit approval from the owner. After the owner dialog, it clears the note consent, so the hook posts no more notes, and it discards your queued notes. With `--delete-notes`, it also queues the removal of your active notes; the next `hub sync` pushes it. Without the flag, your active notes stay until they expire, and the preview offers the flag. Lessons still arrive.
 - **Consent.** The consent stores a digest of the note rules. When a kit update changes the rules, the consent is void and the hook posts nothing, with `note-consent` in the hook log. `note consent` previews the current rules. Run the apply only with explicit approval from the owner. After the owner dialog, it records the consent again.
 
+## Published items
+
+```sh
+node "$KIT/bin/devtwin.mjs" published list --pilot "$LIVE_CONFIG" --scope <scope>
+node "$KIT/bin/devtwin.mjs" published delete --pilot "$LIVE_CONFIG" --scope <scope> --id <lsn_id or note_id>
+node "$KIT/bin/devtwin.mjs" published delete --pilot "$LIVE_CONFIG" --scope <scope> --id <lsn_id or note_id> --apply --plan-fingerprint '<fingerprint>'
+```
+
+Run the apply only with explicit approval from the owner.
+
+- **List.** `published list` reads the local clone of the hub, not the local store, so it also works on a new machine after `hub join`. It shows your lessons (by your claimed handle) with the ID, title, creation time and status: `active`, `superseded`, `contested` or `tombstoned`. A tombstoned lesson whose file is gone shows only its ID and the tombstone time; its text stays in the hub's Git history. The list also shows your own active and expired notes (ID, area, expiry and `expired`), your tombstones and the items that wait in the outbox. It writes nothing, and agents can run it.
+- **Preview.** `published delete` without `--apply` names each file that the delete removes or adds and what changes for colleagues. It always states: "Git history and colleagues' existing clones keep this text; a history rewrite is a manual step for the hub admin."
+- **Apply.** After the owner dialog, devtwin makes one commit. For a lesson, the commit removes `lessons/<lsn_id>.md` and adds `tombstones/<lsn_id>.json` with your handle. For a note, it removes `notes/<handle>/<note_id>.json`. Before the commit and after each rebase, the file on the fetched remote branch must be the one that the preview showed, or the delete fails with `STALE_VERSION`. A push that fails goes to the outbox as a `tombstone` item. Your own machine stops delivering a deleted lesson at once, also while the item waits in the outbox.
+- **Only your own items.** A lesson by another author fails with `HUB_PATH_REFUSED` and the reason `other-author`. A note in another handle's folder fails with the reason `other-handle`. A refused delete shows no dialog and writes nothing.
+- **Replacements.** When you delete a replacement, the preview says what happens to the lesson it replaced. When it was the only replacement, the old lesson reaches agents again. When it was one of two contested replacements, the contest ends and the other replacement is the single successor.
+
+### Tombstones on other machines
+
+On `hub sync`, a tombstone removes a lesson only when its handle matches the lesson's author. A tombstone signed by another handle is listed in `tombstones.ignored` with the reason `handle-mismatch`, and the lesson keeps matching. When the author's own delete later replaces that file, the lesson is removed.
+
+When a sync sees a valid tombstone, devtwin adds the lesson ID to `state/hubs/<hubId>/tombstones.json` (`tombstones.seen` in the sync output) and rebuilds the index without it. A tombstone is valid when the lesson file is still there with the same author, or when the index from before the sync listed the lesson under the tombstone's handle. From then on, this machine never delivers that lesson again. The index and the hook both drop it, also when an older stored index still lists it or when the lesson file comes back without its tombstone (`tombstones.heldBack`). The notes cache holds only the notes that the last sync read, so a deleted note leaves it on the next sync.
+
+### Expired notes
+
+Each `hub sync` (and each run of the hub sync job) deletes your own expired notes from the hub in one commit, at most 200 files per sync. It deletes only files in your own handle's folder, never a colleague's notes. Each developer's devtwin cleans only that developer's notes. The hub admin can prune other expired notes by hand with a normal Git commit. A cleanup that fails, for example because the push is refused, does not fail the sync and goes to no outbox; the next sync tries again. The sync output shows the result in `noteCleanup`.
+
+A hub that holds more than 5000 note files fails to sync with `LIMIT`. The cleanup runs before that read and reads only your own folder, so your own notes do not count against you for long. A hub where many developers stop syncing still needs the admin to prune.
+
 ## Owner actions
 
-`hub join`, `hub leave --apply`, `hub schedule --apply`, `lesson accept`, `lesson copy`, `lesson notices --ack --apply`, `note revoke --apply` and `note consent --apply` are owner actions. The devtwin hook denies them from an agent shell, also through terminal wrappers. Each one but `lesson notices` shows the owner dialog. An agent can list the notices, but it cannot close one, so it cannot hide a replacement from its developer. The previews of `hub leave`, `hub schedule`, `lesson notices --ack`, `note revoke` and `note consent`, and `note list`, stay open to agents. A stale `hub-sync` lock is released with `locks release --lock hub-sync`.
+`hub join`, `hub leave --apply`, `hub schedule --apply`, `lesson accept`, `lesson copy`, `lesson notices --ack --apply`, `note revoke --apply`, `note consent --apply` and `published delete` are owner actions. The devtwin hook denies them from an agent shell, also through terminal wrappers. For `published delete`, the hook denies the preview too. Each one but `lesson notices` shows the owner dialog. An agent can list the notices, but it cannot close one, so it cannot hide a replacement from its developer. The previews of `hub leave`, `hub schedule`, `lesson notices --ack`, `note revoke` and `note consent`, and `note list` and `published list`, stay open to agents. A stale `hub-sync` lock is released with `locks release --lock hub-sync`.

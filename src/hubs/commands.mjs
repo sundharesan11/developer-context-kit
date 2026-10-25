@@ -27,3 +27,13 @@ export const hubScheduleCommand = { options: { scope: { type: "string" }, off: {
 } };
 export const hubSyncCommand = { options: { scope: { type: "string" }, job: { type: "boolean" } }, run: async (values, ctx) => (await import("./sync.mjs")).syncHub(ctx.roots, values.scope, { now: ctx.now, job: values.job ?? false }) };
 export const hubStatusCommand = { options: { scope: { type: "string" } }, run: async (values, ctx) => (await import("./sync.mjs")).hubStatus(ctx.roots, values.scope, { now: ctx.now }) };
+// U14: published list (read-only, open to agents) and published delete (owner-only: preview, then --apply with the plan
+// fingerprint after the owner dialog; the hook denies it from agent shells).
+export const publishedListCommand = { options: { scope: { type: "string" } }, run: async (values, ctx) => (await import("./published.mjs")).listPublished(ctx.roots, { scope: values.scope }, { now: ctx.now }) };
+export const publishedDeleteCommand = { options: { scope: { type: "string" }, id: { type: "string" }, apply: { type: "boolean" }, "plan-fingerprint": { type: "string" } }, async run(values, ctx) {
+  const published = await import("./published.mjs");
+  const input = { scope: values.scope, id: values.id };
+  if (!values.apply) return published.planDelete(ctx.roots, input);
+  needPlan(values);
+  return published.applyDelete(ctx.roots, input, { fingerprint: values["plan-fingerprint"], now: ctx.now, ctx });
+} };

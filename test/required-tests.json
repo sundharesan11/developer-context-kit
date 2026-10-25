@@ -582,5 +582,14 @@
   "notes queued longer than half their expiry are dropped at drain",
   "notes revoke stops posting and deletes the developer's active notes through the outbox",
   "notes the edit-event hook posts and reports without starting a child process",
-  "notes area, branch and line rules"
+  "notes area, branch and line rules",
+  "published delete removes a lesson with a tombstone and a colleague stops matching it after sync",
+  "published delete tombstone signed by another handle is ignored and the lesson keeps matching",
+  "published list works from a fresh clone with an empty local store",
+  "published delete preview shows the Git-history caveat and a denied dialog deletes nothing",
+  "published delete refuses another author's lesson or note",
+  "published delete of an own contested replacement ends the contest",
+  "published cleanup on hub sync deletes own expired notes and leaves a colleague's",
+  "published delete is denied from an agent shell by the owner-action block",
+  "published no delivery after a valid tombstone was seen locally, on the hook path"
 ]

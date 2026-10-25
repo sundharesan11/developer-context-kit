@@ -3,6 +3,8 @@
 // the lesson index with the hub as a source. A failed fetch keeps the old clone and the last sync time. U12: it also
 // records replacements of this developer's own lessons as notices (src/lessons/supersede.mjs).
 // U13: it writes the notes cache that the hook reads (src/notes/post.mjs).
+// U14: after the outbox it deletes this developer's own expired notes (src/hubs/published.mjs), and it adds each valid
+// tombstone it sees to the tombstone memory before the index rebuild, so that lesson never reaches agents again.
 import { join } from "node:path";
 import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
@@ -11,11 +13,12 @@ import { assertScopeId } from "../identity/ids.mjs";
 import { readPrivateJson, ensurePrivatePath, atomicReplace } from "../storage/fsx.mjs";
 import { canonicalJson } from "../storage/canonical.mjs";
 import { isolationTerms } from "../records/isolation.mjs";
-import { rebuildIndex } from "../lessons/index.mjs";
+import { rebuildIndex, readIndex } from "../lessons/index.mjs";
 import { recordNotices } from "../lessons/supersede.mjs";
 import { writeNotesCache } from "../notes/post.mjs";
 import { HUB_SCHEMA_VERSION, readHub, readHubManifest } from "./read.mjs";
 import { hubGit, withHubLock, hubStateDir, drainOutbox, listOutbox } from "./git-write.mjs";
+import { cleanExpiredNotes, readTombstoneMemory, rememberTombstones, validTombstones } from "./published.mjs";
 
 export const FETCH_TIMEOUT_MS = 30_000;
 // The job runs every 600 seconds; a run within 540 seconds of the last one is skipped, so missed runs collapse into one.
@@ -83,7 +86,23 @@ export async function syncHub(roots, scope, { now = () => new Date(), job = fals
       await writeHubBinding(roots, binding);
     }
     const outbox = fetched && !readOnly ? await drainOutbox(roots, binding, { now, terms: await isolationTerms(roots) }) : { pushed: [], dropped: [], kept: (await listOutbox(roots, binding)).map((x) => x.id) };
-    const read = await readHub(binding.clone, { now: now() });
+    // A failed cleanup is reported, not fatal; it never queues, and the next sync tries again.
+    let noteCleanup = { deleted: 0, skipped: readOnly ? "read-only" : "fetch-failed" };
+    if (fetched && !readOnly) {
+      try { noteCleanup = await cleanExpiredNotes(roots, binding, { now }); }
+      catch (error) { noteCleanup = { deleted: 0, problem: error.code ?? "DEVTWIN_INTERNAL" }; }
+    }
+    // A damaged tombstone memory is started again from the tombstones this sync can tie to their authors.
+    let memory, memoryProblem = null;
+    try { memory = await readTombstoneMemory(roots, binding); } catch (error) { memory = []; memoryProblem = error.code ?? "DEVTWIN_INTERNAL"; }
+    const read = await readHub(binding.clone, { now: now(), seen: memory });
+    let priorIndex = null;
+    try { priorIndex = await readIndex(roots, binding.scope); } catch { priorIndex = null; }
+    let seen = [];
+    if (!read.readOnly) {
+      try { seen = await rememberTombstones(roots, binding, validTombstones(read, priorIndex?.entries), { now, damaged: Boolean(memoryProblem) }); }
+      catch (error) { memoryProblem = error.code ?? "DEVTWIN_INTERNAL"; }
+    }
     // A damaged notices file is reported, not fatal: delivery and the outbox matter more than the notice.
     let notices;
     try { notices = read.readOnly ? { added: 0, pending: null } : await recordNotices(roots, binding, read, { now }); }
@@ -97,7 +116,7 @@ export async function syncHub(roots, scope, { now = () => new Date(), job = fals
     const age = syncAge(state, now());
     return { scope: binding.scope, hubId: binding.hubId, fetched, readOnly, lastSyncedAt: state.lastSyncedAt, hoursSinceSync: age.hours, warning: age.warning,
       outbox, lessons: read.lessons.length, notes: read.notes.length, expiredNotes: read.expiredNotes, notesCache, refused: read.refused,
-      tombstones: { removed: read.removed, ignored: read.ignoredTombstones },
+      noteCleanup, tombstones: { removed: read.removed, ignored: read.ignoredTombstones, seen, heldBack: read.heldBack, ...(memoryProblem ? { problem: memoryProblem } : {}) },
       supersession: { superseded: read.superseded.map((x) => x.id), contested: read.contested, ignored: read.ignoredSupersessions }, notices, warnings: read.warnings, index: { written: index.written, fingerprint: index.fingerprint, counts: index.counts } };
   });
 }

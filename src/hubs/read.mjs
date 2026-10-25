@@ -105,7 +105,7 @@ export function parseHubTombstone(text) {
   if (Object.keys(value).some((key) => !["schemaVersion", "id", "handle", "createdAt"].includes(key)) || value.schemaVersion !== 1 || !LESSON_ID.test(value.id ?? "") || !HUB_HANDLE.test(value.handle ?? "") || !isoTime(value.createdAt)) bad();
   return value;
 }
-// KTD20: a tombstone is honored only when its handle matches the lesson's author. U14 adds the publish side.
+// KTD20: a tombstone is honored only when its handle matches the lesson's author. U14 writes them (src/hubs/published.mjs).
 export function applyTombstones(lessons, tombstones) {
   const removed = [], ignored = [];
   const kept = lessons.filter((lesson) => {
@@ -145,8 +145,8 @@ export function applySupersession(lessons) {
 }
 
 // The modes Git's index records for each path, read from the local clone. 100644 and 100755 are regular files.
-function indexModes(clone) {
-  const result = git(clone, ["ls-files", "-s", "-z", "--", "hub.json", "lessons", "notes", "tombstones"]);
+function indexModes(clone, paths = ["hub.json", "lessons", "notes", "tombstones"]) {
+  const result = git(clone, ["ls-files", "-s", "-z", "--", ...paths]);
   if (!result.ok) throw new DevtwinError("HUB_INVALID", "Hub clone unreadable");
   const modes = new Map();
   for (const entry of result.stdout.split("\0").filter(Boolean)) {
@@ -177,16 +177,40 @@ export async function readHubManifest(clone) {
   if (!read) throw new DevtwinError("HUB_INVALID", "Hub manifest missing or unsafe");
   return parseHubManifest(read.text);
 }
+// U14: one developer's own notes, read from their handle's folder only, split into active and expired. It reads at
+// most HUB_LIMITS.notes files (truncated: true when the folder holds more), so the cleanup still runs on a hub that
+// readHub refuses with LIMIT.
+export async function readOwnNotes(clone, handle, { now = new Date() } = {}) {
+  if (!HUB_HANDLE.test(handle ?? "")) throw new DevtwinError("INVALID_INPUT", "Invalid hub handle");
+  const refused = [], active = [], expired = [], dir = "notes/" + handle;
+  const parent = info(join(clone, "notes"));
+  if (parent && (parent.isSymbolicLink() || !parent.isDirectory())) return { active, expired, refused: [{ rel: "notes", reason: "not-regular" }], truncated: false };
+  const all = parent ? names(clone, dir, refused) : [], modes = all.length ? indexModes(clone, [dir]) : new Map();
+  for (const name of all.slice(0, HUB_LIMITS.notes)) {
+    const rel = dir + "/" + name, match = NOTE_REL.exec(rel);
+    if (!match) { refused.push({ rel, reason: "unexpected-name" }); continue; }
+    const read = await readOne(clone, rel, modes, HUB_LIMITS.noteBytes, refused);
+    if (!read) continue;
+    try {
+      const note = parseHubNote(read.text);
+      if (note.id !== match[2] || note.handle !== handle) throw new Error("id");
+      (Date.parse(note.expiresAt) <= now.getTime() ? expired : active).push({ rel, sha256: read.sha256, value: note });
+    } catch { refused.push({ rel, reason: "invalid" }); }
+  }
+  return { active, expired, refused, truncated: all.length > HUB_LIMITS.notes };
+}
 // Everything the client reads from a clone. A hub with a newer schema version is read-only: nothing else is read.
-// now drops expired notes.
-export async function readHub(clone, { now = new Date() } = {}) {
+// now drops expired notes. notes: false skips the notes folder. seen (U14) is this machine's memory of honored
+// tombstones, [{ id, author }]: a lesson in it stays out (heldBack) even when its file comes back without the
+// tombstone. allLessons is every valid lesson file before tombstones, the memory and supersession.
+export async function readHub(clone, { now = new Date(), notes: readNotes = true, seen = [] } = {}) {
   const modes = indexModes(clone), refused = [], warnings = [];
   const manifestRead = await readOne(clone, "hub.json", modes, HUB_LIMITS.hubJsonBytes, refused);
   if (!manifestRead) throw new DevtwinError("HUB_INVALID", "Hub manifest missing or unsafe");
   const hub = parseHubManifest(manifestRead.text);
   if (hub.schemaVersion > HUB_SCHEMA_VERSION) {
     warnings.push({ code: "HUB_SCHEMA_NEWER", schemaVersion: hub.schemaVersion, supported: HUB_SCHEMA_VERSION, message: "This hub uses a newer format. devtwin reads nothing from it and writes nothing to it until the kit is upgraded." });
-    return { hub, readOnly: true, warnings, lessons: [], notes: [], tombstones: [], refused, removed: [], ignoredTombstones: [], superseded: [], contested: [], ignoredSupersessions: [], expiredNotes: 0 };
+    return { hub, readOnly: true, warnings, lessons: [], allLessons: [], notes: [], tombstones: [], refused, removed: [], ignoredTombstones: [], heldBack: [], superseded: [], contested: [], ignoredSupersessions: [], expiredNotes: 0 };
   }
   const lessons = [], notes = [], stones = [];
   const lessonNames = names(clone, "lessons", refused);
@@ -202,7 +226,7 @@ export async function readHub(clone, { now = new Date() } = {}) {
       lessons.push({ rel, sha256: read.sha256, ...lesson });
     } catch { refused.push({ rel, reason: "invalid" }); }
   }
-  const handles = names(clone, "notes", refused);
+  const handles = readNotes ? names(clone, "notes", refused) : [];
   if (handles.length > HUB_LIMITS.handles) throw new DevtwinError("LIMIT", "Too many hub note folders", { max: HUB_LIMITS.handles });
   let noteCount = 0, expiredNotes = 0;
   for (const handle of handles) {
@@ -235,8 +259,10 @@ export async function readHub(clone, { now = new Date() } = {}) {
     } catch { refused.push({ rel, reason: "invalid" }); }
   }
   const { kept, removed, ignored } = applyTombstones(lessons, stones);
-  const replaced = applySupersession(kept);
-  return { hub, readOnly: false, warnings, lessons: replaced.kept, notes, tombstones: stones, refused, removed, ignoredTombstones: ignored,
+  const held = new Map(seen.map((entry) => [entry.id, entry.author])), heldBack = [];
+  const visible = kept.filter((lesson) => { if (held.get(lesson.meta.id) !== lesson.meta.author) return true; heldBack.push(lesson.meta.id); return false; });
+  const replaced = applySupersession(visible);
+  return { hub, readOnly: false, warnings, lessons: replaced.kept, allLessons: lessons, notes, tombstones: stones, refused, removed, ignoredTombstones: ignored, heldBack,
     superseded: replaced.superseded, contested: replaced.contested, ignoredSupersessions: replaced.ignored, expiredNotes };
 }
 // Hub lessons as index records: org reach in the binding's scope, attributed to the claimed author (KTD20). A
