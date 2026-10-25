@@ -1,6 +1,6 @@
 # Limitations
 
-Linux support is not claimed. CI run 38154524118 at commit `8f1133a` (2026-10-11) passed the suite and acceptance on Ubuntu 24.04 and on the Node 22.13.0 floor, but those remain evaluation lanes until support is deliberately adopted and reviewed. Windows is unsupported. Client-data migration is not implemented. There is no backup or sync; a lost laptop can expose local data if disk protection is inadequate and can lose the only copy.
+Linux support is not claimed. CI run 38154524118 at commit `8f1133a` (2026-10-11) passed the suite and acceptance on Ubuntu 24.04 and on the Node 22.13.0 floor, but those remain evaluation lanes until support is deliberately adopted and reviewed. Windows is unsupported. Client-data migration is not implemented; `live migrate` only moves a live setup made under the old devctx name ([MIGRATING.md](MIGRATING.md)). There is no backup or sync; a lost laptop can expose local data if disk protection is inadequate and can lose the only copy.
 
 This pilot supports multi-record onboarding, with one registry publication point and crash/replay tests. The checks do not prove behavior against a malicious same-user process, real agent routing, live accounts, legal redistributability, or production readiness. The synthetic harness defers `fresh-agent-smoke`; fresh-agent checks belong to live activation.
 

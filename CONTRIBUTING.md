@@ -2,7 +2,7 @@
 
 Help make project context reviewable and portable without mixing reusable code with private working data.
 
-This is an experimental, disposable pilot. Discuss changes that weaken the fence, introduce live connectors or alter approval contracts before implementing them.
+devtwin is pre-release: see the [roadmap](docs/ROADMAP.md) for what is built and what is planned. Discuss changes that weaken the fence, introduce live connectors or alter approval contracts before implementing them.
 
 ## Development setup
 
