@@ -1,0 +1,10 @@
+{
+  "session_id": "thr_01example0001",
+  "transcript_path": "/workspace/.codex/sessions/rollout-example.jsonl",
+  "cwd": "{{cwd}}",
+  "hook_event_name": "UserPromptSubmit",
+  "model": "codex-example",
+  "turn_id": "turn_0001",
+  "prompt": "Add a users table. Keep the pg pool settings as they are.",
+  "permission_mode": "default"
+}

@@ -1,0 +1,14 @@
+{
+  "session_id": "thr_01example0001",
+  "transcript_path": "/workspace/.codex/sessions/rollout-example.jsonl",
+  "cwd": "{{cwd}}",
+  "hook_event_name": "PreToolUse",
+  "model": "codex-example",
+  "turn_id": "turn_0002",
+  "tool_name": "apply_patch",
+  "tool_use_id": "call_example0002",
+  "tool_input": {
+    "command": "*** Begin Patch\n*** Update File: db/migrations/002_users.sql\n@@\n -- users\n+CREATE TABLE users (id serial primary key);\n*** Add File: docs/users.md\n+# Users\n*** End Patch\n"
+  },
+  "permission_mode": "default"
+}

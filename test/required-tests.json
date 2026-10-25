@@ -508,5 +508,16 @@
   "lesson index records the linked worktree common directory and resolves it to the parent project",
   "lesson index rebuild is idempotent and private",
   "lesson show returns the body fenced claimed and capped",
-  "lesson matching on a 500-lesson index takes under 50 ms"
+  "lesson matching on a 500-lesson index takes under 50 ms",
+  "hook delivers one index line for a Claude Code Edit on a matching file",
+  "hook delivers the same line for a Codex apply_patch touching a matching path",
+  "hook delivers a lesson for a package named in the prompt before any edit",
+  "hook does not repeat a lesson in one session and delivers it again after compaction",
+  "hook sends four index lines then one overflow line at the session cap",
+  "hook gives a linked worktree of a bound project that project's lessons",
+  "hook returns empty output with exit 0 for a missing receipt, corrupt index or killed run, and lesson match still works",
+  "hook in a scope A repo never shows a scope B lesson (AE4)",
+  "hook emits nothing for a root bound in two scopes",
+  "hook end-to-end p95 including Node startup stays under the bound",
+  "hook state and logs are private files under stateRoot/hooks"
 ]

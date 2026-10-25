@@ -34,6 +34,10 @@ export const COMMANDS = {
   "lesson match": { load: async () => (await import("./lessons/commands.mjs")).lessonMatchCommand },
   "lesson show": { load: async () => (await import("./lessons/commands.mjs")).lessonShowCommand },
   "lesson index": { load: async () => (await import("./lessons/commands.mjs")).lessonIndexCommand },
+  // The agent hook route prints the agent's own JSON, not the CLI envelope, and skips the full pilot load (KTD6).
+  hook: { hook: true, load: async () => import("./hooks/commands.mjs") },
+  "hook verify": { load: async () => (await import("./hooks/commands.mjs")).hookVerifyCommand },
+  "budget report": { load: async () => (await import("./hooks/commands.mjs")).budgetReportCommand },
   "project onboard": { load: async () => (await import("./onboarding/commands.mjs")).projectOnboardCommand },
   "profile show": { load: async () => (await import("./profile/commands.mjs")).profileShowCommand },
   "profile plan": { load: async () => (await import("./profile/commands.mjs")).profilePlanCommand },
@@ -85,12 +89,14 @@ export async function main(argv, options = {}) {
   // kitRoot and templateRoot are test seams for the running kit; production leaves them undefined.
   // stackCatalog, resolvePublicRead, request and lookup are seams for the stack routes; routing will supply the real
   // resolver. Without request and lookup, stack check uses node:https pinned to the checked address (src/stack/fetch.mjs).
-  const { stdout = process.stdout, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot } = options;
+  // stdin carries the agent payload for the hook route: a stream in production, a string in tests.
+  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot } = options;
   let command = argv.slice(0, 2).join(" ");
   try {
     const routed = routeFor(argv);
     command = routed.route;
     if (!isRootFree(command) && !routed.args.some((arg) => arg === "--pilot" || arg.startsWith("--pilot="))) throw new DevtwinError("GATE_REQUIRED", "v0 runs only inside a pilot fence");
+    if (COMMANDS[command].hook === true) return (await COMMANDS[command].load()).runHook(routed.args, { stdin, stdout, now, kitRoot });
     const impl = await COMMANDS[command].load();
     let values;
     try {

@@ -1,0 +1,15 @@
+{
+  "session_id": "thr_01example0001",
+  "transcript_path": "/workspace/.codex/sessions/rollout-example.jsonl",
+  "cwd": "{{cwd}}",
+  "hook_event_name": "PostToolUse",
+  "model": "codex-example",
+  "turn_id": "turn_0003",
+  "tool_name": "Bash",
+  "tool_use_id": "call_example0003",
+  "tool_input": {
+    "command": "sed -n '1,40p' db/migrations/001_init.sql | head -n 5"
+  },
+  "tool_response": "-- init\n",
+  "permission_mode": "default"
+}
