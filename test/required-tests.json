@@ -478,5 +478,6 @@
   "personal store reports a tampered record as corrupt",
   "personal store supersedes a record by expected hash",
   "personal store refuses records without personal reach",
-  "org home keeps org lessons under the scope with no project"
+  "org home keeps org lessons under the scope with no project",
+  "a draft without sources or tags validates instead of throwing"
 ]

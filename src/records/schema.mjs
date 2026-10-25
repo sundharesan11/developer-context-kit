@@ -57,7 +57,7 @@ export function validateDraft(draft, { recordedBy, supersedes = [] } = {}) {
   if (Object.keys(draft).some((key) => !["kind", "status", "title", "body", "sources", "tags", "verification", "applicability", "review", "revisitAfter", "class", "reach", "match"].includes(key))) invalid();
   if (typeof draft.title !== "string" || draft.title.length < 1 || draft.title.length > 200 || /[\r\n]/.test(draft.title)) invalid();
   if (typeof draft.body !== "string" || Buffer.byteLength(draft.body) > 32768) invalid();
-  if (!Array.isArray(draft.sources ?? []) || draft.sources.length > 20 || !Array.isArray(draft.tags ?? []) || draft.tags?.length > 10) invalid();
+  if (!Array.isArray(draft.sources ?? []) || (draft.sources ?? []).length > 20 || !Array.isArray(draft.tags ?? []) || (draft.tags ?? []).length > 10) invalid();
   for (const item of draft.sources ?? []) source(item.ref);
   classAndReach(draft.kind, draft.class ?? defaultClass(draft.kind), draftReach(draft));
   if (draft.match !== undefined) match(draft.match);
