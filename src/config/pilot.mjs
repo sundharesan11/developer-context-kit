@@ -1,6 +1,6 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { digest } from "../storage/canonical.mjs";
 import { isWithin, overlaps, info, readPrivateJson, ensurePrivatePath, atomicReplace } from "../storage/fsx.mjs";
@@ -11,10 +11,16 @@ import { LEGACY_SKILL_PREFIX, LEGACY_DEFAULT_ROOTS } from "./legacy.mjs";
 // The running kit. Tests inject context.kitRoot; production derives it from this file.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const members = ["configRoot", "dataRoot", "stateRoot", "inputsRoot"];
-const keys = ["schemaVersion", "pilotRoot", ...members, "agentHomes", "repos", "forbidden", "live"];
+const keys = ["schemaVersion", "pilotRoot", ...members, "agentHomes", "repos", "forbidden", "live", "writeClasses"];
 const liveKeys = ["configId", "home", "skillDirs", "kitRoot", "kitCommit"];
 // Skill folders sit inside these protected homes; only the exact named folder is carved out, never the home.
 const SKILL_PARENTS = ["real-claude-home", "real-agents-home", "CLAUDE_CONFIG_DIR"];
+// Write classes are the reviewed fence exceptions outside the store. Each lists exact paths; hubRoot lists folders.
+export const WRITE_CLASSES = ["hubRoot", "instructionTargets", "hookTargets", "launchAgents"];
+const FILE_CLASSES = WRITE_CLASSES.slice(1);
+const MAX_CLASS_PATHS = 16;
+const OWNED_INSTRUCTIONS = /^devtwin[a-z0-9._-]{0,64}\.md$/;
+const LAUNCH_AGENT = /^devtwin\.[a-z0-9][a-z0-9.-]{0,95}\.plist$/;
 const fail = (field, protectedLabel) => { throw new DevtwinError("GATE_REQUIRED", "Pilot fence refused path", { field, ...(protectedLabel ? { protected: protectedLabel } : {}) }); };
 const gate = (field, reason) => { throw new DevtwinError("GATE_REQUIRED", "Live config gate refused", { field, reason }); };
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -47,6 +53,44 @@ export function protectedPaths({ home = homedir(), env = process.env, kitRoot = 
 export function skillDirsFor({ home = homedir(), env = process.env } = {}) {
   return { claude: env.CLAUDE_CONFIG_DIR ? join(env.CLAUDE_CONFIG_DIR, "skills") : join(home, ".claude/skills"), codex: join(home, ".agents/skills") };
 }
+// The agent folders whose user-level files devtwin may edit. Codex ignores CODEX_HOME in live mode, as for skills.
+export function agentDirsFor({ home = homedir(), env = process.env } = {}) {
+  return { claude: env.CLAUDE_CONFIG_DIR ?? join(home, ".claude"), codex: join(home, ".codex") };
+}
+// The exact shape each file class allows for one home. Every target must also sit inside that home.
+function classShape(writeClass, path, home, env) {
+  if (!isWithin(path, home) || path === home) return false;
+  const dirs = agentDirsFor({ home, env }), name = basename(path), parent = dirname(path);
+  if (writeClass === "instructionTargets") return path === join(dirs.claude, "CLAUDE.md") || path === join(dirs.codex, "AGENTS.md") || ([dirs.claude, dirs.codex].includes(parent) && OWNED_INSTRUCTIONS.test(name));
+  if (writeClass === "hookTargets") return path === join(dirs.claude, "settings.json") || path === join(dirs.codex, "hooks.json");
+  return parent === join(home, "Library/LaunchAgents") && LAUNCH_AGENT.test(name);
+}
+// A live config checks the classes against its home; a disposable pilot only against a listed fake agent home.
+function validateClasses(pilot, context) {
+  const classes = pilot.writeClasses;
+  if (classes === undefined) return [];
+  if (!isObject(classes) || Object.keys(classes).some((key) => !WRITE_CLASSES.includes(key))) fail("writeClasses");
+  const homes = pilot.live ? [[pilot.live.home, context.env ?? process.env]] : pilot.agentHomes.map((home) => [home, {}]);
+  const seen = new Set(), files = [];
+  for (const writeClass of WRITE_CLASSES) {
+    const paths = classes[writeClass] ?? [], field = "writeClasses." + writeClass;
+    if (!Array.isArray(paths) || paths.length > MAX_CLASS_PATHS || paths.some((path) => typeof path !== "string")) fail(field);
+    for (const path of paths) {
+      validateRoot(path, field, writeClass !== "hubRoot");
+      if (seen.has(comparable(path))) fail(field);
+      seen.add(comparable(path));
+      if (writeClass === "hubRoot") {
+        if (pilot.live && (!isWithin(path, pilot.live.home) || path === pilot.live.home)) fail(field);
+        continue;
+      }
+      if (!homes.some(([home, env]) => classShape(writeClass, path, home, env))) fail(field);
+      const node = info(path);
+      if (node && (!node.isFile() || node.isSymbolicLink())) fail(field);
+      files.push([field, path]);
+    }
+  }
+  return files;
+}
 function validateLive(pilot, context) {
   const live = pilot.live;
   if (!isObject(live) || Object.keys(live).some((key) => !liveKeys.includes(key))) fail("live");
@@ -71,7 +115,7 @@ function validateLive(pilot, context) {
   return skills.map(([field, path]) => [field, path]);
 }
 const carved = (field, path, entry) => field.startsWith("live.skillDirs.") && SKILL_PARENTS.includes(entry.label) && comparable(path) !== comparable(entry.path) && isWithin(comparable(path), comparable(entry.path));
-const outsideStore = (pilot, field) => pilot.live !== undefined && (field === "repos" || field.startsWith("live.skillDirs."));
+const outsideStore = (pilot, field) => pilot.live !== undefined && (field === "repos" || field.startsWith("live.skillDirs.") || field === "writeClasses.hubRoot");
 function validate(pilot, context, allowInternal = false) {
   if (!isObject(pilot)) fail("pilot");
   for (const key of Object.keys(pilot)) if (!keys.includes(key) && !(allowInternal && ["path", "digest", "_context", "warnings"].includes(key))) fail(key);
@@ -79,6 +123,7 @@ function validate(pilot, context, allowInternal = false) {
   for (const key of ["pilotRoot", ...members]) if (typeof pilot[key] !== "string") fail(key);
   for (const key of ["agentHomes", "repos", "forbidden"]) if (!Array.isArray(pilot[key]) || pilot[key].some((item) => typeof item !== "string")) fail(key);
   const skills = Object.hasOwn(pilot, "live") ? validateLive(pilot, context) : [];
+  const files = validateClasses(pilot, context), hubs = (pilot.writeClasses?.hubRoot ?? []).map((path) => ["writeClasses.hubRoot", path]);
   const ps = protectedPaths(context);
   validateRoot(pilot.pilotRoot, "pilotRoot");
   for (const entry of ps) if (touches(pilot.pilotRoot, entry.path)) fail("pilotRoot", entry.label);
@@ -86,7 +131,7 @@ function validate(pilot, context, allowInternal = false) {
     validateRoot(path, "forbidden");
     if (touches(pilot.pilotRoot, path)) fail("pilotRoot");
   }
-  const destinations = [...members.map((key) => [key, pilot[key]]), ...["agentHomes", "repos"].flatMap((key) => (pilot[key] ?? []).map((path) => [key, path])), ...skills];
+  const destinations = [...members.map((key) => [key, pilot[key]]), ...["agentHomes", "repos"].flatMap((key) => (pilot[key] ?? []).map((path) => [key, path])), ...skills, ...hubs];
   for (const [field, path] of destinations) {
     validateRoot(path, field);
     if (outsideStore(pilot, field) ? touches(path, pilot.pilotRoot) : !isWithin(comparable(path), comparable(pilot.pilotRoot)) || comparable(path) === comparable(pilot.pilotRoot)) fail(field);
@@ -95,6 +140,11 @@ function validate(pilot, context, allowInternal = false) {
   }
   const spans = skills.length ? [...destinations, ["live.kitRoot", pilot.live.kitRoot]] : destinations;
   for (let i = 0; i < spans.length; i++) for (let j = i + 1; j < spans.length; j++) if (touches(spans[i][1], spans[j][1])) fail(spans[j][0] === "live.kitRoot" ? spans[i][0] : spans[j][0]);
+  // A file target sits inside a protected agent folder by design; it must still miss every other destination.
+  for (const [field, path] of files) {
+    if (!pilot.live) for (const entry of ps) if (touches(path, entry.path)) fail(field, entry.label);
+    for (const [, other] of [...spans.filter(([key]) => key !== "agentHomes"), ...(pilot.live ? [["pilotRoot", pilot.pilotRoot]] : []), ...pilot.forbidden.map((p) => ["forbidden", p])]) if (touches(path, other)) fail(field);
+  }
   return pilot;
 }
 // Kit paths whose files run or are installed; an untracked or ignored file under them makes the kit dirty.
@@ -181,16 +231,19 @@ function inTarget(pilot, target, path) {
   const top = relative(comparable(target), comparable(path)).split(sep)[0];
   return !pilot.live || top.startsWith("devtwin-") || top.startsWith(LEGACY_SKILL_PREFIX);
 }
-export function assertWritable(roots, destinations, { targetHome } = {}) {
+// A write class destination needs the caller to name its one class, as an installer names its one target home.
+const inClass = (pilot, writeClass, path) => writeClass !== undefined && (pilot.writeClasses?.[writeClass] ?? []).some((approved) => writeClass === "hubRoot" ? isWithin(comparable(path), comparable(approved)) : comparable(path) === comparable(approved));
+export function assertWritable(roots, destinations, { targetHome, writeClass } = {}) {
   const pilot = roots?.pilot;
   if (!pilot || pilotDigest(pilot) !== pilot.digest || roots.configRoot !== pilot.configRoot || roots.dataRoot !== pilot.dataRoot || roots.stateRoot !== pilot.stateRoot) fail("pilot");
   validate(pilot, pilot._context, true);
   const targets = pilot.live ? Object.values(pilot.live.skillDirs) : pilot.agentHomes;
   if (targetHome !== undefined && (typeof targetHome !== "string" || !targets.includes(targetHome))) fail("targetHome");
+  if (writeClass !== undefined && !WRITE_CLASSES.includes(writeClass)) fail("writeClass");
   const stores = [pilot.configRoot, pilot.dataRoot, pilot.stateRoot];
   for (const path of destinations) {
     validateRoot(path, "destination", true);
-    if (!stores.some((root) => isWithin(comparable(path), comparable(root))) && !(targetHome !== undefined && inTarget(pilot, targetHome, path))) fail("destination");
+    if (!stores.some((root) => isWithin(comparable(path), comparable(root))) && !(targetHome !== undefined && inTarget(pilot, targetHome, path)) && !inClass(pilot, writeClass, path)) fail("destination");
     for (const forbidden of pilot.forbidden) if (touches(path, forbidden)) fail("destination");
   }
 }

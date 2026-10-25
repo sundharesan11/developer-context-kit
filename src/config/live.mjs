@@ -12,7 +12,7 @@ import { gitQuery } from "../identity/git.mjs";
 // The running kit. Tests inject ctx.kitRoot; production derives it from this file, as pilot.mjs does.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const AGENTS = ["claude", "codex"];
-export const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live"];
+export const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live", "writeClasses"];
 const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 // Stands in for the config ID while a new config is validated; apply draws the real ID once.
 const PENDING_ID = "cfg_pending0000";
@@ -138,9 +138,16 @@ function setKit(input, ctx) {
   // set-kit runs from the new kit, which must be a clean detached checkout of the requested commit.
   return [change, { kit: { kitRoot, kitCommit } }];
 }
+// Replaces the approved write classes as a whole; the new config passes every fence check before it is approved.
+const setWriteClasses = (writeClasses) => (before) => {
+  if (writeClasses !== undefined && (!writeClasses || typeof writeClasses !== "object" || Array.isArray(writeClasses))) invalid("writeClasses");
+  return { after: { ...before, writeClasses }, details: { writeClasses: { from: before.writeClasses ?? null, to: writeClasses ?? null } } };
+};
 const preview = async (promise) => ({ preview: true, ...(await promise) });
 export const planLiveAddRepo = (input, ctx) => preview(planChange("live-add-repo", input, ctx, addRepo(input.repo)).then((r) => r.plan));
 export const applyLiveAddRepo = (input, ctx, options) => applyChange("live-add-repo", input, ctx, addRepo(input.repo), undefined, options);
 export const planLiveSetKit = (input, ctx) => preview(planChange("live-set-kit", input, ctx, ...setKit(input, ctx)).then((r) => r.plan));
 export const applyLiveSetKit = (input, ctx, options) => applyChange("live-set-kit", input, ctx, ...setKit(input, ctx), options);
 export const previewLiveInit = (input, ctx) => ({ preview: true, ...planLiveInit(input, ctx) });
+export const planLiveSetWriteClasses = (input, ctx) => preview(planChange("live-set-write-classes", input, ctx, setWriteClasses(input.writeClasses)).then((r) => r.plan));
+export const applyLiveSetWriteClasses = (input, ctx, options) => applyChange("live-set-write-classes", input, ctx, setWriteClasses(input.writeClasses), undefined, options);

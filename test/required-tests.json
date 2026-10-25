@@ -479,5 +479,15 @@
   "personal store supersedes a record by expected hash",
   "personal store refuses records without personal reach",
   "org home keeps org lessons under the scope with no project",
-  "a draft without sources or tags validates instead of throwing"
+  "a draft without sources or tags validates instead of throwing",
+  "an approved hook target accepts a write to devtwin's own entry",
+  "a write to an unapproved file in the same folder as an approved target is refused",
+  "changing an approved write class without re-approval fails with GATE_REQUIRED",
+  "a marker-block edit in a fixture CLAUDE.md keeps every byte outside the markers",
+  "an owned-file edit writes a byte-exact private backup into the run folder before replacing",
+  "a launch agent not named devtwin.*.plist is refused",
+  "a symlinked write-class target is refused",
+  "hubRoot allows writes inside and refuses siblings",
+  "write classes refuse unknown classes, duplicates and targets outside the agent folders",
+  "disposable pilot write classes stay exact and inside a listed agent home"
 ]
