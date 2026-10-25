@@ -1,0 +1,14 @@
+{
+  "name": "devtwin",
+  "short_name": "devtwin",
+  "description": "Clone the developer: project context, decisions and handoffs for every coding-agent session.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "browser",
+  "background_color": "#06080f",
+  "theme_color": "#06080f",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

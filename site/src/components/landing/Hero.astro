@@ -1,5 +1,5 @@
 ---
-import { GITHUB_URL, DOCS } from '../../site';
+import { GITHUB_URL, DOCS, INSTALL_CMD } from '../../site';
 import HeroGrid from './HeroGrid.astro';
 import CrtGlass from './CrtGlass.astro';
 ---
@@ -7,18 +7,18 @@ import CrtGlass from './CrtGlass.astro';
   <HeroGrid />
   <div class="wrap">
     <div class="hero-copy">
-      <a class="eyebrow" href="#open-source"><b>Open source</b> Apache-2.0 · local-first CLI + harness</a>
+      <a class="eyebrow" href="#open-source"><b>Open source</b> Apache-2.0 · local-first CLI<span class="eyebrow-x"> for coding agents</span></a>
       <h1 id="hero-title" data-decode data-decode-delay="360">Clone the <em>developer.</em></h1>
-      <p class="lede">devtwin carries everything that makes you effective on a project — <strong>decisions, constraints, commands, handoffs and the right accounts</strong> — into every coding-agent session. On your disk. In every org you work for.</p>
+      <p class="lede">Your agents read the code. devtwin hands them the rest of you — <strong>the decisions, constraints, commands and handoffs</strong> behind it — as a short, cited brief at the start of every session. Reviewed by you, kept on your disk, scoped to every org you work for.</p>
       <div class="hero-actions">
-        <!-- TODO: confirm install command at release -->
         <div class="install" role="group" aria-label="Install command">
-          <span><span class="prompt" aria-hidden="true">$ </span><span class="install-text">npx devtwin init</span></span>
-          <button class="copy" type="button" data-copy="npx devtwin init">Copy</button>
+          <span class="install-line"><span class="prompt" aria-hidden="true">$ </span><span class="install-text">{INSTALL_CMD}</span></span>
+          <button class="copy" type="button" data-copy={INSTALL_CMD}>Copy</button>
         </div>
-        <!-- TODO: confirm the GitHub org/user (sundharesan11) at release -->
-        <a class="btn btn-primary" href={DOCS.installation}>Get started <span aria-hidden="true">→</span></a>
-        <a class="btn btn-ghost" href={GITHUB_URL}>View on GitHub <span aria-hidden="true">→</span></a>
+        <div class="action-btns">
+          <a class="btn btn-primary" href={DOCS.installation}>Get started <span aria-hidden="true">→</span></a>
+          <a class="btn btn-ghost" href={GITHUB_URL}>View on GitHub <span aria-hidden="true">→</span></a>
+        </div>
       </div>
       <div class="works">
         <span>Works with</span>
@@ -237,7 +237,7 @@ import CrtGlass from './CrtGlass.astro';
           <div><b>Capture</b>Records with sources <code>record add</code></div>
           <div><b>Brief</b>Bounded, reviewed <code>context brief</code></div>
           <div><b>Any agent</b>Same context <code>agents install</code></div>
-          <div><b>Right identity</b>Per-org accounts <code>context resolve</code></div>
+          <div><b>Right org</b>Scope from the repo <code>context resolve</code></div>
         </figcaption>
       </div>
     </figure>

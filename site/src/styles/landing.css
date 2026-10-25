@@ -253,7 +253,7 @@ section{position:relative}
 /* record review */
 .review{display:grid;grid-template-columns:200px minmax(0,1fr)}
 .queue{border-right:1px solid var(--line);padding:12px 8px;font:12.5px/1.4 var(--font)}
-.queue h5{margin:4px 8px 10px;font:500 11px/1 var(--mono);color:var(--faint);letter-spacing:.14em;text-transform:uppercase}
+.queue h4{margin:4px 8px 10px;font:500 11px/1 var(--mono);color:var(--faint);letter-spacing:.14em;text-transform:uppercase}
 .q-item{display:block;padding:9px 10px;border-radius:9px;color:var(--muted);margin-bottom:2px}
 .q-item small{display:block;font:11px/1.4 var(--mono);color:var(--faint);margin-top:2px}
 .q-item.on{background:var(--surface-2);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
@@ -269,7 +269,7 @@ section{position:relative}
 .supers{font:12px/1.5 var(--mono);color:var(--faint);padding:10px 12px;border-left:2px solid var(--line-2);margin-bottom:16px}
 .supers s{color:#7c8498}
 .rec-act{display:flex;gap:8px;flex-wrap:wrap}
-@media (max-width:640px){.review{grid-template-columns:1fr}.queue{border-right:0;border-bottom:1px solid var(--line);display:flex;overflow-x:auto;gap:4px}.queue h5{display:none}.q-item{flex:0 0 auto}}
+@media (max-width:640px){.review{grid-template-columns:1fr}.queue{border-right:0;border-bottom:1px solid var(--line);display:flex;overflow-x:auto;gap:4px}.queue h4{display:none}.q-item{flex:0 0 auto}}
 
 /* account switcher */
 .acct{padding:18px}
@@ -307,7 +307,7 @@ section{position:relative}
 .disk{display:grid;grid-template-columns:1fr 1fr}
 .disk>div{padding:20px;font:12.5px/1.85 var(--mono);min-width:0}
 .disk>div+div{border-left:1px solid var(--line)}
-.disk h5{margin:0 0 10px;font:500 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;display:flex;gap:8px;align-items:center}
+.disk h4{margin:0 0 10px;font:500 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;display:flex;gap:8px;align-items:center}
 .tree{color:#c9d0de;white-space:pre;overflow:hidden;text-overflow:ellipsis}
 .tree .d{color:var(--text)}
 .disk-foot{border-top:1px solid var(--line);padding:14px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)}
@@ -352,7 +352,7 @@ section{position:relative}
 
 footer{border-top:1px solid var(--line);padding:48px 0 56px;color:var(--faint);font-size:14px}
 .foot{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:32px}
-.foot h6{margin:0 0 12px;font:500 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.foot h3{margin:0 0 12px;font:500 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .foot ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .foot a{text-decoration:none;color:var(--faint)}
 .foot a:hover{color:var(--text)}
@@ -387,3 +387,37 @@ footer{border-top:1px solid var(--line);padding:48px 0 56px;color:var(--faint);f
 .band-links{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:34px}
 .foot{grid-template-columns:2fr 1fr 1fr 1fr 1fr}
 @media (max-width:760px){.foot{grid-template-columns:1fr 1fr}}
+
+/* install command: the clone URL is long, so it scrolls inside its box on narrow screens */
+.install-line{min-width:0;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.install-line::-webkit-scrollbar{display:none}
+.install .copy,.band-cmd .copy{flex:0 0 auto}
+.band-cmd{font-size:clamp(14px,2.2vw,26px)}
+.band-sub{color:var(--muted);font-size:clamp(15px,1.6vw,17px);margin:18px auto 0;max-width:520px}
+/* narrow screens: wrap the URL rather than hide half of it */
+@media (max-width:520px){
+  .install{font-size:13px;gap:10px;height:auto;min-height:42px;padding:8px 6px 8px 14px;text-align:left}
+  .install-line,.band-cmd .install-line{white-space:normal;overflow-wrap:anywhere;line-height:1.45}
+  .band-cmd{text-align:left}
+  .eyebrow-x{display:none}
+}
+
+/* review frame: the approval is a CLI step, shown as a command */
+.rec-act{align-items:center}
+.rec-cmd{font:500 12.5px/1.4 var(--mono);color:var(--text);padding:8px 12px;border-radius:9px;background:var(--bg-2);border:1px solid var(--line-2);overflow-x:auto;white-space:nowrap;max-width:100%}
+.rec-cmd .acc{color:var(--accent)}
+.intro p code{font-size:.9em;color:var(--accent-2)}
+
+/* 404 */
+.nf-body{min-height:100vh;display:flex;flex-direction:column}
+.nf-body main{flex:1;display:flex}
+.hero.nf{flex:1;display:flex;align-items:center;padding-block:clamp(120px,18vh,200px) clamp(80px,12vh,140px)}
+.hero.nf .wrap{width:100%}
+.nf-code{display:inline-block;margin:0 0 28px;padding:7px 14px;border-radius:999px;border:1px solid var(--line-2);background:rgba(14,19,33,.7);font:500 13px/1.4 var(--mono);color:var(--muted);max-width:100%;overflow-wrap:anywhere}
+.nf-code .acc{color:var(--accent)}
+.nf-err{color:var(--bad)}
+.hero.nf h1{margin-top:0}
+
+/* hero and final actions: the install command on its own row, buttons together below it */
+.hero-actions:has(.action-btns){flex-direction:column;align-items:center}
+.action-btns{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}

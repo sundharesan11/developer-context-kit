@@ -8,6 +8,8 @@ const REPO = 'https://github.com/sundharesan11/devtwin';
 // Override with SITE_URL / SITE_BASE (for example a custom domain with base "/").
 const SITE = process.env.SITE_URL ?? 'https://sundharesan11.github.io';
 const BASE = process.env.SITE_BASE ?? '/devtwin';
+// BASE without a trailing slash, for building asset URLs ("/" becomes "").
+const BASE_PATH = BASE.replace(/\/+$/, '');
 
 export default defineConfig({
 	site: SITE,
@@ -19,7 +21,19 @@ export default defineConfig({
 		starlight({
 			title: 'devtwin',
 			description:
-				'devtwin is an open-source, local-first CLI and harness that carries your project context, decisions and accounts into every coding-agent session.',
+				'devtwin is an open-source, local-first CLI that keeps project decisions, constraints, commands and handoffs as reviewed, source-linked records and hands them to coding agents as a bounded brief.',
+			// The landing site ships its own styled 404 (src/pages/404.astro).
+			disable404Route: true,
+			head: [
+				{ tag: 'link', attrs: { rel: 'icon', href: `${BASE_PATH}/favicon.ico`, sizes: '32x32' } },
+				{ tag: 'link', attrs: { rel: 'apple-touch-icon', href: `${BASE_PATH}/apple-touch-icon.png` } },
+				{ tag: 'meta', attrs: { name: 'theme-color', content: '#06080f' } },
+				{ tag: 'meta', attrs: { property: 'og:image', content: `${SITE}${BASE_PATH}/og.png` } },
+				{ tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+				{ tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+				{ tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+				{ tag: 'meta', attrs: { name: 'twitter:image', content: `${SITE}${BASE_PATH}/og.png` } },
+			],
 			logo: { src: './src/assets/logo.svg', alt: '' },
 			social: [{ icon: 'github', label: 'GitHub', href: REPO }],
 			editLink: { baseUrl: `${REPO}/edit/main/site/` },
