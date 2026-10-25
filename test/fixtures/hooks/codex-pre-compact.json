@@ -1,0 +1,9 @@
+{
+  "session_id": "thr_01example0001",
+  "transcript_path": "/workspace/.codex/sessions/rollout-example.jsonl",
+  "cwd": "{{cwd}}",
+  "hook_event_name": "PreCompact",
+  "model": "codex-example",
+  "turn_id": "turn_0004",
+  "trigger": "auto"
+}

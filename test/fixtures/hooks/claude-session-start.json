@@ -1,0 +1,8 @@
+{
+  "session_id": "0b3c6f0e-5f7a-4d55-9a3e-2f1d8c4e7a10",
+  "transcript_path": "/workspace/.claude/projects/-workspace-example-atlas/0b3c6f0e-5f7a-4d55-9a3e-2f1d8c4e7a10.jsonl",
+  "cwd": "{{cwd}}",
+  "hook_event_name": "SessionStart",
+  "source": "startup",
+  "model": "claude-example"
+}

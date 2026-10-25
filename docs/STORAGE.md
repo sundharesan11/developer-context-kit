@@ -89,6 +89,16 @@ Personal and org records have their own homes. They need no registry entry or pr
 
 Globs match one path segment per `/`. `*` matches any run of characters in a segment and `?` matches one character. A `**` segment matches zero or more segments. A wildcard does not match a leading dot, so a dotfile matches only a pattern that starts with a literal dot. A path with `..` never matches.
 
+### Agent hook state
+
+The hook keeps its state in `stateRoot/hooks/`. The folders are 0700 and the files are 0600.
+
+- **Receipt.** `hooks/kit-receipt.json` holds `schemaVersion` 1, `pilotPath` (the real path), `pilotSha256` (the SHA-256 of the pilot file bytes), `kitRoot`, `kitCommit` (null for a disposable pilot), `verifiedAt` and `ttlSeconds`. `hook verify` writes it by atomic replace with a TTL of seven days. The hook refuses a receipt that is older than its TTL, names another pilot path or another pilot file, or names another kit. In live mode the hook also reads the kit's `.git/HEAD` and compares it with `kitCommit`.
+- **Sessions.** `hooks/sessions/<key>.json` holds the lesson IDs sent in one agent session, the count of index lines and whether the overflow line went out. The key is the SHA-256 of the agent name and the session ID. Each write is an atomic replace with no lock. Compaction removes the file. Session start removes session files older than 14 days and temp files older than one hour.
+- **Budget log.** `hooks/budget.jsonl` gets one line per injection: the time, agent, session key, event, bytes, index lines and overflow lines. It holds no prompt text, path or lesson text. A log over 4 MiB moves to `budget.jsonl.1`.
+- **Hook log.** `hooks/hook.log` gets one line per failure, with the error code only.
+- **Cache writes.** The receipt, session files and logs are devtwin's own state, like the lesson index. They have no preview and no plan fingerprint. The hook writes only when the `hooks` folder already exists, so a hook with no receipt writes nothing.
+
 ## File identity and interrupted writes
 
 SHA-256 of the exact bytes is the authority for source identity. A bound source must also match its device, inode, size and ancestor chain. The stored `mtimeMs` is kept for compatibility and is informational only; it is never compared across reads. Within one read, a change in size, modification time or change time during the read is refused as a changed file.

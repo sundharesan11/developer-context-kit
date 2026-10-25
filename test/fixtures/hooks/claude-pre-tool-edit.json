@@ -1,0 +1,15 @@
+{
+  "session_id": "0b3c6f0e-5f7a-4d55-9a3e-2f1d8c4e7a10",
+  "transcript_path": "/workspace/.claude/projects/-workspace-example-atlas/0b3c6f0e-5f7a-4d55-9a3e-2f1d8c4e7a10.jsonl",
+  "cwd": "{{cwd}}",
+  "permission_mode": "acceptEdits",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "{{cwd}}/db/migrations/002_users.sql",
+    "old_string": "-- users\n",
+    "new_string": "-- users\nCREATE TABLE users (id serial primary key);\n",
+    "replace_all": false
+  },
+  "tool_use_id": "toolu_01Example0000000000000001"
+}
