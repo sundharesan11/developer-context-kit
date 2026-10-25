@@ -1,9 +1,9 @@
 import { readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 
 const CATALOG_PATH = fileURLToPath(new URL("../../catalog/skill-sources.json", import.meta.url));
-const bad = (field) => { throw new DevctxError("INVALID_INPUT", `Invalid ${field}`); };
+const bad = (field) => { throw new DevtwinError("INVALID_INPUT", `Invalid ${field}`); };
 const record = (value, keys, field) => {
   if (value === null || typeof value !== "object" || Array.isArray(value) ||
       Object.keys(value).length !== keys.length || keys.some((key) => !Object.hasOwn(value, key))) bad(field);

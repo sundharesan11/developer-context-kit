@@ -1,6 +1,6 @@
 // Prefixes root-relative links in Markdown/MDX content with the site base path,
 // so `/docs/...` links keep working when the site is served from a subpath
-// (for example GitHub Pages at /developer-context-kit/).
+// (for example GitHub Pages at /devtwin/).
 export default function rehypeBaseLinks({ base = '/' } = {}) {
 	const prefix = base.replace(/\/+$/, '');
 	const fix = (url) =>

@@ -6,7 +6,7 @@ import { digest } from "../storage/canonical.mjs";
 import { isWithin, overlaps, info, readPrivateJson, ensurePrivatePath, atomicReplace } from "../storage/fsx.mjs";
 import { gitQuery } from "../identity/git.mjs";
 import { validateRoot, deepestExisting } from "./roots.mjs";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 // The running kit. Tests inject context.kitRoot; production derives it from this file.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const members = ["configRoot", "dataRoot", "stateRoot", "inputsRoot"];
@@ -14,8 +14,8 @@ const keys = ["schemaVersion", "pilotRoot", ...members, "agentHomes", "repos", "
 const liveKeys = ["configId", "home", "skillDirs", "kitRoot", "kitCommit"];
 // Skill folders sit inside these protected homes; only the exact named folder is carved out, never the home.
 const SKILL_PARENTS = ["real-claude-home", "real-agents-home", "CLAUDE_CONFIG_DIR"];
-const fail = (field, protectedLabel) => { throw new DevctxError("GATE_REQUIRED", "Pilot fence refused path", { field, ...(protectedLabel ? { protected: protectedLabel } : {}) }); };
-const gate = (field, reason) => { throw new DevctxError("GATE_REQUIRED", "Live config gate refused", { field, reason }); };
+const fail = (field, protectedLabel) => { throw new DevtwinError("GATE_REQUIRED", "Pilot fence refused path", { field, ...(protectedLabel ? { protected: protectedLabel } : {}) }); };
+const gate = (field, reason) => { throw new DevtwinError("GATE_REQUIRED", "Live config gate refused", { field, reason }); };
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 function comparable(path) {
   const absolute = resolve(path);
@@ -34,9 +34,9 @@ export function protectedPaths({ home = homedir(), env = process.env, kitRoot = 
     { label: "real-commandcode-home", path: join(home, ".commandcode") },
     ...(env.CLAUDE_CONFIG_DIR ? [{ label: "CLAUDE_CONFIG_DIR", path: env.CLAUDE_CONFIG_DIR }] : []),
     ...(env.CODEX_HOME ? [{ label: "CODEX_HOME", path: env.CODEX_HOME }] : []),
-    { label: "default-config", path: join(home, ".config/devctx") },
-    { label: "default-data", path: join(home, ".local/share/devctx") },
-    { label: "default-state", path: join(home, ".local/state/devctx") },
+    { label: "default-config", path: join(home, ".config/devtwin") },
+    { label: "default-data", path: join(home, ".local/share/devtwin") },
+    { label: "default-state", path: join(home, ".local/state/devtwin") },
     { label: "personal-os-state", path: join(home, ".local/state/personal-os") },
     { label: "kit-checkout", path: kitRoot }
   ];
@@ -171,10 +171,10 @@ export function assertInPilot(pilot, path, field) {
   if (field === "inputsRoot" ? !isWithin(path, pilot.inputsRoot) : !pilot[field]?.includes(path)) fail(field);
   validateRoot(path, field);
 }
-// In live mode the target is a named skill folder, never itself a destination: only devctx-* entries inside it.
+// In live mode the target is a named skill folder, never itself a destination: only devtwin-* entries inside it.
 function inTarget(pilot, target, path) {
   if (!isWithin(comparable(path), comparable(target))) return false;
-  return !pilot.live || relative(comparable(target), comparable(path)).split(sep)[0].startsWith("devctx-");
+  return !pilot.live || relative(comparable(target), comparable(path)).split(sep)[0].startsWith("devtwin-");
 }
 export function assertWritable(roots, destinations, { targetHome } = {}) {
   const pilot = roots?.pilot;

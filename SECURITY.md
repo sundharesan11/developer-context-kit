@@ -1,6 +1,6 @@
 # Security reporting
 
-Developer Context Kit is an experimental local pilot. There is no stable supported release or response-time commitment yet.
+devtwin is an experimental local pilot. There is no stable supported release or response-time commitment yet.
 
 ## Report privately
 

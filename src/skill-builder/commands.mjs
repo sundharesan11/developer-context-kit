@@ -1,7 +1,7 @@
 import { join, relative } from "node:path";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertInPilot } from "../config/pilot.mjs";
 import { readApprovedSource } from "../storage/source-read.mjs";
 import { createWorkspace, recordRequirements, recordDesign, approveDesign, createDraft, validateDraft, showWorkspace, approveContent, approveLocalAction } from "./workspace.mjs";
@@ -24,13 +24,13 @@ export const contentApproveCommand = { options: { ...common, ...revision, ...dec
 export const localPlanCommand = { options: localOptions, run: (v, ctx) => planPackageInstall(ctx.roots, selection(v), localInput(v)) };
 export const localApproveCommand = { options: { ...localOptions, ...decision, "plan-fingerprint": { type: "string" }, "interaction-ref": { type: "string" }, response: { type: "string" } }, async run(v, ctx) {
   const plan = await planPackageInstall(ctx.roots, selection(v), localInput(v));
-  if (plan.fingerprint !== v["plan-fingerprint"]) throw new DevctxError("PLAN_MISMATCH", "Plan fingerprint mismatch");
+  if (plan.fingerprint !== v["plan-fingerprint"]) throw new DevtwinError("PLAN_MISMATCH", "Plan fingerprint mismatch");
   return approveLocalAction(ctx.roots, selection(v), plan, v.decision, v["interaction-ref"], v.response);
 } };
 export const localApplyCommand = { options: { ...localOptions, ...decision, "plan-fingerprint": { type: "string" }, "run-id": { type: "string" } }, run: (v, ctx) => applyPackageInstall(ctx.roots, selection(v), localInput(v), { fingerprint: v["plan-fingerprint"], decisionId: v.decision, runId: v["run-id"] }) };
 export const localStatusCommand = { options: localOptions, run: (v, ctx) => packageInstallStatus(ctx.roots, selection(v), localInput(v)) };
 
-const bundled = ["devctx-onboard", "devctx-record", "devctx-resume"];
+const bundled = ["devtwin-onboard", "devtwin-record", "devtwin-resume"];
 export const discoverCommand = { options: { fixture: { type: "string" } }, async run(v, ctx) {
   const found = [];
   for (const name of bundled) {
@@ -41,9 +41,9 @@ export const discoverCommand = { options: { fixture: { type: "string" } }, async
   if (v.fixture) {
     assertInPilot(ctx.pilot, v.fixture, "inputsRoot");
     const read = await readApprovedSource(ctx.pilot.inputsRoot, relative(ctx.pilot.inputsRoot, join(v.fixture, "SKILL.md")));
-    if (read.skipped || !read.utf8Valid) throw new DevctxError("INVALID_INPUT", "Fixture skill unavailable");
+    if (read.skipped || !read.utf8Valid) throw new DevtwinError("INVALID_INPUT", "Fixture skill unavailable");
     const name = parseFrontmatter(read.text, { nameOnly: true }).meta.name;
-    if (!SKILL_NAME.test(name) || name.length > 64) throw new DevctxError("INVALID_INPUT", "Fixture name unavailable");
+    if (!SKILL_NAME.test(name) || name.length > 64) throw new DevtwinError("INVALID_INPUT", "Fixture name unavailable");
     found.push({ name, description: /^description:\s*(.+)$/m.exec(read.text)?.[1] ?? "", origin: "fixture", path: relative(ctx.pilot.inputsRoot, v.fixture) + "/SKILL.md" });
   }
   return { sources: found };

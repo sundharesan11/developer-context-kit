@@ -112,7 +112,7 @@ test("profile suggest-stack with no onboarded projects returns an empty list", a
   const out = await cli(p, "suggest-stack", ["--scope", "acme"]);
   assert.equal(out.code, 0, JSON.stringify(out.json));
   assert.deepEqual(out.json.result.suggestions, []);
-  assert.equal((await cli(p, "suggest-stack", ["--scope", "globex"])).json.error.code, "DEVCTX_SCOPE_UNKNOWN");
+  assert.equal((await cli(p, "suggest-stack", ["--scope", "globex"])).json.error.code, "DEVTWIN_SCOPE_UNKNOWN");
 });
 test("profile suggest-stack ignores superseded and proposed records", async (t) => {
   const p = await twoProjects(t);
@@ -142,11 +142,11 @@ test("profile plan made with proposed-by agent shows the agent label in the prev
   assert.equal(agent.json.result.proposedBy, "agent");
   assert.deepEqual(agent.json.result.changes, [{ field: "workKind", from: null, to: "Mobile apps", proposedBy: "agent" }]);
   assert.equal((await cli(p, "plan", ["--work", "Mobile apps"])).json.result.proposedBy, "user");
-  assert.equal((await cli(p, "plan", ["--proposed-by", "robot"])).json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.equal((await cli(p, "plan", ["--proposed-by", "robot"])).json.error.code, "DEVTWIN_INVALID_INPUT");
 });
 test("profile seed-from-init copies user.json preferences into the preview only", async (t) => {
   const p = await makePilot(t);
-  assert.equal((await cli(p, "plan", ["--seed-from-init"])).json.error.code, "DEVCTX_NOT_FOUND");
+  assert.equal((await cli(p, "plan", ["--seed-from-init"])).json.error.code, "DEVTWIN_NOT_FOUND");
   await applyInit(p.roots, { actorRefs: [], preferences: { explanationStyle: "detailed", diagrams: "avoid", notes: ["Ask before refactors"] }, now });
   const before = await treeSnapshot(p.sandbox);
   const plan = await cli(p, "plan", ["--seed-from-init", "--preference", "diagrams=prefer"]);
@@ -159,24 +159,24 @@ test("profile seed-from-init copies user.json preferences into the preview only"
 test("profile apply without a plan fingerprint fails with PLAN_REQUIRED", async (t) => {
   const p = await makePilot(t);
   const out = await cli(p, "apply", ["--work", "Backend"]);
-  assert.equal(out.json.error.code, "DEVCTX_PLAN_REQUIRED");
+  assert.equal(out.json.error.code, "DEVTWIN_PLAN_REQUIRED");
   await assert.rejects(access(join(p.configRoot, "profile")));
 });
 test("profile malformed stack-current fails with INVALID_INPUT", async (t) => {
   const p = await makePilot(t);
   for (const bad of ["node=22:urgent", "=1.0", "node=", "two words", "node=1:high:low", "node==1 2"]) {
     const out = await cli(p, "plan", ["--stack-current", bad]);
-    assert.equal(out.json.error.code, "DEVCTX_INVALID_INPUT", bad);
+    assert.equal(out.json.error.code, "DEVTWIN_INVALID_INPUT", bad);
   }
-  for (const bad of [["--preference", "colour=blue"], ["--preference", "noequals"], ["--writing", "formality.Team=casual"]]) assert.equal((await cli(p, "plan", bad)).json.error.code, "DEVCTX_INVALID_INPUT", bad.join(" "));
+  for (const bad of [["--preference", "colour=blue"], ["--preference", "noequals"], ["--writing", "formality.Team=casual"]]) assert.equal((await cli(p, "plan", bad)).json.error.code, "DEVTWIN_INVALID_INPUT", bad.join(" "));
 });
 test("profile apply after another change landed since the preview fails with STALE_VERSION", async (t) => {
   const p = await makePilot(t);
   const stale = await cli(p, "plan", ["--work", "Backend"]);
   await planApply(p, ["--stack-current", "node"]);
   const out = await cli(p, "apply", ["--work", "Backend", "--plan-fingerprint", stale.json.result.fingerprint]);
-  assert.equal(out.json.error.code, "DEVCTX_STALE_VERSION");
-  assert.equal((await cli(p, "apply", ["--work", "Other", "--plan-fingerprint", stale.json.result.fingerprint])).json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal(out.json.error.code, "DEVTWIN_STALE_VERSION");
+  assert.equal((await cli(p, "apply", ["--work", "Other", "--plan-fingerprint", stale.json.result.fingerprint])).json.error.code, "DEVTWIN_PLAN_MISMATCH");
   assert.equal((await readProfile(p.roots)).generation, 1);
 });
 test("help lists the profile routes", async () => {

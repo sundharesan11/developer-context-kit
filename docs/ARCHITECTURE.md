@@ -1,6 +1,6 @@
 # Architecture
 
-Developer Context Kit stores scoped evidence outside the project repository and builds bounded context from it. The current implementation uses local files, not SQLite, a vector database or a hosted service.
+devtwin stores scoped evidence outside the project repository and builds bounded context from it. The current implementation uses local files, not SQLite, a vector database or a hosted service.
 
 ![Pilot architecture: bounded sources, explicit CLI operations, private stores, and manually supplied context.](assets/architecture.svg)
 
@@ -29,7 +29,7 @@ This is source-linked context, not a verified model of the entire codebase. A fr
 
 ## Where data lives
 
-All current roots are explicitly configured inside a pilot. In live mode the pilot is `~/.devctx/store`, and the live config also names the real skill folders and read-only repositories; see [Live activation](LIVE.md).
+All current roots are explicitly configured inside a pilot. In live mode the pilot is `~/.devtwin/store`, and the live config also names the real skill folders and read-only repositories; see [Live activation](LIVE.md).
 
 | Root | Contents | Belongs in the reusable repository? |
 | --- | --- | --- |
@@ -47,9 +47,9 @@ Records are immutable. Supersession records a successor instead of rewriting an 
 
 The kit does not require a particular personal assistant setup, editor or orchestration product. You can use a brief as input to a person or an agent session without installing a skill.
 
-The three bundled skills (`devctx-onboard`, `devctx-resume` and `devctx-record`) route onboard, resume and record actions to this CLI. They locate the kit through the `DEVCTX_KIT` environment variable and call `node "$DEVCTX_KIT/bin/devctx.mjs"`. Before the first call in a session, each skill checks that `DEVCTX_KIT` is an absolute path whose real path is not inside the current repository or worktree, that it contains `bin/devctx.mjs` and a `package.json` named `developer-context-kit`, and that the user confirms the path. The skills offer the live config `~/.devctx/live.json` as the pilot path, or take a disposable pilot path from the user, and the user confirms it once per session. They refuse one inside the current repository or the kit checkout, because the pilot fence protects pilot roots, not the pilot file. They warn when an installed skill's receipt names a different kit commit from the one at `DEVCTX_KIT`. The skills never run `record publish --apply`. Tests check that skills use only real command routes; they do not check each command's flags. Copies into disposable agent-home layouts are testable. Live mode installs into the real skill folders ([Live activation](LIVE.md)); fresh-session discovery there is not yet verified. An agent envelope is an advisory task contract, not an enforced permission system.
+The three bundled skills (`devtwin-onboard`, `devtwin-resume` and `devtwin-record`) route onboard, resume and record actions to this CLI. They locate the kit through the `DEVTWIN_KIT` environment variable and call `node "$DEVTWIN_KIT/bin/devtwin.mjs"`. Before the first call in a session, each skill checks that `DEVTWIN_KIT` is an absolute path whose real path is not inside the current repository or worktree, that it contains `bin/devtwin.mjs` and a `package.json` named `devtwin`, and that the user confirms the path. The skills offer the live config `~/.devtwin/live.json` as the pilot path, or take a disposable pilot path from the user, and the user confirms it once per session. They refuse one inside the current repository or the kit checkout, because the pilot fence protects pilot roots, not the pilot file. They warn when an installed skill's receipt names a different kit commit from the one at `DEVTWIN_KIT`. The skills never run `record publish --apply`. Tests check that skills use only real command routes; they do not check each command's flags. Copies into disposable agent-home layouts are testable. Live mode installs into the real skill folders ([Live activation](LIVE.md)); fresh-session discovery there is not yet verified. An agent envelope is an advisory task contract, not an enforced permission system.
 
-A fourth bundled skill, `devctx-setup`, conducts first-run personal profile setup with the same checks. It is not yet in the bundled installer, so `agents install` still installs the three skills above.
+A fourth bundled skill, `devtwin-setup`, conducts first-run personal profile setup with the same checks. It is not yet in the bundled installer, so `agents install` still installs the three skills above.
 
 A separate personal setup can eventually provide scheduling and approved integrations around this kit. It is not automatically migrated, installed or synchronized. See [Agent protocol](AGENT-PROTOCOL.md).
 

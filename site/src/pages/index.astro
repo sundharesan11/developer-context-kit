@@ -27,8 +27,8 @@ import Footer from '../components/landing/Footer.astro';
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>devctx — Clone the developer</title>
-<meta name="description" content="Developer Context Kit (devctx) is an open-source, local-first CLI and harness that carries your project context, decisions and accounts into every coding-agent session.">
+<title>devtwin — Clone the developer</title>
+<meta name="description" content="devtwin is an open-source, local-first CLI and harness that carries your project context, decisions and accounts into every coding-agent session.">
 <meta name="color-scheme" content="dark">
 <link rel="icon" href={withBase("/favicon.svg")} type="image/svg+xml">
 <!-- Motion gate, before first paint: motion is on unless prefers-reduced-motion asks otherwise. -->
@@ -86,7 +86,7 @@ import Footer from '../components/landing/Footer.astro';
   function selectTab(tab){
     tabs.forEach(function(t){ var on = t === tab; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
     panel.setAttribute('aria-labelledby', tab.id);
-    cmdEl.textContent = tab.dataset.agent === 'cc' ? '/devctx-resume' : 'devctx-resume';
+    cmdEl.textContent = tab.dataset.agent === 'cc' ? '/devtwin-resume' : 'devtwin-resume';
   }
   tabs.forEach(function(t, i){
     t.addEventListener('click', function(){ selectTab(t); });

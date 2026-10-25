@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertScopeId, assertProjectId, RECORD_ID } from "../identity/ids.mjs";
 import { assertWritable, assertInPilot } from "../config/pilot.mjs";
 import { isWithin } from "../storage/fsx.mjs";
@@ -14,7 +14,7 @@ export const HANDOFF_LIMITS = Object.freeze({ maxRecords: 12, maxBytes: 32768 })
 const EXCLUSIONS = ["unselectedEffective", "proposed", "superseded", "hiddenUncommitted", "unselectedUnknown", "unselectedDisputed"];
 const STATES = ["current", "needs-revalidation", "source-missing", "unbound-source", "unverified-source"];
 const LABELS = ["recorded-after-as-of", "different-branch", "different-revision", "different-worktree", "stale-by-date", ...STATES, "not-file-verified"];
-const invalid = () => { throw new DevctxError("INVALID_INPUT", "Explicit selection and canonical as-of required"); };
+const invalid = () => { throw new DevtwinError("INVALID_INPUT", "Explicit selection and canonical as-of required"); };
 const cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 
 async function observe(record, projected, resolved, asOf) {
@@ -50,20 +50,20 @@ export async function buildPortableHandoff(roots, pilot, input) {
     const { scope, cwd, recordIds, asOf } = input;
     assertScopeId(scope);
     if (!Array.isArray(recordIds) || !recordIds.length || new Set(recordIds).size !== recordIds.length || recordIds.some((id) => typeof id !== "string" || !RECORD_ID.test(id))) invalid();
-    if (recordIds.length > HANDOFF_LIMITS.maxRecords) throw new DevctxError("LIMIT", "Selected record count exceeds limit");
+    if (recordIds.length > HANDOFF_LIMITS.maxRecords) throw new DevtwinError("LIMIT", "Selected record count exceeds limit");
     try { canonicalTime(asOf); } catch { invalid(); }
     assertWritable(roots, []);
-    if (pilot !== roots.pilot) throw new DevctxError("GATE_REQUIRED", "Matching pilot required");
-    if (typeof cwd !== "string" || resolve(cwd) !== cwd || !pilot.repos.some((repo) => isWithin(cwd, repo))) throw new DevctxError("GATE_REQUIRED", "Working directory outside pilot repositories");
-    if (realpathSync(cwd) !== cwd) throw new DevctxError("PATH_UNSAFE", "Noncanonical working directory");
+    if (pilot !== roots.pilot) throw new DevtwinError("GATE_REQUIRED", "Matching pilot required");
+    if (typeof cwd !== "string" || resolve(cwd) !== cwd || !pilot.repos.some((repo) => isWithin(cwd, repo))) throw new DevtwinError("GATE_REQUIRED", "Working directory outside pilot repositories");
+    if (realpathSync(cwd) !== cwd) throw new DevtwinError("PATH_UNSAFE", "Noncanonical working directory");
     const resolved = await resolveContext(roots, { scope, cwd });
     assertInPilot(pilot, resolved.worktree.root, "repos");
     const snapshot = await readSnapshot(roots, scope, resolved.project);
-    if (snapshot.corrupt.length) throw new DevctxError("INTEGRITY", "Project snapshot is incomplete", { records: snapshot.corrupt.map((c) => c.id) });
+    if (snapshot.corrupt.length) throw new DevtwinError("INTEGRITY", "Project snapshot is incomplete", { records: snapshot.corrupt.map((c) => c.id) });
     const selected = new Set(recordIds), records = [];
     for (const id of [...recordIds].sort()) {
       const record = snapshot.records.find((item) => item.id === id);
-      if (!record || record.effective === "superseded" || record.status === "proposed") throw new DevctxError("RECORD_NOT_EXPORTABLE", "Selected record unavailable or ineffective");
+      if (!record || record.effective === "superseded" || record.status === "proposed") throw new DevtwinError("RECORD_NOT_EXPORTABLE", "Selected record unavailable or ineffective");
       const projected = portableRecord(record);
       records.push({ ...projected, ...await observe(record, projected, resolved, asOf) });
     }
@@ -132,7 +132,7 @@ export function renderPortableHandoff(model) {
     const content = lines.join("\n") + "\n", packetHash = sha256(content);
     const markdown = content + `\nPacket SHA-256 (all preceding bytes): ${packetHash}\n`;
     const bytes = Buffer.byteLength(markdown);
-    if (bytes > HANDOFF_LIMITS.maxBytes) throw new DevctxError("LIMIT", "Selected content exceeds portable packet byte limit");
+    if (bytes > HANDOFF_LIMITS.maxBytes) throw new DevtwinError("LIMIT", "Selected content exceeds portable packet byte limit");
     return { markdown, packetHash, fileHash: sha256(markdown), bytes };
   } catch (error) { throw handoffError(error); }
 }

@@ -13,7 +13,7 @@ execution: code
 
 ## Goal Capsule
 
-- **Objective:** Make Developer Context Kit (DCK) usable as a clonable, generic personal-harness template. A short first-run setup captures a small private personal profile. Three skill templates (stack watch, Slack update, writing) let each developer create their own private skills through the existing skill builder. A deterministic announcement watch tells the developer when vendors and products they build on release something.
+- **Objective:** Make devtwin usable as a clonable, generic personal-harness template. A short first-run setup captures a small private personal profile. Three skill templates (stack watch, Slack update, writing) let each developer create their own private skills through the existing skill builder. A deterministic announcement watch tells the developer when vendors and products they build on release something.
 - **Product authority:** This Product Contract, then the Planning Contract, then repository instructions. The owner confirmed the scope, sequencing, delivery model, network-approval model and naming on 2026-10-16, and decided the stack-update meaning, template delivery, writing delivery and account-routing placement on 2026-10-17.
 - **Roadmap position:** A new "Personal harness layer" stage after priority 2 (real-home activation) and after organization identity routing, and before session hooks. The order is P2 → organization identity routing → personal harness → session hooks → migration → later rows. Organization identity routing is a separate plan written by another agent. This stage is not a daily-use blocker. It lifts the skill-builder freeze for the create-from-template path only and leaves the skill-source freeze unchanged.
 - **Stop conditions:** Stop and ask if a unit would change `src/agents/install.mjs`, `src/agents/package-install.mjs`, the live config, any agent home, or the pilot fence before priority 2's activation evidence is recorded (priority 2 code is merged; activation evidence is pending). Also stop if a change would send data outward without an approval, if a design needs a credential stored in a record, or if any unit would read from or post to Slack or GitHub on the user's behalf for private data other than through organization identity routing's own routes.
@@ -28,7 +28,7 @@ execution: code
 
 A first-run setup asks three to five skippable questions and writes a capped, private personal profile: how the developer likes to work with agents, the stack they know, the stack they build on now, and the kind of work they do. Every profile change is previewed and approved, keeps history, and lives outside the clone.
 
-DCK ships one new bundled skill, `devctx-setup`, which conducts that setup. The starters are templates, not finished skills. DCK ships three of them: stack watch, Slack update and writing. Each developer turns a template into their own private skill through the existing skill builder.
+DCK ships one new bundled skill, `devtwin-setup`, which conducts that setup. The starters are templates, not finished skills. DCK ships three of them: stack watch, Slack update and writing. Each developer turns a template into their own private skill through the existing skill builder.
 
 The stack-watch template drives a deterministic announcement watch. The watch reads vendor changelog feeds and SDK GitHub releases for the declared stack, matches each announcement against the profile stack and onboarded project records, and writes a sourced digest of what is relevant to what the developer built. Advisory, lifecycle and version sources (OSV, endoflife.date, package registries) are opt-in and off by default.
 
@@ -39,7 +39,7 @@ The Slack-update and writing templates draft from the profile and selected recor
 - **Personal profile:** the developer's own preferences, stack and kind of work that this plan adds (`profile show/plan/apply`, stored under `configRoot/profile/`). Prose says "personal profile" where ambiguity is possible.
 - **Client profile:** the existing onboarding template `templates/client-profile.md` for a project's context. Unchanged.
 - **Live config:** priority 2's machine-level live-mode file (`live.json`). It was renamed from "live profile" on `main` in `6a90cbf`. Its identifiers are `live.configId` (prefix `cfg_`), `state/live/approved-config.json`, and `$LIVE_CONFIG` in the runbook. Error codes are unchanged.
-- **Skill template:** a generic folder under `templates/skills/` with placeholders, a skill-builder requirements stub, a design stub and a candidate `SKILL.md`. It is not an installed or discoverable skill. It is different from `skills/devctx-create-skill/assets/skill-template.md`, the existing blank starter for a skill built from scratch, which stays as it is.
+- **Skill template:** a generic folder under `templates/skills/` with placeholders, a skill-builder requirements stub, a design stub and a candidate `SKILL.md`. It is not an installed or discoverable skill. It is different from `skills/devtwin-create-skill/assets/skill-template.md`, the existing blank starter for a skill built from scratch, which stays as it is.
 - **Template-made skill:** the developer's own private skill, created from a template through the skill builder and stored in their private workspace.
 - **Announcement watch:** the `stack` CLI routes that fetch vendor feeds and SDK releases for the declared stack and match them for relevance.
 - **Organization identity routing:** the separate plan (`docs/plans/2026-10-17-001-feat-organization-identity-routing-plan.md`, on its own branch), sequenced before this stage. It binds each scope to its GitHub and Slack accounts, resolves credentials outside records, and offers read and draft first (increment 1), with send later behind per-message approval (the send increment).
@@ -113,11 +113,11 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 
 - **New stage after organization identity routing, before session hooks.** The order is P2 → organization identity routing → personal harness → session hooks → migration → later rows. The profile and templates run offline and need no hooks or migration. (session-settled: user-directed, 2026-10-16 and 2026-10-17. Chosen over waiting for priorities 1–4, a parallel track, folding into the open-source release, and placing this stage before routing. Routing is the product's core and gets its own plan and review first.)
 - **Stack updates mean announcements; advisories are opt-in.** By default the watch reads vendor changelog feeds and SDK GitHub releases and matches each entry against the personal profile stack and onboarded project records. OSV, endoflife.date and package-registry sources stay available as opt-in source groups, off by default, and keep the earlier privacy and approval hardening. (session-settled: user-directed, 2026-10-17. Chosen over replacing advisories entirely and over keeping the version tracker as the default. The owner's words were "not version updates".)
-- **Templates, not finished skills.** DCK ships skill templates under `templates/skills/` (stack watch, Slack update, writing). Each developer turns a template into their own private skill through the existing skill builder. Only `devctx-setup` is a new bundled skill, so live activation checks four bundled skills instead of three (five once routing's `devctx-connect` is also bundled). (session-settled: user-directed, 2026-10-17. Chosen over a working reference skill and over finished bundled starter skills. The owner's words were "Those are all just templates.")
+- **Templates, not finished skills.** DCK ships skill templates under `templates/skills/` (stack watch, Slack update, writing). Each developer turns a template into their own private skill through the existing skill builder. Only `devtwin-setup` is a new bundled skill, so live activation checks four bundled skills instead of three (five once routing's `devtwin-connect` is also bundled). (session-settled: user-directed, 2026-10-17. Chosen over a working reference skill and over finished bundled starter skills. The owner's words were "Those are all just templates.")
 - **Writing is a template too.** The thin-plus-companions rules move into the writing template: personal profile, selected records, safety rules, and companions supply format only. Draft save (U7) stays as the CLI route the writing and Slack-update templates may use. (session-settled: user-directed, 2026-10-17. Chosen over a bundled writing skill and over dropping writing.)
 - **Account routing is a separate plan; Slack update is draft-only until routing's send increment lands.** Organization identity routing is written by another agent and sequenced before this stage. Its first increment is read and draft only; send comes later behind per-message approval. This plan builds no account, credential, read or send path of its own. (session-settled: user-directed, 2026-10-17. Chosen over folding routing into this stage and over leaving it at the connector priority.)
 - **Slack-update drafts are saved through routing when they can be sent later.** When the scope has a bound Slack account, a skill made from the Slack-update template saves the draft with routing's `connect draft`, which stores it per scope and project, bound to account and target, where routing's send increment can send it. When routing reports `ACCOUNT_UNBOUND`, it falls back to `draft save` and tells the user that this draft cannot be sent later. (session-settled: user-directed, 2026-10-17, review round 2. Chosen over always using `draft save`, whose drafts routing can never send, and over amending routing's draft store.)
-- **The watch's optional GitHub token is a routed public-read binding.** There is no `DEVCTX_GITHUB_TOKEN` or other global variable. The token is resolved through organization identity routing's resolver as a scope-free, public-read binding that routing defines, and is sent only to `api.github.com`. The routing planner adds the matching binding and live-mode exception on its side. (session-settled: user-directed, 2026-10-17, review round 2. Chosen over a global variable, which routing rejects because it applies to every scope, and over dropping the token.)
+- **The watch's optional GitHub token is a routed public-read binding.** There is no `DEVTWIN_GITHUB_TOKEN` or other global variable. The token is resolved through organization identity routing's resolver as a scope-free, public-read binding that routing defines, and is sent only to `api.github.com`. The routing planner adds the matching binding and live-mode exception on its side. (session-settled: user-directed, 2026-10-17, review round 2. Chosen over a global variable, which routing rejects because it applies to every scope, and over dropping the token.)
 - **The watch has its own live-mode exception.** In live mode, `stack check` and `stack digest` may make unauthenticated `GET` requests and OSV `POST` requests to approved hosts only, plus requests to `api.github.com` carrying the routed public-read token. The wording is coordinated with routing's U7 for `docs/LIVE.md` and `docs/SECURITY-MODEL.md`. (session-settled: user-directed, 2026-10-17, review round 2.)
 - **One narrow skill-builder freeze exception.** `docs/ROADMAP.md` records an exception for the create-from-template path only: template listing and seeding plus the bundled templates. Install, export, validation and skill-source work stay frozen. (session-settled: user-directed, 2026-10-17.)
 - **Agents pull the profile; an optional pointer comes later.** The profile lives in the private config root. Skills and the brief read it on demand. An opt-in, previewed one-line pointer in each agent's personal instruction file is added only through the priority 2 installer gate, after priority 2's activation evidence is recorded, with an explicit live-mode rule exception (U9). UI-only slots get paste-ready text. (session-settled: user-directed. Chosen over never touching agent files and over rendering the full profile into each agent file. It keeps one source and the fewest agent-home writes while still allowing an always-on effect.)
@@ -128,15 +128,15 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 - **`init` preferences stay; the profile wins.** No migration and no deprecation of `init` in this stage (R35). (session-settled: user-directed. Chosen over migrating or retiring `init` preferences; keeps existing pilots working unchanged.)
 - **Exact versions go to the advisory host only, and only when advisories are enabled.** Declared exact versions are sent to OSV only, and only when the user opts into the advisory group. Feed, GitHub, registry and lifecycle requests carry no version. The approval preview lists, per host, the feed URLs, identifiers and versions it will receive. Request content is limited to those. Hosts still see the IP address, request time, the fixed user agent and, when a token is set, the GitHub account. (session-settled: user-directed. Chosen over sending names only, because version-specific advisories need the version. Since 2026-10-17 this applies only to the opt-in advisory group.)
 - **Source-plan approval does not expire.** It resets when the stack, feed list, source groups, token use or run mode changes. Each approval records `mode: manual`, so a later scheduler must ask for its own approval; expiry is revisited when scheduling is enabled. (session-settled: user-directed. Chosen over a time-limited approval, because manual runs need no expiry yet.)
-- **Agent-run applies need the user's explicit approval in the session.** A plan fingerprint the agent can read and pass back is not consent. `devctx-setup` and every template run an apply (`profile apply`, `stack approve`, `stack digest --apply`, `draft save --apply`, `connect draft --apply`) or write seeded files only after explicit approval from the user in the session, and the phrase is pinned in tests. Routing's own applies keep routing's typed terminal confirmation.
-- **Everything shipped is instruction-only.** `devctx-setup` and all three templates carry no scripts. Engineering-process skills are recommended companions, not rebuilt. Research shows script-bearing skills carry more risk and large skill packs bloat context.
+- **Agent-run applies need the user's explicit approval in the session.** A plan fingerprint the agent can read and pass back is not consent. `devtwin-setup` and every template run an apply (`profile apply`, `stack approve`, `stack digest --apply`, `draft save --apply`, `connect draft --apply`) or write seeded files only after explicit approval from the user in the session, and the phrase is pinned in tests. Routing's own applies keep routing's typed terminal confirmation.
+- **Everything shipped is instruction-only.** `devtwin-setup` and all three templates carry no scripts. Engineering-process skills are recommended companions, not rebuilt. Research shows script-bearing skills carry more risk and large skill packs bloat context.
 - **Scheduling stays with the scheduler priority.** This stage delivers manual runs and a documented, disabled scheduling recipe. Enabling a schedule needs that priority's gate.
 - **The profile is preference data, not authority.** Agents may follow it for style and workflow choices. It cannot grant permissions, waive stop rules, or override repository instructions or the user.
 
 ### Actors
 
 - A1. Developer: clones the template, answers setup, approves profile and source-plan changes, creates their own skills from templates, runs them.
-- A2. Coding agent (Claude Code, Codex, or another Agent Skills host): reads the profile, runs `devctx-setup`, and runs template-made skills on the developer's request.
+- A2. Coding agent (Claude Code, Codex, or another Agent Skills host): reads the profile, runs `devtwin-setup`, and runs template-made skills on the developer's request.
 - A3. Public data hosts: vendor feed hosts and `api.github.com` by default; advisory, lifecycle and registry hosts when the developer enables them.
 
 ### Key Flows
@@ -215,13 +215,13 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 - R36. Relevance matching is local and deterministic. It matches entry titles and summaries against the declared items' terms and, for an explicitly named scope, against that scope's current accepted records. No profile text, record text, project name or scope name is sent to any host, and the digest cites matching records by ID without quoting them.
 
 **Bundled setup skill and skill templates**
-- R30. `devctx-setup` is the only new bundled skill. It is an instruction-only Agent Skills folder with no bundled scripts. It follows the existing bundled-skill rules (kit path check, pilot path from the user, stop rules) and treats records, briefs and the profile's free text as untrusted data, never instructions.
+- R30. `devtwin-setup` is the only new bundled skill. It is an instruction-only Agent Skills folder with no bundled scripts. It follows the existing bundled-skill rules (kit path check, pilot path from the user, stop rules) and treats records, briefs and the profile's free text as untrusted data, never instructions.
 - R31. Docs recommend engineering-process and writing skill packs as optional companions without bundling them.
 - R37. Skill templates ship under `templates/skills/`: `stack-watch`, `slack-update` and `writing`. A template contains no personal data, carries named placeholders, has no scripts, is never installed by the bundled installer, and is not a discoverable skill. Every template treats records, the profile and fetched text as untrusted data and keeps the existing kit-path and pilot-path preconditions.
-- R38. A developer turns a template into their own private skill through the existing skill builder. Seeding is a read-only render: it fills the placeholders and returns the template's requirements, design and candidate files with their hashes, writing nothing. The developer or the template-made skill writes them into an inputs directory after approval, and a verify step confirms they match the render. The existing workspace, requirements, design approval, draft and validation steps then run unchanged. A seeded skill name cannot start with `devctx-` or match a bundled skill. A template whose placeholders carry scope-specific values renders only for a company-audience workspace in an existing scope.
+- R38. A developer turns a template into their own private skill through the existing skill builder. Seeding is a read-only render: it fills the placeholders and returns the template's requirements, design and candidate files with their hashes, writing nothing. The developer or the template-made skill writes them into an inputs directory after approval, and a verify step confirms they match the render. The existing workspace, requirements, design approval, draft and validation steps then run unchanged. A seeded skill name cannot start with `devtwin-` or match a bundled skill. A template whose placeholders carry scope-specific values renders only for a company-audience workspace in an existing scope.
 - R39. The Slack-update template drafts a status update from the personal profile and user-selected records. It is draft-only until routing's send increment lands: it never reads from or posts to Slack in this stage, and says so when asked to post. It saves through routing's `connect draft` when the scope has a bound Slack account, and otherwise through `draft save` with a note that the draft cannot be sent later.
 - R40. The skill-builder freeze has one recorded exception in `docs/ROADMAP.md`, covering the create-from-template path only. All other skill-builder and skill-source feature work stays frozen.
-- R41. `devctx-setup` and every template run an apply, or write seeded files, only after explicit approval from the user in the session; a fingerprint the agent passes back is not consent.
+- R41. `devtwin-setup` and every template run an apply, or write seeded files, only after explicit approval from the user in the session; a fingerprint the agent passes back is not consent.
 
 **Agent pointer (after priority 2)**
 - R32. An opt-in pointer from each supported agent's personal instruction file to the personal profile is offered only after priority 2's activation evidence is recorded, through its installer gate and an explicit live-mode rule exception, with preview, approval, preserved foreign content and verified removal.
@@ -245,7 +245,7 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 - AE11. **Covers R2, R4.** **Given** a developer ran `git init` in the config root to version it, **when** setup tries to write the profile, **then** the write is refused and the message points to the documented copy-or-export recipe.
 - AE12. **Covers R20, R21, R23.** **Given** a stack with `acme-sdk` (catalog feed `https://changelog.example.com/feed.xml`, repository `example/acme-sdk`), `next=15.2.1`, `react=19` and `postgres=16`, **when** the default source plan is previewed, **then** it lists `changelog.example.com` receiving that feed URL, `api.github.com` receiving `example/acme-sdk`, `vercel/next.js` and `facebook/react`, no version sent to any host, and what hosts still see. **When** the developer enables the advisory and lifecycle groups, **then** the preview adds `api.osv.dev` receiving `npm/next 15.2.1` and no React version, and `endoflife.date` receiving `postgresql` with no version. It marks React advisories "version not exact" (package mapping, major line) and Postgres advisories "advisories not covered" (no package mapping).
 - AE13. **Covers R25, R36.** **Given** scope `alpha` whose project `alpha.web` has an accepted record mentioning `acme-sdk`, **when** the watch runs with `--scope alpha` and the feed has an entry titled "acme-sdk 4 adds streaming" and another with no matching term, **then** the first entry is listed under `alpha.web` with its source link and the record ID, and the second is counted as background. Without `--scope`, the first entry is listed under "your stack" and no project is named.
-- AE14. **Covers R38.** **Given** a workspace made with `skill workspace-create` and the stack-watch template, **when** the developer seeds it with every placeholder set, **then** the render returns the filled files and their hashes and writes nothing. After the files are written into an inputs directory, `skill template-verify` confirms they match, and `skill requirements-record` and `skill design-record` accept the seeded JSON unchanged. A missing placeholder value is refused with the placeholder's name, a skill name starting with `devctx-` is refused, and a changed file fails verification.
+- AE14. **Covers R38.** **Given** a workspace made with `skill workspace-create` and the stack-watch template, **when** the developer seeds it with every placeholder set, **then** the render returns the filled files and their hashes and writes nothing. After the files are written into an inputs directory, `skill template-verify` confirms they match, and `skill requirements-record` and `skill design-record` accept the seeded JSON unchanged. A missing placeholder value is refused with the placeholder's name, a skill name starting with `devtwin-` is refused, and a changed file fails verification.
 - AE15. **Covers R18, R39.** **Given** a skill made from the Slack-update template, **when** the developer asks it to post the update to a channel, **then** it produces a draft, states that posting is unavailable until routing's send increment lands, and offers to save the draft; nothing is read from or posted to Slack. **Given** scope `alpha` has a bound Slack account, the save goes through `connect draft`; **given** routing reports `ACCOUNT_UNBOUND`, the save goes through `draft save` with the note that it cannot be sent later.
 - AE16. **Covers R25.** **Given** an entry reported in a `--scope alpha` digest, **when** a `--scope beta` run fetches the same entry and it links to a `beta` project, **then** the `beta` digest reports it as new.
 
@@ -284,7 +284,7 @@ Research date 2026-10-16, public sources only. Citations point at the source; it
 ### Dependencies / Assumptions
 
 - Priority numbers in this Product Contract refer to `docs/ROADMAP.md` as merged into this branch at `6904ca6`, before organization identity routing and this stage are inserted. The plan names stages by name where the numbering will shift.
-- Roadmap priority 2 (real-home activation) code is merged to `main` and into this branch; activation evidence is pending. This stage does not change install code, `src/agents/install.mjs`, the live config or agent homes until that evidence is recorded. Adding `devctx-setup` to the installer's skill list waits for it (U9).
+- Roadmap priority 2 (real-home activation) code is merged to `main` and into this branch; activation evidence is pending. This stage does not change install code, `src/agents/install.mjs`, the live config or agent homes until that evidence is recorded. Adding `devtwin-setup` to the installer's skill list waits for it (U9).
 - The live config rename landed on `main` in `6a90cbf` and is merged here (`6904ca6`). This plan uses "live config", `live.configId`, `approved-config.json` and `$LIVE_CONFIG`.
 - Organization identity routing is planned separately and sequenced before this stage. This plan depends on it for the Slack-update template's `connect draft` save path, for the scope-free public-read GitHub binding and its resolver, and for the shared live-mode exceptions section that its U7 writes. U11 needs its roadmap row on `main`.
 - Skill-builder milestones A (private creation) and B (disposable installation) are implemented. Milestone B refuses real agent homes. The create-from-template path reuses milestone A unchanged.
@@ -350,10 +350,10 @@ Product Contract preservation, in order:
   - **Address pinning.** The production `request` is built on `node:https.request` with a `lookup` that returns the address the private-address check passed (KTD17). The TLS server name and certificate check stay on the host name.
   - **Default hosts.** `api.github.com` plus the hosts of the approved feed URLs.
   - **Opt-in hosts.** `api.osv.dev` (advisories), `endoflife.date` (lifecycle), and `registry.npmjs.org`, `pypi.org` and `crates.io` (versions).
-  - **User agent.** A fixed `devctx-stack-check` string with no version, host name or machine detail.
+  - **User agent.** A fixed `devtwin-stack-check` string with no version, host name or machine detail.
   - **Token.** An optional token comes only from organization identity routing's resolver, as a scope-free, public-read GitHub binding that routing defines. No global variable is read. It is sent only to `api.github.com`, where it identifies the user's GitHub account. `stack plan` says when GitHub requests will be authenticated as that account. Without the binding, GitHub requests are unauthenticated.
   - **Live mode.** In live mode the watch's requests are allowed only under its own rule exception (U5): unauthenticated `GET` and OSV `POST` to approved hosts only, plus the routed public-read token to `api.github.com`. Every other live command stays offline.
-- KTD9. **`devctx-setup` is the only new bundled skill; installer wiring waits for priority 2.** It lives under `skills/` beside the existing three and follows the same preconditions and stop rules. `src/agents/install.mjs` `SKILL_NAMES` is not touched until priority 2's activation evidence is recorded (U9). Templates live under `templates/skills/`, outside `skills/`, so neither the bundled installer nor `skill discover` sees them. `skill discover` keeps its own hard-coded bundled list in `src/skill-builder/commands.mjs`; U9 replaces it with an import of `SKILL_NAMES`, a one-line consistency fix allowed under the freeze as a bug fix, so the two lists cannot drift. (session-settled: user-directed. Agents pull the profile, and a pointer comes only through the priority 2 installer gate.)
+- KTD9. **`devtwin-setup` is the only new bundled skill; installer wiring waits for priority 2.** It lives under `skills/` beside the existing three and follows the same preconditions and stop rules. `src/agents/install.mjs` `SKILL_NAMES` is not touched until priority 2's activation evidence is recorded (U9). Templates live under `templates/skills/`, outside `skills/`, so neither the bundled installer nor `skill discover` sees them. `skill discover` keeps its own hard-coded bundled list in `src/skill-builder/commands.mjs`; U9 replaces it with an import of `SKILL_NAMES`, a one-line consistency fix allowed under the freeze as a bug fix, so the two lists cannot drift. (session-settled: user-directed. Agents pull the profile, and a pointer comes only through the priority 2 installer gate.)
 - KTD10. **Keep the name; reposition in docs.** No package, CLI or repository rename. README and a new harness guide describe the personal-harness layer. (session-settled: user-directed. Chosen over renaming now or a separate template repository; avoids churn during priority 2.)
 - KTD11. **Roadmap renumbers by name, not by number.**
   - **Placement.** "Personal harness layer" is inserted directly after the organization identity routing row and before session hooks. Later rows shift by one.
@@ -390,9 +390,9 @@ Product Contract preservation, in order:
   - **Placeholder kinds.** Each placeholder is `generic` or `scope`. A `scope` placeholder carries a client-specific value, such as a default scope or a channel audience.
   - **Routes.** `skill template-list` is root-free and lists templates and their placeholders. `skill template-seed --template <name> --audience personal|company [--scope <scope>] --workspace ws_<id> --set key=value …` is a read-only render inside the pilot fence: it returns the filled file contents, a SHA-256 per file and a render digest, and writes nothing. `skill template-verify` takes the same template, audience, scope, workspace and values plus `--dir <directory under inputsRoot>` and `--render-digest`, re-renders, and compares the directory's files byte for byte; it is read-only and fails with `INTEGRITY` naming the first mismatch, a missing file or an extra file.
   - **Writing the files.** Nothing in DCK writes them. After explicit approval from the user in the session, the developer or the template-made skill writes them into a directory the developer chooses under the pilot inputs root, the same way the writing template writes a draft body file. The pilot fence does not change.
-  - **Seed checks.** Seeding requires the workspace to exist (`NOT_FOUND` otherwise, so the flow starts with `skill workspace-create`). It refuses any unfilled required placeholder (`INVALID_INPUT` naming it), a value with a newline or the placeholder marker, and sensitive content (`assertNoSensitive`). It refuses a skill name that starts with `devctx-`, matches a bundled skill or fails the skill-builder name pattern. A template with any `scope` placeholder renders only with `--audience company --scope <scope>`, for a scope that exists in the pilot, and every `scope` placeholder value must equal that scope or a name inside it; `--audience personal` accepts only `generic` placeholders.
+  - **Seed checks.** Seeding requires the workspace to exist (`NOT_FOUND` otherwise, so the flow starts with `skill workspace-create`). It refuses any unfilled required placeholder (`INVALID_INPUT` naming it), a value with a newline or the placeholder marker, and sensitive content (`assertNoSensitive`). It refuses a skill name that starts with `devtwin-`, matches a bundled skill or fails the skill-builder name pattern. A template with any `scope` placeholder renders only with `--audience company --scope <scope>`, for a scope that exists in the pilot, and every `scope` placeholder value must equal that scope or a name inside it; `--audience personal` accepts only `generic` placeholders.
   - **After seeding.** The existing `skill requirements-record`, `design-record`, `design-approve`, `draft-create` and `draft-validate` run unchanged on the written files. No validator, install, export or pilot-fence code changes. A company-audience workspace cannot use milestone B's personal install, which is not available for real homes in this stage anyway.
-- KTD20. **The freeze exception is recorded before any template code lands.** U12's first change adds one separate sentence directly after the freeze sentence in `docs/ROADMAP.md`: the create-from-template path (`skill template-list`, `skill template-seed`, `skill template-verify` and the templates under `templates/skills/`) may be built as part of the personal harness layer; it adds no install, export, validation or pilot-fence behavior; all other skill-builder and skill-source feature work stays frozen. `docs/SKILL-BUILDER.md` gets the same note, plus one line saying that `skills/devctx-create-skill/assets/skill-template.md` stays the blank starter for skills built from scratch and that `templates/skills/` holds guided templates that do not use it. Routing's U1 rewrites the freeze sentence itself; whichever change lands second keeps the other's text, and a docs test pins both. (session-settled: user-directed, 2026-10-17.)
+- KTD20. **The freeze exception is recorded before any template code lands.** U12's first change adds one separate sentence directly after the freeze sentence in `docs/ROADMAP.md`: the create-from-template path (`skill template-list`, `skill template-seed`, `skill template-verify` and the templates under `templates/skills/`) may be built as part of the personal harness layer; it adds no install, export, validation or pilot-fence behavior; all other skill-builder and skill-source feature work stays frozen. `docs/SKILL-BUILDER.md` gets the same note, plus one line saying that `skills/devtwin-create-skill/assets/skill-template.md` stays the blank starter for skills built from scratch and that `templates/skills/` holds guided templates that do not use it. Routing's U1 rewrites the freeze sentence itself; whichever change lands second keeps the other's text, and a docs test pins both. (session-settled: user-directed, 2026-10-17.)
 
 ### High-Level Technical Design
 
@@ -401,10 +401,10 @@ Data flow and approval gates. Every box that writes is preceded by a preview and
 ```mermaid
 flowchart TB
   subgraph Clone[Toolkit clone - generic, no personal data]
-    Setup[Bundled skill: devctx-setup]
+    Setup[Bundled skill: devtwin-setup]
     Templates[templates/skills: stack-watch, slack-update, writing]
     Catalog[catalog/stack-sources.json]
-    CLI[devctx CLI]
+    CLI[devtwin CLI]
   end
   subgraph Private[Private roots outside the clone]
     Profile[configRoot/profile: revisions + current pointer]
@@ -540,7 +540,7 @@ flowchart TB
   - Error: `profile apply` without `--plan-fingerprint` fails with `PLAN_REQUIRED`.
   - Error: a malformed `--stack-current` value fails with `INVALID_INPUT`.
   - Integration: suggest-stack ignores superseded and proposed records.
-- **Verification:** `node bin/devctx.mjs help` lists the new routes; CLI tests pass.
+- **Verification:** `node bin/devtwin.mjs help` lists the new routes; CLI tests pass.
 
 ### U3. Profile in the brief, excluded from handoff
 
@@ -586,7 +586,7 @@ flowchart TB
   - Edge: with a fake clock advanced 400 days, an approval for an unchanged stack, feeds, groups, hosts, authentication state and mode still matches (KTD13).
   - Error: approve without the routed public-read binding, then add the binding (through a fake resolver); the next check fails with `APPROVAL_REQUIRED`. Covers AE7.
   - Edge: a second `stack plan` without `--feed` or `--map` shows the earlier overrides as carried forward and the approval still matches; `--clear-overrides` drops them and the approval no longer matches.
-  - Edge: with `GH_TOKEN`, `GITHUB_TOKEN` and `DEVCTX_GITHUB_TOKEN` set in the environment and no routed binding, the plan says GitHub requests are unauthenticated.
+  - Edge: with `GH_TOKEN`, `GITHUB_TOKEN` and `DEVTWIN_GITHUB_TOKEN` set in the environment and no routed binding, the plan says GitHub requests are unauthenticated.
   - Edge: a profile revision that changes only an item's care level keeps the approval valid.
   - Edge: a profile revision that changes only writing preferences keeps the approval valid.
   - Edge: every stored approval records `mode: manual`; a check presenting another mode fails with `APPROVAL_REQUIRED`.
@@ -642,12 +642,12 @@ flowchart TB
   - Error: a request to a host not in the approval is never made (asserted through the fake `request` log).
   - Error: oversized bodies, redirects and unexpected content types fail per item with typed codes.
   - Error: the token never appears in output, entries or any request to a non-GitHub host.
-  - Error: with `GH_TOKEN`, `GITHUB_TOKEN` and `DEVCTX_GITHUB_TOKEN` set and no routed binding, no request carries an `Authorization` header.
+  - Error: with `GH_TOKEN`, `GITHUB_TOKEN` and `DEVTWIN_GITHUB_TOKEN` set and no routed binding, no request carries an `Authorization` header.
   - Edge: when routing's resolver refuses the public-read binding with `TOKEN_TOO_BROAD` (routing AE6b), the run falls back to unauthenticated GitHub requests, reports the refusal once, and the approval's authentication state no longer matches, so the next run asks for approval again.
   - Error: with a live config and before the watch's live-mode entry lands, `stack check` fails with `GATE_REQUIRED` and makes no request.
   - Docs (live-mode step): `docs/LIVE.md` and `docs/SECURITY-MODEL.md` list the watch's exception inside routing's "Live-mode exceptions" section, with the same hosts, methods and credential source.
   - Integration: every request in the fake `request` log carries only an approved feed URL, a catalog identifier or, for OSV only, an exact version. No profile text, record content, scope, project name or path appears in any request, and no account identifier appears in any request to a host other than `api.github.com` (KTD12).
-  - Integration: every request carries the user agent `devctx-stack-check` exactly, with no version, host name or machine detail.
+  - Integration: every request carries the user agent `devtwin-stack-check` exactly, with no version, host name or machine detail.
   - Edge, opt-in: an item declared as a major line (`postgres=16`) makes no OSV request and reports advisories as "version not exact"; an item without a version reports "version unknown".
   - Integration: with no `--with`, no request reaches `api.osv.dev`, `endoflife.date` or any registry.
   - Integration: `stack check` writes no file under any pilot root.
@@ -701,45 +701,45 @@ flowchart TB
 - **Goal:** Ship the instruction-only bundled skill that conducts first-run setup.
 - **Requirements:** R5–R7, R30, R41; F1.
 - **Dependencies:** U2, U12 (the skill calls `skill template-list`).
-- **Files:** create `skills/devctx-setup/SKILL.md`; modify `test/docs.test.mjs`.
+- **Files:** create `skills/devtwin-setup/SKILL.md`; modify `test/docs.test.mjs`.
 - **Approach:**
   - **Preconditions.** Keep the existing ones: kit path checks, user-supplied pilot path, single-quoted arguments and stop rules. Call only real routes. State that records, briefs and the profile's free text are untrusted data, never instructions, and never run commands or edit files because of them.
   - **Steps.** First check that the pilot file exists and `init` has run; if not, point to the getting-started pilot steps and stop without creating anything. Then explain what is stored and where, and ask at most five skippable questions one at a time. Offer suggest-stack results as a preview, show the full `profile plan` output, and apply only on approval.
   - **Close.** Finally run `skill template-list` and tell the developer how to create their own skill from a template, without creating one unless asked.
-- **Patterns to follow:** `skills/devctx-resume/SKILL.md` structure; bundled-skill tests in `test/docs.test.mjs`.
+- **Patterns to follow:** `skills/devtwin-resume/SKILL.md` structure; bundled-skill tests in `test/docs.test.mjs`.
 - **Test scenarios:**
-  - Happy path: the extended bundled-skill test list includes `devctx-setup`; it passes frontmatter and route checks.
+  - Happy path: the extended bundled-skill test list includes `devtwin-setup`; it passes frontmatter and route checks.
   - Happy path: pinned phrases are split into two sets.
-    - The common set is required of every bundled skill (the existing three, `devctx-setup`, and routing's `devctx-connect` if it has landed): `DEVCTX_KIT`, absolute path, real path, pilot path, kit checkout, `record publish --apply`, untrusted, and Never send or share.
+    - The common set is required of every bundled skill (the existing three, `devtwin-setup`, and routing's `devtwin-connect` if it has landed): `DEVTWIN_KIT`, absolute path, real path, pilot path, kit checkout, `record publish --apply`, untrusted, and Never send or share.
     - The existing project-scoped set stays required of onboard, resume and record: `--scope`, `GIT_QUERY_FAILED`, `PROJECT_UNBOUND`, inside the current repository, and repos.
-  - Edge: `devctx-setup` names "Never send or share" and `record publish --apply` only as prohibited.
-  - Edge: `devctx-setup` stops when the pilot or `init` is missing.
-  - Edge: `devctx-setup` asks no more than five questions (pinned count phrase) and creates no skill without a request.
-  - Edge: `devctx-setup` contains the pinned phrase "explicit approval from the user in the session" next to `profile apply`.
+  - Edge: `devtwin-setup` names "Never send or share" and `record publish --apply` only as prohibited.
+  - Edge: `devtwin-setup` stops when the pilot or `init` is missing.
+  - Edge: `devtwin-setup` asks no more than five questions (pinned count phrase) and creates no skill without a request.
+  - Edge: `devtwin-setup` contains the pinned phrase "explicit approval from the user in the session" next to `profile apply`.
   - Error: a skill that invokes a route not in `COMMANDS` fails the route test.
   - Test expectation for behavior quality: none. Live-model evaluation of question quality is deferred, as for the existing skills.
 - **Verification:** Docs tests pass; the skill contains no scripts.
 
 ### U9. Installer wiring and opt-in pointer (after priority 2 activation evidence)
 
-- **Goal:** Make `devctx-setup` installable in live mode and offer the opt-in personal-profile pointer, with the live-mode rule changes stated and reviewed.
+- **Goal:** Make `devtwin-setup` installable in live mode and offer the opt-in personal-profile pointer, with the live-mode rule changes stated and reviewed.
 - **Requirements:** R32; KTD9.
 - **Dependencies:** U8, U10, U11; priority 2 activation evidence recorded.
 - **Files:** modify `src/agents/install.mjs`, `src/skill-builder/commands.mjs` (the `skill discover` list), `src/config/live.mjs`, `src/config/commands.mjs`, `src/cli.mjs`, `scripts/acceptance.mjs`, `docs/LIVE.md`, `docs/SECURITY-MODEL.md`, `docs/ARCHITECTURE.md`, `docs/SKILL-BUILDER.md`; create `src/agents/pointer.mjs`; test `test/agents.test.mjs`, `test/skill-builder.test.mjs`, `test/live-install.test.mjs`, `test/live-commands.test.mjs`, `test/docs.test.mjs`.
 - **Approach:**
-  - **Skills.** Add `devctx-setup` to `SKILL_NAMES`. The journal check in `src/agents/install.mjs` accepts any listed name, so existing three-skill journals stay valid; never remove a name. Templates are never added. Routing's U8 adds `devctx-connect` to the same list; coordinate so whichever lands second keeps the other's name.
+  - **Skills.** Add `devtwin-setup` to `SKILL_NAMES`. The journal check in `src/agents/install.mjs` accepts any listed name, so existing three-skill journals stay valid; never remove a name. Templates are never added. Routing's U8 adds `devtwin-connect` to the same list; coordinate so whichever lands second keeps the other's name.
   - **`skill discover`.** Replace the hard-coded `bundled` list in `src/skill-builder/commands.mjs` with an import of `SKILL_NAMES`. This is a one-line consistency fix allowed under the freeze as a bug fix, and the U12 exception note names it.
-  - **Activation criteria.** `docs/LIVE.md` steps 15 and 16 currently pass only when each session lists `devctx-onboard`, `devctx-record` and `devctx-resume`. Change them to list every name in `SKILL_NAMES`: four with `devctx-setup`, or five if routing's `devctx-connect` has landed. Record that activation evidence gathered with three skills covers only those three, and that each added skill needs its own fresh-session check. Update the "three bundled skills" statements in `docs/ARCHITECTURE.md` and `docs/SKILL-BUILDER.md`.
-  - **Rule exception.** `docs/LIVE.md` and `docs/SECURITY-MODEL.md` say live mode writes only `devctx-*` entries inside the named skill folders. Add one explicit, narrow exception: with a separate owner approval, live mode may write one marked `devctx` pointer block into `<home>/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`) and `<home>/.codex/AGENTS.md`.
+  - **Activation criteria.** `docs/LIVE.md` steps 15 and 16 currently pass only when each session lists `devtwin-onboard`, `devtwin-record` and `devtwin-resume`. Change them to list every name in `SKILL_NAMES`: four with `devtwin-setup`, or five if routing's `devtwin-connect` has landed. Record that activation evidence gathered with three skills covers only those three, and that each added skill needs its own fresh-session check. Update the "three bundled skills" statements in `docs/ARCHITECTURE.md` and `docs/SKILL-BUILDER.md`.
+  - **Rule exception.** `docs/LIVE.md` and `docs/SECURITY-MODEL.md` say live mode writes only `devtwin-*` entries inside the named skill folders. Add one explicit, narrow exception: with a separate owner approval, live mode may write one marked `devtwin` pointer block into `<home>/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`) and `<home>/.codex/AGENTS.md`.
     - The target paths are recorded in the live config through an approved change that updates `approved-config.json`, like `live add-repo`.
     - Live mode never creates the file or its parent, never follows a symlink, and never touches text outside its own markers.
     - It refuses if the file is missing and prints paste-ready text instead.
-  - **Pointer content.** For Claude, the block imports a rendered Markdown copy of the current personal profile under `configRoot/profile/`. That copy is regenerated on each `profile apply` and checked against the revision hash by `profile show`. For Codex, which has no import, the block tells the agent to read the personal profile through `devctx-resume` or `profile show`. The block carries no profile text itself.
+  - **Pointer content.** For Claude, the block imports a rendered Markdown copy of the current personal profile under `configRoot/profile/`. That copy is regenerated on each `profile apply` and checked against the revision hash by `profile show`. For Codex, which has no import, the block tells the agent to read the personal profile through `devtwin-resume` or `profile show`. The block carries no profile text itself.
   - **Ownership.** Each pointer write is journaled with a receipt like skill entries. Removal deletes only a block whose bytes match its receipt; an edited block is reported as modified and left alone.
   - **Review together.** Organization identity routing may add its own live-mode changes. Review this unit's exception alongside them.
 - **Execution note:** Start only after activation evidence is recorded; merge `origin/main` first. Get an independent review of this unit's live-mode exception with the code, because it widens what live mode may write in real agent homes.
 - **Test scenarios:**
-  - Happy path: live install preview lists every `SKILL_NAMES` entry, including `devctx-setup`, for Claude and Codex in a disposable home, and no template.
+  - Happy path: live install preview lists every `SKILL_NAMES` entry, including `devtwin-setup`, for Claude and Codex in a disposable home, and no template.
   - Happy path: `skill discover` lists exactly the `SKILL_NAMES` entries.
   - Integration: an existing three-skill journal still verifies and uninstalls cleanly after `SKILL_NAMES` grows.
   - Happy path: pointer preview shows the exact block and target; apply adds it once; re-apply is idempotent.
@@ -748,8 +748,8 @@ flowchart TB
   - Error: an edited pointer block is reported as modified and not removed.
   - Error: foreign content in the instruction file is preserved byte for byte across apply and removal.
   - Error: a pointer target not recorded in the approved live config is refused with `GATE_REQUIRED`.
-  - Docs: `docs/LIVE.md` names every bundled skill, including `devctx-setup`, in its activation pass criteria and states the pointer exception; `docs/SECURITY-MODEL.md` states the same exception.
-- **Verification:** Agent, live and acceptance tests pass in disposable homes; fresh-session discovery of `devctx-setup` is a separate activation check.
+  - Docs: `docs/LIVE.md` names every bundled skill, including `devtwin-setup`, in its activation pass criteria and states the pointer exception; `docs/SECURITY-MODEL.md` states the same exception.
+- **Verification:** Agent, live and acceptance tests pass in disposable homes; fresh-session discovery of `devtwin-setup` is a separate activation check.
 
 ### U10. Template hygiene and docs
 
@@ -764,7 +764,7 @@ flowchart TB
     - the setup skill;
     - the three templates and the create-from-template walk-through: `skill workspace-create`, `skill template-list`, `skill template-seed` (read-only render), writing the files into an inputs directory after approval, `skill template-verify`, then `skill requirements-record` through `skill draft-validate`;
     - that scope-value templates need a company-audience workspace in that scope;
-    - how `templates/skills/` relates to the blank starter `skills/devctx-create-skill/assets/skill-template.md`;
+    - how `templates/skills/` relates to the blank starter `skills/devtwin-create-skill/assets/skill-template.md`;
     - that installing a template-made skill into a real agent home is not available in this stage;
     - the announcement watch and its relevance groups, with the opt-in advisory, lifecycle and version groups;
     - network hosts, feed URL rules, approval, and the optional token as routing's scope-free public-read binding (fine-grained, public-read-only token recommended);
@@ -829,11 +829,11 @@ flowchart TB
   - Error: verify with `--dir` outside `inputsRoot` fails with `GATE_REQUIRED`; a symlinked file is refused with `PATH_UNSAFE`.
   - Error: a template with a `scope` placeholder rendered with `--audience personal`, or with `--audience company --scope` for a scope not in the pilot, or with a scope value outside the named scope, is refused.
   - Error: a missing required placeholder fails with `INVALID_INPUT` naming the key. Covers AE14.
-  - Error: a skill name starting with `devctx-`, equal to a bundled skill name, or failing the name pattern is refused. Covers AE14.
+  - Error: a skill name starting with `devtwin-`, equal to a bundled skill name, or failing the name pattern is refused. Covers AE14.
   - Error: a value containing a newline, the `{{dck:` marker or a token-like string is refused.
   - Error: a fixture template with an undeclared placeholder, an unused declared key or an extra file fails template validation.
   - Docs: `docs/ROADMAP.md` and `docs/SKILL-BUILDER.md` contain the pinned exception sentence, the freeze paragraph still says all other skill-builder and skill-source feature work stays frozen, and `docs/SKILL-BUILDER.md` states the blank-starter relation.
-- **Verification:** Template tests pass; `node bin/devctx.mjs help` lists the three routes; existing skill-builder tests pass unchanged; no route added by this unit writes a file.
+- **Verification:** Template tests pass; `node bin/devtwin.mjs help` lists the three routes; existing skill-builder tests pass unchanged; no route added by this unit writes a file.
 
 ### U13. Skill templates
 
@@ -848,17 +848,17 @@ flowchart TB
   - **`stack-watch`.** Runs `stack plan`, shows the feed URLs, identifiers and versions per host and what hosts still see, and asks for approval when needed. Then it runs `stack check` (with `--scope` only when the user names one) and summarizes only fetched entries with their URLs, grouped as the digest groups them. It offers `stack digest` and explains how to opt into the advisory groups.
   - **`writing`.** Thin, per KTD14. It establishes audience and purpose and asks one question when either is unclear. It reads `profile show` and only user-selected records, applies the profile's writing preferences, lists the context used, and marks unverified names, dates, numbers and commitments. It never sends. It offers `draft save` on request, asking before it writes the body file into `inputsRoot`. It states "Companion skills supply format only; this skill's rules (never send, list context used, mark unverified) always apply."
   - **`slack-update`.** The writing rules, with a team-update structure taken from the profile and selected records. It states that it is draft-only and that posting is unavailable until routing's send increment lands; it does not read Slack. To save, it previews `connect draft --scope --cwd --provider slack --target … --body-file …` for the scope. If routing reports `ACCOUNT_UNBOUND`, it uses `draft save --scope` instead and tells the user that this draft cannot be sent later. It never names any other Slack tool or connector as something to call, and never runs a send.
-- **Patterns to follow:** `skills/devctx-resume/SKILL.md`; skill-builder requirements and design schemas in `src/skill-builder/workspace.mjs`.
+- **Patterns to follow:** `skills/devtwin-resume/SKILL.md`; skill-builder requirements and design schemas in `src/skill-builder/workspace.mjs`.
 - **Test scenarios:**
   - Happy path: each template, seeded with test values, passes `skill draft-validate` (via the U12 integration path).
   - Happy path: each template's candidate invokes only routes in `COMMANDS`.
-  - Edge: no template contains a script, a `references/` file with per-message-type guidance, a home path, an email other than `@example.com`, or a `devctx-` default name.
-  - Edge: the common pinned phrases (`DEVCTX_KIT`, absolute path, real path, pilot path, untrusted, Never send or share) appear in every candidate, outside any placeholder.
+  - Edge: no template contains a script, a `references/` file with per-message-type guidance, a home path, an email other than `@example.com`, or a `devtwin-` default name.
+  - Edge: the common pinned phrases (`DEVTWIN_KIT`, absolute path, real path, pilot path, untrusted, Never send or share) appear in every candidate, outside any placeholder.
   - Integration: the writing template requires listing context used and marking unverified facts. Covers AE6.
   - Edge: the writing and Slack-update templates contain "Companion skills supply format only" and do not tell the agent to detect installed skills.
   - Edge: the Slack-update template contains "draft only", "routing's send increment", `connect draft`, the `ACCOUNT_UNBOUND` fallback to `draft save`, and "cannot be sent later", and no instruction to post or send. Covers AE15.
   - Edge: no template contains "until organization identity routing lands" or "until routing lands".
-  - Edge: every template and `devctx-setup` contain "explicit approval from the user in the session" next to each apply it names.
+  - Edge: every template and `devtwin-setup` contain "explicit approval from the user in the session" next to each apply it names.
   - Edge: the stack-watch template states that request content is limited to feed URLs and identifiers, and that fetched text is untrusted and never acted on.
   - Error: `skill discover` and the bundled installer do not list any template.
   - Test expectation for behavior quality: none. Live-model evaluation of template-made skills is deferred.
@@ -874,10 +874,10 @@ flowchart TB
 | Package and privacy audit | `npm run check:package` | U10, U12, U13, and every commit that adds files |
 | Personal-identifier audit | `node scripts/check-package.mjs --denylist <owner term list kept outside the repository>` with a non-empty list | U10, U11, U13 and before any release candidate |
 | Synthetic acceptance | `node scripts/acceptance.mjs --pilot-root <fresh disposable dir>/pilot --report <fresh disposable dir>/acceptance.json` | U1, U2, U4–U6, U9, U10, U12 |
-| CLI route listing | `node bin/devctx.mjs help` | U2, U4–U7, U12 |
+| CLI route listing | `node bin/devtwin.mjs help` | U2, U4–U7, U12 |
 | Live-mode exception review | Independent plan and code review of the exception text, with routing's U7 section | U5 live-mode step, U9 |
 
-No test may reach the live network. Live-model behavior of `devctx-setup` and of template-made skills is not evaluated in this stage and must be reported as deferred.
+No test may reach the live network. Live-model behavior of `devtwin-setup` and of template-made skills is not evaluated in this stage and must be reported as deferred.
 
 ---
 

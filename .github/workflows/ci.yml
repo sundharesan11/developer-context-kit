@@ -59,7 +59,7 @@ jobs:
         run: npm test
       - name: Run disposable acceptance checks
         run: |
-          PILOT_PARENT="$(mktemp -d "$RUNNER_TEMP/devctx-ci.XXXXXX")"
+          PILOT_PARENT="$(mktemp -d "$RUNNER_TEMP/devtwin-ci.XXXXXX")"
           PILOT_PARENT="$(cd "$PILOT_PARENT" && pwd -P)"
           node scripts/acceptance.mjs --pilot-root "$PILOT_PARENT/pilot" --report "$PILOT_PARENT/report.json"
           node --input-type=module - "$PILOT_PARENT/report.json" <<'NODE'

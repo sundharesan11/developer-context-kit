@@ -1,9 +1,9 @@
 ---
 title: Roadmap
-description: What devctx can do today and what comes next, in priority order.
+description: What devtwin can do today and what comes next, in priority order.
 ---
 
-devctx is an early local tool, not yet a packaged release. The order below favors daily use: protect private state, prove it on real projects, connect sessions, then bring over an existing setup.
+devtwin is an early local tool, not yet a packaged release. The order below favors daily use: protect private state, prove it on real projects, connect sessions, then bring over an existing setup.
 
 ## Available today
 
@@ -13,8 +13,8 @@ devctx is an early local tool, not yet a packaged release. The order below favor
 - Agent proposals that you review and publish.
 - Private, selected-record handoff packets.
 - Bundled skills for Claude Code and Codex, with journaled install, uninstall, recovery and rollback check.
-- Live mode: a private store under `~/.devctx`, a pinned kit clone and your real skill folders.
-- Personal profile, `devctx-setup` skill and skill templates.
+- Live mode: a private store under `~/.devtwin`, a pinned kit clone and your real skill folders.
+- Personal profile, `devtwin-setup` skill and skill templates.
 - Manual stack watch with approved hosts and dated digests.
 - Private drafts.
 - Skill builder and third-party skill sources, installing into disposable pilot homes.
@@ -48,4 +48,4 @@ Skill-builder and skill-source features are frozen until priorities 1 to 4 ship.
 - The default onboarding request ID comes from your flags, not file contents; pass a new `--request-id` after the repository changes.
 - Bundled skills are checked for command routes, not every flag.
 
-See [Limitations](/docs/security/limitations/) for the full list, and the [repository](https://github.com/sundharesan11/developer-context-kit) for current work.
+See [Limitations](/docs/security/limitations/) for the full list, and the [repository](https://github.com/sundharesan11/devtwin) for current work.

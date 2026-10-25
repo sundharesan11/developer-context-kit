@@ -3,7 +3,7 @@ import { open, lstat, unlink } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
 import { ensurePrivatePath } from "./fsx.mjs";
 import { sha256 } from "./canonical.mjs";
@@ -15,7 +15,7 @@ async function readLock(path) {
   const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const st = await handle.stat();
-    if (!st.isFile()) throw new DevctxError("PATH_UNSAFE", "Lock is not a regular file");
+    if (!st.isFile()) throw new DevtwinError("PATH_UNSAFE", "Lock is not a regular file");
     const buf = Buffer.alloc(LOCK_LIMIT); const { bytesRead } = await handle.read(buf, 0, LOCK_LIMIT, 0);
     return { bytes: buf.subarray(0, bytesRead), dev: st.dev, ino: st.ino };
   } finally { await handle.close(); }
@@ -42,7 +42,7 @@ export async function withLock(lockPath, owner, action, { waitMs = 2000, faults 
     try { fd = await open(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600); break; }
     catch (error) {
       if (error.code !== "EEXIST") throw error;
-      if (Date.now() >= until) throw new DevctxError("BUSY", "Lock busy", { holder: await describeLock(lockPath) });
+      if (Date.now() >= until) throw new DevtwinError("BUSY", "Lock busy", { holder: await describeLock(lockPath) });
       await sleep(50);
     }
   }
@@ -66,17 +66,17 @@ export async function withLock(lockPath, owner, action, { waitMs = 2000, faults 
   return result;
 }
 export async function withPilotLock(roots, lockPath, owner, action, { destinations, waitMs = 2000, targetHome } = {}) {
-  if (!Array.isArray(destinations) || !destinations.length) throw new DevctxError("INVALID_INPUT", "Lock destinations required");
+  if (!Array.isArray(destinations) || !destinations.length) throw new DevtwinError("INVALID_INPUT", "Lock destinations required");
   assertWritable(roots, [lockPath, ...destinations], { targetHome });
   const rel = relative(roots.stateRoot, dirname(lockPath));
-  if (rel !== "locks") throw new DevctxError("PATH_UNSAFE", "Lock path outside lock directory");
+  if (rel !== "locks") throw new DevtwinError("PATH_UNSAFE", "Lock path outside lock directory");
   ensurePrivatePath(roots.stateRoot, ["locks"]);
   return withLock(lockPath, owner, async () => { assertWritable(roots, [lockPath, ...destinations], { targetHome }); return action(); }, { waitMs });
 }
 // Locks an owner may release by hand after a crash. Each lives at stateRoot/locks/<name>.lock.
 export const RELEASABLE_LOCKS = ["install", "live"];
 async function releaseState(roots, lock) {
-  if (typeof lock !== "string" || !RELEASABLE_LOCKS.includes(lock)) throw new DevctxError("INVALID_INPUT", "Unknown lock", { field: "lock", allowed: RELEASABLE_LOCKS });
+  if (typeof lock !== "string" || !RELEASABLE_LOCKS.includes(lock)) throw new DevtwinError("INVALID_INPUT", "Unknown lock", { field: "lock", allowed: RELEASABLE_LOCKS });
   const path = join(roots.stateRoot, "locks", lock + ".lock");
   assertWritable(roots, [path]);
   let read = null;
@@ -98,18 +98,18 @@ export async function planLockRelease(roots, { lock }) { return (await releaseSt
 export async function applyLockRelease(roots, { lock, fingerprint }) {
   const { plan, read } = await releaseState(roots, lock);
   assertFingerprint(plan, fingerprint);
-  if (plan.reason === "no-lock") throw new DevctxError("NOT_FOUND", "Lock not held", { lock });
-  if (plan.reason === "owner-running") throw new DevctxError("BUSY", "Lock owner is still running", { lock, holder: plan.holder });
-  if (!plan.release) throw new DevctxError("GATE_REQUIRED", "Lock cannot be released from this host", { lock, reason: plan.reason });
+  if (plan.reason === "no-lock") throw new DevtwinError("NOT_FOUND", "Lock not held", { lock });
+  if (plan.reason === "owner-running") throw new DevtwinError("BUSY", "Lock owner is still running", { lock, holder: plan.holder });
+  if (!plan.release) throw new DevtwinError("GATE_REQUIRED", "Lock cannot be released from this host", { lock, reason: plan.reason });
   const current = await readLock(plan.path).catch(() => null);
-  if (!current || current.dev !== read.dev || current.ino !== read.ino || sha256(current.bytes) !== plan.lockHash) throw new DevctxError("STALE_VERSION", "Lock changed during release", { lock });
+  if (!current || current.dev !== read.dev || current.ino !== read.ino || sha256(current.bytes) !== plan.lockHash) throw new DevtwinError("STALE_VERSION", "Lock changed during release", { lock });
   const st = await lstat(plan.path);
-  if (st.dev !== read.dev || st.ino !== read.ino) throw new DevctxError("STALE_VERSION", "Lock changed during release", { lock });
+  if (st.dev !== read.dev || st.ino !== read.ino) throw new DevtwinError("STALE_VERSION", "Lock changed during release", { lock });
   await unlink(plan.path);
   return { released: true, lock, path: plan.path, holder: plan.holder, lockHash: plan.lockHash };
 }
 export const locksReleaseCommand = { options: { lock: { type: "string" }, apply: { type: "boolean" }, "plan-fingerprint": { type: "string" } }, async run(values, ctx) {
   if (!values.apply) return planLockRelease(ctx.roots, { lock: values.lock });
-  if (!values["plan-fingerprint"]) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
+  if (!values["plan-fingerprint"]) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");
   return applyLockRelease(ctx.roots, { lock: values.lock, fingerprint: values["plan-fingerprint"] });
 } };

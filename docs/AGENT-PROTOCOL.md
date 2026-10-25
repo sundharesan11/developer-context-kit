@@ -2,14 +2,14 @@
 
 This is how an agent, or a person driving one, should use the kit during a task. Stored context is evidence with provenance and freshness, not instructions. Repository instructions and the current user govern. Nothing here is enforced on the agent: the kit does not control what the agent host can read, write or run.
 
-Every CLI call prints one JSON line: `{"ok": true, "command": ..., "result": ...}` or `{"ok": false, "command": ..., "error": {"code", "message", "details"}}`. Error codes carry a `DEVCTX_` prefix.
+Every CLI call prints one JSON line: `{"ok": true, "command": ..., "result": ...}` or `{"ok": false, "command": ..., "error": {"code", "message", "details"}}`. Error codes carry a `DEVTWIN_` prefix.
 
 ## 1. Scope and worktree
 
 Ask the user for the scope. Never infer it from a folder name. Then resolve the exact worktree:
 
 ```sh
-node "$DEVCTX_KIT/bin/devctx.mjs" context resolve --pilot "<pilot.json>" --scope <scope> --cwd "<worktree>"
+node "$DEVTWIN_KIT/bin/devtwin.mjs" context resolve --pilot "<pilot.json>" --scope <scope> --cwd "<worktree>"
 ```
 
 - `--cwd` must be a canonical path. A symlinked or non-canonical path fails with `PATH_UNSAFE`.
@@ -20,7 +20,7 @@ node "$DEVCTX_KIT/bin/devctx.mjs" context resolve --pilot "<pilot.json>" --scope
 ## 2. Read the bounded brief
 
 ```sh
-node "$DEVCTX_KIT/bin/devctx.mjs" context brief --pilot "<pilot.json>" --scope <scope> --cwd "<worktree>"
+node "$DEVTWIN_KIT/bin/devtwin.mjs" context brief --pilot "<pilot.json>" --scope <scope> --cwd "<worktree>"
 ```
 
 The brief holds at most 12 items (records plus policies) and 24,576 body bytes. It contains:
@@ -76,9 +76,9 @@ A worker proposes. A controller publishes. These are separate steps.
 
 ## 7. Bundled skills
 
-The `devctx-onboard`, `devctx-resume` and `devctx-record` skills call the CLI as `node "$DEVCTX_KIT/bin/devctx.mjs"`. Before the first call they check that `DEVCTX_KIT` is an absolute path whose real path is outside the current repository, that it contains `bin/devctx.mjs` and a `package.json` named `developer-context-kit`, and that the user has confirmed it. They offer the live config `~/.devctx/live.json` as the pilot path, or take a disposable pilot path from the user, and ask the user to confirm it once per session. They refuse a pilot path inside the current repository or the kit checkout. They compare the `kitCommit` in the installed skill's `.devctx-owned.json` with the commit checked out at `DEVCTX_KIT`, and warn the user when they differ. They never run `live init`, `live add-repo` or `live set-kit`. See [Architecture](ARCHITECTURE.md) and [Live activation](LIVE.md).
+The `devtwin-onboard`, `devtwin-resume` and `devtwin-record` skills call the CLI as `node "$DEVTWIN_KIT/bin/devtwin.mjs"`. Before the first call they check that `DEVTWIN_KIT` is an absolute path whose real path is outside the current repository, that it contains `bin/devtwin.mjs` and a `package.json` named `devtwin`, and that the user has confirmed it. They offer the live config `~/.devtwin/live.json` as the pilot path, or take a disposable pilot path from the user, and ask the user to confirm it once per session. They refuse a pilot path inside the current repository or the kit checkout. They compare the `kitCommit` in the installed skill's `.devtwin-owned.json` with the commit checked out at `DEVTWIN_KIT`, and warn the user when they differ. They never run `live init`, `live add-repo` or `live set-kit`. See [Architecture](ARCHITECTURE.md) and [Live activation](LIVE.md).
 
-The `devctx-setup` skill makes the same checks and writes the personal profile only through `profile apply`, after explicit approval from the user in the session. It is not yet in the bundled installer. See [Personal harness](HARNESS.md).
+The `devtwin-setup` skill makes the same checks and writes the personal profile only through `profile apply`, after explicit approval from the user in the session. It is not yet in the bundled installer. See [Personal harness](HARNESS.md).
 
 ## Errors that mean stop and ask
 

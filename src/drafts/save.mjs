@@ -1,5 +1,5 @@
 import { dirname, join, relative } from "node:path";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertInPilot, assertWritable } from "../config/pilot.mjs";
 import { loadScope } from "../config/store.mjs";
 import { sha256 } from "../storage/canonical.mjs";
@@ -14,11 +14,11 @@ export const DRAFT_NOTE = "Saved privately only; nothing is sent, posted or sche
 export const draftLockPath = (roots) => join(roots.stateRoot, "locks", "drafts.lock");
 // The body file must lie inside inputsRoot and is read through the approved-source reader, as record body files are.
 async function readBody(pilot, path) {
-  if (typeof path !== "string" || !path) throw new DevctxError("INVALID_INPUT", "Body file required", { field: "body-file" });
+  if (typeof path !== "string" || !path) throw new DevtwinError("INVALID_INPUT", "Body file required", { field: "body-file" });
   assertInPilot(pilot, dirname(path), "inputsRoot");
   const read = await readApprovedSource(pilot.inputsRoot, relative(pilot.inputsRoot, path));
-  if (read.skipped || Buffer.byteLength(read.text) > DRAFT_LIMIT) throw new DevctxError("INVALID_INPUT", "Body file unavailable", { field: "body-file" });
-  if (!read.text.trim()) throw new DevctxError("INVALID_INPUT", "Body file is empty", { field: "body-file" });
+  if (read.skipped || Buffer.byteLength(read.text) > DRAFT_LIMIT) throw new DevtwinError("INVALID_INPUT", "Body file unavailable", { field: "body-file" });
+  if (!read.text.trim()) throw new DevtwinError("INVALID_INPUT", "Body file is empty", { field: "body-file" });
   assertNoSensitive(read.text);
   return read.text;
 }
@@ -37,18 +37,18 @@ export async function planDraft(roots, input) {
   return plan;
 }
 export async function applyDraft(roots, input, { fingerprint } = {}) {
-  if (!fingerprint) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
+  if (!fingerprint) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");
   const { dir, path } = await buildDraft(roots, input);
   return withPilotLock(roots, draftLockPath(roots), { kind: "draft-save" }, async () => {
     const checked = await buildDraft(roots, input);
     assertFingerprint(checked.plan, fingerprint);
     // The lock guards the destination computed before it; a body that changed in between names another one.
-    if (checked.path !== path) throw new DevctxError("SOURCE_CHANGED", "Body changed before write");
-    if (info(path)) throw new DevctxError("CONFLICT", "Draft already exists", { destination: checked.plan.destination });
+    if (checked.path !== path) throw new DevtwinError("SOURCE_CHANGED", "Body changed before write");
+    if (info(path)) throw new DevtwinError("CONFLICT", "Draft already exists", { destination: checked.plan.destination });
     ensurePrivatePath(roots.dataRoot, checked.segments);
     await writeNewFile(path, checked.body);
     fsyncDir(dir);
-    if ((checkNode(info(path), path).mode & 0o777) !== 0o600) throw new DevctxError("INTEGRITY", "Written draft failed verification");
+    if ((checkNode(info(path), path).mode & 0o777) !== 0o600) throw new DevtwinError("INTEGRITY", "Written draft failed verification");
     const { scope, destination, bodyHash, bytes } = checked.plan;
     return { kind: "draft", scope, destination, bodyHash, bytes, sendable: false, note: DRAFT_NOTE };
   }, { destinations: [dir, path] });

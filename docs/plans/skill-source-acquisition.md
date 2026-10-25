@@ -6,7 +6,7 @@
 
 **Architecture:** A root-free preview resolves a pinned commit's tree and binds exact file metadata into a deterministic fingerprint. A pilot-bound stage repeats that preview, verifies selected blob bytes, and writes exclusively beneath `dataRoot`; an offline inspector accepts only a complete, internally consistent run. Acquisition remains separate from skill-builder approval and agent installation.
 
-**Tech Stack:** Node.js `>=22.13.0`, ESM, built-in fetch/crypto/fs, `node:test`, existing catalog, canonical hashing, `DevctxError`, and pilot APIs. No new dependencies or subprocesses.
+**Tech Stack:** Node.js `>=22.13.0`, ESM, built-in fetch/crypto/fs, `node:test`, existing catalog, canonical hashing, `DevtwinError`, and pilot APIs. No new dependencies or subprocesses.
 
 ## Global constraints
 
@@ -102,9 +102,9 @@ The declarations above specify signatures, not implementation stubs to commit. `
 - Preview only accepts selected tree entries whose mode/type agree (`blob`/`100644` or `100755`), size fits caps and SHA is valid. Symlinks `120000`, gitlinks `160000`, directories and unsupported modes selected as files are `UNSUPPORTED_ENTRY`. Every selected ancestor must be an exact tree entry with type `tree` and mode `040000`; no alias lookup. Reject duplicate paths and case-folded/prefix role collisions affecting selected paths and their ancestors in the upstream tree. Unselected valid symlinks/gitlinks do not fail a selection.
 - For every unselected tree entry, require a nonempty path string of at most 4096 UTF-16 units, no NUL, no leading/trailing slash, and no empty/`.`/`..` component; require a lowercase 40-hex SHA and nonempty string type/mode. For known modes require their correct type (`040000` tree, `100644`/`100755`/legacy `100664` blob, `120000` blob, `160000` commit), but tolerate an unknown mode on an unselected entry. Require a nonnegative safe integer size only for blob entries. Spaces, plus, at-signs, non-ASCII, trailing dots and denied selection names on unrelated entries do not fail the tree. Apply strict ASCII/selection rules only to selected paths and ancestors. Use ASCII-only lowercasing to detect conflicts with selected paths; an unselected non-ASCII Unicode-fold alias is a documented residual and is never written. Reject malformed metadata, cap excess and any truncated tree even if selected files appear. Full tree validation does not expand the selection.
 - Each JSON stream enforces declared length when uncompressed, streamed decoded-response byte limits even if compressed, fatal UTF-8 and valid JSON. Validate declared length as a nonnegative integer when present. Abort on both per-request and remaining operation deadlines; cancel all bodies in `finally`. No retries or pagination fallback. Failed HTTP response bodies are not read or echoed.
-- Fixed origin `https://api.github.com`, constructed `/repos/<catalog owner>/<catalog name>/git/...` paths, `redirect:"manual"`, `Accept: application/vnd.github+json`, `User-Agent: devctx-skill-sources`. No token/env auth, cookies or response-provided URLs. Reuse catalog identity validation rather than accepting a URL.
+- Fixed origin `https://api.github.com`, constructed `/repos/<catalog owner>/<catalog name>/git/...` paths, `redirect:"manual"`, `Accept: application/vnd.github+json`, `User-Agent: devtwin-skill-sources`. No token/env auth, cookies or response-provided URLs. Reuse catalog identity validation rather than accepting a URL.
 
-All codes below are passed to `DevctxError` and appear with the existing `DEVCTX_` prefix:
+All codes below are passed to `DevtwinError` and appear with the existing `DEVTWIN_` prefix:
 
 | Code | Trigger |
 | --- | --- |
@@ -132,7 +132,7 @@ All codes below are passed to `DevctxError` and appear with the existing `DEVCTX
 
 **Files:** Create `selection.mjs`, `github-package.mjs`, and `test/skill-acquisition.test.mjs` at paths in the file map. Register exact new package entries and named tests with their owning change.
 
-**Consumes:** `validateSourceRecipe`, `validatePriorLock`, `digest`, `DevctxError`.
+**Consumes:** `validateSourceRecipe`, `validatePriorLock`, `digest`, `DevtwinError`.
 **Produces:** `validateSelection`, `validateManifest`, `manifestFingerprint`, `gitBlobSha`, `previewAcquisition`, `downloadAcquisition` and the exact shapes above.
 
 - [ ] Write a synthetic fixture with a root `SKILL.md`, nested `skills/demo/SKILL.md`, `skills/demo/references/guide.md`, `LICENSE`, and an unselected symlink/gitlink. Construct blob IDs from real fixture bytes, not repeated-letter fake blob hashes. Its injected `request` accepts only expected constructed URLs and asserts no auth headers plus manual redirects; preserve `URL.search` so `?recursive=1` is actually tested.
@@ -142,9 +142,9 @@ All codes below are passed to `DevctxError` and appear with the existing `DEVCTX
 assert.deepEqual(validateSelection(source, pin, ["LICENSE", "SKILL.md"]).files,
   ["LICENSE", "SKILL.md"]);
 assert.throws(() => validateSelection(source, pin, ["A/x", "a/y"]),
-  {code: "DEVCTX_SELECTION_CONFLICT"});
+  {code: "DEVTWIN_SELECTION_CONFLICT"});
 assert.throws(() => validateSelection(source, pin, ["../SKILL.md"]),
-  {code: "DEVCTX_INVALID_INPUT"});
+  {code: "DEVTWIN_INVALID_INPUT"});
 assert.equal(gitBlobSha(Buffer.alloc(0)), "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391");
 ```
 
@@ -155,14 +155,14 @@ assert.equal(gitBlobSha(Buffer.alloc(0)), "e69de29bb2d1d6434b8b29ae775ad8c2e48c5
 ```js
 const compact = content.replace(/[\r\n]/g, "");
 if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(compact)) {
-  throw new DevctxError("UPSTREAM_INVALID", "Invalid GitHub blob encoding");
+  throw new DevtwinError("UPSTREAM_INVALID", "Invalid GitHub blob encoding");
 }
 const bytes = Buffer.from(compact, "base64");
 if (bytes.toString("base64") !== compact || bytes.length !== expected.size) {
-  throw new DevctxError("UPSTREAM_INVALID", "Invalid GitHub blob size or encoding");
+  throw new DevtwinError("UPSTREAM_INVALID", "Invalid GitHub blob size or encoding");
 }
 const actual = createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
-if (actual !== expected.blob) throw new DevctxError("INTEGRITY", "Git blob hash mismatch");
+if (actual !== expected.blob) throw new DevtwinError("INTEGRITY", "Git blob hash mismatch");
 const sha256 = "sha256:" + createHash("sha256").update(bytes).digest("hex");
 ```
 
@@ -211,7 +211,7 @@ Tiered trust rules apply at the start and each revalidation:
 - [ ] Write fault tests before implementation; run `node --test test/skill-staging.test.mjs test/pilot.test.mjs` and expect new acquisition tests to fail.
 - [ ] Add `.gemini`, `.cursor`, `.commandcode` to `protectedPaths()` alongside existing default agent homes. This intentionally strengthens every pilot-gated route: a dataRoot-only guard cannot recognize an unlisted live discovery home, so the additive known-home guard belongs in this slice. Test fake-home paths, Darwin case aliases and existing valid pilots. Do not probe executables or infer custom configuration. Unknown custom discovery roots must appear in `pilot.forbidden`; only existing Claude/Codex environment overrides and known defaults are automatic.
 - [ ] Implement a private acquisition guard that calls `assertWritable(roots, destinations)`, additionally requires every destination within dataRoot, and enforces the four trust tiers above before/after download and before each mutation. Never chmod. Use `join()` only after validation and containment checks; leave lowercase-only shared `safeJoin()` unchanged. Add tests for pilotRoot 0775, group-writable intermediate, caller-owned sticky 1777 ancestor (accepted), non-sticky 0777 ancestor (refused), and existing dataRoot 0755 (refused without chmod). Normal pilots exercise root-owned system ancestors.
-- [ ] Wrap every filesystem/helper call in staging.mjs: rethrow DevctxError with its code and a fixed safe message but replace details with `{field}` or validated run-relative `{rel}`; map raw errno/errors to `STORAGE_ERROR` with `{operation}` from `inspect`, `mkdir`, `read`, `write`, `link`, `unlink-pending`, `fsync`. Never pass through `details.path` or raw exception messages. After final receipt publication, use `STAGE_UNCONFIRMED` with `{runId,next:"inspect"}` for failure. Serialize errors from the entire fault matrix and assert no sandbox path, fakeHome path or injected raw error text appears.
+- [ ] Wrap every filesystem/helper call in staging.mjs: rethrow DevtwinError with its code and a fixed safe message but replace details with `{field}` or validated run-relative `{rel}`; map raw errno/errors to `STORAGE_ERROR` with `{operation}` from `inspect`, `mkdir`, `read`, `write`, `link`, `unlink-pending`, `fsync`. Never pass through `details.path` or raw exception messages. After final receipt publication, use `STAGE_UNCONFIRMED` with `{runId,next:"inspect"}` for failure. Serialize errors from the entire fault matrix and assert no sandbox path, fakeHome path or injected raw error text appears.
 - [ ] Download and verify all selected bytes in bounded memory before making any directory. Only dataRoot itself and its descendants may be created; its parent/intermediates must already satisfy the trust tiers. Ensure private shared `skill-sources` and `staging` containers one component at a time; concurrent creation of a shared container may accept EEXIST only after the full existing-private-node checks. Create the new run with nonrecursive `mkdir` mode 0700; EEXIST is `CONFLICT`, even for an empty matching directory. Capture its device/inode; validate that identity and its entire parent chain before every subsequent mutation. No retry by adopting that directory.
 - [ ] Create `files` and needed selected ancestor directories exclusively inside this new run. Maintain an in-memory map of directories created by this invocation and their device/inode values, so shared selected ancestors can be reused only if that exact node is still present. Reject unexpected existing entries, symlinks, hardlinks, FIFO/device nodes, path-role/case collisions or changed ancestors. Write payload files with `writeNewFile`, then private-read and rehash them before completion. Do not use `atomicReplace`, `ensureRoots`, `writeRunReceipt`, or the installer; they offer broader writes or adopt existing containers/runs.
 - [ ] Fsync payload directories from leaves upward. Write and fsync the complete receipt bytes exclusively to `.receipt-pending` with `writeNewFile`; record that pending file's device/inode. Publish with `linkSync(pending, receipt.json)`, whose EEXIST is `CONFLICT` and never overwrites. Fsync the run; revalidate parents and invocation-owned pending inode, unlink only that pending path, fsync run again and staging parent, then inspect before success. Node has no inode-conditional unlink: the check/unlink window remains a same-user race, and this is not perfect foreign-replacement protection. Never unlink/roll back the final receipt. Before-link failure leaves an incomplete run; after-link failure returns `STAGE_UNCONFIRMED` with the run ID and inspect instruction, without success output. A later inspection determines the truth, with no automatic recovery.
@@ -228,9 +228,9 @@ Tiered trust rules apply at the start and each revalidation:
 **Produces:** Exactly these commands:
 
 ```text
-devctx skill-sources preview --source <catalog-id> --pin-json <object> --files-json <array>
-devctx skill-sources stage --pilot <pilot-file> --source <catalog-id> --pin-json <object> --files-json <array> --preview-hash <sha256:fingerprint>
-devctx skill-sources inspect --pilot <pilot-file> --run <stage-id>
+devtwin skill-sources preview --source <catalog-id> --pin-json <object> --files-json <array>
+devtwin skill-sources stage --pilot <pilot-file> --source <catalog-id> --pin-json <object> --files-json <array> --preview-hash <sha256:fingerprint>
+devtwin skill-sources inspect --pilot <pilot-file> --run <stage-id>
 ```
 
 `preview` is `rootFree:true, rootOptions:false`. Stage and inspect remain pilot-bound but also use `rootOptions:false`; declare their one allowed `pilot` string option locally. This retains the existing missing-pilot gate and enables the existing duplicate-option rejection without admitting config/data/state override flags. Extend request injection only to `skill-sources preview` and `skill-sources stage` alongside existing check; inspect has no request capability. Do not make any existing route root-free.

@@ -8,7 +8,7 @@ test("public alpha onboarding documents only implemented CLI routes", async () =
   for (const file of ["README.md", "docs/GETTING-STARTED.md", "docs/ONBOARDING.md", "docs/SKILL-SOURCES.md", "docs/HARNESS.md"]) {
     const text = await readFile(join(import.meta.dirname, "..", file), "utf8");
     let count = 0;
-    for (const match of text.matchAll(/node bin\/devctx\.mjs[ \t]+([a-z-]+)(?:[ \t]+([a-z-]+))?/g)) {
+    for (const match of text.matchAll(/node bin\/devtwin\.mjs[ \t]+([a-z-]+)(?:[ \t]+([a-z-]+))?/g)) {
       const first = match[1], second = match[2];
       assert.ok(COMMANDS[first] || COMMANDS[first + " " + second], file + ": " + match[0]);
       count++;
@@ -84,7 +84,7 @@ test("docs state the candidate's limits in pinned phrases", async () => {
     "README.md": ["local package candidate", "NOT currently installed", "no automatic private-to-public synchronization", "not a sandbox"],
     "docs/SECURITY-MODEL.md": ["residual race", "same-user"],
     "docs/LIMITATIONS.md": ["Linux support is not claimed", "Windows is unsupported", "migration is not implemented", "no backup or sync", "lost laptop", "multi-record onboarding", "no backup of the live store", "client repository text"],
-    "docs/LIVE.md": ["mkdir -m 700 ~/.devctx", "--setting-sources user", "--sandbox read-only", "rollback-check", "live set-kit", "agents recover", "legacy", "Cursor", "same-user tampering", "If the store is lost", "No backup"],
+    "docs/LIVE.md": ["mkdir -m 700 ~/.devtwin", "--setting-sources user", "--sandbox read-only", "rollback-check", "live set-kit", "agents recover", "legacy", "Cursor", "same-user tampering", "If the store is lost", "No backup"],
   };
   for (const [file, phrases] of Object.entries(want)) {
     const text = await read(file);
@@ -97,30 +97,30 @@ test("docs state the candidate's limits in pinned phrases", async () => {
 });
 
 // Skill-text checks only; which skills the installer installs is pinned by SKILL_NAMES in src/agents/install.mjs.
-const BUNDLED_SKILLS = ["devctx-onboard", "devctx-resume", "devctx-record", "devctx-setup"];
-const PROJECT_SKILLS = ["devctx-onboard", "devctx-resume", "devctx-record"];
+const BUNDLED_SKILLS = ["devtwin-onboard", "devtwin-resume", "devtwin-record", "devtwin-setup"];
+const PROJECT_SKILLS = ["devtwin-onboard", "devtwin-resume", "devtwin-record"];
 const readBundledSkill = (name) => readFile(join(import.meta.dirname, "..", "skills", name, "SKILL.md"), "utf8");
 function assertSkillRoutes(name, text, COMMANDS) {
-  assert.doesNotMatch(text, /node bin\/devctx\.mjs/, name + ": checkout-relative command");
+  assert.doesNotMatch(text, /node bin\/devtwin\.mjs/, name + ": checkout-relative command");
   let count = 0;
-  for (const match of text.matchAll(/devctx\.mjs"?[ \t]+([a-z-]+)(?:[ \t]+([a-z-]+))?/g)) {
+  for (const match of text.matchAll(/devtwin\.mjs"?[ \t]+([a-z-]+)(?:[ \t]+([a-z-]+))?/g)) {
     const first = match[1], second = match[2];
     assert.ok(COMMANDS[first] || COMMANDS[first + " " + second], name + ": " + match[0]);
     count++;
   }
   assert.ok(count > 0, name + " invokes the CLI");
-  for (const match of text.matchAll(/node[^\n]*devctx\.mjs[^\n]*/g)) {
-    assert.match(match[0], /node "\$DEVCTX_KIT\/bin\/devctx\.mjs" /, name + ": " + match[0]);
+  for (const match of text.matchAll(/node[^\n]*devtwin\.mjs[^\n]*/g)) {
+    assert.match(match[0], /node "\$DEVTWIN_KIT\/bin\/devtwin\.mjs" /, name + ": " + match[0]);
     assert.doesNotMatch(match[0], /record publish/, name + " never invokes record publish");
   }
 }
-test("bundled skills invoke only implemented CLI routes through DEVCTX_KIT", async () => {
+test("bundled skills invoke only implemented CLI routes through DEVTWIN_KIT", async () => {
   const { COMMANDS } = await import("../src/cli.mjs");
   for (const name of BUNDLED_SKILLS) assertSkillRoutes(name, await readBundledSkill(name), COMMANDS);
 });
 test("bundled skill route check refuses a route missing from COMMANDS", async () => {
   const { COMMANDS } = await import("../src/cli.mjs");
-  const text = "```sh\nnode \"$DEVCTX_KIT/bin/devctx.mjs\" profile erase --pilot '<pilot.json>'\n```\n";
+  const text = "```sh\nnode \"$DEVTWIN_KIT/bin/devtwin.mjs\" profile erase --pilot '<pilot.json>'\n```\n";
   assert.throws(() => assertSkillRoutes("fixture", text, COMMANDS), /profile erase/);
 });
 test("bundled skill frontmatter passes skill-builder rules with a one-line description", async () => {
@@ -138,10 +138,10 @@ test("bundled skill frontmatter passes skill-builder rules with a one-line descr
     assert.match(body, /^# /m, name + " has a title");
   }
 });
-test("bundled skills state the DEVCTX_KIT validation and pilot-path rules", async () => {
-  const common = ["DEVCTX_KIT", "absolute path", "real path", "bin/devctx.mjs", "package.json", "developer-context-kit",
+test("bundled skills state the DEVTWIN_KIT validation and pilot-path rules", async () => {
+  const common = ["DEVTWIN_KIT", "absolute path", "real path", "bin/devtwin.mjs", "package.json", "devtwin",
     "confirm", "pilot path", "kit checkout", "GATE_REQUIRED", "record publish --apply", "untrusted", "Never send or share",
-    "live config", "~/.devctx/live.json", "confirm the pilot path once per session", "kit commit", ".devctx-owned.json", "rev-parse HEAD", "warn the user"];
+    "live config", "~/.devtwin/live.json", "confirm the pilot path once per session", "kit commit", ".devtwin-owned.json", "rev-parse HEAD", "warn the user"];
   for (const name of BUNDLED_SKILLS) {
     const text = await readBundledSkill(name);
     for (const phrase of common) assert.ok(text.includes(phrase), name + ": " + phrase);
@@ -150,30 +150,30 @@ test("bundled skills state the DEVCTX_KIT validation and pilot-path rules", asyn
     const text = await readBundledSkill(name);
     for (const phrase of ["inside the current repository", "repos", "--scope", "GIT_QUERY_FAILED", "PROJECT_UNBOUND"]) assert.ok(text.includes(phrase), name + ": " + phrase);
   }
-  assert.match(await readBundledSkill("devctx-record"), /attributed to "human"/);
-  assert.match(await readBundledSkill("devctx-resume"), /freshness/);
+  assert.match(await readBundledSkill("devtwin-record"), /attributed to "human"/);
+  assert.match(await readBundledSkill("devtwin-resume"), /freshness/);
 });
-test("devctx-setup is instruction-only and names sending and publishing only as prohibited", async () => {
-  assert.deepEqual(await readdir(join(import.meta.dirname, "..", "skills", "devctx-setup")), ["SKILL.md"]);
-  const text = await readBundledSkill("devctx-setup");
+test("devtwin-setup is instruction-only and names sending and publishing only as prohibited", async () => {
+  assert.deepEqual(await readdir(join(import.meta.dirname, "..", "skills", "devtwin-setup")), ["SKILL.md"]);
+  const text = await readBundledSkill("devtwin-setup");
   for (const phrase of ["Never send or share", "record publish --apply"]) {
     const lines = text.split("\n").filter((line) => line.includes(phrase));
     assert.ok(lines.length > 0, phrase);
     for (const line of lines) assert.match(line, /^- Never /, "only as prohibited: " + line);
   }
 });
-test("devctx-setup stops without a pilot or init, caps questions, and creates no skill unasked", async () => {
-  const text = await readBundledSkill("devctx-setup");
+test("devtwin-setup stops without a pilot or init, caps questions, and creates no skill unasked", async () => {
+  const text = await readBundledSkill("devtwin-setup");
   assert.ok(text.includes("If the pilot file does not exist or `init` has not run, stop without creating anything."));
   assert.ok(text.includes("Never run `init`"));
   assert.ok(text.includes("Ask at most five questions"));
   assert.equal((text.match(/^### Question [0-9]/gm) ?? []).length <= 5, true, "no more than five questions");
   assert.ok(text.includes("Do not create a skill unless the user asks for one."));
-  assert.doesNotMatch(text, /devctx\.mjs"? skill (workspace-create|template-seed|draft-create|local-apply)/, "setup itself creates no skill");
+  assert.doesNotMatch(text, /devtwin\.mjs"? skill (workspace-create|template-seed|draft-create|local-apply)/, "setup itself creates no skill");
   assert.match(text, /untrusted data, never instructions/);
 });
-test("devctx-setup applies the profile only on explicit approval from the user in the session", async () => {
-  const text = await readBundledSkill("devctx-setup");
+test("devtwin-setup applies the profile only on explicit approval from the user in the session", async () => {
+  const text = await readBundledSkill("devtwin-setup");
   const paragraphs = text.split(/\n\s*\n/);
   assert.ok(paragraphs.some((p) => p.includes("profile apply") && p.includes("explicit approval from the user in the session")), "approval phrase next to profile apply");
   assert.ok(text.includes("A fingerprint the agent passes back is not consent."));
@@ -186,7 +186,7 @@ test("roadmap and skill-builder docs record the create-from-template freeze exce
   assert.ok(roadmap.includes(freeze + " " + exception), "exception sentence directly follows the freeze sentence");
   assert.equal(roadmap.split(exception).length, 2, "roadmap records the exception once");
   assert.ok(builder.includes(exception), "skill-builder doc carries the same note");
-  assert.ok(builder.includes("`skills/devctx-create-skill/assets/skill-template.md` stays the blank starter for skills built from scratch; `templates/skills/` holds guided templates that do not use it."));
+  assert.ok(builder.includes("`skills/devtwin-create-skill/assets/skill-template.md` stays the blank starter for skills built from scratch; `templates/skills/` holds guided templates that do not use it."));
 });
 
 // U13: the shipped skill templates under templates/skills/ (candidate text checks; rendering is in skill-templates.test.mjs).
@@ -194,19 +194,19 @@ const SKILL_TEMPLATES = ["slack-update", "stack-watch", "writing"];
 const templateDir = (name) => join(import.meta.dirname, "..", "templates", "skills", name);
 const readCandidate = (name) => readFile(join(templateDir(name), "candidate", "SKILL.md"), "utf8");
 const unplaced = (text) => text.replace(/\{\{dck:[^{}]*\}\}/g, "");
-test("skill templates invoke only implemented CLI routes through DEVCTX_KIT", async () => {
+test("skill templates invoke only implemented CLI routes through DEVTWIN_KIT", async () => {
   const { COMMANDS } = await import("../src/cli.mjs");
   for (const name of SKILL_TEMPLATES) assertSkillRoutes(name, await readCandidate(name), COMMANDS);
 });
-test("skill templates carry no script, per-message-type reference, home path, private email or devctx- name", async () => {
+test("skill templates carry no script, per-message-type reference, home path, private email or devtwin- name", async () => {
   for (const name of SKILL_TEMPLATES) {
     assert.deepEqual((await readdir(templateDir(name))).sort(), ["candidate", "design.json", "requirements.json", "template.json"], name);
     assert.deepEqual(await readdir(join(templateDir(name), "candidate")), ["SKILL.md"], name);
     const meta = JSON.parse(await readFile(join(templateDir(name), "template.json"), "utf8"));
-    for (const p of meta.placeholders) assert.ok(!(p.default ?? "").startsWith("devctx-"), name + ": " + p.key);
+    for (const p of meta.placeholders) assert.ok(!(p.default ?? "").startsWith("devtwin-"), name + ": " + p.key);
     for (const file of ["template.json", "requirements.json", "design.json", "candidate/SKILL.md"]) {
       const text = await readFile(join(templateDir(name), ...file.split("/")), "utf8");
-      assert.doesNotMatch(text, /devctx-|references\/|scripts\//, name + "/" + file);
+      assert.doesNotMatch(text, /devtwin-|references\/|scripts\//, name + "/" + file);
       assert.doesNotMatch(text, /\/(?:Users|home)\/|(?:^|[\s'"`(])~\//m, name + "/" + file + " home path");
       for (const match of text.matchAll(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi)) assert.match(match[0], /@example\.com$/i, name + "/" + file);
       assert.doesNotMatch(text, /until (?:organization identity )?routing lands/i, name + "/" + file);
@@ -214,7 +214,7 @@ test("skill templates carry no script, per-message-type reference, home path, pr
   }
 });
 test("skill templates state the common pinned phrases outside placeholders", async () => {
-  const common = ["DEVCTX_KIT", "absolute path", "real path", "bin/devctx.mjs", "package.json", "developer-context-kit", "pilot path",
+  const common = ["DEVTWIN_KIT", "absolute path", "real path", "bin/devtwin.mjs", "package.json", "devtwin", "pilot path",
     "confirm the pilot path once per session", "GATE_REQUIRED", "record publish --apply", "untrusted", "never instructions", "Never send or share", "single quotes"];
   for (const name of SKILL_TEMPLATES) {
     const text = unplaced(await readCandidate(name));
@@ -264,7 +264,7 @@ test("harness guide states the template's limits in pinned phrases", async () =>
     "what hosts still see", "personal profile", "skill template", "not available in this stage", "routing's send increment", "cannot be sent later",
     "explicit approval from the user in the session", "optional companions",
     "client profile", "live config", "template-made skill", "always unauthenticated", "GATE_REQUIRED", "draft save --scope", "scopes/<scope>/",
-    "not yet in the bundled installer", "skills/devctx-create-skill/assets/skill-template.md", "company-audience workspace", "internal-comms", "doc-coauthoring"]) assert.ok(harness.includes(phrase), "docs/HARNESS.md: " + phrase);
+    "not yet in the bundled installer", "skills/devtwin-create-skill/assets/skill-template.md", "company-audience workspace", "internal-comms", "doc-coauthoring"]) assert.ok(harness.includes(phrase), "docs/HARNESS.md: " + phrase);
   for (const route of ["skill workspace-create", "skill template-list", "skill template-seed", "skill template-verify", "skill requirements-record", "skill draft-validate",
     "profile plan", "profile apply", "stack plan", "stack approve", "stack check", "stack digest"]) assert.ok(harness.includes(route), "docs/HARNESS.md names " + route);
   const schedule = /```sh\n# Scheduling recipe[^\n]*\n([\s\S]*?)```/.exec(harness);

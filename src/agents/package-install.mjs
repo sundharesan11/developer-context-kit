@@ -3,7 +3,7 @@ import { lstatSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
 import { validateRoot } from "../config/roots.mjs";
 import { canonicalJson, digest, sha256 } from "../storage/canonical.mjs";
@@ -15,10 +15,10 @@ import { assertPackageRel, PACKAGE_LIMITS } from "../skill-builder/validate.mjs"
 import { loadLocalRevision, loadLocalDecision } from "../skill-builder/workspace.mjs";
 import { AGENT_HOMES, SKILL_NAMES } from "./install.mjs";
 
-const marker = ".devctx-owned.json";
+const marker = ".devtwin-owned.json";
 const receiptKeys = ["schemaVersion", "kind", "skill", "version", "audience", "workspace", "revision", "packageDigest", "files", "runId"].sort();
 function selectionCheck(selection) {
-  if (selection?.audience !== "personal" || selection.scope || selection.project || !/^ws_[a-z0-9_-]{8,64}$/.test(selection.workspace ?? "")) throw new DevctxError("GATE_REQUIRED", "Only personal workspaces can be installed");
+  if (selection?.audience !== "personal" || selection.scope || selection.project || !/^ws_[a-z0-9_-]{8,64}$/.test(selection.workspace ?? "")) throw new DevtwinError("GATE_REQUIRED", "Only personal workspaces can be installed");
 }
 async function observed(dir, manifest, workspace, mode) {
   if (!info(dir)) return { status: mode === "install" ? "create" : "absent" };
@@ -52,13 +52,13 @@ async function observed(dir, manifest, workspace, mode) {
 }
 export async function planPackageInstall(roots, selection, { revisionId, contentDecisionId, targetHome, agents, mode }) {
   selectionCheck(selection); const pilot = safeHome(roots, targetHome);
-  if (!["install", "uninstall"].includes(mode) || (mode === "install" ? !contentDecisionId : !!contentDecisionId)) throw new DevctxError("INVALID_INPUT", "Invalid local action");
+  if (!["install", "uninstall"].includes(mode) || (mode === "install" ? !contentDecisionId : !!contentDecisionId)) throw new DevtwinError("INVALID_INPUT", "Invalid local action");
   const chosen = agentsCheck(agents);
   const { manifest, files, validation } = await loadLocalRevision(roots, selection, revisionId, { requireValidation: mode === "install" });
-  if (SKILL_NAMES.includes(manifest.name) || manifest.name.startsWith("devctx-")) throw new DevctxError("CONFLICT", "Bundled skill name reserved");
+  if (SKILL_NAMES.includes(manifest.name) || manifest.name.startsWith("devtwin-")) throw new DevtwinError("CONFLICT", "Bundled skill name reserved");
   if (mode === "install") {
     const content = await loadLocalDecision(roots, selection, contentDecisionId, "approve-content");
-    if (content.revision !== revisionId || content.packageDigest !== manifest.packageDigest || content.personalGenericNonConfidential !== true || content.responseText !== `Approved content ${manifest.packageDigest} as personal generic non-confidential`) throw new DevctxError("STALE_VERSION", "Content approval stale");
+    if (content.revision !== revisionId || content.packageDigest !== manifest.packageDigest || content.personalGenericNonConfidential !== true || content.responseText !== `Approved content ${manifest.packageDigest} as personal generic non-confidential`) throw new DevtwinError("STALE_VERSION", "Content approval stale");
   }
   const hashes = fileHashes(files), actions = [];
   for (const agent of chosen) {
@@ -77,14 +77,14 @@ export async function applyPackageInstall(roots, selection, input, { fingerprint
   const id = runId ?? "run_" + randomBytes(12).toString("hex");
   const lock = join(roots.stateRoot, "locks", "install.lock"), runs = join(roots.stateRoot, "runs"), consumed = join(roots.stateRoot, "skill-installs", "consumed", selection.workspace, decisionId + ".json");
   return withPilotLock(roots, lock, { kind: "skill-package-install", runId: id }, async () => {
-    if (!RUN_ID.test(id)) throw new DevctxError("INVALID_ID", "Invalid run ID");
-    if ((await journals(roots, input.targetHome)).incomplete.length) throw new DevctxError("RECOVERY_REQUIRED", "Incomplete installer journal");
+    if (!RUN_ID.test(id)) throw new DevtwinError("INVALID_ID", "Invalid run ID");
+    if ((await journals(roots, input.targetHome)).incomplete.length) throw new DevtwinError("RECOVERY_REQUIRED", "Incomplete installer journal");
     const plan = await planPackageInstall(roots, selection, input);
     assertFingerprint(plan, fingerprint);
-    if (plan.actions.some((a) => !["create", "update", "remove", "installed", "absent"].includes(a.status)) || !plan.actions.some((a) => ["create", "update", "remove"].includes(a.status))) throw new DevctxError("CONFLICT", "No safe local action");
+    if (plan.actions.some((a) => !["create", "update", "remove", "installed", "absent"].includes(a.status)) || !plan.actions.some((a) => ["create", "update", "remove"].includes(a.status))) throw new DevtwinError("CONFLICT", "No safe local action");
     const decision = await loadLocalDecision(roots, selection, decisionId, `approve-local-${plan.mode}`);
-    if (decision.planFingerprint !== plan.fingerprint || decision.revision !== plan.revision || decision.packageDigest !== plan.packageDigest || decision.contentDecision !== plan.contentDecision || decision.targetHome !== plan.targetHome || JSON.stringify(decision.agents) !== JSON.stringify(plan.agents) || decision.responseText !== `Approved ${plan.mode} ${plan.fingerprint}`) throw new DevctxError("STALE_VERSION", "Local approval stale");
-    if (info(join(runs, id))) throw new DevctxError("CONFLICT", "Run ID already exists");
+    if (decision.planFingerprint !== plan.fingerprint || decision.revision !== plan.revision || decision.packageDigest !== plan.packageDigest || decision.contentDecision !== plan.contentDecision || decision.targetHome !== plan.targetHome || JSON.stringify(decision.agents) !== JSON.stringify(plan.agents) || decision.responseText !== `Approved ${plan.mode} ${plan.fingerprint}`) throw new DevtwinError("STALE_VERSION", "Local approval stale");
+    if (info(join(runs, id))) throw new DevtwinError("CONFLICT", "Run ID already exists");
     ensurePrivatePath(roots.stateRoot, ["skill-installs", "consumed", selection.workspace]);
     await writeNewFile(consumed, canonicalJson({ runId: id, planFingerprint: fingerprint }) + "\n");
     if (faults.afterConsume) await faults.afterConsume();
@@ -97,11 +97,11 @@ export async function applyPackageInstall(roots, selection, input, { fingerprint
     if (faults.afterJournal) await faults.afterJournal();
     const { manifest, files, validation } = await loadLocalRevision(roots, selection, plan.revision, { requireValidation: plan.mode === "install" });
     const reloadedHashes = fileHashes(files);
-    if (manifest.packageDigest !== plan.packageDigest || (validation ? digest(validation) : null) !== plan.validationDigest || intended.some((action) => canonicalJson(action.files) !== canonicalJson(reloadedHashes))) throw new DevctxError("STALE_VERSION", "Revision changed during apply");
+    if (manifest.packageDigest !== plan.packageDigest || (validation ? digest(validation) : null) !== plan.validationDigest || intended.some((action) => canonicalJson(action.files) !== canonicalJson(reloadedHashes))) throw new DevtwinError("STALE_VERSION", "Revision changed during apply");
     for (const action of intended) {
       assertWritable(roots, [action.path, journalPath], { targetHome: input.targetHome });
       const prior = await observed(action.path, manifest, selection.workspace, plan.mode);
-      if (prior.status !== action.status || (prior.receipt ? digest(prior.receipt) : null) !== action.priorReceiptDigest) throw new DevctxError("STALE_VERSION", "Target changed during apply");
+      if (prior.status !== action.status || (prior.receipt ? digest(prior.receipt) : null) !== action.priorReceiptDigest) throw new DevtwinError("STALE_VERSION", "Target changed during apply");
       const nextReceipt = { schemaVersion: 2, kind: "skill-package", skill: manifest.name, version: "0.0.0-local", audience: "personal", workspace: selection.workspace, revision: plan.revision, packageDigest: plan.packageDigest, files: fileHashes(files), runId: id };
       await performPackageAction(roots, action, {files, priorReceipt: prior.receipt, nextReceipt, journalPath, targetHome: input.targetHome}, {faults});
       journal.completed.push(action);
@@ -112,7 +112,7 @@ export async function applyPackageInstall(roots, selection, input, { fingerprint
 }
 export async function packageInstallStatus(roots, selection, input) {
   selectionCheck(selection); safeHome(roots, input.targetHome);
-  if (!["install", "uninstall"].includes(input.mode) || (input.mode === "uninstall" && input.contentDecisionId)) throw new DevctxError("INVALID_INPUT", "Invalid local status selection");
+  if (!["install", "uninstall"].includes(input.mode) || (input.mode === "uninstall" && input.contentDecisionId)) throw new DevtwinError("INVALID_INPUT", "Invalid local status selection");
   const lock = join(roots.stateRoot, "locks", "install.lock");
   return withPilotLock(roots, lock, { kind: "skill-package-status" }, async () => {
     const history = await journals(roots, input.targetHome);
@@ -128,7 +128,7 @@ export async function packageInstallStatus(roots, selection, input) {
     let planned = null;
     if (input.contentDecisionId) {
       const decision = await loadLocalDecision(roots, selection, input.contentDecisionId, "approve-content");
-      if (decision.revision !== input.revisionId || decision.packageDigest !== manifest.packageDigest || decision.personalGenericNonConfidential !== true || decision.responseText !== `Approved content ${manifest.packageDigest} as personal generic non-confidential`) throw new DevctxError("STALE_VERSION", "Content approval stale");
+      if (decision.revision !== input.revisionId || decision.packageDigest !== manifest.packageDigest || decision.personalGenericNonConfidential !== true || decision.responseText !== `Approved content ${manifest.packageDigest} as personal generic non-confidential`) throw new DevtwinError("STALE_VERSION", "Content approval stale");
       planned = await planPackageInstall(roots, selection, input);
     }
     return { status: history.incomplete.length ? "RECOVERY_REQUIRED" : "ok", ...history, consumed, actions, planned };

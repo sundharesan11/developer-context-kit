@@ -1,8 +1,8 @@
 // Shared links for the landing page.
 // TODO: confirm the GitHub org/user at release.
-export const GITHUB_URL = 'https://github.com/sundharesan11/developer-context-kit';
+export const GITHUB_URL = 'https://github.com/sundharesan11/devtwin';
 
-// Prefix a root-relative path with the configured base (e.g. /developer-context-kit on GitHub Pages).
+// Prefix a root-relative path with the configured base (e.g. /devtwin on GitHub Pages).
 export const withBase = (path: string) => import.meta.env.BASE_URL.replace(/\/+$/, '') + path;
 
 const DOC_PATHS = {

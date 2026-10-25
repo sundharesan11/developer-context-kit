@@ -26,7 +26,7 @@ export async function readScopeRecords(roots, scope, { reader = readSnapshot } =
       const records = snapshot.records.filter((r) => r.status !== "proposed" && r.effective !== "superseded")
         .map((r) => ({ id: r.id, text: r.title + "\n" + r.body })).sort((a, b) => a.id < b.id ? -1 : 1);
       out.push({ project, records });
-    } catch (error) { out.push({ project, records: [], unavailable: error.code ?? "DEVCTX_INTERNAL" }); }
+    } catch (error) { out.push({ project, records: [], unavailable: error.code ?? "DEVTWIN_INTERNAL" }); }
   }
   return out;
 }

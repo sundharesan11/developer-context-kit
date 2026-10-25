@@ -45,7 +45,7 @@ Known gaps:
 
 - `policy.outbound` is validated but nothing uses it.
 - `resolveSecret` is accepted but never called. The connector does not fetch any credential.
-- Error codes carry the `DEVCTX_` prefix when serialized, for example `DEVCTX_AUTH_MISMATCH`.
+- Error codes carry the `DEVTWIN_` prefix when serialized, for example `DEVTWIN_AUTH_MISMATCH`.
 
 ## Fake provider
 

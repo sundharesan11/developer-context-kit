@@ -41,7 +41,7 @@ for (const file of files) {
 }
 let pack = noPack ? "not-run" : "run";
 if (!noPack && listed.status === 0) {
-  const temp = mkdtempSync(join(tmpdir(), "devctx-pack-"));
+  const temp = mkdtempSync(join(tmpdir(), "devtwin-pack-"));
   const env = { PATH: process.env.PATH, HOME: temp, npm_config_cache: join(temp, "cache"), npm_config_logs_max: "0", npm_config_update_notifier: "false", npm_config_offline: "true" };
   const result = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: root, env, encoding: "utf8", maxBuffer: 16 << 20 });
   if (result.status !== 0) findings.push({ file: ".", type: "pack-failed" });

@@ -29,18 +29,18 @@ These rules reduce accidental damage and make tampering visible. They are not a 
 - The secret tripwire refuses or skips credential-like text. It covers private key blocks (including PGP), `Authorization` headers, bearer tokens, `x-api-key` and other credential assignments, JWTs, classic and fine-grained GitHub tokens, AWS access and temporary keys, Slack tokens, LLM provider, Stripe, Google and npm keys, and URL user info. Field names `password`, `token`, `secret`, `api_key`, `private_key`, `access_key` and `credential` are refused, and so are names ending in `_token`, `_secret` or `_password` or in camelCase `Token`, `Secret` or `Password`. It is a tripwire, not clearance: other formats pass.
 - SHA-256 of the exact bytes is the source identity authority. Stored `mtimeMs` values are informational. Hashes detect change; they are not signatures.
 - Git queries fail closed. Only exit 128 with "not a git repository" counts as "not a repository". Any other failure, including a timeout or a refused repository, is `GIT_QUERY_FAILED`. Git output, remote count and remote URL length are bounded with `LIMIT`.
-- Agent-home writes require the installer's one named target home, which must be listed in `pilot.agentHomes`. Other mutators cannot write any agent home. In live mode `agentHomes` is empty, and the bundled installer instead writes only `devctx-*` entries directly inside the live config's named skill folders; see below.
+- Agent-home writes require the installer's one named target home, which must be listed in `pilot.agentHomes`. Other mutators cannot write any agent home. In live mode `agentHomes` is empty, and the bundled installer instead writes only `devtwin-*` entries directly inside the live config's named skill folders; see below.
 
 ## Live mode
 
 Live mode ([Live activation](LIVE.md)) relaxes the fence for exactly the paths a live config names. It does not make the kit a sandbox.
 
 - Only the named skill folders and repositories are exempt from the "inside pilotRoot and not protected" rules. A skill folder must be exactly `<home>/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) or `<home>/.agents/skills`, must already exist and must have no symlinked ancestor below the home. The rest of each protected home stays protected.
-- In a skill folder the installer writes only `devctx-*` entries. It never creates, removes or chmods the folder or its parents, and never touches a foreign, symlinked, edited or unowned entry. A conflict blocks only that agent.
+- In a skill folder the installer writes only `devtwin-*` entries. It never creates, removes or chmods the folder or its parents, and never touches a foreign, symlinked, edited or unowned entry. A conflict blocks only that agent.
 - An entry is removable only when its receipt matches a completed journal in this store for the same config ID.
 - Live commands run only from the kit the live config names, clean and detached at its commit. The home is the process home, and a different home is refused.
 - The approved config digest in the store catches accidental edits to `live.json`. It does not stop deliberate same-user tampering: the same user can rewrite the live config and the digest together.
-- The rollback check compares a skill folder with the inventory taken before an install run. It fails on `devctx-*` differences and lists foreign changes for the owner. It restores nothing.
+- The rollback check compares a skill folder with the inventory taken before an install run. It fails on `devtwin-*` differences and lists foreign changes for the owner. It restores nothing.
 - Cursor also reads `~/.agents/skills` and sees the installed skills. The skills keep every confirmation for any caller.
 - There is no backup. Onboarding copies some client repository text into the store, protected by mode 0700 and disk encryption only.
 

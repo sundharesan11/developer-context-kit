@@ -1,4 +1,4 @@
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { loadStackCatalog, validateStackCatalog } from "./catalog.mjs";
 import { planStack, approveStack, readStackApproval, approvalDifferences, noPublicReadBinding } from "./plan.mjs";
 import { runStackCheck } from "./check.mjs";
@@ -20,7 +20,7 @@ export const stackPlanCommand = {
 export const stackApproveCommand = {
   options: { ...options, "plan-fingerprint": { type: "string" } },
   async run(values, ctx) {
-    if (!values["plan-fingerprint"]) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
+    if (!values["plan-fingerprint"]) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");
     return approveStack(ctx.roots, input(values), deps(ctx), { fingerprint: values["plan-fingerprint"], now: ctx.now });
   }
 };
@@ -37,7 +37,7 @@ export const stackDigestCommand = {
   async run(values, ctx) {
     const scope = values.scope ?? null;
     if (!values.apply) return planDigest(ctx.roots, { scope }, { ...deps(ctx), request: ctx.request, lookup: ctx.lookup, now: ctx.now });
-    if (!values["plan-fingerprint"]) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
+    if (!values["plan-fingerprint"]) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");
     return applyDigest(ctx.roots, { scope, fingerprint: values["plan-fingerprint"] });
   }
 };

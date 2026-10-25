@@ -4,7 +4,7 @@
   "examples": ["Draft an email telling the client it ships Friday", "Write a PR description for this change"],
   "negativeExample": "Send the email to the client",
   "inputs": ["personal profile", "records the user selects", "the user's request"],
-  "permittedTools": ["devctx profile show", "devctx context resolve", "devctx context brief", "devctx draft save"],
+  "permittedTools": ["devtwin profile show", "devtwin context resolve", "devtwin context brief", "devtwin draft save"],
   "forbiddenTools": ["any send, post or schedule action", "record publish --apply"],
   "permittedContext": ["profile writing preferences", "records the user selects"],
   "forbiddenContext": ["the whole record store", "repository files the user did not select"],

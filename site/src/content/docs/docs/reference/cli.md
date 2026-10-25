@@ -1,15 +1,15 @@
 ---
 title: CLI reference
-description: Every devctx command, grouped by task, with its flags, what it writes and an example.
+description: Every devtwin command, grouped by task, with its flags, what it writes and an example.
 ---
 
-Run devctx from a checkout of the kit:
+Run devtwin from a checkout of the kit:
 
 ```sh
-node bin/devctx.mjs <command> [flags]
+node bin/devtwin.mjs <command> [flags]
 ```
 
-devctx is not published to npm yet. It has no third-party runtime dependencies and needs Node.js 22.13 or later. macOS is the reference platform.
+devtwin is not published to npm yet. It has no third-party runtime dependencies and needs Node.js 22.13 or later. macOS is the reference platform.
 
 ## Conventions
 
@@ -26,10 +26,10 @@ On success:
 On failure:
 
 ```json
-{"ok":false,"command":"context resolve","error":{"code":"DEVCTX_PROJECT_UNBOUND","message":"Worktree not bound in selected scope","details":{"reason":"not-bound-in-scope","remedy":"project onboard --scope other --repo <worktree>"}}}
+{"ok":false,"command":"context resolve","error":{"code":"DEVTWIN_PROJECT_UNBOUND","message":"Worktree not bound in selected scope","details":{"reason":"not-bound-in-scope","remedy":"project onboard --scope other --repo <worktree>"}}}
 ```
 
-`error.code` always starts with `DEVCTX_`. `details` is an object that may be empty. See [Errors](/docs/reference/errors/).
+`error.code` always starts with `DEVTWIN_`. `details` is an object that may be empty. See [Errors](/docs/reference/errors/).
 
 ### Exit codes
 
@@ -37,15 +37,15 @@ On failure:
 | --- | --- |
 | `0` | Success (`ok: true`). |
 | `1` | Any error except usage errors. |
-| `2` | `DEVCTX_USAGE`: unknown command, unknown or malformed flag. |
+| `2` | `DEVTWIN_USAGE`: unknown command, unknown or malformed flag. |
 
 ### The pilot fence
 
-Every command except `help`, `version`, `skill-sources catalog`, `skill-sources check`, `skill-sources preview` and `skill template-list` requires `--pilot <file>`: the absolute path of a [pilot file](/docs/reference/configuration/#pilot-file) or of the live config `~/.devctx/live.json`. Without it, the command fails with `DEVCTX_GATE_REQUIRED` ("v0 runs only inside a pilot fence").
+Every command except `help`, `version`, `skill-sources catalog`, `skill-sources check`, `skill-sources preview` and `skill template-list` requires `--pilot <file>`: the absolute path of a [pilot file](/docs/reference/configuration/#pilot-file) or of the live config `~/.devtwin/live.json`. Without it, the command fails with `DEVTWIN_GATE_REQUIRED` ("v0 runs only inside a pilot fence").
 
-Most commands also accept `--config-root`, `--data-root` and `--state-root`. They are optional; if given, they must equal the pilot's roots or the command fails with `DEVCTX_GATE_REQUIRED`. The `live`, `handoff export`, `skill-sources` and `skill template-list` commands do not accept them.
+Most commands also accept `--config-root`, `--data-root` and `--state-root`. They are optional; if given, they must equal the pilot's roots or the command fails with `DEVTWIN_GATE_REQUIRED`. The `live`, `handoff export`, `skill-sources` and `skill template-list` commands do not accept them.
 
-Flags are strict: unknown flags and positional arguments fail with `DEVCTX_USAGE`.
+Flags are strict: unknown flags and positional arguments fail with `DEVTWIN_USAGE`.
 
 ### Preview and apply
 
@@ -78,7 +78,7 @@ The skill builder and skill-source installers add separate recorded approvals; s
 Lists every command. No pilot needed.
 
 ```sh
-node bin/devctx.mjs help
+node bin/devtwin.mjs help
 ```
 
 ### `version`
@@ -86,8 +86,8 @@ node bin/devctx.mjs help
 Prints the kit name and version. No pilot needed.
 
 ```sh
-node bin/devctx.mjs version
-# {"ok":true,"command":"version","result":{"name":"devctx","version":"0.0.0-local"}}
+node bin/devtwin.mjs version
+# {"ok":true,"command":"version","result":{"name":"devtwin","version":"0.0.0-local"}}
 ```
 
 ### `doctor`
@@ -99,12 +99,12 @@ Read-only health check of the pilot. Reports `node`, `git`, `roots`, `locks`, `o
 | `--pilot <file>` | Required. |
 
 ```sh
-node bin/devctx.mjs doctor --pilot "$PILOT"
+node bin/devtwin.mjs doctor --pilot "$PILOT"
 ```
 
 ### `init`
 
-Creates the pilot's private config, data and state roots, `user.json` and an empty registry. Preview without `--apply`. Re-running with the same inputs is a no-op; different inputs are a `DEVCTX_CONFLICT`.
+Creates the pilot's private config, data and state roots, `user.json` and an empty registry. Preview without `--apply`. Re-running with the same inputs is a no-op; different inputs are a `DEVTWIN_CONFLICT`.
 
 | Flag | |
 | --- | --- |
@@ -114,7 +114,7 @@ Creates the pilot's private config, data and state roots, `user.json` and an emp
 | `--apply` | Write. |
 
 ```sh
-node bin/devctx.mjs init --pilot "$PILOT" --actor email:you@example.com --apply
+node bin/devtwin.mjs init --pilot "$PILOT" --actor email:you@example.com --apply
 ```
 
 ### `scope add`
@@ -131,7 +131,7 @@ Creates a scope. Preview without `--apply`.
 | `--apply` | Write. |
 
 ```sh
-node bin/devctx.mjs scope add --pilot "$PILOT" --scope example --apply
+node bin/devtwin.mjs scope add --pilot "$PILOT" --scope example --apply
 ```
 
 ### `locks release`
@@ -145,12 +145,12 @@ Releases a stale lock left by a killed command. Apply removes it only if it belo
 | `--apply --plan-fingerprint <fp>` | Release. |
 
 ```sh
-node bin/devctx.mjs locks release --pilot "$PILOT" --lock install
+node bin/devtwin.mjs locks release --pilot "$PILOT" --lock install
 ```
 
 ## Live config
 
-These commands manage `~/.devctx/live.json`. They must run from the kit clone the live config names (for `live set-kit`, the new clone). `--pilot` must be an absolute path. See [Live mode](/docs/guides/live-mode/).
+These commands manage `~/.devtwin/live.json`. They must run from the kit clone the live config names (for `live set-kit`, the new clone). `--pilot` must be an absolute path. See [Live mode](/docs/guides/live-mode/).
 
 ### `live init`
 
@@ -164,7 +164,7 @@ Creates the live config and the private store next to it.
 | `--apply --plan-fingerprint <fp>` | Write. |
 
 ```sh
-node "$KIT/bin/devctx.mjs" live init --pilot "$HOME/.devctx/live.json" --agent claude --agent codex --repo "$REPO"
+node "$KIT/bin/devtwin.mjs" live init --pilot "$HOME/.devtwin/live.json" --agent claude --agent codex --repo "$REPO"
 ```
 
 ### `live add-repo`
@@ -209,7 +209,7 @@ Scans a repository, proposes records and binds the worktree to a project. Never 
 | `--apply --plan-fingerprint <fp>` | Write. |
 
 ```sh
-node bin/devctx.mjs project onboard --pilot "$PILOT" --scope example --project example.atlas \
+node bin/devtwin.mjs project onboard --pilot "$PILOT" --scope example --project example.atlas \
   --repo "$REPO" --request-id req_atlas_onboard_01 --accept all
 ```
 
@@ -224,7 +224,7 @@ Finds the project bound to a worktree. Read-only.
 | `--cwd <path>` | Required. Canonical path inside the worktree. |
 
 ```sh
-node bin/devctx.mjs context resolve --pilot "$PILOT" --scope example --cwd "$REPO"
+node bin/devtwin.mjs context resolve --pilot "$PILOT" --scope example --cwd "$REPO"
 ```
 
 Returns `state`, `scope`, `project`, `binding`, `worktree` (`root`, `branch`, `head`, `dirty`), `cwdRelative` and `warnings`.
@@ -234,7 +234,7 @@ Returns `state`, `scope`, `project`, `binding`, `worktree` (`root`, `branch`, `h
 Builds the bounded brief for a worktree: at most 12 items and 24,576 body bytes. Read-only. Same flags as `context resolve`. See [Briefs](/docs/concepts/briefs/).
 
 ```sh
-node bin/devctx.mjs context brief --pilot "$PILOT" --scope example --cwd "$REPO"
+node bin/devtwin.mjs context brief --pilot "$PILOT" --scope example --cwd "$REPO"
 ```
 
 Returns `notice`, `worktree`, `warnings`, `preferences`, `profile`, `policies`, `records`, `review`, `unknownIds`, `disputedIds`, `omittedIds`, `receipt` and `briefHash`.
@@ -253,7 +253,7 @@ Writes a private Markdown packet of explicitly selected records. See [Handoffs](
 | `--out <file>` | Required. A new `<name>.handoff.md` directly inside `dataRoot/exports/handoffs/<scope>/<project>/`. |
 
 ```sh
-node bin/devctx.mjs handoff export --pilot "$PILOT" --scope example --cwd "$REPO" \
+node bin/devtwin.mjs handoff export --pilot "$PILOT" --scope example --cwd "$REPO" \
   --record rec_42cda2baa21c74516c2d593c --as-of 2026-10-25T00:00:00.000Z \
   --out "$DATA_ROOT/exports/handoffs/example/example.atlas/atlas.handoff.md"
 ```
@@ -282,7 +282,7 @@ Returns `records`, `packetHash`, `fileHash`, `bytes`, `output` and `"publication
 Writes a new record. See [Capture decisions](/docs/guides/capture-decisions/).
 
 ```sh
-node bin/devctx.mjs record add --pilot "$PILOT" --scope example --project example.atlas \
+node bin/devtwin.mjs record add --pilot "$PILOT" --scope example --project example.atlas \
   --kind decision --title "Use server-side search" --body "Filter on the server." \
   --request-id req_atlas_decision_01 --apply
 ```
@@ -351,7 +351,7 @@ Previews a new profile revision. Writes nothing.
 | `--proposed-by <agent\|user>` | Who proposed the values. Default `user`. |
 
 ```sh
-node bin/devctx.mjs profile plan --pilot "$PILOT" --work 'Backend services' --stack-current 'node=>=22:high'
+node bin/devtwin.mjs profile plan --pilot "$PILOT" --work 'Backend services' --stack-current 'node=>=22:high'
 ```
 
 ### `profile apply`
@@ -392,7 +392,7 @@ Lists watched items, sources and every host that would be contacted. No network,
 Stores the approval for a plan. Same flags as `stack plan`, plus `--plan-fingerprint <fp>` (required).
 
 ```sh
-node bin/devctx.mjs stack approve --pilot "$PILOT" --plan-fingerprint 'sha256:…'
+node bin/devtwin.mjs stack approve --pilot "$PILOT" --plan-fingerprint 'sha256:…'
 ```
 
 ### `stack check`
@@ -428,7 +428,7 @@ Saves a draft privately. Never sends.
 | `--apply --plan-fingerprint <fp>` | Write. |
 
 ```sh
-node bin/devctx.mjs draft save --pilot "$PILOT" --scope example --body-file "$INPUTS/draft.md"
+node bin/devtwin.mjs draft save --pilot "$PILOT" --scope example --body-file "$INPUTS/draft.md"
 ```
 
 ## Agent skills
@@ -446,7 +446,7 @@ See [Use with coding agents](/docs/guides/coding-agents/).
 | `--run-id <id>` | Optional run ID; a random one is generated by default. |
 
 ```sh
-node bin/devctx.mjs agents install --pilot "$PILOT" --home "$AGENT_HOME" --agent claude --agent codex
+node bin/devtwin.mjs agents install --pilot "$PILOT" --home "$AGENT_HOME" --agent claude --agent codex
 ```
 
 ### `agents status`
@@ -466,7 +466,7 @@ node bin/devctx.mjs agents install --pilot "$PILOT" --home "$AGENT_HOME" --agent
 
 ### `agents rollback-check`
 
-Compares skill folders with the inventory taken before an install run. Read-only. Fails with `DEVCTX_ROLLBACK_MISMATCH` on any `devctx-*` difference.
+Compares skill folders with the inventory taken before an install run. Read-only. Fails with `DEVTWIN_ROLLBACK_MISMATCH` on any `devtwin-*` difference.
 
 | Flag | |
 | --- | --- |

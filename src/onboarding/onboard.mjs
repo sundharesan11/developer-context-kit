@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertInPilot, assertWritable } from "../config/pilot.mjs";
 import { readRegistry, findByPath, publishRegistry } from "../config/registry.mjs";
 import { loadScope, bindingPath, writeBindingVersion, readBindingVersion, readBindingByHash, manifestPath, writeManifest, readManifest } from "../config/store.mjs";
@@ -18,10 +18,10 @@ import { commitOnboardingBundle, verifyManifestBundles, readSnapshot } from "../
 import { writeRunReceipt, ensureRunReceipt } from "../storage/runs.mjs";
 const template = readFileSync(fileURLToPath(new URL("../../templates/client-profile.md", import.meta.url)), "utf8");
 const PROFILE_TITLE = "Client profile";
-const conflict = () => new DevctxError("BINDING_CONFLICT", "Worktree bound elsewhere", { reason: "bound elsewhere" });
+const conflict = () => new DevtwinError("BINDING_CONFLICT", "Worktree bound elsewhere", { reason: "bound elsewhere" });
 function requestFor(input) {
   assertScopeId(input.scope); assertProjectId(input.project, input.scope);
-  if (![undefined, true, false].includes(input.keepPrevious)) throw new DevctxError("INVALID_INPUT", "Invalid keep-previous flag");
+  if (![undefined, true, false].includes(input.keepPrevious)) throw new DevtwinError("INVALID_INPUT", "Invalid keep-previous flag");
   const request = { ...onboardRequest(input), ...(input.keepPrevious ? { keepPrevious: true } : {}) };
   return { request, requestHash: requestHashFor(request), requestId: input.requestId ?? deterministicRequestId("onboard", request) };
 }
@@ -66,7 +66,7 @@ async function retireList(roots, registry, input, recreated) {
   for (const op of registry.operations) if (op.scope === input.scope && op.project === input.project && (await operationPath(roots, registry, op)) === input.repo) earlier.add(op.operationId);
   if (!earlier.size) return [];
   const { records } = await readSnapshot(roots, input.scope, input.project).catch((error) => {
-    if (error.code === "DEVCTX_RECOVERY_REQUIRED") throw new DevctxError("RECOVERY_REQUIRED", error.message, { ...error.details, remedy: "repair the project records, or re-run project onboard with --keep-previous to skip retiring earlier records" });
+    if (error.code === "DEVTWIN_RECOVERY_REQUIRED") throw new DevtwinError("RECOVERY_REQUIRED", error.message, { ...error.details, remedy: "repair the project records, or re-run project onboard with --keep-previous to skip retiring earlier records" });
     throw error;
   });
   return records.filter((r) => earlier.has(r.operationId) && recreated.has(canonicalJson([r.kind, r.title])) && r.effective !== "superseded").map((r) => ({ id: r.id, recordHash: r.recordHash })).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -82,7 +82,7 @@ export async function planOnboard(roots, pilot, input) {
   const derived = deriveCandidates(scan, { expectedRemotes: input.expectedRemotes ?? [], environments: input.environments ?? [] });
   const approvedSources = scan.sources.filter((s) => !s.skipped).map(sourceIdentity);
   const projectEntries = registry.bindings.filter((b) => b.scope === input.scope && b.project === input.project);
-  if (projectEntries.some((b) => b.commonDir !== scan.location.commonDir)) throw new DevctxError("BINDING_CONFLICT", "Project belongs to another repository");
+  if (projectEntries.some((b) => b.commonDir !== scan.location.commonDir)) throw new DevtwinError("BINDING_CONFLICT", "Project belongs to another repository");
   const latest = projectEntries.reduce((a, b) => !a || b.bindingVersion > a.bindingVersion ? b : a, null);
   const previous = latest ? await readBindingVersion(roots, latest) : null;
   const versionDir = join(roots.configRoot, "projects", input.scope, input.project);
@@ -116,10 +116,10 @@ export async function applyOnboard(roots, pilot, input, { fingerprint, now = () 
     const registry = (await readRegistry(roots)).value;
     const published = registry.operations.find((x) => x.requestId === requestId);
     if (published) {
-      if (published.scope !== input.scope || published.project !== input.project || published.requestHash !== requestHash) throw new DevctxError("CONFLICT", "Request ID reused");
-      if (fingerprint !== published.planFingerprint) throw new DevctxError("PLAN_MISMATCH", "Published plan differs");
+      if (published.scope !== input.scope || published.project !== input.project || published.requestHash !== requestHash) throw new DevtwinError("CONFLICT", "Request ID reused");
+      if (fingerprint !== published.planFingerprint) throw new DevtwinError("PLAN_MISMATCH", "Published plan differs");
       const manifest = await readManifest(roots, input.scope, input.project, published.operationId, published.manifestHash);
-      if (manifest.requestHash !== requestHash || manifest.planFingerprint !== published.planFingerprint || manifest.operationId !== published.operationId) throw new DevctxError("RECOVERY_REQUIRED", "Published operation mismatch");
+      if (manifest.requestHash !== requestHash || manifest.planFingerprint !== published.planFingerprint || manifest.operationId !== published.operationId) throw new DevtwinError("RECOVERY_REQUIRED", "Published operation mismatch");
       await readBindingByHash(roots, input.scope, input.project, manifest.bindingHash);
       await verifyManifestBundles(roots, input.scope, input.project, manifest);
       const receipt = onboardReceipt(published, manifest);
@@ -128,7 +128,7 @@ export async function applyOnboard(roots, pilot, input, { fingerprint, now = () 
     }
     const plan = await planOnboard(roots, pilot, { ...input, requestId });
     assertFingerprint(plan, fingerprint);
-    if (plan.conflicts.some((c) => c.blocking)) throw new DevctxError("CONFLICT", "Blocking onboarding conflict");
+    if (plan.conflicts.some((c) => c.blocking)) throw new DevtwinError("CONFLICT", "Blocking onboarding conflict");
     const existing = findByPath(registry, input.repo);
     if (existing && (existing.scope !== input.scope || existing.project !== input.project)) throw conflict();
     const operationId = operationIdFor({ scope: input.scope, project: input.project, requestId });
@@ -139,7 +139,7 @@ export async function applyOnboard(roots, pilot, input, { fingerprint, now = () 
     const bundles = [];
     for (const item of draftsFor(plan)) {
       const result = await commitOnboardingBundle(roots, { scope: input.scope, project: input.project, requestId: item.requestId, recordedBy: { actor: "human", runId: "run_onboard0001" }, draft: item.draft, operationId }, { now, faults: { beforeRename: faults.beforeRename }, supersedes: item.supersedes ?? [] }).catch((error) => {
-        if (error.code === "DEVCTX_CONFLICT") throw new DevctxError("CONFLICT", "Staged onboarding differs from current plan", { reason: "staged-bundle-changed", remedy: "re-run project onboard with a new --request-id" });
+        if (error.code === "DEVTWIN_CONFLICT") throw new DevtwinError("CONFLICT", "Staged onboarding differs from current plan", { reason: "staged-bundle-changed", remedy: "re-run project onboard with a new --request-id" });
         throw error;
       });
       bundles.push({ id: result.recordId, recordHash: result.recordHash, bodyHash: result.bodyHash ?? plan.bundles.find((b) => b.id === result.recordId).bodyHash });

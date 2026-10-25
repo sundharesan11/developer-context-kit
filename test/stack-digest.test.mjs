@@ -227,10 +227,10 @@ test("the digest contains no record text, only record IDs", async (t) => {
 test("stack digest apply with an unknown or stale fingerprint writes neither digest nor seen state", async (t) => {
   const p = await ready(t);
   const unknown = await apply(p, "sha256:" + "a".repeat(64));
-  assert.equal(unknown.json.error.code, "DEVCTX_PLAN_MISMATCH");
-  assert.equal((await apply(p, "../escape")).json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal(unknown.json.error.code, "DEVTWIN_PLAN_MISMATCH");
+  assert.equal((await apply(p, "../escape")).json.error.code, "DEVTWIN_PLAN_MISMATCH");
   const missing = await cli(p, ["stack", "digest", "--apply"]);
-  assert.equal(missing.json.error.code, "DEVCTX_PLAN_REQUIRED");
+  assert.equal(missing.json.error.code, "DEVTWIN_PLAN_REQUIRED");
   // Two previews against the same seen state; applying one makes the other stale.
   const a = await preview(p, fakeNet());
   const b = await preview(p, fakeNet({ [ATOM]: { status: 503 } }));
@@ -239,13 +239,13 @@ test("stack digest apply with an unknown or stale fingerprint writes neither dig
   const seenBefore = readFileSync(seenStatePath(p.roots, null));
   const digestsBefore = await list(join(p.dataRoot, "digests", "stack"));
   const stale = await apply(p, b.fingerprint);
-  assert.equal(stale.json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal(stale.json.error.code, "DEVTWIN_PLAN_MISMATCH");
   assert.deepEqual(readFileSync(seenStatePath(p.roots, null)), seenBefore);
   assert.deepEqual(await list(join(p.dataRoot, "digests", "stack")), digestsBefore);
   // A preview for one scope cannot be applied as another.
   const scoped = await preview(p, fakeNet(), ["--scope", "alpha"]);
-  assert.equal((await apply(p, scoped.fingerprint, ["--scope", "beta"])).json.error.code, "DEVCTX_PLAN_MISMATCH");
-  assert.equal((await apply(p, scoped.fingerprint)).json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal((await apply(p, scoped.fingerprint, ["--scope", "beta"])).json.error.code, "DEVTWIN_PLAN_MISMATCH");
+  assert.equal((await apply(p, scoped.fingerprint)).json.error.code, "DEVTWIN_PLAN_MISMATCH");
   assert.deepEqual(await list(join(p.dataRoot, "scopes", "alpha", "digests", "stack")), []);
   assert.equal((await readSeenState(p.roots, "alpha")).size, 0);
 });
@@ -257,7 +257,7 @@ test("stack digest apply never overwrites an existing digest", async (t) => {
   await mkdir(join(p.dataRoot, "digests", "stack"), { recursive: true, mode: 0o700 });
   await writeFile(target, "existing\n", { mode: 0o600 });
   const out = await apply(p, plan.fingerprint);
-  assert.equal(out.json.error.code, "DEVCTX_CONFLICT");
+  assert.equal(out.json.error.code, "DEVTWIN_CONFLICT");
   assert.equal(await readFile(target, "utf8"), "existing\n");
   assert.equal((await readSeenState(p.roots, null)).size, 0);
 });
@@ -280,7 +280,7 @@ test("stack digest apply refuses a pending file whose bytes no longer match its 
   await chmod(path, 0o600);
   await writeFile(path, JSON.stringify(value) + "\n");
   const out = await apply(p, plan.fingerprint);
-  assert.equal(out.json.error.code, "DEVCTX_INTEGRITY");
+  assert.equal(out.json.error.code, "DEVTWIN_INTEGRITY");
   assert.deepEqual(await list(join(p.dataRoot, "digests", "stack")), []);
   assert.equal((await readSeenState(p.roots, null)).size, 0);
 });
@@ -314,28 +314,28 @@ test("stack digest is listed in help", async () => {
 });
 
 test("with a live config stack digest preview and apply fail with GATE_REQUIRED and make no request", async (t) => {
-  const sb = await sandbox(t), home = join(sb, "home"), devctx = join(home, ".devctx");
+  const sb = await sandbox(t), home = join(sb, "home"), devtwin = join(home, ".devtwin");
   for (const rel of [".claude/skills", ".agents/skills"]) await mkdir(join(home, rel), { recursive: true });
-  await mkdir(devctx);
-  await chmod(devctx, 0o700);
-  const kit = await makeRepo(join(devctx, "kit"), { "README.md": "kit\n" });
+  await mkdir(devtwin);
+  await chmod(devtwin, 0o700);
+  const kit = await makeRepo(join(devtwin, "kit"), { "README.md": "kit\n" });
   await fixtureGit(kit, ["checkout", "-q", "--detach"]);
-  const liveConfig = join(devctx, "live.json");
+  const liveConfig = join(devtwin, "live.json");
   const run = (args, extra = {}) => { const chunks = []; return main(args, { stdout: { write(v) { chunks.push(v); return true; } }, now, home, env: {}, kitRoot: kit, ...extra }).then((code) => ({ code, json: JSON.parse(chunks.join("")) })); };
   const init = await run(["live", "init", "--pilot", liveConfig, "--agent", "claude"]);
   assert.equal(init.json.ok, true, JSON.stringify(init.json));
   const applied = await run(["live", "init", "--pilot", liveConfig, "--agent", "claude", "--apply", "--plan-fingerprint", init.json.result.fingerprint]);
   assert.equal(applied.json.ok, true, JSON.stringify(applied.json));
   const net = fakeNet();
-  const before = await treeSnapshot(devctx);
+  const before = await treeSnapshot(devtwin);
   for (const extra of [[], ["--apply", "--plan-fingerprint", "sha256:" + "b".repeat(64)]]) {
     const out = await run(["stack", "digest", "--pilot", liveConfig, ...extra], { request: net.request, lookup: net.lookup, stackCatalog: CATALOG });
     assert.equal(out.json.ok, false);
-    assert.equal(out.json.error.code, "DEVCTX_GATE_REQUIRED");
+    assert.equal(out.json.error.code, "DEVTWIN_GATE_REQUIRED");
     assert.equal(out.json.error.details.reason, "no-live-exception");
   }
   assert.equal(net.log.length + net.lookups.length, 0);
-  assert.equal(await treeSnapshot(devctx), before);
+  assert.equal(await treeSnapshot(devtwin), before);
 });
 
 test("an apply that lands while a preview is fetching makes that preview stale with PLAN_MISMATCH", async (t) => {
@@ -351,7 +351,7 @@ test("an apply that lands while a preview is fetching makes that preview stale w
   const seenBefore = readFileSync(seenStatePath(p.roots, null));
   const digestsBefore = await list(join(p.dataRoot, "digests", "stack"));
   const stale = await apply(p, second.json.result.fingerprint);
-  assert.equal(stale.json.error?.code, "DEVCTX_PLAN_MISMATCH", stale.text);
+  assert.equal(stale.json.error?.code, "DEVTWIN_PLAN_MISMATCH", stale.text);
   assert.deepEqual(readFileSync(seenStatePath(p.roots, null)), seenBefore);
   assert.deepEqual(await list(join(p.dataRoot, "digests", "stack")), digestsBefore);
 });
@@ -381,7 +381,7 @@ test("a digest apply keeps CONFLICT when the existing digest has the planned byt
   await writeFile(target, plan.markdown, { mode: 0o644 });
   await chmod(target, 0o644);
   const out = await apply(p, plan.fingerprint);
-  assert.equal(out.json.error?.code, "DEVCTX_CONFLICT", out.text);
+  assert.equal(out.json.error?.code, "DEVTWIN_CONFLICT", out.text);
   assert.equal((await readSeenState(p.roots, null)).size, 0);
   assert.deepEqual(await list(pendingDir(p)), [plan.fingerprint.slice(7) + ".json"]);
 });
@@ -394,7 +394,7 @@ test("stack digest apply after the stack approval changed since preview fails wi
   const approved = await cli(p, ["stack", "approve", "--with", "advisories", "--plan-fingerprint", changed.json.result.fingerprint]);
   assert.equal(approved.code, 0, approved.text);
   const out = await apply(p, plan.fingerprint);
-  assert.equal(out.json.error?.code, "DEVCTX_PLAN_MISMATCH", out.text);
+  assert.equal(out.json.error?.code, "DEVTWIN_PLAN_MISMATCH", out.text);
   assert.match(out.json.error.message, /approval changed/);
   assert.deepEqual(await list(join(p.dataRoot, "digests", "stack")), []);
   assert.equal((await readSeenState(p.roots, null)).size, 0);

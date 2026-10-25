@@ -96,7 +96,7 @@ test("template seeding feeds the unchanged skill-builder steps from workspace-cr
 test("skill template-seed for a workspace that does not exist fails with NOT_FOUND", async (t) => {
   const p = await makePilot(t);
   const seed = await skill(p, "template-seed", [...personal, ...notes()]);
-  assert.equal(seed.json.error.code, "DEVCTX_NOT_FOUND");
+  assert.equal(seed.json.error.code, "DEVTWIN_NOT_FOUND");
 });
 
 test("skill template-verify fails with INTEGRITY naming an edited, removed or extra file", async (t) => {
@@ -104,18 +104,18 @@ test("skill template-verify fails with INTEGRITY naming an edited, removed or ex
   const { dir, verify } = await seeded(t, p);
   await writeFile(join(dir, "design.json"), (await readFile(join(dir, "design.json"), "utf8")) + " ");
   let result = await verify();
-  assert.equal(result.json.error.code, "DEVCTX_INTEGRITY"); assert.equal(result.json.error.details.path, "design.json");
+  assert.equal(result.json.error.code, "DEVTWIN_INTEGRITY"); assert.equal(result.json.error.details.path, "design.json");
   const second = await seeded(t, p, join(p.inputsRoot, "second"));
   await rm(join(second.dir, "candidate", "SKILL.md"));
   result = await second.verify();
-  assert.equal(result.json.error.code, "DEVCTX_INTEGRITY"); assert.equal(result.json.error.details.path, "candidate/SKILL.md");
+  assert.equal(result.json.error.code, "DEVTWIN_INTEGRITY"); assert.equal(result.json.error.details.path, "candidate/SKILL.md");
   const third = await seeded(t, p, join(p.inputsRoot, "third"));
   await writeFile(join(third.dir, "notes.md"), "extra\n");
   result = await third.verify();
-  assert.equal(result.json.error.code, "DEVCTX_INTEGRITY"); assert.equal(result.json.error.details.path, "notes.md");
+  assert.equal(result.json.error.code, "DEVTWIN_INTEGRITY"); assert.equal(result.json.error.details.path, "notes.md");
   const fourth = await seeded(t, p, join(p.inputsRoot, "fourth"));
   result = await skill(p, "template-verify", [...personal, ...notes(), "--dir", fourth.dir, "--render-digest", "sha256:" + "0".repeat(64)]);
-  assert.equal(result.json.error.code, "DEVCTX_PLAN_MISMATCH");
+  assert.equal(result.json.error.code, "DEVTWIN_PLAN_MISMATCH");
 });
 
 test("skill template-verify refuses a directory outside inputsRoot with GATE_REQUIRED and a symlinked file with PATH_UNSAFE", async (t) => {
@@ -123,13 +123,13 @@ test("skill template-verify refuses a directory outside inputsRoot with GATE_REQ
   const outside = join(p.sandbox, "outside");
   const { seed } = await seeded(t, p, outside);
   const gated = await skill(p, "template-verify", [...personal, ...notes(), "--dir", outside, "--render-digest", seed.renderDigest]);
-  assert.equal(gated.json.error.code, "DEVCTX_GATE_REQUIRED");
+  assert.equal(gated.json.error.code, "DEVTWIN_GATE_REQUIRED");
   const { dir, verify } = await seeded(t, p);
   await rm(join(dir, "design.json")); await symlink(join(outside, "design.json"), join(dir, "design.json"));
-  assert.equal((await verify()).json.error.code, "DEVCTX_PATH_UNSAFE");
+  assert.equal((await verify()).json.error.code, "DEVTWIN_PATH_UNSAFE");
   const linked = await seeded(t, p, join(p.inputsRoot, "linked"));
   await link(join(linked.dir, "design.json"), join(p.inputsRoot, "hard-link.json"));
-  assert.equal((await linked.verify()).json.error.code, "DEVCTX_PATH_UNSAFE");
+  assert.equal((await linked.verify()).json.error.code, "DEVTWIN_PATH_UNSAFE");
 });
 
 test("a scope placeholder renders only for a company workspace in an existing scope with a value inside that scope", async (t) => {
@@ -137,40 +137,40 @@ test("a scope placeholder renders only for a company workspace in an existing sc
   const channel = (value) => ["--template", "fixture-channel", "--set", "skill-name=team-update", "--set", "channel=" + value];
   assert.equal((await skill(p, "workspace-create", personal)).code, 0);
   const asPersonal = await skill(p, "template-seed", [...personal, ...channel("acme")]);
-  assert.equal(asPersonal.json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.equal(asPersonal.json.error.code, "DEVTWIN_INVALID_INPUT");
   const unknown = await skill(p, "template-seed", [...company, ...channel("acme")]);
-  assert.equal(unknown.json.error.code, "DEVCTX_SCOPE_UNKNOWN");
+  assert.equal(unknown.json.error.code, "DEVTWIN_SCOPE_UNKNOWN");
   await applyScopeAdd(p.roots, { scope: "acme" });
   assert.equal((await skill(p, "workspace-create", company)).code, 0);
   for (const value of ["acme", "acme.platform-team"]) assert.equal((await skill(p, "template-seed", [...company, ...channel(value)])).code, 0, value);
   for (const value of ["beacon", "beacon.platform", "acmex", "acme."]) {
     const outside = await skill(p, "template-seed", [...company, ...channel(value)]);
-    assert.equal(outside.json.error.code, "DEVCTX_INVALID_INPUT", value); assert.equal(outside.json.error.details.key, "channel");
+    assert.equal(outside.json.error.code, "DEVTWIN_INVALID_INPUT", value); assert.equal(outside.json.error.details.key, "channel");
   }
 });
 
 test("skill template-seed refuses a missing required placeholder with INVALID_INPUT naming the key", async (t) => {
   const p = await personalPilot(t);
   const missing = await skill(p, "template-seed", [...personal, ...notes(["topic=notes"])]);
-  assert.equal(missing.json.error.code, "DEVCTX_INVALID_INPUT"); assert.equal(missing.json.error.details.key, "skill-name");
+  assert.equal(missing.json.error.code, "DEVTWIN_INVALID_INPUT"); assert.equal(missing.json.error.details.key, "skill-name");
   const unknown = await skill(p, "template-seed", [...personal, ...notes(["skill-name=summarize-notes", "colour=blue"])]);
-  assert.equal(unknown.json.error.code, "DEVCTX_INVALID_INPUT"); assert.equal(unknown.json.error.details.key, "colour");
+  assert.equal(unknown.json.error.code, "DEVTWIN_INVALID_INPUT"); assert.equal(unknown.json.error.details.key, "colour");
   const twice = await skill(p, "template-seed", [...personal, ...notes(["skill-name=summarize-notes", "skill-name=other-notes"])]);
-  assert.equal(twice.json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.equal(twice.json.error.code, "DEVTWIN_INVALID_INPUT");
 });
 
 test("skill template-seed refuses reserved, bundled and invalid skill names", async (t) => {
   const p = await personalPilot(t);
-  for (const name of ["devctx-notes", "devctx-onboard", "devctx-create-skill", "Bad_Name", "-lead", "a".repeat(65)]) {
+  for (const name of ["devtwin-notes", "devtwin-onboard", "devtwin-create-skill", "Bad_Name", "-lead", "a".repeat(65)]) {
     const result = await skill(p, "template-seed", [...personal, ...notes(["skill-name=" + name])]);
-    assert.equal(result.json.error.code, "DEVCTX_INVALID_INPUT", name);
+    assert.equal(result.json.error.code, "DEVTWIN_INVALID_INPUT", name);
   }
 });
 
 test("skill template-seed refuses a value with a newline, the placeholder marker or a token-like string", async (t) => {
   const p = await personalPilot(t);
   const token = "gh" + "p_" + "A".repeat(30);
-  for (const [value, code] of [["two\nlines", "DEVCTX_INVALID_INPUT"], ["x {{dck:topic}}", "DEVCTX_INVALID_INPUT"], [token, "DEVCTX_SENSITIVE_CONTENT"]]) {
+  for (const [value, code] of [["two\nlines", "DEVTWIN_INVALID_INPUT"], ["x {{dck:topic}}", "DEVTWIN_INVALID_INPUT"], [token, "DEVTWIN_SENSITIVE_CONTENT"]]) {
     const result = await skill(p, "template-seed", [...personal, ...notes(["skill-name=summarize-notes", "topic=" + value])]);
     assert.equal(result.json.error.code, code, value);
   }
@@ -186,12 +186,12 @@ test("template validation refuses an undeclared placeholder, an unused declared 
   };
   for (const [label, change] of Object.entries(cases)) {
     const root = await mutated(t, change);
-    assert.throws(() => listTemplates(root), { code: "DEVCTX_INVALID_INPUT" }, label);
+    assert.throws(() => listTemplates(root), { code: "DEVTWIN_INVALID_INPUT" }, label);
     const listed = await runCli(["skill", "template-list"], { templateRoot: root });
-    assert.equal(listed.json.error.code, "DEVCTX_INVALID_INPUT", label);
+    assert.equal(listed.json.error.code, "DEVTWIN_INVALID_INPUT", label);
   }
   const linked = await mutated(t, async (dir) => { await rm(join(dir, "design.json")); await symlink(join(templateRoot, "fixture-notes", "design.json"), join(dir, "design.json")); });
-  assert.throws(() => listTemplates(linked), { code: "DEVCTX_PATH_UNSAFE" });
+  assert.throws(() => listTemplates(linked), { code: "DEVTWIN_PATH_UNSAFE" });
 });
 
 test("template routes are listed in help and take no apply option", async (t) => {
@@ -199,7 +199,7 @@ test("template routes are listed in help and take no apply option", async (t) =>
   for (const route of ["skill template-list", "skill template-seed", "skill template-verify"]) assert.ok(help.json.result.commands.includes(route), route);
   const p = await personalPilot(t);
   assert.equal((await skill(p, "template-seed", [...personal, ...notes(), "--apply"])).code, 2);
-  assert.equal((await skill(p, "template-seed", [...personal, "--template", "missing-template", "--set", "skill-name=x-y"])).json.error.code, "DEVCTX_NOT_FOUND");
+  assert.equal((await skill(p, "template-seed", [...personal, "--template", "missing-template", "--set", "skill-name=x-y"])).json.error.code, "DEVTWIN_NOT_FOUND");
 });
 
 // U13: the real templates shipped under templates/skills/ (no templateRoot override).
@@ -260,7 +260,7 @@ test("skill template-seed refuses a description the skill validator would reject
   assert.equal((await kit("workspace-create", sel)).code, 0);
   for (const description of ["Use when: x", "true", "2026-01-01 notes"]) {
     const seed = await kit("template-seed", [...sel, "--template", "writing", "--set", "skill-name=message-drafts", "--set", "skill-description=" + description]);
-    assert.equal(seed.json.error?.code, "DEVCTX_INVALID_INPUT", description + JSON.stringify(seed.json));
+    assert.equal(seed.json.error?.code, "DEVTWIN_INVALID_INPUT", description + JSON.stringify(seed.json));
   }
   const plain = await kit("template-seed", [...sel, "--template", "writing", "--set", "skill-name=message-drafts", "--set", "skill-description=Use when drafting a note, email or PR text (short)."]);
   assert.equal(plain.code, 0, JSON.stringify(plain.json));

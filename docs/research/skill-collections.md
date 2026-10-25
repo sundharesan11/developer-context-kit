@@ -78,8 +78,8 @@ src/skill-sources/                        # catalog, checks, acquisition and rev
                                          # planned: unattended update policy and native routes
 src/agents/catalog-adapters/              # planned: host-specific render/discovery
 src/automations/orca.mjs                  # planned: first scheduler adapter
-skills/devctx-manage-skill-sources/        # planned: setup, inspect and update workflow
-skills/devctx-setup-automation/            # planned: schedule creation and testing
+skills/devtwin-manage-skill-sources/        # planned: setup, inspect and update workflow
+skills/devtwin-setup-automation/            # planned: schedule creation and testing
 test/skill-sources.test.mjs               # implemented: catalog and HTTP fixtures
 ```
 

@@ -1,5 +1,5 @@
 ---
-// Starlight follows the OS colour scheme by default. The devctx site is a
+// Starlight follows the OS colour scheme by default. The devtwin site is a
 // "Night" site, so a first-time visitor starts on the dark theme. After that
 // first visit Starlight's own theme picker (dark / light / auto) is respected.
 import Default from '@astrojs/starlight/components/ThemeProvider.astro';
@@ -7,8 +7,8 @@ import Default from '@astrojs/starlight/components/ThemeProvider.astro';
 
 <script is:inline>
 	try {
-		if (!localStorage.getItem('devctx-theme-seeded')) {
-			localStorage.setItem('devctx-theme-seeded', '1');
+		if (!localStorage.getItem('devtwin-theme-seeded')) {
+			localStorage.setItem('devtwin-theme-seeded', '1');
 			if (!localStorage.getItem('starlight-theme')) localStorage.setItem('starlight-theme', 'dark');
 		}
 	} catch (e) {}

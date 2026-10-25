@@ -42,25 +42,25 @@ test("handoff output refuses alternate roots aliases existing nodes and unsafe p
   const paths = [s.repo, s.inputsRoot, s.configRoot, s.stateRoot, s.agentHomes[0], s.forbidden[0], s.sandbox, resolve(import.meta.dirname, ".."), join(s.fakeHome, ".codex")].map((dir) => join(dir, "bad.handoff.md"));
   paths.push("relative.handoff.md", dirname(value.out) + "/../acme.atlas/bad.handoff.md", join(dirname(value.out), "nested/bad.handoff.md"));
   const before = await treeSnapshot(s.pilot.pilotRoot);
-  for (const out of paths) await assert.rejects(invoke(s, { ...value, out }), (e) => ["DEVCTX_GATE_REQUIRED", "DEVCTX_PATH_UNSAFE"].includes(e.code));
+  for (const out of paths) await assert.rejects(invoke(s, { ...value, out }), (e) => ["DEVTWIN_GATE_REQUIRED", "DEVTWIN_PATH_UNSAFE"].includes(e.code));
   assert.equal(await treeSnapshot(s.pilot.pilotRoot), before);
   await mkdir(dirname(value.out), { recursive: true, mode: 0o700 });
   await writeFile(value.out, "preserve", { mode: 0o600 });
   await symlink(value.out, join(dirname(value.out), "linked.handoff.md"));
   await link(value.out, join(dirname(value.out), "hardlinked.handoff.md"));
   await mkdir(join(dirname(value.out), "directory.handoff.md"));
-  for (const filename of ["packet", "linked", "hardlinked", "directory"]) await assert.rejects(invoke(s, input(s, [a.recordId], filename)), (e) => ["DEVCTX_CONFLICT", "DEVCTX_PATH_UNSAFE", "DEVCTX_GATE_REQUIRED"].includes(e.code));
+  for (const filename of ["packet", "linked", "hardlinked", "directory"]) await assert.rejects(invoke(s, input(s, [a.recordId], filename)), (e) => ["DEVTWIN_CONFLICT", "DEVTWIN_PATH_UNSAFE", "DEVTWIN_GATE_REQUIRED"].includes(e.code));
   assert.equal(await readFile(value.out, "utf8"), "preserve");
   await chmod(dirname(value.out), 0o755);
-  await assert.rejects(invoke(s, input(s, [a.recordId], "unsafe")), { code: "DEVCTX_PATH_UNSAFE" });
+  await assert.rejects(invoke(s, input(s, [a.recordId], "unsafe")), { code: "DEVTWIN_PATH_UNSAFE" });
   assert.equal((await stat(dirname(value.out))).mode & 0o777, 0o755);
   const other = await seedCommittedProject(t), b = await addRecord(other.roots, draftFor("acme", "acme.atlas"), { now });
   await symlink(other.inputsRoot, join(other.dataRoot, "exports"));
-  await assert.rejects(invoke(other, input(other, [b.recordId])), (e) => ["DEVCTX_PATH_UNSAFE", "DEVCTX_GATE_REQUIRED"].includes(e.code));
+  await assert.rejects(invoke(other, input(other, [b.recordId])), (e) => ["DEVTWIN_PATH_UNSAFE", "DEVTWIN_GATE_REQUIRED"].includes(e.code));
   const restricted = await seedCommittedProject(t), c = await addRecord(restricted.roots, draftFor("acme", "acme.atlas"), { now });
   await chmod(restricted.dataRoot, 0o500);
   try {
-    await assert.rejects(invoke(restricted, input(restricted, [c.recordId])), { code: "DEVCTX_PATH_UNSAFE" });
+    await assert.rejects(invoke(restricted, input(restricted, [c.recordId])), { code: "DEVTWIN_PATH_UNSAFE" });
     assert.equal((await stat(restricted.dataRoot)).mode & 0o777, 0o500);
   } finally { await chmod(restricted.dataRoot, 0o700); }
 });
@@ -69,9 +69,9 @@ test("handoff direct APIs require matching pilot before reads or writes", async 
   const s = await seedCommittedProject(t), a = await addRecord(s.roots, draftFor("acme", "acme.atlas"), { now });
   const value = input(s, [a.recordId]), call = await exporter(), before = await treeSnapshot(s.pilot.pilotRoot);
   for (const [roots, pilot] of [[{ ...s.roots, pilot: undefined }, s.pilot], [s.roots, undefined], [s.roots, { ...s.pilot }], [{ ...s.roots, dataRoot: s.inputsRoot }, s.pilot]]) {
-    await assert.rejects(call(roots, pilot, value), { code: "DEVCTX_GATE_REQUIRED" });
+    await assert.rejects(call(roots, pilot, value), { code: "DEVTWIN_GATE_REQUIRED" });
   }
-  await assert.rejects(invoke(s, { ...value, cwd: s.sandbox }), { code: "DEVCTX_GATE_REQUIRED" });
+  await assert.rejects(invoke(s, { ...value, cwd: s.sandbox }), { code: "DEVTWIN_GATE_REQUIRED" });
   assert.equal(await treeSnapshot(s.pilot.pilotRoot), before);
 });
 
@@ -83,10 +83,10 @@ test("handoff CLI accepts repeated --record and refuses duplicate single-value o
   assert.equal(result.code, 0, JSON.stringify(result.json));
   assert.equal(result.json.result.records.length, 2);
   for (const [flag, option] of [["pilot", s.path], ["out", value.out], ["as-of", asOf], ["cwd", s.repo], ["scope", "acme"]]) {
-    assert.equal((await runCli([...args(s, value), "--" + flag, option])).json.error.code, "DEVCTX_USAGE");
+    assert.equal((await runCli([...args(s, value), "--" + flag, option])).json.error.code, "DEVTWIN_USAGE");
   }
-  assert.equal((await runCli(args(s, { ...value, recordIds: [] }))).json.error.code, "DEVCTX_INVALID_INPUT");
-  assert.equal((await runCli(["skill-sources", "stage", "--pilot", s.path, "--pilot", s.path])).json.error.code, "DEVCTX_USAGE");
+  assert.equal((await runCli(args(s, { ...value, recordIds: [] }))).json.error.code, "DEVTWIN_INVALID_INPUT");
+  assert.equal((await runCli(["skill-sources", "stage", "--pilot", s.path, "--pilot", s.path])).json.error.code, "DEVTWIN_USAGE");
 });
 
 test("handoff preflight failures create no export file or directories", async (t) => {
@@ -94,11 +94,11 @@ test("handoff preflight failures create no export file or directories", async (t
   for (const [i, body] of ["/tmp/private", "x".repeat(32768)].entries()) {
     const a = await addRecord(s.roots, draftFor("acme", "acme.atlas", { requestId: `req_failure000${i}`, body }), { now });
     const before = await treeSnapshot(s.pilot.pilotRoot);
-    await assert.rejects(invoke(s, input(s, [a.recordId])), { code: i === 0 ? "DEVCTX_HANDOFF_UNSAFE" : "DEVCTX_LIMIT" });
+    await assert.rejects(invoke(s, input(s, [a.recordId])), { code: i === 0 ? "DEVTWIN_HANDOFF_UNSAFE" : "DEVTWIN_LIMIT" });
     assert.equal(await treeSnapshot(s.pilot.pilotRoot), before);
     assert.equal(existsSync(join(s.dataRoot, "exports")), false);
   }
-  await assert.rejects(invoke(s, input(s, [])), { code: "DEVCTX_INVALID_INPUT" });
+  await assert.rejects(invoke(s, input(s, [])), { code: "DEVTWIN_INVALID_INPUT" });
   assert.equal(existsSync(join(s.dataRoot, "exports")), false);
 });
 
@@ -107,15 +107,15 @@ test("handoff export rechecks selected evidence before exclusive publication", a
   const draft = draftFor("acme", "acme.atlas");
   draft.draft.sources = [{ ref: "file:README.md", sha256: sha256(body) }];
   const a = await addRecord(s.roots, draft, { now }), value = input(s, [a.recordId]);
-  await assert.rejects(invoke(s, value, { faults: { beforeRecheck: () => writeFile(join(s.repo, "README.md"), "changed\n") } }), { code: "DEVCTX_SOURCE_CHANGED" });
+  await assert.rejects(invoke(s, value, { faults: { beforeRecheck: () => writeFile(join(s.repo, "README.md"), "changed\n") } }), { code: "DEVTWIN_SOURCE_CHANGED" });
   assert.equal(existsSync(value.out), false);
   await writeFile(join(s.repo, "README.md"), body);
-  await assert.rejects(invoke(s, value, { faults: { beforeRecheck: () => addRecord(s.roots, draftFor("acme", "acme.atlas", { requestId: "req_raceaddition01" }), { now }) } }), { code: "DEVCTX_SOURCE_CHANGED" });
+  await assert.rejects(invoke(s, value, { faults: { beforeRecheck: () => addRecord(s.roots, draftFor("acme", "acme.atlas", { requestId: "req_raceaddition01" }), { now }) } }), { code: "DEVTWIN_SOURCE_CHANGED" });
   const one = await invoke(s, value), two = await invoke(s, input(s, [a.recordId], "second"));
   assert.equal(one.fileHash, two.fileHash);
   assert.equal(await readFile(value.out, "utf8"), await readFile(input(s, [a.recordId], "second").out, "utf8"));
-  await assert.rejects(invoke(s, value), { code: "DEVCTX_CONFLICT" });
-  await assert.rejects(invoke(s, input(s, [a.recordId], "superseded"), { faults: { beforeRecheck: () => supersedeRecord(s.roots, { ...draftFor("acme", "acme.atlas", { requestId: "req_racesupersede01" }), targets: [a.recordId], expectHashes: [a.recordHash] }, { now }) } }), { code: "DEVCTX_RECORD_NOT_EXPORTABLE" });
+  await assert.rejects(invoke(s, value), { code: "DEVTWIN_CONFLICT" });
+  await assert.rejects(invoke(s, input(s, [a.recordId], "superseded"), { faults: { beforeRecheck: () => supersedeRecord(s.roots, { ...draftFor("acme", "acme.atlas", { requestId: "req_racesupersede01" }), targets: [a.recordId], expectHashes: [a.recordHash] }, { now }) } }), { code: "DEVTWIN_RECORD_NOT_EXPORTABLE" });
 });
 
 test("handoff CLI errors do not echo private paths or unsafe content", async (t) => {
@@ -124,11 +124,11 @@ test("handoff CLI errors do not echo private paths or unsafe content", async (t)
   await mkdir(dirname(value.out), { recursive: true, mode: 0o700 });
   await chmod(dirname(value.out), 0o755);
   const badParent = await runCli(args(s, value));
-  assert.equal(badParent.json.error.code, "DEVCTX_PATH_UNSAFE");
+  assert.equal(badParent.json.error.code, "DEVTWIN_PATH_UNSAFE");
   const badPilot = await runCli(args({ ...s, path: join(s.sandbox, "missing.json") }, value));
   const unsafe = await addRecord(s.roots, draftFor("acme", "acme.atlas", { requestId: "req_unsafeerror01", body: "/tmp/PRIVATE-CONTENT-CANARY" }), { now });
   const badContent = await runCli(args(s, input(s, [unsafe.recordId])));
-  assert.equal(badContent.json.error.code, "DEVCTX_HANDOFF_UNSAFE");
+  assert.equal(badContent.json.error.code, "DEVTWIN_HANDOFF_UNSAFE");
   for (const result of [badParent, badPilot, badContent]) {
     const text = JSON.stringify(result.json);
     assert.ok(!text.includes(s.sandbox) && !text.includes("PRIVATE-CONTENT-CANARY") && !text.includes("ENOENT"));

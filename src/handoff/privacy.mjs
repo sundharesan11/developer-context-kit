@@ -1,4 +1,4 @@
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { RECORD_ID, assertActorRef } from "../identity/ids.mjs";
 import { KINDS, STATUSES } from "../records/schema.mjs";
 import { assertNoSensitive } from "../records/redact.mjs";
@@ -20,7 +20,7 @@ const TRIPWIRES = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
   /\b(?:email|github|slack|linear|handle):[A-Za-z0-9._@+-]+/i
 ];
-export function unsafe() { throw new DevctxError("HANDOFF_UNSAFE", "Selected evidence is not portable"); }
+export function unsafe() { throw new DevtwinError("HANDOFF_UNSAFE", "Selected evidence is not portable"); }
 export function assertPortableText(text) {
   if (typeof text !== "string") unsafe();
   assertNoSensitive(text);
@@ -97,10 +97,10 @@ export function portableRecord(record, { projected = false } = {}) {
 }
 const SAFE_CODES = new Set(["INVALID_INPUT", "INVALID_ID", "LIMIT", "HANDOFF_UNSAFE", "SENSITIVE_CONTENT", "GATE_REQUIRED", "PATH_UNSAFE", "PATH_ESCAPE", "PROJECT_UNBOUND", "RECORD_NOT_EXPORTABLE", "INTEGRITY", "RECOVERY_REQUIRED", "SOURCE_CHANGED", "CONFLICT", "GIT_UNAVAILABLE", "STORAGE_ERROR", "SCHEMA_UNSUPPORTED"]);
 export function handoffError(error) {
-  const code = error instanceof DevctxError ? error.code.replace(/^DEVCTX_/, "") : "STORAGE_ERROR";
+  const code = error instanceof DevtwinError ? error.code.replace(/^DEVTWIN_/, "") : "STORAGE_ERROR";
   const message = "Portable handoff held; inspect selected evidence and pilot locally";
   // Corrupt-record IDs are opaque hashes; pass them through so an operator can find the record.
   const ids = code === "INTEGRITY" ? error.details?.records : null;
-  if (Array.isArray(ids) && ids.length && ids.every((id) => typeof id === "string" && RECORD_ID.test(id))) return new DevctxError(code, message + "; corrupt records: " + ids.slice(0, 5).join(", ") + (ids.length > 5 ? ", ..." : ""), { records: ids });
-  return new DevctxError(SAFE_CODES.has(code) ? code : "STORAGE_ERROR", message);
+  if (Array.isArray(ids) && ids.length && ids.every((id) => typeof id === "string" && RECORD_ID.test(id))) return new DevtwinError(code, message + "; corrupt records: " + ids.slice(0, 5).join(", ") + (ids.length > 5 ? ", ..." : ""), { records: ids });
+  return new DevtwinError(SAFE_CODES.has(code) ? code : "STORAGE_ERROR", message);
 }

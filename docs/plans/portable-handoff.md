@@ -28,7 +28,7 @@
 Add exactly this root-bound command; do not add `--all`, `--from-brief`, implicit selection, or root overrides:
 
 ```sh
-node bin/devctx.mjs handoff export --pilot "$PILOT_FILE" \
+node bin/devtwin.mjs handoff export --pilot "$PILOT_FILE" \
   --scope acme --cwd "$ATLAS_REPO" \
   --record "$FACT_RECORD_ID" --record "$HANDOFF_RECORD_ID" \
   --as-of 2026-10-09T00:00:00.000Z \
@@ -86,7 +86,7 @@ Validate scope with `assertScopeId`, selected IDs with `RECORD_ID`, and `asOf` b
 
 First verify roots and pilot identity with `assertWritable(roots, [])`, require `pilot === roots.pilot`, and verify canonical cwd is within a declared pilot repository. Then call `resolveContext(roots, {scope, cwd})`, assert its exact root with `assertInPilot(pilot, resolved.worktree.root, "repos")`, and call `readSnapshot(roots, scope, resolved.project)`. Do not read another project's records or policies to resolve a missing selected ID.
 
-Sort record IDs using code-unit order (`array.sort()`), not locale-dependent ordering. Require every selected ID to exist in this project, be effective, and have status observed, confirmed or disputed. Missing IDs, superseded records and proposed records return `RECORD_NOT_EXPORTABLE`; no successor is automatically selected. `readSnapshot` returns corruption without throwing, so explicitly execute `if (snapshot.corrupt.length) throw new DevctxError("INTEGRITY", "Project snapshot is incomplete")`. Corruption may hide supersession; no corrupt bytes or paths appear in the error. Hidden uncommitted records remain excluded and are counted.
+Sort record IDs using code-unit order (`array.sort()`), not locale-dependent ordering. Require every selected ID to exist in this project, be effective, and have status observed, confirmed or disputed. Missing IDs, superseded records and proposed records return `RECORD_NOT_EXPORTABLE`; no successor is automatically selected. `readSnapshot` returns corruption without throwing, so explicitly execute `if (snapshot.corrupt.length) throw new DevtwinError("INTEGRITY", "Project snapshot is incomplete")`. Corruption may hide supersession; no corrupt bytes or paths appear in the error. Hidden uncommitted records remain excluded and are counted.
 
 No unselected title, body, source ref or actor is rendered. Exclusions show counts for `unselectedEffective`, `proposed`, `superseded`, `hiddenUncommitted`, `unselectedUnknown`, and `unselectedDisputed`, plus fixed exclusions for preferences, policies, binding paths/remotes, unselected record content, verification payloads, review notes, reviewer and user-reference identities, environment/task/worktree applicability and private proposal files. Counts may overlap only for the two explicitly labeled unknown/disputed subsets. `proposed` counts record-store records in that status only; private `proposals/*.json` files are not inspected or counted, so zero does not mean no pending proposals. This inventory is scoped to the resolved project. It says unknowns and disputes outside the selection have not been reviewed, even when their counts are zero.
 
@@ -243,9 +243,9 @@ Run `node --test test/handoff-export.test.mjs`; retain the expected assertion fa
 | `handoff freshness uses resolved worktree source hashes and explicit evaluation date` | Bound README match/change/delete, unapproved ref, missing recorded hash, wrong branch/commit/worktree applicability, due/future/invalid revisitAfter and records later than asOf. Assert labels and recorded/observed hashes. Seed a multi-root binding where root zero differs from selected cwd to prove exact-root reads. |
 | `handoff dirty detached and unverified evidence caveats remain visible` | Dirty README, detached HEAD and no-file-source records. Assert dirty warning, unknown branch label and not-file-verified; command record is inert and marker file never appears. |
 
-Use assertion patterns such as `assert.rejects(fn, {code: "DEVCTX_HANDOFF_UNSAFE"})`, byte equality with `assert.equal(a.markdown, b.markdown)`, and `assert.equal(sha256(content), result.packetHash)`. Keep `SENSITIVE_CONTENT` for existing credential-pattern hits; portability failures use `HANDOFF_UNSAFE`. Run `node --test test/handoff.test.mjs` and retain RED evidence before implementing each behavior group.
+Use assertion patterns such as `assert.rejects(fn, {code: "DEVTWIN_HANDOFF_UNSAFE"})`, byte equality with `assert.equal(a.markdown, b.markdown)`, and `assert.equal(sha256(content), result.packetHash)`. Keep `SENSITIVE_CONTENT` for existing credential-pattern hits; portability failures use `HANDOFF_UNSAFE`. Run `node --test test/handoff.test.mjs` and retain RED evidence before implementing each behavior group.
 
-- [ ] **4. Implement the smallest portable projection and renderer.** Add the privacy and portable modules with the exact contract above. Reuse `DevctxError`, ID/schema constants, `assertNoSensitive`, `readSnapshot`, `resolveContext`, `readApprovedSource`, `canonicalJson`, `digest` and `sha256`. Explicitly reject nonempty `snapshot.corrupt`; validate every copied field instead of using raw object spreads. Render the fixed recipient instructions: verify repository identity/exporting-worktree revision and instructions locally; review unknowns/disputes and stale evidence; inspect documented commands before rerunning them; check results independently; reject an invalid packet footer; review confidentiality/rights before sharing. Run `node --test test/handoff.test.mjs` to GREEN, then tidy internal helpers without changing the public API.
+- [ ] **4. Implement the smallest portable projection and renderer.** Add the privacy and portable modules with the exact contract above. Reuse `DevtwinError`, ID/schema constants, `assertNoSensitive`, `readSnapshot`, `resolveContext`, `readApprovedSource`, `canonicalJson`, `digest` and `sha256`. Explicitly reject nonempty `snapshot.corrupt`; validate every copied field instead of using raw object spreads. Render the fixed recipient instructions: verify repository identity/exporting-worktree revision and instructions locally; review unknowns/disputes and stale evidence; inspect documented commands before rerunning them; check results independently; reject an invalid packet footer; review confidentiality/rights before sharing. Run `node --test test/handoff.test.mjs` to GREEN, then tidy internal helpers without changing the public API.
 
 - [ ] **5. Add output refusal and race tests.** Extend `test/handoff-export.test.mjs` before filesystem implementation with these exact names:
 
@@ -275,12 +275,12 @@ For duplicate-token validation use the loaded declaration, not a hardcoded flag 
 
 ```js
 if (seen.has(token.name) && impl.options[token.name]?.multiple !== true) {
-  throw new DevctxError("USAGE", "Duplicate command option");
+  throw new DevtwinError("USAGE", "Duplicate command option");
 }
 seen.add(token.name);
 ```
 
-For helper failures construct a new `DevctxError` from a closed set of known error codes, bounded field enums, selected record ID regex and fixed reason enums. Never spread original error details or preserve its original message. This includes the PATH_UNSAFE `{path}` emitted by `checkNode`.
+For helper failures construct a new `DevtwinError` from a closed set of known error codes, bounded field enums, selected record ID regex and fixed reason enums. Never spread original error details or preserve its original message. This includes the PATH_UNSAFE `{path}` emitted by `checkNode`.
 
 - [ ] **7. Make new onboarding profiles portable without history edits.** First add `new onboarding profiles use project identity and preserve historical records` to `test/onboard.test.mjs`: onboard a fresh synthetic project and assert its brief includes its project ID and no absolute root; preserve bytes/hashes of an earlier synthetic absolute-path record and prove export of that old selected record holds. Run `node --test test/onboard.test.mjs` to observe RED. Then change only the profile value:
 

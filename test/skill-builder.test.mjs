@@ -76,7 +76,7 @@ test("intake rejects symlinked package files without running helpers", async (t)
 
 test("direct mutation without a pilot fence cannot create a workspace", async (t) => {
   const p = await makePilot(t);
-  await assert.rejects(createWorkspace({ dataRoot: p.dataRoot, stateRoot: p.stateRoot }, { audience: "personal", workspace: "ws_fixture01" }), { code: "DEVCTX_GATE_REQUIRED" });
+  await assert.rejects(createWorkspace({ dataRoot: p.dataRoot, stateRoot: p.stateRoot }, { audience: "personal", workspace: "ws_fixture01" }), { code: "DEVTWIN_GATE_REQUIRED" });
 });
 
 test("company and project workspaces require registered membership and keep scope separate", async (t) => {
@@ -173,7 +173,7 @@ test("direct requirements intake uses roots pilot and refuses outside files", as
   const p = await makePilot(t); await setup(p);
   const outside = join(p.sandbox, "outside"); await mkdir(outside);
   const file = join(outside, "rq.json"); await writeFile(file, JSON.stringify({ ...requirements, goal: "Outside marker" }));
-  await assert.rejects(recordRequirements(p.roots, { audience: "personal", workspace: "ws_fixture01" }, "rq_outside01", file), { code: "DEVCTX_GATE_REQUIRED" });
+  await assert.rejects(recordRequirements(p.roots, { audience: "personal", workspace: "ws_fixture01" }, "rq_outside01", file), { code: "DEVTWIN_GATE_REQUIRED" });
 });
 
 test("typed YAML plain scalars and a denial are refused", async (t) => {
@@ -190,7 +190,7 @@ test("crashed staging is retained, blocks revision reuse, and incomplete draft i
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate); await writeFile(join(candidate, "SKILL.md"), "---\nname: summarize-note\ndescription: Summarize a note.\n---\n# Summary\n");
   await assert.rejects(createDraft(p.roots, { audience: "personal", workspace: "ws_fixture01" }, { requirementsId: "rq_fixture01", designId: "ds_fixture01", decisionId: "dc_fixture01", revisionId: "rv_fixture01", candidate }, { faults: { afterFiles: () => { throw new Error("synthetic crash"); } } }));
   const retry = await call(p, "draft-create", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate]);
-  assert.equal(retry.json.error.code, "DEVCTX_CONFLICT");
+  assert.equal(retry.json.error.code, "DEVTWIN_CONFLICT");
   const draftDir = join(p.dataRoot, "personal", "skill-workspaces", "ws_fixture01", "drafts", "rv_missing01"); await mkdir(draftDir);
   const shown = await call(p, "workspace-show");
   assert.deepEqual(shown.json.result.staging, ["rv_fixture01"]);
@@ -254,7 +254,7 @@ test("draft-create still refuses a decoded name different from the approved desi
   const candidate = join(p.inputsRoot, "candidate"); await mkdir(candidate);
   await writeFile(join(candidate, "SKILL.md"), '---\nname: "other-skill"\ndescription: "A synthetic skill."\n---\n# Skill\n');
   const created = await call(p, "draft-create", ["--requirements", "rq_fixture01", "--design", "ds_fixture01", "--decision", "dc_fixture01", "--revision", "rv_fixture01", "--candidate", candidate]);
-  assert.equal(created.json.error.code, "DEVCTX_INVALID_INPUT");
+  assert.equal(created.json.error.code, "DEVTWIN_INVALID_INPUT");
 });
 
 for (const name of ["summarize-note", "3d-render", "yes"]) {
@@ -270,6 +270,6 @@ for (const name of ["summarize-note", "3d-render", "yes"]) {
 test("single-letter YAML boolean aliases require quoting", () => {
   for (const value of ["y", "n", "Y", "N"]) {
     const files = { "SKILL.md": `---\nname: summarize-note\ndescription: ${value}\n---\n# Skill\n` };
-    assert.throws(() => validatePackage(files, "summarize-note"), { code: "DEVCTX_INVALID_INPUT" });
+    assert.throws(() => validatePackage(files, "summarize-note"), { code: "DEVTWIN_INVALID_INPUT" });
   }
 });

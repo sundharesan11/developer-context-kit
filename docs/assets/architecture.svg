@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="600" viewBox="0 0 1120 600" role="img" aria-labelledby="title desc">
-  <title id="title">Developer Context Kit: the disposable pilot</title>
+  <title id="title">devtwin: the disposable pilot</title>
   <desc id="desc">Bounded project sources flow to explicit CLI preview and approval, then to private configuration, data and state stores. The stores produce briefs and selected handoffs for manual use in a session. New observations return through explicit record operations. Nothing automatically publishes or connects accounts.</desc>
   <defs>
     <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8Z" fill="#52627a"/></marker>
   </defs>
   <rect width="1120" height="600" rx="18" fill="#f5f7fb"/>
   <g font-family="Arial, Helvetica, sans-serif">
-    <text x="36" y="44" font-size="13" font-weight="700" letter-spacing="2" fill="#52627a">DEVELOPER CONTEXT KIT</text>
+    <text x="36" y="44" font-size="13" font-weight="700" letter-spacing="2" fill="#52627a">DEVTWIN</text>
     <text x="36" y="83" font-size="29" font-weight="700" fill="#172539">Project context, outside the project repo.</text>
     <text x="36" y="113" font-size="16" fill="#52627a">Implemented pilot · explicit operations · disposable local roots</text>
 

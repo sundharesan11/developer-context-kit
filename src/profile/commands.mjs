@@ -1,11 +1,11 @@
 import { join } from "node:path";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
 import { canonicalJson } from "../storage/canonical.mjs";
 import { planProfile, applyProfile, readProfile, readProfileRevision, findStaleBase } from "./store.mjs";
 import { parseStackEntry, formatStackEntry } from "./validate.mjs";
 const list = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
-const invalid = (field) => { throw new DevctxError("INVALID_INPUT", "Invalid profile input", { field }); };
+const invalid = (field) => { throw new DevtwinError("INVALID_INPUT", "Invalid profile input", { field }); };
 const clone = (value) => JSON.parse(JSON.stringify(value ?? {}));
 const DESTINATION = { root: "configRoot", path: "profile" };
 const PREFERENCE_KEYS = ["explanationStyle", "diagrams", "autonomy", "notes"];
@@ -88,7 +88,7 @@ function changes(before, after, proposedBy) {
 }
 async function readSeed(roots) {
   try { return (await readPrivateJson(join(roots.configRoot, "user.json"))).preferences ?? {}; }
-  catch (error) { if (error.code === "ENOENT") throw new DevctxError("NOT_FOUND", "Pilot not initialized", { remedy: "run devctx init before --seed-from-init" }); throw error; }
+  catch (error) { if (error.code === "ENOENT") throw new DevtwinError("NOT_FOUND", "Pilot not initialized", { remedy: "run devtwin init before --seed-from-init" }); throw error; }
 }
 async function proposal(values, ctx) {
   const proposedBy = values["proposed-by"] ?? "user";
@@ -112,15 +112,15 @@ export const profileApplyCommand = {
   options: { ...profileOptions, "plan-fingerprint": { type: "string" } },
   async run(values, ctx) {
     const fingerprint = values["plan-fingerprint"];
-    if (!fingerprint) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
+    if (!fingerprint) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");
     const { derive, profile } = await proposal(values, ctx);
     try {
       const result = await applyProfile(ctx.roots, { profile, fingerprint }, { now: ctx.now });
       return { generation: result.generation, revisionHash: result.revisionHash, destination: DESTINATION };
     } catch (error) {
-      if (error.code !== "DEVCTX_PLAN_MISMATCH") throw error;
+      if (error.code !== "DEVTWIN_PLAN_MISMATCH") throw error;
       const stale = await findStaleBase(ctx.roots, derive, fingerprint);
-      if (stale) throw new DevctxError("STALE_VERSION", "Profile changed since preview", stale);
+      if (stale) throw new DevtwinError("STALE_VERSION", "Profile changed since preview", stale);
       throw error;
     }
   }

@@ -1,4 +1,4 @@
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { loadScope } from "../config/store.mjs";
 import { readRegistry } from "../config/registry.mjs";
 import { requireCommittedProject, readSnapshot } from "../records/store.mjs";
@@ -18,7 +18,7 @@ function engines(body) {
 const validEntry = (name, version) => { try { return formatStackEntry(parseStackEntry(name + (version ? "=" + version : ""))); } catch { return null; } };
 const citationKey = (c) => [c.project, c.recordId ?? "", c.source ?? ""].join("\0");
 export async function suggestStack(roots, { scope } = {}) {
-  if (!scope) throw new DevctxError("INVALID_INPUT", "Scope required", { field: "scope" });
+  if (!scope) throw new DevtwinError("INVALID_INPUT", "Scope required", { field: "scope" });
   await loadScope(roots, scope);
   let registry;
   try { registry = (await readRegistry(roots)).value; } catch (error) { if (error.code === "ENOENT") return { scope, suggestions: [], skipped: [], notice: NOTICE }; throw error; }
@@ -37,7 +37,7 @@ export async function suggestStack(roots, { scope } = {}) {
     try {
       ({ binding } = await requireCommittedProject(roots, scope, project));
       snapshot = await readSnapshot(roots, scope, project);
-    } catch (error) { skipped.push({ project, code: error.code ?? "DEVCTX_INTERNAL" }); continue; }
+    } catch (error) { skipped.push({ project, code: error.code ?? "DEVTWIN_INTERNAL" }); continue; }
     for (const source of binding.approvedSources) if (ECOSYSTEMS[source.rel]) add(ECOSYSTEMS[source.rel], null, { project, source: source.rel });
     for (const record of snapshot.records) {
       if (record.kind !== "command" || record.title !== "Package declarations" || record.status === "proposed" || record.effective === "superseded") continue;

@@ -1,10 +1,10 @@
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 
 // KTD16: a small bounded reader for RSS 2.0, Atom 1.0 and JSON Feed 1.1. No DTD, no external or custom entity,
 // only the five predefined entities and numeric references. Only title, link, ID, date and summary are kept.
 export const FEED_LIMITS = Object.freeze({ depth: 32, elements: 20000, entries: 200, nodeText: 262144, title: 300, summary: 1000, link: 2048, id: 512 });
-const invalid = (reason) => { throw new DevctxError("FEED_INVALID", "Feed could not be parsed", { reason }); };
-const limit = (reason) => { throw new DevctxError("FEED_LIMIT", "Feed exceeds a parser limit", { reason }); };
+const invalid = (reason) => { throw new DevtwinError("FEED_INVALID", "Feed could not be parsed", { reason }); };
+const limit = (reason) => { throw new DevtwinError("FEED_LIMIT", "Feed exceeds a parser limit", { reason }); };
 const XML_ENTITIES = { lt: "<", gt: ">", amp: "&", quot: "\"", apos: "'" };
 const HTML_ENTITIES = { ...XML_ENTITIES, nbsp: " ", ndash: "–", mdash: "—", hellip: "…", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", copy: "©", reg: "®", trade: "™" };
 const NAME = /^[A-Za-z_][\w.:-]*$/;

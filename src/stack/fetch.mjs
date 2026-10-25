@@ -1,13 +1,13 @@
 import https from "node:https";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { USER_AGENT, GITHUB_HOST } from "./plan.mjs";
 
 // KTD8 and KTD17: every request goes through an injected request(options) and lookup(host). The lookup result is
 // checked for private addresses and the request connects to exactly that address; redirects are never followed.
 export const FETCH_LIMITS = Object.freeze({ body: 1048576, total: 8388608, calls: 64, timeoutMs: 10000, runMs: 120000 });
-const fail = (code, message, details = {}) => { throw new DevctxError(code, message, details); };
+const fail = (code, message, details = {}) => { throw new DevtwinError(code, message, details); };
 const v4 = (address) => address.split(".").map(Number);
 function unsafeV4([a, b, c]) {
   return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
@@ -81,7 +81,7 @@ async function* chunksOf(body) {
   else fail("UPSTREAM_INVALID", "Missing response body");
 }
 // One fetcher per run: it holds the approved host set, the call and byte budgets and the optional bearer value for
-// api.github.com. fetchResource returns {bytes, contentType, url} or throws a typed DevctxError for that source only.
+// api.github.com. fetchResource returns {bytes, contentType, url} or throws a typed DevtwinError for that source only.
 export function createFetcher({ request = httpsRequest, lookup = systemLookup, hosts, bearer = null, limits = {} } = {}) {
   const caps = { ...FETCH_LIMITS, ...limits };
   const allowed = new Set(hosts);
@@ -124,7 +124,7 @@ export function createFetcher({ request = httpsRequest, lookup = systemLookup, h
           parts.push(chunk);
         }
       } catch (error) {
-        if (error instanceof DevctxError) throw error;
+        if (error instanceof DevtwinError) throw error;
         fail(controller.signal.aborted ? "NETWORK_TIMEOUT" : "UPSTREAM_INVALID", "Response body read failed");
       }
       if (declared !== null && /^\d+$/.test(declared) && size !== Number(declared)) fail("UPSTREAM_INVALID", "Truncated response");

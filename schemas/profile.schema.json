@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "devctx personal profile revision v1",
+  "title": "devtwin personal profile revision v1",
   "type": "object",
   "required": [
     "schemaVersion",

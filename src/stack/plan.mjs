@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
 import { canonicalJson, digest } from "../storage/canonical.mjs";
 import { atomicReplace, ensurePrivatePath, readPrivateJson } from "../storage/fsx.mjs";
@@ -16,14 +16,14 @@ export const GITHUB_HOST = "api.github.com", OSV_HOST = "api.osv.dev", EOL_HOST 
 export const REGISTRY_HOSTS = Object.freeze({ npm: "registry.npmjs.org", pypi: "pypi.org", crates: "crates.io" });
 export const OSV_ECOSYSTEMS = Object.freeze({ npm: "npm", pypi: "PyPI", crates: "crates.io" });
 export const EXACT_VERSION = /^v?[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.+-]+)?$/;
-export const USER_AGENT = "devctx-stack-check";
+export const USER_AGENT = "devtwin-stack-check";
 export const REQUEST_CONTENT = "Request content is limited to the feed URLs, identifiers and versions listed for each host. No profile text, record, path, scope, project name or local identifier is sent.";
 export const FOLLOW_NOTE = "The set of fetched feed URLs, tied to your IP address, shows which vendors you follow.";
 // Without routing's binding the seam reports none; no environment variable is ever read for a token.
 export const noPublicReadBinding = async () => ({ bound: false });
 export const stackApprovalPath = (roots) => join(roots.stateRoot, "stack", "approval.json");
 export const stackLockPath = (roots) => join(roots.stateRoot, "locks", "stack.lock");
-const invalid = (field, message = "Invalid stack plan input") => { throw new DevctxError("INVALID_INPUT", message, { field }); };
+const invalid = (field, message = "Invalid stack plan input") => { throw new DevtwinError("INVALID_INPUT", message, { field }); };
 const sorted = (values) => [...new Set(values)].sort();
 const nameOf = (text, field) => {
   const entry = parseStackEntry(text);
@@ -44,11 +44,11 @@ export function parseMapOverride(text) {
   const at = rest.indexOf(":");
   if (at < 0) invalid("map", "Map overrides use name=kind:identifier");
   const kind = rest.slice(0, at);
-  if (!MAP_KINDS.includes(kind)) throw new DevctxError("INVALID_INPUT", "Unknown map kind", { field: "map", allowed: MAP_KINDS });
+  if (!MAP_KINDS.includes(kind)) throw new DevtwinError("INVALID_INPUT", "Unknown map kind", { field: "map", allowed: MAP_KINDS });
   return { name, kind, id: checkIdentifier(kind, rest.slice(at + 1), "map") };
 }
 export function parseGroups(values = []) {
-  for (const value of values) if (!GROUPS.includes(value)) throw new DevctxError("INVALID_INPUT", "Unknown source group", { field: "with", allowed: GROUPS });
+  for (const value of values) if (!GROUPS.includes(value)) throw new DevtwinError("INVALID_INPUT", "Unknown source group", { field: "with", allowed: GROUPS });
   return ["announcements", ...GROUPS.filter((group) => values.includes(group))];
 }
 const overrideKey = (o) => canonicalJson(o);
@@ -63,7 +63,7 @@ export async function readStackApproval(roots) {
   catch (error) { if (error.code === "ENOENT") return null; throw error; }
   const { recordHash, ...body } = value ?? {};
   if (!value || typeof value !== "object" || Object.keys(value).length !== APPROVAL_KEYS.length || APPROVAL_KEYS.some((key) => !Object.hasOwn(value, key)) ||
-      value.schemaVersion !== 1 || value.kind !== "stack-sources" || value.pilotDigest !== roots.pilot.digest || recordHash !== digest(body)) throw new DevctxError("INTEGRITY", "Stack approval invalid");
+      value.schemaVersion !== 1 || value.kind !== "stack-sources" || value.pilotDigest !== roots.pilot.digest || recordHash !== digest(body)) throw new DevtwinError("INTEGRITY", "Stack approval invalid");
   return value;
 }
 // Overrides given on this call replace the set; with none given, the current approval's overrides carry forward
@@ -129,7 +129,7 @@ function hostsFrom(fetches) {
 export const itemListHash = (entries) => digest(entries.map((e) => ({ name: e.name, version: e.version ?? null })).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 // input: {feeds, maps, groups, clearOverrides} as CLI strings; deps: {catalog, resolvePublicRead}.
 export async function planStack(roots, input = {}, { catalog, resolvePublicRead = noPublicReadBinding } = {}) {
-  if (!catalog) throw new DevctxError("INVALID_INPUT", "Stack catalog required");
+  if (!catalog) throw new DevtwinError("INVALID_INPUT", "Stack catalog required");
   const groups = parseGroups(input.groups ?? []);
   const given = { feeds: (input.feeds ?? []).map(parseFeedOverride), maps: (input.maps ?? []).map(parseMapOverride) };
   const current = await readProfile(roots);
@@ -144,7 +144,7 @@ export async function planStack(roots, input = {}, { catalog, resolvePublicRead 
   let bound = false, refused = null;
   if (hosts.some((h) => h.host === GITHUB_HOST)) {
     try { bound = (await resolvePublicRead({ purpose: "public-read", host: GITHUB_HOST }))?.bound === true; }
-    catch (error) { if (!(error instanceof DevctxError)) throw error; refused = error.code; }
+    catch (error) { if (!(error instanceof DevtwinError)) throw error; refused = error.code; }
   }
   const authentication = bound ? "routed-public-read" : "unauthenticated";
   const items = resolved.map((r) => r.item);
@@ -181,17 +181,17 @@ export function approvalDifferences(approval, plan, { mode = MODE } = {}) {
 export async function assertStackApproved(roots, plan, { mode = MODE } = {}) {
   const approval = await readStackApproval(roots);
   const differences = approvalDifferences(approval, plan, { mode });
-  if (differences.length) throw new DevctxError("APPROVAL_REQUIRED", "Stack source plan needs approval", { differences });
+  if (differences.length) throw new DevtwinError("APPROVAL_REQUIRED", "Stack source plan needs approval", { differences });
   return approval;
 }
 export async function approveStack(roots, input, deps, { fingerprint, now = () => new Date() } = {}) {
-  if (!fingerprint) throw new DevctxError("PLAN_REQUIRED", "Plan fingerprint required");
+  if (!fingerprint) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");
   const path = stackApprovalPath(roots), dir = join(roots.stateRoot, "stack");
   assertWritable(roots, [dir, path]);
   return withPilotLock(roots, stackLockPath(roots), { kind: "stack-approve" }, async () => {
     const plan = await planStack(roots, input, deps);
     assertFingerprint(plan, fingerprint);
-    if (!plan.approvable) throw new DevctxError("CONFLICT", "An empty source plan cannot be approved", { notWatched: plan.notWatched });
+    if (!plan.approvable) throw new DevtwinError("CONFLICT", "An empty source plan cannot be approved", { notWatched: plan.notWatched });
     const terms = approvalTerms(plan, MODE);
     const body = { schemaVersion: 1, kind: "stack-sources", pilotDigest: roots.pilot.digest, planFingerprint: plan.fingerprint, ...terms,
       items: plan.items.map((i) => ({ name: i.name, version: i.version })), overrides: { feeds: plan.overrides.feeds, maps: plan.overrides.maps },

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { digest } from "../storage/canonical.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
 import { assertScopeId } from "../identity/ids.mjs";
@@ -20,7 +20,7 @@ const HASH = /^sha256:[0-9a-f]{64}$/;
 const LEVELS = ["project", "stack", "background"];
 const SEVERITIES = { critical: "critical", high: "high", moderate: "medium", medium: "medium", low: "low" };
 const DAY = 86400000;
-const upstream = (message) => { throw new DevctxError("UPSTREAM_INVALID", message); };
+const upstream = (message) => { throw new DevtwinError("UPSTREAM_INVALID", message); };
 function json(bytes) {
   try { return JSON.parse(decodeUtf8(bytes)); } catch { return upstream("Invalid JSON response"); }
 }
@@ -45,7 +45,7 @@ export async function readSeenState(roots, scope) {
   catch (error) { if (error.code === "ENOENT") return new Set(); throw error; }
   const { recordHash, ...body } = isObject(value) ? value : {};
   if (!isObject(value) || Object.keys(value).length !== 5 || body.schemaVersion !== 1 || body.kind !== "stack-seen" || body.scope !== (scope ?? null) ||
-      !Array.isArray(body.hashes) || body.hashes.some((h) => typeof h !== "string" || !HASH.test(h)) || recordHash !== digest(body)) throw new DevctxError("INTEGRITY", "Stack seen state invalid");
+      !Array.isArray(body.hashes) || body.hashes.some((h) => typeof h !== "string" || !HASH.test(h)) || recordHash !== digest(body)) throw new DevtwinError("INTEGRITY", "Stack seen state invalid");
   return new Set(body.hashes);
 }
 
@@ -62,7 +62,7 @@ function findingOf(item, group, kind, severity, fields, fetchedAt) {
 function releaseData(bytes) {
   const list = json(bytes);
   if (!Array.isArray(list)) upstream("Invalid GitHub releases");
-  if (list.length > FEED_LIMITS.entries) throw new DevctxError("FEED_LIMIT", "Feed exceeds a parser limit", { reason: "entries" });
+  if (list.length > FEED_LIMITS.entries) throw new DevtwinError("FEED_LIMIT", "Feed exceeds a parser limit", { reason: "entries" });
   return list.filter((r) => isObject(r) && r.draft !== true).map((r) => {
     const body = typeof r.body === "string" ? r.body.slice(0, FEED_LIMITS.nodeText) : "";
     const raw = {
@@ -116,10 +116,10 @@ function versionFindings(item, version, pkg, bytes, fetchedAt, sourceUrl) {
   return { findings, notes };
 }
 function failureOf(item, source, url, error) {
-  const code = error instanceof DevctxError ? error.code : "DEVCTX_NETWORK_UNAVAILABLE";
+  const code = error instanceof DevtwinError ? error.code : "DEVTWIN_NETWORK_UNAVAILABLE";
   const details = {};
   for (const key of ["status", "retryAfterSeconds", "resetAt", "reason", "contentType", "encoding"]) if (error?.details && Object.hasOwn(error.details, key)) details[key] = error.details[key];
-  return { item, source, host: new URL(url).hostname, url, code, reason: error instanceof DevctxError ? error.message : "Request failed", details };
+  return { item, source, host: new URL(url).hostname, url, code, reason: error instanceof DevtwinError ? error.message : "Request failed", details };
 }
 // Called once per run, only when the approval says GitHub requests use the routed public-read binding. reveal: true
 // asks routing's resolver for the value itself; a typed refusal (such as TOKEN_TOO_BROAD) means unauthenticated.
@@ -128,9 +128,9 @@ async function publicReadValue(approval, resolvePublicRead) {
   try {
     const result = await resolvePublicRead({ purpose: "public-read", host: GITHUB_HOST, reveal: true });
     if (result?.bound === true && typeof result.value === "string" && result.value.length && !/[\s\p{Cc}]/u.test(result.value)) return { bearer: result.value, refused: null };
-    return { bearer: null, refused: "DEVCTX_BINDING_UNAVAILABLE" };
+    return { bearer: null, refused: "DEVTWIN_BINDING_UNAVAILABLE" };
   } catch (error) {
-    if (!(error instanceof DevctxError)) throw error;
+    if (!(error instanceof DevtwinError)) throw error;
     return { bearer: null, refused: error.code };
   }
 }
@@ -138,7 +138,7 @@ async function publicReadValue(approval, resolvePublicRead) {
 export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
   const { catalog, resolvePublicRead = noPublicReadBinding, request = httpsRequest, lookup = systemLookup, now = () => new Date(), reader = readSnapshot, limits } = deps;
   // Live mode stays offline until the watch's entry lands in the "Live-mode exceptions" section (U5 live-mode step).
-  if (roots.pilot?.live) throw new DevctxError("GATE_REQUIRED", "Stack watch is not allowed in live mode yet", { field: "live", reason: "no-live-exception" });
+  if (roots.pilot?.live) throw new DevtwinError("GATE_REQUIRED", "Stack watch is not allowed in live mode yet", { field: "live", reason: "no-live-exception" });
   if (scope !== null) assertScopeId(scope);
   const stored = await readStackApproval(roots);
   const plan = await planStack(roots, { groups: (stored?.groups ?? []).filter((g) => g !== "announcements") }, { catalog, resolvePublicRead });

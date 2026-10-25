@@ -24,7 +24,7 @@ execution: code
 
 ### Summary
 
-Add a declared live profile that names the exact real skill folders and read-only repositories DCK may use, with private state in `~/.devctx/store` and a pinned kit clone in `~/.devctx/kit`. Make bundled-skill install, status, uninstall and rollback checking safe on real folders that already hold foreign skills. Then activate on the owner's machine, onboard one client monorepo into its client scope, prove fresh Claude and Codex sessions find the skills, and rehearse rollback.
+Add a declared live profile that names the exact real skill folders and read-only repositories DCK may use, with private state in `~/.devtwin/store` and a pinned kit clone in `~/.devtwin/kit`. Make bundled-skill install, status, uninstall and rollback checking safe on real folders that already hold foreign skills. Then activate on the owner's machine, onboard one client monorepo into its client scope, prove fresh Claude and Codex sessions find the skills, and rehearse rollback.
 
 ### Problem Frame
 
@@ -38,7 +38,7 @@ The real skill folders are not empty. The owner's Claude skill folder already ho
 
 - R1. A live profile declares a stable profile ID, the private store roots, one skill folder per agent, the read-only repositories, and the expected kit path and commit.
 - R2. The disposable pilot keeps every current rule. Existing tests keep their expected outcomes, except the Codex layout change in R7 and the acceptance check count in U7.
-- R3. In live mode, writes outside the store go only to `devctx-*` entries directly inside an allowlisted skill folder. Live mode never creates, removes or changes the mode of a skill folder or its parents.
+- R3. In live mode, writes outside the store go only to `devtwin-*` entries directly inside an allowlisted skill folder. Live mode never creates, removes or changes the mode of a skill folder or its parents.
 - R4. A live profile is refused when:
   - the store or the profile file sits inside any Git worktree;
   - the kit is not the top level of its own clone, or sits inside `pilotRoot` or another worktree;
@@ -53,7 +53,7 @@ The real skill folders are not empty. The owner's Claude skill folder already ho
 **Install and rollback**
 
 - R8. Install never touches a foreign, modified, symlinked or same-named unowned entry. A conflict blocks only that agent, and the preview says why.
-- R9. At the start of apply, before the first write, DCK records an inventory of each target skill folder. A read-only rollback check then fails on any difference in `devctx-*` entries and lists any change to foreign entries for the owner to review.
+- R9. At the start of apply, before the first write, DCK records an inventory of each target skill folder. A read-only rollback check then fails on any difference in `devtwin-*` entries and lists any change to foreign entries for the owner to review.
 - R10. An incomplete install run for the profile blocks new applies until the owner approves a recovery plan. Before the first write, the run folder keeps copies of the old and new file bytes, and each started journal entry records the action and its file hashes. Recovery removes an interrupted create, completes or rolls back an interrupted update from the run folder's copies, and finishes an interrupted remove, always matching the journal's hashes, never the current kit's. A file that matches neither is reported and left.
 - R11. An entry is removable only when its receipt matches a completed journal entry in the private store for the same profile. Uninstall works from those records alone and survives an approved kit change.
 - R12. Per-agent selection (`--agent`) keeps working in live mode.
@@ -61,13 +61,13 @@ The real skill folders are not empty. The owner's Claude skill folder already ho
 **Real project**
 
 - R13. Onboarding a live repository outside the store works through the existing preview and approval flow and never writes to the repository.
-- R14. The bundled skills accept `~/.devctx/live.json` after the user confirms it once per session, and warn when an installed receipt's kit commit differs from the commit checked out at `DEVCTX_KIT`.
+- R14. The bundled skills accept `~/.devtwin/live.json` after the user confirms it once per session, and warn when an installed receipt's kit commit differs from the commit checked out at `DEVTWIN_KIT`.
 
 **Activation evidence**
 
 - R15. On the owner's machine:
   - preview, approval and apply for both agents, with foreign entries unchanged;
-  - fresh Claude and Codex sessions, run read-only and answering the once-per-session confirmation, list the `devctx-*` skills and resolve the onboarded project;
+  - fresh Claude and Codex sessions, run read-only and answering the once-per-session confirmation, list the `devtwin-*` skills and resolve the onboarded project;
   - one interactive session per agent, started by the owner from the same neutral folder, does the same;
   - uninstall passes the rollback check, and reinstall succeeds.
 - R16. Activation sessions, scripted and interactive, must not write to the client repository: they run from a neutral working folder with only user-level settings. The repository snapshot hashes tracked and untracked files and `.git` outside `objects`, `logs` and `FETCH_HEAD`, and records ignored files by path, size and modification time.
@@ -75,7 +75,7 @@ The real skill folders are not empty. The owner's Claude skill folder already ho
 
 ### Scope Boundaries
 
-- No global `devctx` command on `PATH`; agents use `DEVCTX_KIT`.
+- No global `devtwin` command on `PATH`; agents use `DEVTWIN_KIT`.
 - No session start or end hooks (priority 3), no backup (priority 1, deferred by the owner), no migration from the owner's existing setup (priority 4).
 - No adoption, repair or chmod of existing foreign skills or folders, and no writes to `~/.codex/skills`. Earlier pilot installs under `.codex/skills` are reported by status as leftovers and never touched.
 - DCK never edits the client repository's Git configuration to get past a refusal.
@@ -89,7 +89,7 @@ The real skill folders are not empty. The owner's Claude skill folder already ho
 
 ### Acceptance Examples
 
-- AE1. **Given** a fake home whose `.claude/skills` holds a foreign `devctx-resume` folder without a receipt, **when** the owner previews install, **then** Claude shows `conflict` with a reason, Codex proceeds, and apply writes nothing under `.claude/skills`.
+- AE1. **Given** a fake home whose `.claude/skills` holds a foreign `devtwin-resume` folder without a receipt, **when** the owner previews install, **then** Claude shows `conflict` with a reason, Codex proceeds, and apply writes nothing under `.claude/skills`.
 - AE2. **Given** an install of both agents, **when** the owner uninstalls and runs the rollback check, **then** the check passes and top-level foreign entries are unchanged. The test also hashes the fake foreign trees directly.
 - AE3. **Given** a live profile and the dev checkout as the running kit, **when** any live command runs, **then** it fails with `GATE_REQUIRED` naming the kit mismatch.
 - AE4. **Given** an onboarded repository, **when** onboarding completes, **then** its snapshot as defined in R16 is identical to before.
@@ -101,16 +101,16 @@ The real skill folders are not empty. The owner's Claude skill folder already ho
 
 ### Key Technical Decisions
 
-- KTD1. **One folder for private state.** Everything lives under `~/.devctx` at mode 0700. (session-settled: user-directed — chosen over the XDG config/share/state split: one place to find and later back up.)
-- KTD2. **Layout inside `~/.devctx`.** The store is `~/.devctx/store/{config,data,state,inputs}` with `pilotRoot` at `~/.devctx/store`. The kit clone is the sibling `~/.devctx/kit`. The profile is `~/.devctx/live.json`. The fence protects the running kit, so the kit cannot sit inside `pilotRoot`.
+- KTD1. **One folder for private state.** Everything lives under `~/.devtwin` at mode 0700. (session-settled: user-directed — chosen over the XDG config/share/state split: one place to find and later back up.)
+- KTD2. **Layout inside `~/.devtwin`.** The store is `~/.devtwin/store/{config,data,state,inputs}` with `pilotRoot` at `~/.devtwin/store`. The kit clone is the sibling `~/.devtwin/kit`. The profile is `~/.devtwin/live.json`. The fence protects the running kit, so the kit cannot sit inside `pilotRoot`.
 - KTD3. **Pinned clone at a reviewed main commit.** The live kit is a separate `git clone` checked out detached at the merged commit. (session-settled: user-directed — chosen over pointing agents at the dev checkout: development cannot change live behavior.)
 - KTD4. **Live mode extends the pilot schema rather than adding a code path.** The pilot schema gains an optional `live` block, included in `pilotDigest`. When it is present, `validate()` exempts only the named skill folders and repositories from the "inside pilotRoot and not protected" rules, and `agentHomes` must be empty. Locks, journals and the other checks stay shared. (session-settled: user-approved — chosen over a separate live code path: the existing fence checks are proven.)
-- KTD5. **Skill folders, not homes, are the write roots.** In live mode `assertWritable` and the install lock take the profile's skill folder as the allowed root and accept only `devctx-*` children. The real home is never a write root. Install code takes an injectable home so tests use fake homes.
+- KTD5. **Skill folders, not homes, are the write roots.** In live mode `assertWritable` and the install lock take the profile's skill folder as the allowed root and accept only `devtwin-*` children. The real home is never a write root. Install code takes an injectable home so tests use fake homes.
 - KTD6. **Codex uses `.agents/skills` only.** (session-settled: user-approved — chosen over also writing `~/.codex/skills`: current Codex documentation reads `.agents/skills`, and old copies stay untouched.) Cursor also reads `~/.agents/skills` and will see the skills. That is accepted and documented: the skills behave the same for any caller and keep every confirmation gate. `CODEX_HOME` is recorded and warned about, but does not change the target.
 - KTD7. **Approved profile digest and stable profile ID.** `live init` writes a random profile ID once. Each approved profile command records the new profile digest in the store under the pilot lock. The digest catches accidental edits, not deliberate tampering by the same user; the docs say so. Receipts and journals bind to the profile ID, not to the kit or the repository list, so adding a repository or changing the kit keeps installs owned. The kit commit in a receipt is provenance only.
 - KTD8. **Rollback is evidence, not automation.** Rollback is the reviewed uninstall plus the inventory check. Nothing is restored automatically.
 - KTD9. **No backup in this stage.** (session-settled: user-directed — chosen over building backup first: the owner deferred it on 2026-10-16.) The docs state the risk, including that onboarding copies some client text into the store.
-- KTD10. **Delivering `DEVCTX_KIT`.** It is exported from the owner's shell profile, and the bundled skills verify it. Writing agent settings files is outside the allowlist. GUI-launched agents may not inherit it; the runbook says how to check.
+- KTD10. **Delivering `DEVTWIN_KIT`.** It is exported from the owner's shell profile, and the bundled skills verify it. Writing agent settings files is outside the allowlist. GUI-launched agents may not inherit it; the runbook says how to check.
 - KTD11. **First project.** The owner's first client monorepo goes in a single scope for that client and is read-only. (session-settled: user-directed — chosen over a per-repository scope: one scope for all of that client's work.)
 
 ### High-Level Technical Design
@@ -127,16 +127,16 @@ flowchart TB
   K -->|yes| C[commands]
   C --> I[agents install]
   I --> INV[inventory before first write]
-  INV --> J[journal + write devctx-* only]
+  INV --> J[journal + write devtwin-* only]
   C --> O[project onboard, read-only]
   C --> U[uninstall from receipt + journal]
   U --> RC[rollback check vs inventory]
 ```
 
-Layout of `~/.devctx` after activation:
+Layout of `~/.devtwin` after activation:
 
 ```text
-~/.devctx/            0700
+~/.devtwin/            0700
   live.json           profile (pilot schema + live block)
   kit/                pinned clone, detached at the merged commit
   store/              pilotRoot
@@ -147,10 +147,10 @@ Layout of `~/.devctx` after activation:
 
 - **Real folders hold many foreign entries, and other tools may change them.** Status classes never act on foreign entries. The rollback check separates DCK differences from foreign churn, and U8 runs it immediately after uninstall.
 - **Large monorepo limits.** `git status` may hit the 30 s timeout or the 16 MiB buffer. The preview surfaces this before any write.
-- **Agents not inheriting `DEVCTX_KIT`.** The skills refuse clearly, and the runbook covers checking.
+- **Agents not inheriting `DEVTWIN_KIT`.** The skills refuse clearly, and the runbook covers checking.
 - **Codex discovery on the installed version.** U8 checks it before apply.
 - **Repo-local Git LFS or filter config.** `locateWorktree` refuses repo-local `filter.*` and `diff.*` settings. U8 runs the onboarding preview first; a refusal stops activation for that repository.
-- **Lost store.** Without backup, losing the store leaves installed `devctx-*` entries unowned. `docs/LIVE.md` gives a manual removal procedure.
+- **Lost store.** Without backup, losing the store leaves installed `devtwin-*` entries unowned. `docs/LIVE.md` gives a manual removal procedure.
 - **No backup, and client text in the store.** Accepted per KTD9; the store is private at 0700.
 
 ---
@@ -178,7 +178,7 @@ Layout of `~/.devctx` after activation:
   - A kit whose `HEAD` differs from `kitCommit`, or has local changes, fails with `GATE_REQUIRED`.
   - A profile edited by hand after approval fails with `GATE_REQUIRED`.
   - A skill folder inside a listed repository, such as `<repo>/.claude/skills`, is refused.
-  - An integration test clones the committed kit into a temp folder, detaches it, and runs `bin/devctx.mjs` from there against a live profile.
+  - An integration test clones the committed kit into a temp folder, detaches it, and runs `bin/devtwin.mjs` from there against a live profile.
 - **Verification:** all pilot tests pass unchanged and the new tests pass.
 
 ### U2. Live-safe bundled install, status and uninstall
@@ -191,8 +191,8 @@ Layout of `~/.devctx` after activation:
   - Change `AGENT_HOMES.codex` to `.agents/skills`, and drop the package installer's now-redundant competing check there.
   - Replace the hard-coded real-home refusal in `planInstall` with a check that the target resolves to the profile's skill folder. Keep `safeHome` refusals for package and source installs.
   - Never create a skill folder in live mode, and never check or change parent modes on the bundled path.
-  - Record profile ID, run ID, kit commit and file hashes in `.devctx-owned.json`, and the same in the journal.
-  - Treat an entry as owned only when its receipt matches a completed journal entry for the profile and holds exactly `SKILL.md` and `.devctx-owned.json`.
+  - Record profile ID, run ID, kit commit and file hashes in `.devtwin-owned.json`, and the same in the journal.
+  - Treat an entry as owned only when its receipt matches a completed journal entry for the profile and holds exactly `SKILL.md` and `.devtwin-owned.json`.
   - Before the first write, copy the old and new file bytes into the run folder, and journal each action as started with its file hashes; journal it as completed after. Gate apply on incomplete bundled-install runs for the profile only. Add an approved recovery plan bounded by R10.
   - Status lists leftover bundled entries under the old `.codex/skills` path without acting on them.
 - **Execution note:** start from AE1 as a failing test.
@@ -217,10 +217,10 @@ Layout of `~/.devctx` after activation:
 - **Requirements:** R9; KTD8.
 - **Dependencies:** U2.
 - **Files:** `src/agents/inventory.mjs` (new), `src/agents/install.mjs`, `src/agents/commands.mjs`, `src/cli.mjs`, `test/live-install.test.mjs`, `scripts/package-allowlist.json`.
-- **Approach:** at the start of apply, before the first write, record each target folder's top-level entries with `lstat` only: name, type, mode, link target and modification time. Walk and hash `devctx-*` entries fully without following symlinks. Add a read-only `agents rollback-check --run-id <install run>` that compares the folder with that install run's inventory, fails on `devctx-*` differences, and lists foreign changes with timestamps.
+- **Approach:** at the start of apply, before the first write, record each target folder's top-level entries with `lstat` only: name, type, mode, link target and modification time. Walk and hash `devtwin-*` entries fully without following symlinks. Add a read-only `agents rollback-check --run-id <install run>` that compares the folder with that install run's inventory, fails on `devtwin-*` differences, and lists foreign changes with timestamps.
 - **Test scenarios:**
   - Covers AE2. Install then uninstall, then the check passes.
-  - A leftover `devctx-*` file after uninstall fails the check.
+  - A leftover `devtwin-*` file after uninstall fails the check.
   - A top-level foreign file edited after install is listed but does not fail the check.
   - A folder with more than 150 foreign entries, including symlinked trees, inventories without walking into them.
   - The check makes no writes.
@@ -232,7 +232,7 @@ Layout of `~/.devctx` after activation:
 - **Requirements:** R1, R6; KTD2, KTD7.
 - **Dependencies:** U1.
 - **Files:** `src/config/live.mjs` (new), `src/config/commands.mjs`, `src/cli.mjs`, `test/live-profile.test.mjs`, `scripts/package-allowlist.json`.
-- **Approach:** `live init` previews the profile and store layout from the account home, `--agent`, optional `--repo` and the running kit, then writes them on `--apply` with the plan fingerprint. `live add-repo` appends one repository. `live set-kit` runs from the new kit and changes the kit path and commit; its preview shows the old and new values. Each apply records the approved digest under the pilot lock. All refuse an existing non-empty store without a profile. `live init` refuses when `~/.devctx` is not 0700 and never changes its mode; `docs/LIVE.md` creates it at 0700 before the clone.
+- **Approach:** `live init` previews the profile and store layout from the account home, `--agent`, optional `--repo` and the running kit, then writes them on `--apply` with the plan fingerprint. `live add-repo` appends one repository. `live set-kit` runs from the new kit and changes the kit path and commit; its preview shows the old and new values. Each apply records the approved digest under the pilot lock. All refuse an existing non-empty store without a profile. `live init` refuses when `~/.devtwin` is not 0700 and never changes its mode; `docs/LIVE.md` creates it at 0700 before the clone.
 - **Test scenarios:**
   - `live init` preview writes nothing, and apply creates 0700 folders, the profile and the approved digest.
   - A stale fingerprint is refused.
@@ -260,8 +260,8 @@ Layout of `~/.devctx` after activation:
 - **Goal:** skills and docs describe live mode accurately.
 - **Requirements:** R14, R17; KTD6, KTD9, KTD10.
 - **Dependencies:** U1 to U4.
-- **Files:** `skills/devctx-onboard/SKILL.md`, `skills/devctx-resume/SKILL.md`, `skills/devctx-record/SKILL.md`, `docs/LIVE.md` (new), `README.md`, `docs/LIMITATIONS.md`, `docs/GETTING-STARTED.md`, `docs/ROADMAP.md`, `docs/AGENT-PROTOCOL.md`, `docs/SECURITY-MODEL.md`, `docs/STORAGE.md`, `docs/RELEASING.md`, `docs/README.md`, `test/docs.test.mjs`, `scripts/package-allowlist.json`.
-- **Approach:** skills offer `~/.devctx/live.json` for the user to confirm, keep every existing refusal, and compare an installed receipt's kit commit with the commit at `DEVCTX_KIT`. `docs/LIVE.md` is the runbook: clone and pin, `live init`, install preview and approval, `DEVCTX_KIT` export, scope and onboarding, read-only fresh-session checks, rollback check, side-by-side upgrade with `live set-kit`, Cursor visibility and the no-backup risk. Cover the digest's limit, manual removal after a lost store, and leftover `.codex/skills` copies. Correct each statement the research listed as made false, keeping test-pinned phrases that stay true.
+- **Files:** `skills/devtwin-onboard/SKILL.md`, `skills/devtwin-resume/SKILL.md`, `skills/devtwin-record/SKILL.md`, `docs/LIVE.md` (new), `README.md`, `docs/LIMITATIONS.md`, `docs/GETTING-STARTED.md`, `docs/ROADMAP.md`, `docs/AGENT-PROTOCOL.md`, `docs/SECURITY-MODEL.md`, `docs/STORAGE.md`, `docs/RELEASING.md`, `docs/README.md`, `test/docs.test.mjs`, `scripts/package-allowlist.json`.
+- **Approach:** skills offer `~/.devtwin/live.json` for the user to confirm, keep every existing refusal, and compare an installed receipt's kit commit with the commit at `DEVTWIN_KIT`. `docs/LIVE.md` is the runbook: clone and pin, `live init`, install preview and approval, `DEVTWIN_KIT` export, scope and onboarding, read-only fresh-session checks, rollback check, side-by-side upgrade with `live set-kit`, Cursor visibility and the no-backup risk. Cover the digest's limit, manual removal after a lost store, and leftover `.codex/skills` copies. Correct each statement the research listed as made false, keeping test-pinned phrases that stay true.
 - **Test scenarios:**
   - The docs test pins the new skill phrases: live profile path, confirm, kit commit warning.
   - The docs test pins the no-backup statement in `docs/LIMITATIONS.md`.
@@ -281,7 +281,7 @@ Layout of `~/.devctx` after activation:
 
 ### U8. Activation on the owner's machine
 
-- **Status:** done. Run on 2026-10-25 at kit commit `b95ff72`; it passed. Live init, store init, scope add and read-only onboarding of one real client repository, with identical before and after-onboarding snapshots. Bundled install for Claude and Codex, three skills each, no conflicts. Fresh `claude -p --setting-sources user` and `codex exec --sandbox read-only` sessions from a neutral folder listed the `devctx-*` skills, resolved the project and read the brief, with an identical brief hash. Rollback rehearsal: uninstall, `rollback-check` `ok`, reinstall. The owner's interactive sessions and the `DEVCTX_KIT` shell-profile export remain. The private evidence stays in `~/.devctx/store/state/evidence/`.
+- **Status:** done. Run on 2026-10-25 at kit commit `b95ff72`; it passed. Live init, store init, scope add and read-only onboarding of one real client repository, with identical before and after-onboarding snapshots. Bundled install for Claude and Codex, three skills each, no conflicts. Fresh `claude -p --setting-sources user` and `codex exec --sandbox read-only` sessions from a neutral folder listed the `devtwin-*` skills, resolved the project and read the brief, with an identical brief hash. Rollback rehearsal: uninstall, `rollback-check` `ok`, reinstall. The owner's interactive sessions and the `DEVTWIN_KIT` shell-profile export remain. The private evidence stays in `~/.devtwin/store/state/evidence/`.
 - **Goal:** produce the priority 2 exit evidence.
 - **Requirements:** R15, R16, R17.
 - **Dependencies:** U1 to U7 merged to main with green CI.
@@ -295,9 +295,9 @@ Layout of `~/.devctx` after activation:
   - Add the client scope, then show the repository's onboarding preview before any skill install; stop if it is refused. Apply after approval.
   - Show the install preview for both agents and apply after owner approval.
   - Ask before editing the shell profile.
-  - From a neutral working folder, run a fresh `claude -p --setting-sources user` session and `codex exec --sandbox read-only`, passing the repository as `--cwd` to devctx and answering the kit confirmation in the prompt, to list `devctx-*` skills and resolve the repository. The owner runs one interactive session per agent.
+  - From a neutral working folder, run a fresh `claude -p --setting-sources user` session and `codex exec --sandbox read-only`, passing the repository as `--cwd` to devtwin and answering the kit confirmation in the prompt, to list `devtwin-*` skills and resolve the repository. The owner runs one interactive session per agent.
   - Uninstall, run the rollback check at once, reinstall after a fresh approval, and recheck discovery.
-  - Snapshot the repository right after onboarding apply and after the last session, and compare both with the before snapshot. Keep evidence in `~/.devctx/store/state/evidence/`.
+  - Snapshot the repository right after onboarding apply and after the last session, and compare both with the before snapshot. Keep evidence in `~/.devtwin/store/state/evidence/`.
 - **Execution note:** operational, not code. Every write is a separate owner approval.
 - **Test expectation:** none -- this unit is a guarded manual run; the evidence files are its proof.
 - **Verification:** the evidence shows each R15 item. Any repository snapshot difference is listed by path, and the owner judges each one.

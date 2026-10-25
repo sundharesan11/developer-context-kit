@@ -3,7 +3,7 @@
   "description": "{{dck:skill-description}}",
   "workflow": ["Check the kit and pilot preconditions", "Confirm the scope and the channel audience", "Read profile show and only the records the user selects", "Draft the update with the profile's writing preferences", "List the context used and mark unverified facts", "Offer draft save --scope, writing only after explicit approval from the user in the session"],
   "outputs": ["Draft update in the session", "Optional private draft saved by draft save --apply"],
-  "dependencies": ["developer-context-kit profile, context and draft routes"],
+  "dependencies": ["devtwin profile, context and draft routes"],
   "tests": ["a request to post produces a draft and says posting is unavailable", "the saved draft is noted as one that cannot be sent later"],
   "tree": ["SKILL.md"],
   "destinations": ["private"],

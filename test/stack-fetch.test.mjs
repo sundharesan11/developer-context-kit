@@ -15,7 +15,7 @@ function harness(respond = () => ({}), { lookup } = {}) {
   });
   return { log, lookups, fetcher };
 }
-const rejectsWith = (promise, code, check = () => true) => assert.rejects(promise, (e) => { assert.equal(e.code, "DEVCTX_" + code); return check(e); });
+const rejectsWith = (promise, code, check = () => true) => assert.rejects(promise, (e) => { assert.equal(e.code, "DEVTWIN_" + code); return check(e); });
 // A request that settles only when its signal aborts, as node:https does with a signal.
 const hangs = ({ signal }) => new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true }));
 

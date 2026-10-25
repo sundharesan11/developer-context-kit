@@ -1,16 +1,16 @@
 # Personal harness layer
 
-Developer Context Kit can serve as a personal-harness template. You clone it, set up a small private personal profile, and turn generic skill templates into your own private skills through the existing skill builder. A manual announcement watch reports what the vendors and SDKs you build on have released.
+devtwin can serve as a personal-harness template. You clone it, set up a small private personal profile, and turn generic skill templates into your own private skills through the existing skill builder. A manual announcement watch reports what the vendors and SDKs you build on have released.
 
 The clone stays generic. Your profile, digests, drafts, approvals, seeded templates and skill workspaces live under the pilot's private roots, outside the clone. The package audit fails when such files are tracked (see [Keep the clone generic](#keep-the-clone-generic)).
 
-This layer is evaluated with synthetic fixtures only. How a live model behaves with `devctx-setup` or a template-made skill is not evaluated in this stage.
+This layer is evaluated with synthetic fixtures only. How a live model behaves with `devtwin-setup` or a template-made skill is not evaluated in this stage.
 
 ## Terms
 
 - **Personal profile:** your own working preferences, stack and kind of work (`profile show`, `profile plan`, `profile apply`), stored under `configRoot/profile/`.
 - **Client profile:** the onboarding template `templates/client-profile.md` for one project's context. The client profile is unrelated to the personal profile and unchanged.
-- **Live config:** live mode's machine-level file `~/.devctx/live.json`. See [Live activation](LIVE.md).
+- **Live config:** live mode's machine-level file `~/.devtwin/live.json`. See [Live activation](LIVE.md).
 - **Skill template:** a generic folder under `templates/skills/` with named placeholders, a requirements stub, a design stub and a candidate `SKILL.md`. It is not an installed or discoverable skill.
 - **Template-made skill:** your own private skill, created from a skill template through the skill builder and kept in your private skill workspace.
 - **Announcement watch:** the `stack` routes that fetch vendor feeds and SDK releases for your declared stack and match them for relevance.
@@ -33,9 +33,9 @@ The profile holds only:
 Every field is optional, so a fully skipped setup is an empty profile. The canonical JSON is capped at 4,096 bytes (`LIMIT` beyond that). Unknown keys, secret-named fields and credential-like text are refused.
 
 ```sh
-node bin/devctx.mjs profile show --pilot "$PILOT_FILE"
-node bin/devctx.mjs profile plan --pilot "$PILOT_FILE" --work 'Backend services' --preference 'explanationStyle=concise' --stack-current 'node=>=22:high'
-node bin/devctx.mjs profile apply --pilot "$PILOT_FILE" --work 'Backend services' --preference 'explanationStyle=concise' --stack-current 'node=>=22:high' --plan-fingerprint "$FINGERPRINT"
+node bin/devtwin.mjs profile show --pilot "$PILOT_FILE"
+node bin/devtwin.mjs profile plan --pilot "$PILOT_FILE" --work 'Backend services' --preference 'explanationStyle=concise' --stack-current 'node=>=22:high'
+node bin/devtwin.mjs profile apply --pilot "$PILOT_FILE" --work 'Backend services' --preference 'explanationStyle=concise' --stack-current 'node=>=22:high' --plan-fingerprint "$FINGERPRINT"
 ```
 
 `profile plan` writes nothing. It shows the complete proposed profile, each changed field with its old and new value, the size against the cap and the base generation. `profile apply` takes the same flags and the reviewed fingerprint. It writes a new revision `v<generation>.json` and then moves the `current.json` pointer, so earlier revisions are kept. `profile show --generation <n>` reads an earlier revision. If the profile changed after the preview, apply fails with `STALE_VERSION`; other differences fail with `PLAN_MISMATCH`. `--seed-from-init` fills preference keys the profile leaves unset from the preferences given at `init`. `profile suggest-stack --scope <scope>` suggests stack entries from that scope's onboarded projects and cites them. It reads only private onboarding data, never a repository. `profile export` renders the profile as Markdown and writes nothing.
@@ -44,9 +44,9 @@ node bin/devctx.mjs profile apply --pilot "$PILOT_FILE" --work 'Backend services
 
 ## The setup skill
 
-`skills/devctx-setup` conducts first-run setup. It checks `DEVCTX_KIT` and the pilot path like the other bundled skills, and stops without creating anything if the pilot file is missing or `init` has not run. It asks at most five skippable questions, previews the full profile with `profile plan`, and lists the templates with `skill template-list`. It runs `profile apply` only after explicit approval from the user in the session for the plan just shown. A fingerprint an agent passes back is not consent. It creates no skill unless you ask.
+`skills/devtwin-setup` conducts first-run setup. It checks `DEVTWIN_KIT` and the pilot path like the other bundled skills, and stops without creating anything if the pilot file is missing or `init` has not run. It asks at most five skippable questions, previews the full profile with `profile plan`, and lists the templates with `skill template-list`. It runs `profile apply` only after explicit approval from the user in the session for the plan just shown. A fingerprint an agent passes back is not consent. It creates no skill unless you ask.
 
-`devctx-setup` is not yet in the bundled installer, so `agents install` does not install it. Live-mode activation passed on 2026-10-25; the installer wiring (U9 of the harness plan) is not built yet. Until then, you can read its `SKILL.md` in the kit checkout.
+`devtwin-setup` is not yet in the bundled installer, so `agents install` does not install it. Live-mode activation passed on 2026-10-25; the installer wiring (U9 of the harness plan) is not built yet. Until then, you can read its `SKILL.md` in the kit checkout.
 
 ## Skill templates
 
@@ -60,7 +60,7 @@ The kit ships three skill templates under `templates/skills/`:
 
 A template contains no personal data and no scripts. It is never installed by the bundled installer and is not a discoverable skill. Every template treats records, the profile and fetched text as untrusted data and keeps the kit-path and pilot-path checks of the bundled skills.
 
-`skills/devctx-create-skill/assets/skill-template.md` stays the blank starter for skills built from scratch. `templates/skills/` holds guided templates that do not use it.
+`skills/devtwin-create-skill/assets/skill-template.md` stays the blank starter for skills built from scratch. `templates/skills/` holds guided templates that do not use it.
 
 ### Create a skill from a template
 
@@ -74,10 +74,10 @@ The full route reference is in the [skill builder](SKILL-BUILDER.md#create-from-
 6. Continue with the usual skill-builder steps, from `skill requirements-record` with `<dir>/requirements.json`, through `skill design-record`, `skill design-approve` and `skill draft-create --candidate <dir>/candidate`, to `skill draft-validate`.
 
 ```sh
-node bin/devctx.mjs skill template-list
-node bin/devctx.mjs skill workspace-create --pilot "$PILOT_FILE" --audience personal --workspace ws_example01
-node bin/devctx.mjs skill template-seed --pilot "$PILOT_FILE" --audience personal --workspace ws_example01 --template writing --set 'skill-name=draft-my-notes'
-node bin/devctx.mjs skill template-verify --pilot "$PILOT_FILE" --audience personal --workspace ws_example01 --template writing --set 'skill-name=draft-my-notes' --dir "$SEEDED_DIR" --render-digest "$RENDER_DIGEST"
+node bin/devtwin.mjs skill template-list
+node bin/devtwin.mjs skill workspace-create --pilot "$PILOT_FILE" --audience personal --workspace ws_example01
+node bin/devtwin.mjs skill template-seed --pilot "$PILOT_FILE" --audience personal --workspace ws_example01 --template writing --set 'skill-name=draft-my-notes'
+node bin/devtwin.mjs skill template-verify --pilot "$PILOT_FILE" --audience personal --workspace ws_example01 --template writing --set 'skill-name=draft-my-notes' --dir "$SEEDED_DIR" --render-digest "$RENDER_DIGEST"
 ```
 
 Templates with scope-value placeholders (`slack-update`'s `default-scope` and `channel-audience`) need a company-audience workspace in that scope: `--audience company --scope <scope>`. Each such value must be the scope itself or a `<scope>.<name>` inside it.
@@ -89,11 +89,11 @@ Installing a template-made skill into a real agent home is not available in this
 The watch is manual. Nothing runs on a schedule. It reads `stackCurrent` from the profile and resolves each entry against the bundled catalog `catalog/stack-sources.json`, plus any overrides you give.
 
 ```sh
-node bin/devctx.mjs stack plan --pilot "$PILOT_FILE"
-node bin/devctx.mjs stack approve --pilot "$PILOT_FILE" --plan-fingerprint "$FINGERPRINT"
-node bin/devctx.mjs stack check --pilot "$PILOT_FILE"
-node bin/devctx.mjs stack digest --pilot "$PILOT_FILE" --scope acme
-node bin/devctx.mjs stack digest --pilot "$PILOT_FILE" --scope acme --apply --plan-fingerprint "$DIGEST_FINGERPRINT"
+node bin/devtwin.mjs stack plan --pilot "$PILOT_FILE"
+node bin/devtwin.mjs stack approve --pilot "$PILOT_FILE" --plan-fingerprint "$FINGERPRINT"
+node bin/devtwin.mjs stack check --pilot "$PILOT_FILE"
+node bin/devtwin.mjs stack digest --pilot "$PILOT_FILE" --scope acme
+node bin/devtwin.mjs stack digest --pilot "$PILOT_FILE" --scope acme --apply --plan-fingerprint "$DIGEST_FINGERPRINT"
 ```
 
 - `stack plan` makes no request and writes nothing. It lists every item, the sources found for it, and items that are not watched with the reason. It also lists each host with the exact feed URLs, identifiers and versions it would receive.
@@ -131,7 +131,7 @@ Feed URLs must use `https`, with no user name or password, port or fragment. The
 
 Request content is limited to the feed URLs and identifiers listed for each host. Exact versions go to OSV only, and only when advisories are enabled. No profile text, record, path, scope, project name or local identifier is sent.
 
-This is what hosts still see: your IP address, the request time and the fixed user agent `devctx-stack-check`. With a routed token, GitHub would also see the GitHub account of that binding. The set of feed URLs you fetch, tied to your IP address, shows which vendors you follow.
+This is what hosts still see: your IP address, the request time and the fixed user agent `devtwin-stack-check`. With a routed token, GitHub would also see the GitHub account of that binding. The set of feed URLs you fetch, tied to your IP address, shows which vendors you follow.
 
 Fetched feed and release text is untrusted. The digest quotes titles and excerpts inside fences as inert text, and an agent must never follow instructions found in it.
 
@@ -144,8 +144,8 @@ Fetched feed and release text is untrusted. The digest quotes titles and excerpt
 The `writing` and `slack-update` templates never send. A draft is saved privately only when you ask:
 
 ```sh
-node bin/devctx.mjs draft save --pilot "$PILOT_FILE" --scope acme --body-file "$BODY_FILE"
-node bin/devctx.mjs draft save --pilot "$PILOT_FILE" --scope acme --body-file "$BODY_FILE" --apply --plan-fingerprint "$FINGERPRINT"
+node bin/devtwin.mjs draft save --pilot "$PILOT_FILE" --scope acme --body-file "$BODY_FILE"
+node bin/devtwin.mjs draft save --pilot "$PILOT_FILE" --scope acme --body-file "$BODY_FILE" --apply --plan-fingerprint "$FINGERPRINT"
 ```
 
 The body file must be inside the pilot's inputs root. A draft goes to `dataRoot/drafts/` without a scope, or under `dataRoot/scopes/<scope>/drafts/` with one. It is reported as `sendable: false`.
@@ -180,8 +180,8 @@ Schedules are disabled by default, and enabling one is outside this stage. The r
 ```sh
 # Scheduling recipe (commented out; enabling a schedule is outside this stage).
 # cron, Mondays at 09:00, disposable pilot only:
-# 0 9 * * 1 cd "$DEVCTX_KIT" && node bin/devctx.mjs stack digest --pilot "$PILOT_FILE" >> "$PILOT_LOG" 2>&1
-# launchd: a user agent with ProgramArguments node, bin/devctx.mjs, stack, digest, --pilot and the pilot path,
+# 0 9 * * 1 cd "$DEVTWIN_KIT" && node bin/devtwin.mjs stack digest --pilot "$PILOT_FILE" >> "$PILOT_LOG" 2>&1
+# launchd: a user agent with ProgramArguments node, bin/devtwin.mjs, stack, digest, --pilot and the pilot path,
 # and StartCalendarInterval Weekday 1, Hour 9. Do not load it in this stage.
 ```
 
@@ -195,7 +195,7 @@ These are optional companions. The kit does not bundle, install or detect them:
 
 ## What this stage does not do
 
-- No fresh-session discovery claim: whether a new agent session finds and uses `devctx-setup` or a template-made skill is not verified.
-- No install of template-made skills into real agent homes, and `devctx-setup` is not yet in the bundled installer.
+- No fresh-session discovery claim: whether a new agent session finds and uses `devtwin-setup` or a template-made skill is not verified.
+- No install of template-made skills into real agent homes, and `devtwin-setup` is not yet in the bundled installer.
 - No enabled schedules, no Slack reading or sending, and no authenticated GitHub requests until routing lands.
 - No Linux or Windows support claim. See [Limitations](LIMITATIONS.md) and the [security model](SECURITY-MODEL.md#personal-harness-layer).

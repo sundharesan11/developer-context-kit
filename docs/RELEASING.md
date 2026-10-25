@@ -57,7 +57,7 @@ Keep raw reports private until reviewed. A release note may summarize counts, en
 
 Suggested factual description:
 
-> Developer Context Kit is an experimental local CLI for scoped project context, decisions and handoffs. Its pilot uses disposable directories and synthetic tests. A live mode for one real machine is implemented and has passed one owner activation. Live connectors and automatic skill updates are still under development.
+> devtwin is an experimental local CLI for scoped project context, decisions and handoffs. Its pilot uses disposable directories and synthetic tests. A live mode for one real machine is implemented and has passed one owner activation. Live connectors and automatic skill updates are still under development.
 
 Do not claim “works with every agent,” “automatically remembers everything,” “secure sandbox,” or “weekly updates are enabled.” Do not present a previous milestone's test count as evidence for a different commit.
 

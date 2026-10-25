@@ -51,27 +51,27 @@ test("skill staging inspection refuses incomplete and changed runs", async (t) =
   for (const hook of ["afterRunCreated", "afterFileWritten", "beforeReceipt", "afterReceiptLinked", "afterReceipt"]) {
     const p = await fixture(t);
     const error = await stageAcquisition(p.roots, source, p.input, {request: p.request, runIdBytes, faults: {[hook]: async () => { throw new Error("RAW_CANARY " + p.sandbox); }}}).catch((e) => e);
-    assert.ok(["DEVCTX_STORAGE_ERROR", "DEVCTX_STAGE_UNCONFIRMED"].includes(error.code), hook);
+    assert.ok(["DEVTWIN_STORAGE_ERROR", "DEVTWIN_STAGE_UNCONFIRMED"].includes(error.code), hook);
     const output = JSON.stringify(toJson(error));
     assert.ok(!output.includes(p.sandbox) && !output.includes(p.fakeHome) && !output.includes("RAW_CANARY"));
     if (hook === "afterReceipt") assert.equal((await inspectAcquisition(p.roots, runId)).status, "staged");
-    else await assert.rejects(inspectAcquisition(p.roots, runId), {code: "DEVCTX_STAGE_INCOMPLETE"});
+    else await assert.rejects(inspectAcquisition(p.roots, runId), {code: "DEVTWIN_STAGE_INCOMPLETE"});
     if (hook === "afterReceiptLinked" || hook === "afterReceipt") assert.deepEqual(error.details, {runId, next: "inspect"});
   }
   const p = await fixture(t);
   await stageAcquisition(p.roots, source, p.input, {request: p.request, runIdBytes});
   await writeFile(join(p.run, "files/skills/SKILL.md"), "changed");
-  await assert.rejects(inspectAcquisition(p.roots, runId), {code: "DEVCTX_INTEGRITY"});
+  await assert.rejects(inspectAcquisition(p.roots, runId), {code: "DEVTWIN_INTEGRITY"});
 });
 
 test("skill staging refuses reused run IDs without adopting or writing the old run", async (t) => {
   const p = await fixture(t);
   await stageAcquisition(p.roots, source, p.input, {request: p.request, runIdBytes});
   const before = await treeSnapshot(p.run), calls = p.calls();
-  await assert.rejects(stageAcquisition(p.roots, source, p.input, {request: p.request, runIdBytes}), {code: "DEVCTX_CONFLICT"});
+  await assert.rejects(stageAcquisition(p.roots, source, p.input, {request: p.request, runIdBytes}), {code: "DEVTWIN_CONFLICT"});
   assert.equal(p.calls() - calls, 3);
   assert.equal(await treeSnapshot(p.run), before);
-  await assert.rejects(stageAcquisition(p.roots, source, p.input, {request: p.request, runIdBytes: () => "../bad"}), {code: "DEVCTX_INVALID_INPUT"});
+  await assert.rejects(stageAcquisition(p.roots, source, p.input, {request: p.request, runIdBytes: () => "../bad"}), {code: "DEVTWIN_INVALID_INPUT"});
 });
 
 test("skill staging enforces tiered private ancestry and never chmods existing directories", async (t) => {
@@ -87,7 +87,7 @@ test("skill staging enforces tiered private ancestry and never chmods existing d
     }
     if (which === "nonsticky" || which === "sticky") await chmod(p.sandbox, which === "sticky" ? 0o1777 : 0o777);
     if (which === "sticky") assert.equal((await stageAcquisition(roots, source, p.input, {request: p.request})).status, "staged");
-    else await assert.rejects(stageAcquisition(roots, source, p.input, {request: p.request}), {code: "DEVCTX_PATH_UNSAFE"});
+    else await assert.rejects(stageAcquisition(roots, source, p.input, {request: p.request}), {code: "DEVTWIN_PATH_UNSAFE"});
     if (which === "data") assert.equal((await stat(p.dataRoot)).mode & 0o777, 0o755);
   }
 });
@@ -107,7 +107,7 @@ test("skill staging inspection rejects extra, linked, renamed and corrupt entrie
     if (mutation === "receipt-executable") await chmod(join(p.run, "receipt.json"), 0o700);
     if (mutation === "pending") await writeFile(join(p.run, ".receipt-pending"), "x", {mode: 0o600});
     const error = await inspectAcquisition(p.roots, runId).catch((e) => e);
-    assert.ok(["DEVCTX_PATH_UNSAFE", "DEVCTX_INTEGRITY"].includes(error.code), mutation);
+    assert.ok(["DEVTWIN_PATH_UNSAFE", "DEVTWIN_INTEGRITY"].includes(error.code), mutation);
     assert.ok(!JSON.stringify(toJson(error)).includes(p.sandbox));
   }
 });
@@ -116,7 +116,7 @@ test("skill staging preserves safe rate limit hints and writes nothing on downlo
   const p = await fixture(t);
   const request = async () => new Response("unread", {status: 429, headers: {"retry-after": "10", "x-ratelimit-reset": "1800000000"}});
   const before = await treeSnapshot(p.pilot.pilotRoot);
-  await assert.rejects(stageAcquisition(p.roots, source, p.input, {request}), {code: "DEVCTX_RATE_LIMITED", details: {retryAfterSeconds: 10, resetAt: "2027-01-15T08:00:00.000Z"}});
+  await assert.rejects(stageAcquisition(p.roots, source, p.input, {request}), {code: "DEVTWIN_RATE_LIMITED", details: {retryAfterSeconds: 10, resetAt: "2027-01-15T08:00:00.000Z"}});
   assert.equal(await treeSnapshot(p.pilot.pilotRoot), before);
 });
 
@@ -124,10 +124,10 @@ test("skill staging preserves pilot binding and rejects dataRoot parent replacem
   const p = await fixture(t);
   await stageAcquisition(p.roots, source, p.input, {request: p.request, runIdBytes});
   const changed = rootsFromPilot(await loadPilot(await p.with({forbidden: [...p.forbidden, join(p.sandbox, "more-forbidden")]}), {home: p.fakeHome, kitRoot: "/nonexistent-kit", env: {}}));
-  await assert.rejects(inspectAcquisition(changed, runId), {code: "DEVCTX_GATE_REQUIRED", details: {field: "pilotDigest"}});
+  await assert.rejects(inspectAcquisition(changed, runId), {code: "DEVTWIN_GATE_REQUIRED", details: {field: "pilotDigest"}});
   const q = await fixture(t);
   await assert.rejects(stageAcquisition(q.roots, source, q.input, {request: q.request, runIdBytes, faults: {afterRunCreated: async () => {
     await rename(q.run, q.run + "-old"); await mkdir(q.run, {mode: 0o700});
-  }}}), {code: "DEVCTX_PATH_UNSAFE"});
+  }}}), {code: "DEVTWIN_PATH_UNSAFE"});
   assert.deepEqual(await readdir(q.run), []);
 });

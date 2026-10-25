@@ -28,7 +28,7 @@ test("source package required files and review declarations fail closed", async 
     (m) => m.files.pop(), (m) => m.requiredPaths.push("missing.md"),
     (m) => { m.licensePaths = []; }, (m) => m.noticePaths.push("missing-notice"),
     (m) => m.files.push({...m.files[0]}), (m) => { m.files[0].target = "../LICENSE"; },
-    (m) => { m.files[0].target = ".devctx-owned.json"; }, (m) => { m.extra = true; },
+    (m) => { m.files[0].target = ".devtwin-owned.json"; }, (m) => { m.extra = true; },
     (m) => Object.setPrototypeOf(m, {inherited: true})
   ]) {
     const mapping = structuredClone(x.mapping); mutate(mapping);
@@ -79,10 +79,10 @@ test("source package reports unsupported bytes links limits and legal collisions
 test("source package reinspection refuses changed stages and executable storage", async (t) => {
   const x = await stageSourceFixture(t);
   await writeFile(join(x.stagePath, "files/LICENSE"), "Changed");
-  await assert.rejects(reviewSourcePackage(x.p.roots, x), {code: "DEVCTX_INTEGRITY"});
+  await assert.rejects(reviewSourcePackage(x.p.roots, x), {code: "DEVTWIN_INTEGRITY"});
   const y = await stageSourceFixture(t);
   await chmod(join(y.stagePath, "files/LICENSE"), 0o700);
-  await assert.rejects(reviewSourcePackage(y.p.roots, y), {code: "DEVCTX_PATH_UNSAFE"});
+  await assert.rejects(reviewSourcePackage(y.p.roots, y), {code: "DEVTWIN_PATH_UNSAFE"});
 });
 
 test("source package holds oversized packages and unsupported paths without executing helpers", async (t) => {

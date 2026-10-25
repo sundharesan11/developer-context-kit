@@ -22,13 +22,13 @@ test("new onboarding profiles use project identity and preserve historical recor
   const plan = await planOnboard(s.roots, s.pilot, request);
   await applyOnboard(s.roots, s.pilot, request, { fingerprint: plan.fingerprint, now });
   assert.deepEqual(await Promise.all([readFile(join(path, "body.md")), readFile(join(path, "record.json"))]), before);
-  await assert.rejects(buildPortableHandoff(s.roots, s.pilot, { scope: "acme", cwd: s.repo, recordIds: [historical.recordId], asOf: "2026-10-09T00:00:00.000Z" }), { code: "DEVCTX_HANDOFF_UNSAFE" });
+  await assert.rejects(buildPortableHandoff(s.roots, s.pilot, { scope: "acme", cwd: s.repo, recordIds: [historical.recordId], asOf: "2026-10-09T00:00:00.000Z" }), { code: "DEVTWIN_HANDOFF_UNSAFE" });
 });
 for (const point of ["afterBundles", "afterBinding", "afterManifest"]) {
   test(`crash ${point}: project invisible, identical retry commits once`, async (t) => {
     const s = await onboardFixture(t);
     await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now, faults: { [point]: () => { throw new Error("crash"); } } }));
-    await assert.rejects(requireCommittedProject(s.roots, "acme", "acme.atlas"), { code: "DEVCTX_PROJECT_UNBOUND" });
+    await assert.rejects(requireCommittedProject(s.roots, "acme", "acme.atlas"), { code: "DEVTWIN_PROJECT_UNBOUND" });
     assert.equal((await readRegistry(s.roots)).value.operations.length, 0);
     const ok = await applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now });
     assert.equal(ok.replayed, false);
@@ -59,8 +59,8 @@ test("reused request id with a changed payload conflicts, before or after commit
   const ok = await applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now });
   assert.equal(ok.replayed, false);
   const before = await readRegistry(s.roots);
-  await assert.rejects(applyOnboard(s.roots, s.pilot, changed, { fingerprint: s.plan.fingerprint, now }), { code: "DEVCTX_CONFLICT" });
-  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { fingerprint: "sha256:" + "0".repeat(64), now }), { code: "DEVCTX_PLAN_MISMATCH" });
+  await assert.rejects(applyOnboard(s.roots, s.pilot, changed, { fingerprint: s.plan.fingerprint, now }), { code: "DEVTWIN_CONFLICT" });
+  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { fingerprint: "sha256:" + "0".repeat(64), now }), { code: "DEVTWIN_PLAN_MISMATCH" });
   assert.equal((await readRegistry(s.roots)).sha, before.sha);
 });
 test("orphan staging from a failed unapplied bundle is a recovery report, never deleted or published", async (t) => {
@@ -68,33 +68,33 @@ test("orphan staging from a failed unapplied bundle is a recovery report, never 
   const opts = { fingerprint: s.plan.fingerprint, now };
   await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { ...opts, faults: { beforeRename: () => { throw new Error("crash"); } } }));
   const err = await applyOnboard(s.roots, s.pilot, s.input, opts).catch((e) => e);
-  assert.equal(err.code, "DEVCTX_RECOVERY_REQUIRED");
+  assert.equal(err.code, "DEVTWIN_RECOVERY_REQUIRED");
   assert.equal(err.details.staging.length, 1);
   assert.equal((await readRegistry(s.roots)).value.operations.length, 0);
   assert.equal((await readdir(join(s.roots.dataRoot, "scopes/acme/projects/acme.atlas/staging"))).length, 1);
-  await assert.rejects(requireCommittedProject(s.roots, "acme", "acme.atlas"), { code: "DEVCTX_PROJECT_UNBOUND" });
+  await assert.rejects(requireCommittedProject(s.roots, "acme", "acme.atlas"), { code: "DEVTWIN_PROJECT_UNBOUND" });
 });
 test("missing bundle after commit yields RECOVERY_REQUIRED, never a short read", async (t) => {
   const s = await onboardFixture(t);
   const r = await applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now });
   const recs = join(s.roots.dataRoot, "scopes/acme/projects/acme.atlas/records");
   await rename(join(recs, r.bundles[0].id), join(s.roots.dataRoot, "moved-away"));
-  await assert.rejects(requireCommittedProject(s.roots, "acme", "acme.atlas"), { code: "DEVCTX_RECOVERY_REQUIRED" });
-  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now }), { code: "DEVCTX_RECOVERY_REQUIRED" });
+  await assert.rejects(requireCommittedProject(s.roots, "acme", "acme.atlas"), { code: "DEVTWIN_RECOVERY_REQUIRED" });
+  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now }), { code: "DEVTWIN_RECOVERY_REQUIRED" });
 });
 test("same worktree under another scope is BINDING_CONFLICT without naming it", async (t) => {
   const s = await onboardFixture(t);
   await applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now });
   await applyScopeAdd(s.roots, { scope: "globex", hubs: [], policies: [] });
   const err = await planOnboard(s.roots, s.pilot, { ...s.input, scope: "globex", project: "globex.atlas", requestId: "req_globex001" }).catch((e) => e);
-  assert.equal(err.code, "DEVCTX_BINDING_CONFLICT");
+  assert.equal(err.code, "DEVTWIN_BINDING_CONFLICT");
   assert.ok(!JSON.stringify(toJson(err)).includes("acme"));
 });
 test("source mutated between preview and apply is refused; nothing published; repo has only the edit", async (t) => {
   const s = await onboardFixture(t);
   await writeFile(join(s.repo, "README.md"), "# Atlas\nChanged.\n");
   const edited = await treeSnapshot(s.repo);
-  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now }), (e) => ["DEVCTX_SOURCE_CHANGED", "DEVCTX_PLAN_MISMATCH"].includes(e.code));
+  await assert.rejects(applyOnboard(s.roots, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now }), (e) => ["DEVTWIN_SOURCE_CHANGED", "DEVTWIN_PLAN_MISMATCH"].includes(e.code));
   assert.equal((await readRegistry(s.roots)).value.operations.length, 0);
   assert.equal(await treeSnapshot(s.repo), edited);
 });
@@ -102,7 +102,7 @@ test("direct onboarding without pilot leaves registry and locks unchanged", asyn
   const s = await onboardFixture(t);
   const bare = { configRoot: s.roots.configRoot, dataRoot: s.roots.dataRoot, stateRoot: s.roots.stateRoot };
   const before = await readRegistry(s.roots);
-  await assert.rejects(applyOnboard(bare, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now }), { code: "DEVCTX_GATE_REQUIRED" });
+  await assert.rejects(applyOnboard(bare, s.pilot, s.input, { fingerprint: s.plan.fingerprint, now }), { code: "DEVTWIN_GATE_REQUIRED" });
   assert.equal((await readRegistry(s.roots)).sha, before.sha);
   assert.deepEqual(await readdir(join(s.roots.stateRoot, "locks")), []);
 });
@@ -209,7 +209,7 @@ test("re-onboarding retry after a retire target changes fails naming the request
   const before = await readRegistry(s.roots);
   const fresh = await planOnboard(s.roots, s.pilot, input);
   const err = await applyOnboard(s.roots, s.pilot, input, { fingerprint: fresh.fingerprint, now }).catch((e) => e);
-  assert.equal(err.code, "DEVCTX_CONFLICT");
+  assert.equal(err.code, "DEVTWIN_CONFLICT");
   assert.match(err.details.remedy, /--request-id/);
   assert.equal((await readRegistry(s.roots)).sha, before.sha);
 });
@@ -220,7 +220,7 @@ test("re-onboarding apply with a fingerprint from before a retire-list change is
   const plan = await planOnboard(s.roots, s.pilot, input);
   await userSupersede(s, prior);
   const before = await readRegistry(s.roots);
-  await assert.rejects(applyOnboard(s.roots, s.pilot, input, { fingerprint: plan.fingerprint, now }), { code: "DEVCTX_PLAN_MISMATCH" });
+  await assert.rejects(applyOnboard(s.roots, s.pilot, input, { fingerprint: plan.fingerprint, now }), { code: "DEVTWIN_PLAN_MISMATCH" });
   assert.equal((await readRegistry(s.roots)).sha, before.sha);
 });
 test("re-onboarding retires profiles from earlier path-less registry operations of the same worktree", async (t) => {
@@ -241,7 +241,7 @@ test("re-onboarding preview over a damaged bundle names the keep-previous remedy
   const prior = await autoProfile(s);
   await writeFile(join(s.dataRoot, "scopes/acme/projects/acme.atlas/records", prior.id, "body.md"), "tampered\n");
   const err = await planOnboard(s.roots, s.pilot, { ...s.input, requestId: "req_reonboard01" }).catch((e) => e);
-  assert.equal(err.code, "DEVCTX_RECOVERY_REQUIRED");
+  assert.equal(err.code, "DEVTWIN_RECOVERY_REQUIRED");
   assert.match(err.details.remedy, /--keep-previous/);
   const kept = await planOnboard(s.roots, s.pilot, { ...s.input, requestId: "req_reonboard01", keepPrevious: true });
   assert.deepEqual(kept.retire, []);

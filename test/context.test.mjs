@@ -25,12 +25,12 @@ test("cross-scope canary never appears in another scope's brief", async (t) => {
   const brief = await buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas });
   assert.ok(!JSON.stringify(brief).includes("CANARY-GLOBEX"));
   assert.ok(!JSON.stringify(brief).toLowerCase().includes("globex"));
-  await assert.rejects(resolveContext(s.roots, { scope: "globex", cwd: s.atlas }), (e) => e.code === "DEVCTX_PROJECT_UNBOUND" && e.details.reason === "not-bound-in-scope");
+  await assert.rejects(resolveContext(s.roots, { scope: "globex", cwd: s.atlas }), (e) => e.code === "DEVTWIN_PROJECT_UNBOUND" && e.details.reason === "not-bound-in-scope");
 });
 test("symlinked cwd refused; subdirectory resolves; brief deterministic and bounded", async (t) => {
   const s = await twoScopes(t);
   await symlink(s.atlas, join(s.base, "alias"));
-  await assert.rejects(resolveContext(s.roots, { scope: "acme", cwd: join(s.base, "alias") }), { code: "DEVCTX_PATH_UNSAFE" });
+  await assert.rejects(resolveContext(s.roots, { scope: "acme", cwd: join(s.base, "alias") }), { code: "DEVTWIN_PATH_UNSAFE" });
   for (let i = 0; i < 20; i++) await addRecord(s.roots, draftFor("acme", "acme.atlas", { requestId: `req_bulk${String(i).padStart(4, "0")}`, body: "x".repeat(3000) }), { now });
   const sub = join(s.atlas, "src"); await mkdir(sub);
   assert.equal((await resolveContext(s.roots, { scope: "acme", cwd: sub })).project, "acme.atlas");
@@ -74,9 +74,9 @@ test("required policy is loaded first or the brief fails; optional policy omissi
   assert.deepEqual(ok.receipt.policies.omittedIds, ["pol_style"]);
   assert.equal(ok.receipt.omittedCount.policies, 1);
   await withPolicies([{ id: "pol_huge", hubId: "eng", rel: "HUGE.md", required: true }]);
-  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), (e) => e.code === "DEVCTX_LIMIT" && e.details.requiredPolicyIds[0] === "pol_huge");
+  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), (e) => e.code === "DEVTWIN_LIMIT" && e.details.requiredPolicyIds[0] === "pol_huge");
   await withPolicies([{ id: "pol_gone", hubId: "eng", rel: "MISSING.md", required: true }]);
-  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), (e) => e.code === "DEVCTX_POLICY_UNAVAILABLE" && e.details.policyId === "pol_gone");
+  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), (e) => e.code === "DEVTWIN_POLICY_UNAVAILABLE" && e.details.policyId === "pol_gone");
 });
 test("receipt separates preferences, scope policies and project records", async (t) => {
   const s = await twoScopes(t);
@@ -90,7 +90,7 @@ test("receipt separates preferences, scope policies and project records", async 
   assert.deepEqual(brief.receipt.records.selected.map((r) => r.id).sort(), brief.records.map((r) => r.id).sort());
   assert.ok(!brief.records.some((r) => JSON.stringify(r).includes("diagrams")));
   await writeFile(userFile, JSON.stringify({ ...user, preferences: { client: "acme" } }));
-  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), { code: "DEVCTX_INVALID_INPUT" });
+  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), { code: "DEVTWIN_INVALID_INPUT" });
 });
 test("brief with a profile includes it, its notice and its hash in the receipt", async (t) => {
   const s = await twoScopes(t);
@@ -147,7 +147,7 @@ test("brief fails with LIMIT and reports profile bytes when required policies pl
   await writeFile(scopeFile, JSON.stringify({ ...base, hubs: [{ id: "eng", kind: "local-dir", path: hub, purposes: ["policy"] }], policies: [{ id: "pol_big", hubId: "eng", rel: "BIG.md", required: true }] }));
   assert.equal((await buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas })).policies[0].id, "pol_big");
   await applyProfileFixture(s.roots, sizedProfile(4096));
-  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), (e) => e.code === "DEVCTX_LIMIT" && e.details.profileBytes === 4096 && e.details.bytes === 22000 && e.details.requiredPolicyIds[0] === "pol_big");
+  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), (e) => e.code === "DEVTWIN_LIMIT" && e.details.profileBytes === 4096 && e.details.bytes === 22000 && e.details.requiredPolicyIds[0] === "pol_big");
 });
 test("brief fails with RECOVERY_REQUIRED on a corrupt profile and keeps the committed revision after an interrupted apply", async (t) => {
   const s = await twoScopes(t);
@@ -158,7 +158,7 @@ test("brief fails with RECOVERY_REQUIRED on a corrupt profile and keeps the comm
   assert.deepEqual(brief.profile.value, { workKind: "one" });
   assert.equal(brief.profile.generation, 1);
   await writeFile(join(s.roots.configRoot, "profile/v1.json"), "{}\n");
-  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), { code: "DEVCTX_RECOVERY_REQUIRED" });
+  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), { code: "DEVTWIN_RECOVERY_REQUIRED" });
   await writeFile(join(s.roots.configRoot, "profile/current.json"), "not json");
-  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), { code: "DEVCTX_RECOVERY_REQUIRED" });
+  await assert.rejects(buildBrief(s.roots, s.pilot, { scope: "acme", cwd: s.atlas }), { code: "DEVTWIN_RECOVERY_REQUIRED" });
 });

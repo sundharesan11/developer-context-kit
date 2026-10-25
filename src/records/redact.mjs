@@ -1,4 +1,4 @@
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 const PATTERNS = [
   ["private-key", /-----BEGIN [A-Z ]*PRIVATE KEY(?: BLOCK)?-----/g],
   ["authorization", /authorization\s*:\s*\S+/gi],
@@ -24,7 +24,7 @@ export function scanSensitive(text) {
 }
 export function assertNoSensitive(text) {
   const found = scanSensitive(text);
-  if (found.length) throw new DevctxError("SENSITIVE_CONTENT", "Sensitive content refused", { types: [...new Set(found.map((x) => x.type))] });
+  if (found.length) throw new DevtwinError("SENSITIVE_CONTENT", "Sensitive content refused", { types: [...new Set(found.map((x) => x.type))] });
 }
 export function findForbiddenFields(value, prefix = "") {
   const result = [];

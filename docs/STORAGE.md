@@ -27,7 +27,7 @@ Source installation keeps write-once content and action records at `dataRoot/ski
 
 Single-use action consumption lives at `stateRoot/skill-source-installs/consumed/<decision-id>.json`. Source apply shares `stateRoot/locks/install.lock` and writes `runs/<run-id>/journal.json` with kind `skill-source-local`, decision/content IDs, fingerprint, target home and intended/completed actions. Both package adapters reject incomplete shared journals. No history, stage, decision or partial target is pruned automatically.
 
-Source `.devctx-owned.json` uses schema 3 and kind `skill-source-package`, with skill/source/repository/pin/stage identity, acquisition fingerprint, package/mapping digests, content decision, file hashes and run ID. It cannot adopt a bundled/personal marker. Output bytes are upstream bytes; the ownership marker is toolkit metadata. Source files, including helpers, are exactly 0600 and directories exactly 0700. Added owner-execute or special bits mark an installed source modified.
+Source `.devtwin-owned.json` uses schema 3 and kind `skill-source-package`, with skill/source/repository/pin/stage identity, acquisition fingerprint, package/mapping digests, content decision, file hashes and run ID. It cannot adopt a bundled/personal marker. Output bytes are upstream bytes; the ownership marker is toolkit metadata. Source files, including helpers, are exactly 0600 and directories exactly 0700. Added owner-execute or special bits mark an installed source modified.
 
 Apply consumes approval before journal creation. A failure in between leaves a consumed decision with no target writes; status shows consumption. Failures after journal creation retain recovery evidence and block later package applies to that home. Before ownership publication, the shared executor verifies output hashes and the exact file/directory inventory. Multi-host completion is journaled incrementally; success on one host does not hide a failed second host.
 
@@ -61,15 +61,15 @@ SHA-256 of the exact bytes is the authority for source identity. A bound source 
 - Run receipts are fsynced with their directories. If a published onboarding lost its receipt in a crash, a replay writes it again; an existing receipt that differs fails with `RECOVERY_REQUIRED`.
 - Git queries time out after 30 seconds and fail with `GIT_QUERY_FAILED`. Output over 16 MiB, more than 16 remotes or a remote URL over 2,048 bytes fails with `LIMIT`.
 
-Agent-home paths are writable only by an installer, and only the one target home it names. That home must be listed in `pilot.agentHomes`. In live mode only the bundled installer writes outside the store, and only `devctx-*` entries in the live config's named skill folders.
+Agent-home paths are writable only by an installer, and only the one target home it names. That home must be listed in `pilot.agentHomes`. In live mode only the bundled installer writes outside the store, and only `devtwin-*` entries in the live config's named skill folders.
 
 ## Live store
 
-A live config keeps its private state under `~/.devctx`, at mode 0700. The live config is `~/.devctx/live.json`. The store is `~/.devctx/store`, with `config`, `data`, `state` and `inputs` inside it. The kit clone is `~/.devctx/kit`. See [Live activation](LIVE.md).
+A live config keeps its private state under `~/.devtwin`, at mode 0700. The live config is `~/.devtwin/live.json`. The store is `~/.devtwin/store`, with `config`, `data`, `state` and `inputs` inside it. The kit clone is `~/.devtwin/kit`. See [Live activation](LIVE.md).
 
 - `state/live/approved-config.json` holds the config ID and the digest of the last approved live config. Live config commands update it under `state/locks/live.lock`.
 - Each bundled install, update or uninstall writes `state/runs/<run-id>/journal.json`, with the config ID, kit commit, plan fingerprint and intended, started and completed actions. Before the first write the run folder keeps copies of the old and new file bytes under `copies/`. The run also records an inventory of each target skill folder for the rollback check.
-- An installed entry holds `SKILL.md` and a `.devctx-owned.json` receipt (schema 2, kind `skill-bundled`) with the skill, config ID, run ID, kit commit and file hash. Ownership needs a matching completed journal in this store. The kit commit is provenance only.
+- An installed entry holds `SKILL.md` and a `.devtwin-owned.json` receipt (schema 2, kind `skill-bundled`) with the skill, config ID, run ID, kit commit and file hash. Ownership needs a matching completed journal in this store. The kit commit is provenance only.
 - An incomplete run blocks new applies until `agents recover` applies an approved recovery plan. Journals are written atomically. `agents recover --release` closes a run stuck on held entries or an unreadable journal and leaves the held files in place as foreign entries; an unreadable journal is kept as `journal.released.json`. Nothing is repaired automatically.
 - Activation evidence stays in `state/evidence/`, created by the owner.
 

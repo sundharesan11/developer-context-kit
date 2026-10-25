@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { DevctxError } from "../errors.mjs";
+import { DevtwinError } from "../errors.mjs";
 import { digest } from "../storage/canonical.mjs";
 import { isDeniedRel } from "../storage/source-read.mjs";
 import { getSource, loadBundledCatalog, validateSourceRecipe } from "./catalog.mjs";
@@ -12,7 +12,7 @@ export const ACQUISITION_LIMITS = Object.freeze({
   operationMs: 30000, receiptBytes: 65536
 });
 export const ASSESSMENT = Object.freeze({pin: "caller-supplied-unverified", content: "selected-files-only", safety: "unreviewed", compatibility: "unverified", dependencies: "unreviewed", installation: "not-installed", redistribution: "unreviewed"});
-const fail = (code, field) => { throw new DevctxError(code, "Invalid acquisition input", {field}); };
+const fail = (code, field) => { throw new DevtwinError(code, "Invalid acquisition input", {field}); };
 const sha = (v) => typeof v === "string" && /^[0-9a-f]{40}$/.test(v);
 const exact = (v, keys) => v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === keys.length && keys.every((k) => Object.hasOwn(v, k));
 

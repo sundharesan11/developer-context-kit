@@ -1,9 +1,9 @@
 ---
 title: Onboard a repository
-description: Preview what devctx would record about a repository, approve the exact plan, and read the resulting context brief.
+description: Preview what devtwin would record about a repository, approve the exact plan, and read the resulting context brief.
 ---
 
-Onboarding turns a repository into a **project** that devctx knows about. It scans a small, fixed set of files, proposes context records, and binds the worktree to a project ID inside a scope. You see everything first and approve the exact plan.
+Onboarding turns a repository into a **project** that devtwin knows about. It scans a small, fixed set of files, proposes context records, and binds the worktree to a project ID inside a scope. You see everything first and approve the exact plan.
 
 Onboarding never writes to the repository. All private context is stored under your pilot's data root.
 
@@ -11,7 +11,7 @@ Onboarding never writes to the repository. All private context is stored under y
 
 You need:
 
-- A pilot file whose `repos` list contains the repository's real path. In live mode that is `~/.devctx/live.json`; see [Live mode](/docs/guides/live-mode/).
+- A pilot file whose `repos` list contains the repository's real path. In live mode that is `~/.devtwin/live.json`; see [Live mode](/docs/guides/live-mode/).
 - `init` and `scope add` applied for that pilot. See [Quickstart](/docs/getting-started/quickstart/).
 - A **scope** (for example `example`) and a **project ID** that starts with it (for example `example.atlas`). See [Scopes and projects](/docs/concepts/scopes-and-projects/).
 
@@ -25,7 +25,7 @@ REPO=/absolute/path/to/atlas
 ## 1. Preview the onboarding
 
 ```sh
-node bin/devctx.mjs project onboard \
+node bin/devtwin.mjs project onboard \
   --pilot "$PILOT" --scope example --project example.atlas \
   --repo "$REPO" --environment staging \
   --request-id req_atlas_onboard_01 --accept all
@@ -59,7 +59,7 @@ Preview writes nothing. The result is one JSON line; the parts to review are:
 
 The scanner reads only these files if present: `README.md` (or `README`), `AGENTS.md`, `CLAUDE.md`, `package.json`, `.nvmrc`, `.node-version`, `go.mod`, `pyproject.toml`, `Cargo.toml` and `Makefile`. Add other files with `--doc <repo-relative path>` (repeatable). Text that looks like a credential is skipped instead of proposed.
 
-Package scripts and Makefile targets become **declared** commands. devctx never runs them.
+Package scripts and Makefile targets become **declared** commands. devtwin never runs them.
 
 ### Optional inputs
 
@@ -88,7 +88,7 @@ Changing the selection changes the plan, so preview again with the new `--accept
 Repeat every preview flag unchanged and add `--apply --plan-fingerprint`:
 
 ```sh
-node bin/devctx.mjs project onboard \
+node bin/devtwin.mjs project onboard \
   --pilot "$PILOT" --scope example --project example.atlas \
   --repo "$REPO" --environment staging \
   --request-id req_atlas_onboard_01 --accept all \
@@ -102,10 +102,10 @@ node bin/devctx.mjs project onboard \
  "committedGeneration":1,"replayed":false}}
 ```
 
-If anything changed between preview and apply (files, registry state, flags), apply refuses with `DEVCTX_PLAN_MISMATCH` or `DEVCTX_STALE_VERSION`. Preview again.
+If anything changed between preview and apply (files, registry state, flags), apply refuses with `DEVTWIN_PLAN_MISMATCH` or `DEVTWIN_STALE_VERSION`. Preview again.
 
 :::tip[Request IDs]
-The request ID is the idempotency key. Retrying the exact same approved request returns `replayed: true` and does no new work. Reusing a request ID with different inputs is a `DEVCTX_CONFLICT`. Use a fresh `--request-id` for every new onboarding or refresh.
+The request ID is the idempotency key. Retrying the exact same approved request returns `replayed: true` and does no new work. Reusing a request ID with different inputs is a `DEVTWIN_CONFLICT`. Use a fresh `--request-id` for every new onboarding or refresh.
 :::
 
 ## 4. Check the result
@@ -113,8 +113,8 @@ The request ID is the idempotency key. Retrying the exact same approved request 
 Resolve the worktree to its project, then read the brief:
 
 ```sh
-node bin/devctx.mjs context resolve --pilot "$PILOT" --scope example --cwd "$REPO"
-node bin/devctx.mjs context brief   --pilot "$PILOT" --scope example --cwd "$REPO"
+node bin/devtwin.mjs context resolve --pilot "$PILOT" --scope example --cwd "$REPO"
+node bin/devtwin.mjs context brief   --pilot "$PILOT" --scope example --cwd "$REPO"
 ```
 
 `context resolve` returns `"state":"bound"`, the `project`, and the `worktree` (`root`, `branch`, `head`, `dirty`). The brief lists the records you accepted with their freshness. See [Briefs](/docs/concepts/briefs/).
@@ -138,10 +138,10 @@ To keep everything, add `--keep-previous` to both preview and apply. The preview
 
 ## Wrong scope or unbound worktree
 
-`context resolve` in a scope where the worktree is not bound fails with `DEVCTX_PROJECT_UNBOUND` and tells you why:
+`context resolve` in a scope where the worktree is not bound fails with `DEVTWIN_PROJECT_UNBOUND` and tells you why:
 
 ```json
-{"ok":false,"command":"context resolve","error":{"code":"DEVCTX_PROJECT_UNBOUND",
+{"ok":false,"command":"context resolve","error":{"code":"DEVTWIN_PROJECT_UNBOUND",
  "message":"Worktree not bound in selected scope",
  "details":{"reason":"not-bound-in-scope","remedy":"project onboard --scope other --repo <worktree>"}}}
 ```

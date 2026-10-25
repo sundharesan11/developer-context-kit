@@ -56,7 +56,7 @@ export async function stageSourceFixture(t, {p, version = 1, sourceId = "humaniz
 }
 function assertFixtureBody(body) { if (!body) throw new Error("Unexpected fixture request"); }
 export async function sandbox(t) {
-  const dir = await realpath(await mkdtemp(join(tmpdir(), "devctx-t-")));
+  const dir = await realpath(await mkdtemp(join(tmpdir(), "devtwin-t-")));
   t.after(() => rm(dir, { recursive: true, force: true }));
   return dir;
 }
