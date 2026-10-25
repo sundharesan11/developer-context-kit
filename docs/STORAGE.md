@@ -60,6 +60,23 @@ New records use schema 2. Readers accept schema 1 and 2, and a schema 1 record i
 - **Reach.** The top-level `reach` is `personal`, `project` or `org`. A fact has project reach, and a preference never has project reach. The project store accepts project reach only. `applicability.level` keeps its schema 1 values.
 - **Match.** `match` holds `paths`, `packages` and `topics`, at most 20, 20 and 10 distinct entries. Paths are repo-relative globs that use `*` and `?`. They follow the `file:` source rules: no absolute path, no `..` and no denied file such as `.env*` or `*.pem`.
 
+### Personal and org homes
+
+Personal and org records have their own homes. They need no registry entry or project binding. These homes are library functions in `src/records/personal.mjs`. No CLI command writes to them yet.
+
+- **Personal.** `dataRoot/personal/records/<record-id>/` holds records with `personal` reach and the kinds `lesson` and `preference`. Writes use `stateRoot/locks/personal_records.lock`.
+- **Org.** `dataRoot/scopes/<scope>/org/records/<record-id>/` holds `lesson` records with `org` reach for a scope that exists. Writes use the scope lock.
+- **Integrity.** Each home uses the project store's bundle rules. The reader recomputes the record ID from the home and request ID, and checks the reach, kind, body hash and body size. A record that fails is reported as corrupt. Writes are staged, fsynced and renamed into place. Supersession names each target with its expected record hash.
+- **Wrong reach.** Each home refuses a draft whose reach or kind does not belong there. The project store refuses any reach other than `project`.
+
+### Isolation checks
+
+`src/records/isolation.mjs` holds the checks for text that leaves a scope or comes from another person.
+
+- **Outbound.** Text is checked for credential patterns, then for the names of every scope in the config. The names are the scope ID, the display name, each project ID, each binding root path and each remote host. A name matches only as a whole word, in any case. `github.com`, `gitlab.com`, `bitbucket.org` and any host found in two or more scopes are left out. A personal record is checked against every scope. An org record is checked against every other scope. A match fails with `ISOLATION`.
+- **Hub proposals.** A hub proposal keeps its own project check as a plain substring match. It is then checked against every other scope.
+- **Inbound.** Another person's text has control, format and bidi characters removed. Its body is capped at 2,400 bytes, about 600 tokens. It is then fenced and labelled as claimed by the author's handle.
+
 ## File identity and interrupted writes
 
 SHA-256 of the exact bytes is the authority for source identity. A bound source must also match its device, inode, size and ancestor chain. The stored `mtimeMs` is kept for compatibility and is informational only; it is never compared across reads. Within one read, a change in size, modification time or change time during the read is refused as a changed file.

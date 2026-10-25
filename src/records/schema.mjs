@@ -1,6 +1,6 @@
 import { DevtwinError } from "../errors.mjs";
 import { sha256, digest, canonicalJson } from "../storage/canonical.mjs";
-import { assertActorRef, assertProjectId, assertScopeId, recordIdFor } from "../identity/ids.mjs";
+import { assertActorRef, assertProjectId, assertScopeId, recordIdFor, personalRecordIdFor, orgRecordIdFor } from "../identity/ids.mjs";
 import { assertSourceRel, isDeniedRel } from "../storage/source-read.mjs";
 import { assertNoSensitive, findForbiddenFields } from "./redact.mjs";
 export const KINDS = ["brief", "map", "command", "environment", "constraint", "fact", "decision", "experiment", "unknown", "handoff", "lesson", "preference"];
@@ -68,11 +68,26 @@ export function validateDraft(draft, { recordedBy, supersedes = [] } = {}) {
   if (findForbiddenFields(draft).length) invalid();
   return draft;
 }
+// Fields shared by project, personal and org records. The caller supplies the identity fields.
+function recordFields({ requestId, requestHash, operationId = null, recordedBy, draft, supersedes = [] }, now) {
+  return { kind: draft.kind, class: draft.class ?? defaultClass(draft.kind), reach: draftReach(draft), match: match(draft.match ?? {}), status: draft.status, title: draft.title, bodyHash: sha256(draft.body), bodyBytes: Buffer.byteLength(draft.body), sources: draft.sources ?? [], verification: draft.verification ?? [], recordedBy, applicability: { level: draft.applicability?.level ?? "project", branch: draft.applicability?.branch ?? null, commit: draft.applicability?.commit ?? null, worktree: draft.applicability?.worktree ?? null, task: draft.applicability?.task ?? null, environment: draft.applicability?.environment ?? null }, supersedes, review: draft.review ? { reviewer: draft.review.reviewer, receipt: "owner-cli-confirmation", note: draft.review.note ?? "" } : null, revisitAfter: draft.revisitAfter ?? null, requestId, requestHash, operationId, createdAt: now().toISOString() };
+}
 export function buildRecord({ scope, project, requestId, requestHash, operationId = null, recordedBy, draft, supersedes = [] }, { now = () => new Date() } = {}) {
   assertScopeId(scope); assertProjectId(project, scope);
   validateDraft(draft, { recordedBy, supersedes });
   assertProjectReach(draft);
-  return { schemaVersion: 2, id: recordIdFor({ scope, project, requestId }), scope, project, kind: draft.kind, class: draft.class ?? defaultClass(draft.kind), reach: draftReach(draft), match: match(draft.match ?? {}), status: draft.status, title: draft.title, bodyHash: sha256(draft.body), bodyBytes: Buffer.byteLength(draft.body), sources: draft.sources ?? [], verification: draft.verification ?? [], recordedBy, applicability: { level: draft.applicability?.level ?? "project", branch: draft.applicability?.branch ?? null, commit: draft.applicability?.commit ?? null, worktree: draft.applicability?.worktree ?? null, task: draft.applicability?.task ?? null, environment: draft.applicability?.environment ?? null }, supersedes, review: draft.review ? { reviewer: draft.review.reviewer, receipt: "owner-cli-confirmation", note: draft.review.note ?? "" } : null, revisitAfter: draft.revisitAfter ?? null, requestId, requestHash, operationId, createdAt: now().toISOString() };
+  return { schemaVersion: 2, id: recordIdFor({ scope, project, requestId }), scope, project, ...recordFields({ requestId, requestHash, operationId, recordedBy, draft, supersedes }, now) };
+}
+// Personal and org homes. Each home takes one reach and a fixed set of kinds, and never an operation ID.
+export const HOME_KINDS = { personal: ["lesson", "preference"], org: ["lesson"] };
+export function assertHomeReach(reach, draft) {
+  if (!HOME_KINDS[reach]?.includes(draft?.kind) || draftReach(draft) !== reach) throw new DevtwinError("INVALID_INPUT", "Record reach does not match its home");
+}
+export function buildHomeRecord({ reach, scope = null, requestId, requestHash, recordedBy, draft, supersedes = [] }, { now = () => new Date() } = {}) {
+  validateDraft(draft, { recordedBy, supersedes });
+  assertHomeReach(reach, draft);
+  const id = reach === "org" ? orgRecordIdFor({ scope, requestId }) : personalRecordIdFor({ requestId });
+  return { schemaVersion: 2, id, scope: reach === "org" ? scope : null, project: null, ...recordFields({ requestId, requestHash, recordedBy, draft, supersedes }, now) };
 }
 // Readers accept v1 and v2. A v1 record is returned as stored and never rewritten.
 export function validateRecord(record) {

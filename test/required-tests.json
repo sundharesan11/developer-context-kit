@@ -467,5 +467,16 @@
   "project store refuses records whose reach is not project",
   "v2 project lesson passes the handoff privacy check unchanged",
   "personal and org record IDs are derived and distinct from project IDs",
-  "context brief orders a v2 lesson after project facts"
+  "context brief orders a v2 lesson after project facts",
+  "isolation refuses a general lesson from one scope that names another scope's project",
+  "isolation refuses a lesson body with a credential pattern before publication",
+  "isolation leaves out shared code hosts and hosts found in two scopes",
+  "isolation matches a two-letter scope ID only as a whole word",
+  "isolation renders inbound text fenced claimed and stripped of control characters",
+  "hub proposal identifier check still refuses content naming its own project",
+  "personal store keeps a clean general lesson and reads it back hash-checked",
+  "personal store reports a tampered record as corrupt",
+  "personal store supersedes a record by expected hash",
+  "personal store refuses records without personal reach",
+  "org home keeps org lessons under the scope with no project"
 ]

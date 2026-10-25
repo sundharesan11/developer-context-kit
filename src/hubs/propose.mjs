@@ -5,12 +5,11 @@ import { loadScope } from "../config/store.mjs";
 import { assertWritable } from "../config/pilot.mjs";
 import { requireCommittedProject, readSnapshot } from "../records/store.mjs";
 import { scanSensitive } from "../records/redact.mjs";
+import { remoteHost, projectIdentifiers, mentionsIdentifier, isolationTerms, assertOutboundClean } from "../records/isolation.mjs";
 import { digest, canonicalJson } from "../storage/canonical.mjs";
 import { ensurePrivatePath, writeNewFile } from "../storage/fsx.mjs";
 import { withPilotLock, scopeLockPath } from "../storage/lock.mjs";
-export function remoteHost(url) {
-  try { return new URL(url).hostname; } catch { return /^(?:[^@\s]+@)?([^:\s/]+):[^\s]+$/.exec(url)?.[1] ?? ""; }
-}
+export { remoteHost };
 export async function proposeHubLearning(roots, { scope, project, recordIds, hubId }, { now = () => new Date(), apply = false } = {}) {
   const scopeConfig = await loadScope(roots, scope);
   const hub = scopeConfig.hubs.find((x) => x.id === hubId);
@@ -21,8 +20,9 @@ export async function proposeHubLearning(roots, { scope, project, recordIds, hub
   if (!selected.length || selected.some((r) => !r)) throw new DevtwinError("INVALID_INPUT", "Record selection invalid");
   if (selected.some((r) => r.status !== "confirmed" || r.effective === "superseded")) throw new DevtwinError("APPROVAL_REQUIRED", "Only confirmed records may be proposed");
   const content = selected.map((r) => r.title + "\n" + r.body).join("\n\n");
-  const identifiers = [scope, project, ...binding.roots.map((r) => r.path), ...binding.remotes.map((r) => remoteHost(r.url))].filter(Boolean);
-  if (scanSensitive(content).length || identifiers.some((term) => content.toLowerCase().includes(term.toLowerCase()))) throw new DevtwinError("SENSITIVE_CONTENT", "Hub proposal content refused");
+  if (scanSensitive(content).length || mentionsIdentifier(content, projectIdentifiers(scope, project, binding))) throw new DevtwinError("SENSITIVE_CONTENT", "Hub proposal content refused");
+  // The hub belongs to this scope, so the whole-word check covers every other scope.
+  assertOutboundClean(content, await isolationTerms(roots), { except: scope });
   const proposalId = "hub-" + digest({ scope, project, recordIds, hubId }).slice(7, 31);
   const path = join(roots.dataRoot, "scopes", scope, "projects", project, "proposals", proposalId + ".json");
   if (!apply) return { preview: true, proposalId, path };
