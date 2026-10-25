@@ -12,7 +12,8 @@ export const setupOptions = {
   scope: { type: "string" }, "display-name": { type: "string" }, project: { type: "string" }, repo: { type: "string" },
   doc: { type: "string", multiple: true }, "expect-remote": { type: "string", multiple: true }, environment: { type: "string", multiple: true },
   actor: { type: "string", multiple: true }, accept: { type: "string" }, "request-id": { type: "string" }, "keep-previous": { type: "boolean" },
-  recommendation: { type: "string", multiple: true }
+  recommendation: { type: "string", multiple: true },
+  "hub-remote": { type: "string" }, "hub-handle": { type: "string" }, "hub-email": { type: "string" }, "ssh-command": { type: "string" }, "hub-root": { type: "string" }
 };
 export const stepContext = (values, ctx) => ({ ...ctx, values });
 // A step's header: the consent text and its state. done and skip never write; a failed check reads as not done.

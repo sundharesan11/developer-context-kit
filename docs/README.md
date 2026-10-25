@@ -15,6 +15,7 @@ Start with a disposable synthetic project. Move to the [live activation runbook]
 | How do I activate it on my machine? | [Live activation](LIVE.md) |
 | I set it up under the old devctx name. How do I move? | [Migrating from devctx](MIGRATING.md) |
 | How do I set up my personal profile, skill templates and announcement watch? | [Personal harness](HARNESS.md) |
+| How do I share lessons with colleagues through a hub? | [Organization hub](HUB.md) |
 | What works and what remains? | [Roadmap](ROADMAP.md) and [Limitations](LIMITATIONS.md) |
 
 ## Workflow and data contracts
@@ -23,6 +24,7 @@ Start with a disposable synthetic project. Move to the [live activation runbook]
 - [Handoff export](HANDOFF.md): selected private Markdown packets and disclosure limits.
 - [Agent protocol](AGENT-PROTOCOL.md): task context, proposals and advisory boundaries.
 - [Personal harness](HARNESS.md): personal profile, skill templates, announcement watch, drafts and what each sends.
+- [Organization hub](HUB.md): hub join, sync and leave, the hub sync job, identity and the trust model.
 - [Skill builder](SKILL-BUILDER.md): requirements, approvals, drafts and disposable installation.
 - [Skill sources](SKILL-SOURCES.md): catalog, acquisition, provenance and installation limits.
 - [Auth boundary](AUTH.md): secret references, connector gate and approval contract; fake providers only, no live connectors.

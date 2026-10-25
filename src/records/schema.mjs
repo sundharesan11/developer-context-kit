@@ -28,6 +28,8 @@ function glob(value) {
   const plain = value.replace(/[*?]/g, "x");
   try { assertSourceRel(plain); if (isDeniedRel(plain)) invalid(); } catch { invalid(); }
 }
+// Also validates the match block of a hub lesson (src/hubs/read.mjs).
+export function validateMatch(value) { return match(value); }
 function match(value) {
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !(key in MATCH_LIMITS))) invalid();
   const out = {};

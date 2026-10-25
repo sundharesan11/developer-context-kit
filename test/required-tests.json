@@ -536,5 +536,21 @@
   "setup terminal loop without a TTY refuses and points to the setup skill",
   "live write-classes previews, applies, clears and refuses a path outside the allowed shapes",
   "owner block denies live write-classes apply, owner setup steps and the setup loop from an agent shell",
-  "setup sandbox recommendations for a repository with a compose file include a container note and write nothing"
+  "setup sandbox recommendations for a repository with a compose file include a container note and write nothing",
+  "hub join then sync makes a colleague's lesson matchable",
+  "hub commit and push to a bare-repo fixture work with no global Git config",
+  "hub offline sync keeps the old clone and shows the last sync age",
+  "hub leave removes delivery and the job, and keeps personal copies",
+  "hub join refuses an HTTPS remote and remotes with a password",
+  "hub lesson committed as a symlink to a file outside the clone is refused and its target is not read",
+  "hub oversized note file is refused",
+  "hub with a newer schema version is read-only with a warning",
+  "hub second join for the same scope is refused",
+  "hub join apply without dialog approval writes nothing",
+  "owner dialog passes its text only as arguments",
+  "owner block denies hub join and hub leave from agent shells",
+  "hub-sync launchd plist runs hub sync every 10 minutes through the launchctl seam",
+  "hub outbox drain re-runs isolation and drops a stale note",
+  "hub two fixture machines exchange a lesson and a note through one bare repo with only the sync job running",
+  "setup hub-join and job-hub-sync steps join the hub and install the job through the owner dialog"
 ]

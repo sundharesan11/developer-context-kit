@@ -53,7 +53,18 @@ The approved write classes in a live config ([Live-mode exceptions](LIVE.md#live
 - Only `live write-classes` changes the classes, through a preview and an apply with its fingerprint. The new config passes every fence check before its digest is approved. The devtwin hook denies its `--apply` from an agent shell, as for the other owner actions.
 - The fence accepts a class path only when the caller names that class. A record, draft or onboarding write cannot reach a class path.
 - A disposable pilot can list classes too. Its file targets must have the same shapes inside a listed fake agent home, and its hub folders must be inside `pilotRoot`.
-- Only `agents install --hooks` and `agents uninstall --hooks` edit a class file, and only the `hookTargets` files. The shared edit step limits edits to developer-owned files to the devtwin marker block or devtwin's own JSON entries. The prior bytes are backed up byte for byte in the run folder first. The file is read without following links and checked again immediately before the replace, but the same-user residual race between that check and the rename remains.
+- Hub commands write only inside an approved `hubRoot` folder, and `hub schedule` writes only its own `devtwin.hub-sync.<scope>.plist` in `launchAgents`. `hub leave` deletes only the scope's clone folder and that plist.
+- Only `agents install --hooks`, `agents uninstall --hooks` and `hub schedule` edit a class file. The hook commands edit only the `hookTargets` files, and `hub schedule` only its plist. The shared edit step limits edits to developer-owned files to the devtwin marker block or devtwin's own JSON entries. The prior bytes are backed up byte for byte in the run folder first. The file is read without following links and checked again immediately before the replace, but the same-user residual race between that check and the rename remains.
+
+## Organization hubs
+
+The full guide is [HUB.md](HUB.md).
+
+- Hub identity rests on Git push access. Anyone with push access can add files under any handle, and devtwin does not verify the handle or the commit email. Agents show hub lessons as "claimed by" the handle. A tombstone removes a lesson only when its handle matches the lesson's author.
+- Hub remotes are SSH only. HTTPS, `git://`, `file://`, local paths, transport helpers and a password in the remote are refused. Hub Git calls allow only the SSH transport, keep global config, hooks and filters off, and pass the handle and email as per-command config.
+- Hub content is untrusted input. Clones keep symlinks off and use no submodules. Each hub file is read through the no-follow, regular-file, size-capped reader, and only when Git's index lists it as a regular file. File size, file count and JSON depth have caps. Lesson text reaches agents only as fenced, attributed data.
+- Outbound hub items pass the sensitive-content check and the all-scope name check before they are queued and again when they are pushed. devtwin never force-pushes.
+- `hub join`, `hub leave --apply` and `hub schedule --apply` are owner actions. The devtwin hook denies them from agent shells, and each shows a macOS dialog with the exact content. The dialog text reaches `osascript` only as arguments, never as script text. Without a desktop session, the dialog denies.
 
 ## Setup
 

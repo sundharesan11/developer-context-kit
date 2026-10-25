@@ -3,7 +3,7 @@
 // the devtwin-setup skill show the same consent screens. A step for a later phase is listed as "not available yet".
 // ctx: { roots, pilot, values, now, home, env, kitRoot }. values are the setup flags; each step reads only its own.
 import { join } from "node:path";
-import { existsSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { DevtwinError } from "../errors.mjs";
 import { agentDirsFor } from "../config/pilot.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
@@ -12,7 +12,7 @@ import { readRegistry } from "../config/registry.mjs";
 import { CODEX_TRUST_NOTE } from "../agents/hooks-install.mjs";
 import { receiptPath, receiptProblem, readPilotBytes } from "../hooks/receipt.mjs";
 import { readPersonalSnapshot, addPersonalRecord } from "../records/personal.mjs";
-import { personalRecordIdFor } from "../identity/ids.mjs";
+import { personalRecordIdFor, SCOPE_ID } from "../identity/ids.mjs";
 import { planSandbox, applySandbox, sandboxDone } from "./sandbox.mjs";
 
 const AGENTS = ["claude", "codex"];
@@ -196,6 +196,40 @@ const firstProject = {
   }
 };
 
+// U10: the hub steps. Without --hub-remote the scope stays in solo mode and the join step is skipped. Both are owner
+// steps: their apply shows the owner dialog, and the devtwin hook denies them from agent shells.
+const hubCmd = async () => (await import("../hubs/commands.mjs"));
+const HUB_FLAGS = [["hub-remote", "remote"], ["hub-handle", "handle"], ["hub-email", "email"], ["ssh-command", "ssh-command"], ["hub-root", "hub-root"]];
+const hubValues = (ctx) => ({ scope: ctx.values.scope, ...Object.fromEntries(HUB_FLAGS.filter(([flag]) => ctx.values[flag] !== undefined).map(([flag, key]) => [key, ctx.values[flag]])) });
+// The step header is synchronous, so it reads the small private binding file directly. Any problem reads as not joined.
+function hubBindingSync(ctx) {
+  try {
+    if (typeof ctx.values.scope !== "string" || !SCOPE_ID.test(ctx.values.scope)) return null;
+    const value = JSON.parse(readFileSync(join(ctx.roots.configRoot, "hubs", ctx.values.scope + ".json"), "utf8"));
+    return value?.status === "joined" ? value : null;
+  } catch { return null; }
+}
+const hubJoin = {
+  id: "hub-join", title: "Join an organization hub", available: true, owner: true,
+  skip: (ctx) => ctx.values["hub-remote"] || hubBindingSync(ctx) ? null : "solo mode: no --hub-remote given",
+  what: "Joins the organization hub at --hub-remote (SSH only) for --scope, with your --hub-handle and --hub-email, and an optional --ssh-command. Clones the hub into the approved hub root folder and records the note consent. Runs hub join.",
+  why: "A hub shares accepted lessons with colleagues' agents at the moment they touch an area. Without it, devtwin runs in solo mode.",
+  undo: "hub leave --scope <scope>, through preview and apply, revokes the note consent, removes the hub sync job, turns delivery off and deletes the clone. Personal records stay.",
+  plan: async (ctx) => (await hubCmd()).hubJoinCommand.run(hubValues(ctx), ctx),
+  apply: async (ctx, fingerprint) => (await hubCmd()).hubJoinCommand.run({ ...hubValues(ctx), apply: true, "plan-fingerprint": fingerprint }, ctx),
+  done: (ctx) => Boolean(hubBindingSync(ctx))
+};
+const jobHubSync = {
+  id: "job-hub-sync", title: "Scheduled job: hub sync", available: true, owner: true,
+  skip: (ctx) => hubBindingSync(ctx) ? null : "no hub joined for this scope",
+  what: "Installs a user LaunchAgent, devtwin.hub-sync.<scope>.plist, that runs hub sync every 10 minutes: fetch the hub, push the outbox, rebuild the lesson index. The plist path must be in the launchAgents write class. Runs hub schedule.",
+  why: "Keeps the hub clone current and posts queued notes and lessons, with its own consent and off switch.",
+  undo: "hub schedule --scope <scope> --off, through preview and apply, removes the job. Then notes and lesson updates stop until you run hub sync by hand.",
+  plan: async (ctx) => (await hubCmd()).hubScheduleCommand.run({ scope: ctx.values.scope }, ctx),
+  apply: async (ctx, fingerprint) => (await hubCmd()).hubScheduleCommand.run({ scope: ctx.values.scope, apply: true, "plan-fingerprint": fingerprint }, ctx),
+  done: (ctx) => hubBindingSync(ctx)?.jobs?.hubSync?.enabled === true
+};
+
 const sandbox = {
   id: "sandbox", title: "Sandbox recommendations", available: true,
   what: "Reads the project scan of --repo and recommends agent sandbox settings, and a container setup when the scan finds services. It writes no agent setting. Apply stores the recommendations you accept (--recommendation <id>; with none, all) as personal preference records.",
@@ -217,8 +251,8 @@ export const STEPS = Object.freeze([
   later("starter-templates", "Starter templates", "P4", "Will install starter output templates (U17).", "Templates give agents a shared shape for briefs, reviews and reports."),
   scope,
   firstProject,
-  later("hub-join", "Join an organization hub", "P3", "Will join an organization hub for lessons and notes (U10). Without it, devtwin runs in solo mode.", "A hub shares accepted lessons with colleagues' agents."),
-  later("job-hub-sync", "Scheduled job: hub sync", "P3", "Will schedule the hub sync job, with its own consent and off switch (U10).", "Keeps the hub clone current."),
+  hubJoin,
+  jobHubSync,
   later("job-radar", "Scheduled job: weekly radar", "P5", "Will schedule the weekly stack radar, with its own consent and off switch (U20).", "Tells you about relevant changes in your stack."),
   later("job-advisories", "Scheduled job: security advisories", "P5", "Will schedule the security advisory check, with its own consent and off switch (U20).", "Tells you about advisories for your stack."),
   later("job-review-reminder", "Scheduled job: monthly review reminder", "P5", "Will schedule the monthly setup review reminder, with its own consent and off switch (U20).", "Reminds you to review what devtwin keeps and does."),

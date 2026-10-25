@@ -85,7 +85,7 @@ test("owner block denies devtwin owner-only actions run directly from an agent s
     assert.match(out.permissionDecisionReason, /Ask your developer to run it themselves/);
     assert.doesNotMatch(result.out, /additionalContext/);
   }
-  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "hub join", "instructions apply", "lesson accept", "lesson copy", "live add-repo", "live init", "live migrate", "live set-kit", "live write-classes", "pref accept", "published delete", "record publish"]);
+  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson accept", "lesson copy", "live add-repo", "live init", "live migrate", "live set-kit", "live write-classes", "pref accept", "published delete", "record publish"]);
 });
 
 test("owner block denies owner-only actions through terminal wrappers", async (t) => {

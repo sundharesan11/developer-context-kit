@@ -74,7 +74,7 @@ export async function withPilotLock(roots, lockPath, owner, action, { destinatio
   return withLock(lockPath, owner, async () => { assertWritable(roots, [lockPath, ...destinations], { targetHome }); return action(); }, { waitMs });
 }
 // Locks an owner may release by hand after a crash. Each lives at stateRoot/locks/<name>.lock.
-export const RELEASABLE_LOCKS = ["install", "live"];
+export const RELEASABLE_LOCKS = ["install", "live", "hub-sync"];
 async function releaseState(roots, lock) {
   if (typeof lock !== "string" || !RELEASABLE_LOCKS.includes(lock)) throw new DevtwinError("INVALID_INPUT", "Unknown lock", { field: "lock", allowed: RELEASABLE_LOCKS });
   const path = join(roots.stateRoot, "locks", lock + ".lock");
