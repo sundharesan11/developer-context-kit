@@ -62,18 +62,29 @@ New records use schema 2. Readers accept schema 1 and 2, and a schema 1 record i
 
 ### Personal and org homes
 
-Personal and org records have their own homes. They need no registry entry or project binding. These homes are library functions in `src/records/personal.mjs`. No CLI command writes to them yet.
+Personal and org records have their own homes. They need no registry entry or project binding. These homes are library functions in `src/records/personal.mjs`. `lesson accept` with a general target and `lesson copy` read or write the personal home. No CLI command writes to the org home: the hub copy of a lesson is the organization's copy.
 
 - **Personal.** `dataRoot/personal/records/<record-id>/` holds records with `personal` reach and the kinds `lesson` and `preference`. Writes use `stateRoot/locks/personal_records.lock`.
 - **Org.** `dataRoot/scopes/<scope>/org/records/<record-id>/` holds `lesson` records with `org` reach for a scope that exists. Writes use the scope lock.
 - **Integrity.** Each home uses the project store's bundle rules. The reader recomputes the record ID from the home and request ID, and checks the reach, kind, body hash and body size. A record that fails is reported as corrupt. Writes are staged, fsynced and renamed into place. Supersession names each target with its expected record hash.
 - **Wrong reach.** Each home refuses a draft whose reach or kind does not belong there. The project store refuses any reach other than `project`.
 
+### Lesson proposals
+
+`lesson propose` writes one private file per proposal at `dataRoot/lesson-proposals/<prop_id>.json`. The folder is 0700 and each file is 0600. Writes use `stateRoot/locks/lesson_proposals.lock`.
+
+- **Content.** A proposal holds the session ID, the scope, the project or `null`, the lesson (title, do or don't line, body and `match` block), its `state` and its `review`. A new proposal has the state `pending` and the review `unreviewed`.
+- **ID.** The proposal ID is `prop_` and a digest of the session ID, scope, project and lesson. The same draft in the same session is one proposal.
+- **Cap.** One session ID has at most three proposals. Rejected and accepted proposals still count.
+- **Changes.** `lesson edit` replaces the file by atomic replace with a new `revision`. `lesson reject` and `lesson accept` set the state to `rejected` or `accepted` and keep the file. Accept records what it wrote in `outcome`.
+- **Machine only.** No command sends a proposal to a hub or another machine. Only `lesson accept` publishes a lesson, after the owner dialog.
+
 ### Isolation checks
 
 `src/records/isolation.mjs` holds the checks for text that leaves a scope or comes from another person.
 
 - **Outbound.** Text is checked for credential patterns, then for the names of every scope in the config. The names are the scope ID, the display name, each project ID, each binding root path and each remote host. A name matches only as a whole word, in any case. `github.com`, `gitlab.com`, `bitbucket.org` and any host found in two or more scopes are left out. A personal record is checked against every scope. An org record is checked against every other scope. A match fails with `ISOLATION`.
+- **Lessons.** `lesson propose`, `lesson edit` and `lesson accept` check the lesson against every scope but its own. A general target is also checked against its own scope. `lesson copy` checks against every scope but the target.
 - **Hub proposals.** A hub proposal keeps its own project check as a plain substring match. It is then checked against every other scope.
 - **Inbound.** Another person's text has control, format and bidi characters removed. Its body is capped at 2,400 bytes, about 600 tokens. It is then fenced and labelled as claimed by the author's handle.
 
@@ -81,7 +92,7 @@ Personal and org records have their own homes. They need no registry entry or pr
 
 `lesson index --scope <scope>` builds one index file per scope at `stateRoot/lessons/<scope>.json`. The folder is 0700 and the file is 0600. The file is written by atomic replace under `stateRoot/locks/lessons_<scope>.lock`.
 
-- **Sources.** The index reads the scope's project records, its org records and the personal store. It keeps only lessons and preferences that have a `match` block and an effective status of `observed` or `confirmed`. Superseded, proposed and disputed records are left out.
+- **Sources.** The index reads the scope's project records, its org records, the personal store and the hub clone of a joined scope. It keeps only lessons and preferences that have a `match` block and an effective status of `observed` or `confirmed`. Superseded, proposed and disputed records are left out.
 - **Entries.** Each entry holds the record ID, reach, scope, project, title, a one-line summary, the claimed author, the revisit date, the `match` block and the record hash.
 - **Path map.** The index also maps each bound root to its scope and project, with the root's Git common directory. A linked worktree resolves to its parent project through that directory.
 - **Fingerprint.** The `fingerprint` is the digest of the rest of the file. A rebuild writes only when the fingerprint changes, so the same records always give the same bytes.

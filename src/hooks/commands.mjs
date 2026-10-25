@@ -63,11 +63,15 @@ async function locate(stateRoot, cwd) {
   return hits.length ? { status: "bound", cwd: canonical, root, ...hits[0] } : { status: "unbound" };
 }
 const plural = (n, word) => n + " " + word + (n === 1 ? "" : "s");
-function startLine(found) {
+// U11 (KTD23): the session tag that `lesson propose --session` takes, so the three-proposal cap is per agent session.
+// It is derived from the session key, never the agent's raw session ID.
+export const sessionTag = (key) => "ses_" + key.slice(0, 24);
+function startLine(found, key) {
   if (found.status === "ambiguous") return "devtwin hook: this folder is bound in more than one scope, so lessons are off.";
-  if (found.status !== "bound") return "devtwin hook live: this folder is not a bound project.";
+  const session = " Session ID for lesson propose: " + sessionTag(key) + ".";
+  if (found.status !== "bound") return "devtwin hook live: this folder is not a bound project." + session;
   const count = found.index.entries.filter((e) => e.reach !== "project" || e.project === found.repo.project).length;
-  return "devtwin hook live: " + plural(count, "lesson") + " for " + found.repo.project + ". Index lines arrive when work matches.";
+  return "devtwin hook live: " + plural(count, "lesson") + " for " + found.repo.project + ". Index lines arrive when work matches." + session;
 }
 // The block an agent receives: the notice, at most four index lines per session and one overflow line at the cap.
 async function deliver(stateRoot, { agent, key, found, matches, now }) {
@@ -98,7 +102,7 @@ async function respond({ stateRoot, pilotPath, pilotBytes, agent, event, payload
   if (event === "SessionStart") pruneSessions(stateRoot, now);
   const found = await locate(stateRoot, payload.cwd);
   if (found.status === "ambiguous") logHook(stateRoot, { at, agent, event, code: "ambiguous-root" });
-  if (event === "SessionStart") return { text: startLine(found), lines: 0, overflow: 0, key };
+  if (event === "SessionStart") return { text: startLine(found, key), lines: 0, overflow: 0, key };
   if (found.status !== "bound") return null;
   const project = found.repo.project;
   let matches;
