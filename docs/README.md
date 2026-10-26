@@ -15,6 +15,7 @@ Start with a disposable synthetic project. Move to the [live activation runbook]
 | How do I activate it on my machine? | [Live activation](LIVE.md) |
 | I set it up under the old devctx name. How do I move? | [Migrating from devctx](MIGRATING.md) |
 | How do I set up my personal profile, skill templates and announcement watch? | [Personal harness](HARNESS.md) |
+| How do I turn on the weekly radar, advisory alerts and the review reminder? | [The radar](HARNESS.md#the-radar) and [Schedules](HARNESS.md#schedules) |
 | How do I share lessons with colleagues through a hub? | [Organization hub](HUB.md) |
 | What works and what remains? | [Roadmap](ROADMAP.md) and [Limitations](LIMITATIONS.md) |
 
@@ -23,7 +24,7 @@ Start with a disposable synthetic project. Move to the [live activation runbook]
 - [Storage](STORAGE.md): roots, immutable records, journals and failure recovery.
 - [Handoff export](HANDOFF.md): selected private Markdown packets and disclosure limits.
 - [Agent protocol](AGENT-PROTOCOL.md): task context, proposals and advisory boundaries.
-- [Personal harness](HARNESS.md): personal profile, skill templates, announcement watch, drafts and what each sends.
+- [Personal harness](HARNESS.md): personal profile, skill templates, announcement watch, the radar and its schedules, drafts and what each sends.
 - [Organization hub](HUB.md): hub join, sync and leave, the hub sync job, identity and the trust model.
 - [Skill builder](SKILL-BUILDER.md): requirements, approvals, drafts and disposable installation.
 - [Skill sources](SKILL-SOURCES.md): catalog, acquisition, provenance and installation limits.
@@ -52,6 +53,6 @@ Plans describe their milestone, not proof that every planned feature shipped. Us
 - [Live activation](plans/2026-10-16-001-feat-live-activation-plan.md)
 - [Personal harness template](plans/2026-10-16-001-feat-personal-harness-template-plan.md)
 - [Organization identity routing](plans/2026-10-17-001-feat-organization-identity-routing-plan.md): planned, not implemented.
-- [devtwin next phase](plans/2026-10-25-001-feat-devtwin-next-phase-plan.md): lessons, hooks, setup, hubs, preferences, release radar and onboarding. Phases P0 to P4 are implemented; P5 and P6 remain.
+- [devtwin next phase](plans/2026-10-25-001-feat-devtwin-next-phase-plan.md): lessons, hooks, setup, hubs, preferences, release radar and onboarding. Phases P0 to P5 are implemented; P6 remains.
 - [Skill-collection research](research/skill-collections.md): dated upstream observations, not a live compatibility guarantee.
 - Personal harness research: [context and memory](research/personal-harness/context-and-memory.md), [harness templates](research/personal-harness/harness-templates.md) and [starter skills](research/personal-harness/starter-skills.md).

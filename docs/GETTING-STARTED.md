@@ -103,7 +103,7 @@ Give `setup apply` the same flags as the plan that you approved, and that plan's
 | `scope`, `first-project` | Adds a scope and onboards one repository (`scope add`, `project onboard`). |
 | `sandbox` | Recommends agent sandbox settings and a container setup for `--repo`. It writes no agent setting. Accepted recommendations (`--recommendation <id>`) become personal preferences. |
 
-The starter templates, the hub join and the scheduled jobs show as "not available yet". Without a hub, devtwin runs in solo mode.
+The starter templates step shows as "not available yet". The scheduled radar, advisory and review steps are skipped until you approve their plist paths with `live write-classes --launch-agent`. Without a hub, devtwin runs in solo mode.
 
 The skill, hook and write class steps are owner actions. The devtwin hook denies their `setup apply` from an agent shell, so the agent shows you the plan and you run the apply in your own terminal.
 

@@ -110,6 +110,14 @@ Lessons, the agent hook and the organization hub add these:
 | `state/hubs/<hubId>/` | The outbox, the colleagues' notes cache, replacement notices and tombstone memory. |
 | `<hub root>/<scope>/` | The local clone of the hub, inside a hub root folder you approved. Not in the store. |
 
+The [radar and its schedules](/docs/guides/stack-watch/#the-radar) add these:
+
+| Path | Holds |
+| --- | --- |
+| `data/guides/radar/` or `data/scopes/<scope>/guides/radar/` | Radar guides: one "how to try this" note for each item you chose. |
+| `state/radar/` | The items of the latest digest (ID, catalog name, kind, date and links, no feed text) and the advisory alert memory. |
+| `state/schedule/` | Each job's flag in `jobs.json` and its last-run receipt in `receipts/<job>.json`. |
+
 ## Live mode layout
 
 In live mode, everything private lives under one folder in your home directory:
@@ -127,7 +135,7 @@ In live mode, everything private lives under one folder in your home directory:
 
 </FileTree>
 
-Outside this folder, live mode writes only `devtwin-*` skill folders inside `~/.claude/skills` and `~/.agents/skills`, and the exact paths you approved as [write classes](/docs/reference/configuration/#write-classes): hub clone folders, devtwin's own entries in the agent hook settings files, and its `devtwin.*.plist` files in `~/Library/LaunchAgents`. See [Live mode](/docs/guides/live-mode/).
+Outside this folder, live mode writes only `devtwin-*` skill folders inside `~/.claude/skills` and `~/.agents/skills`, and the exact paths you approved as [write classes](/docs/reference/configuration/#write-classes): hub clone folders, devtwin's own entries in the agent hook settings files, and its `devtwin.*.plist` files in `~/Library/LaunchAgents`. The hub sync and radar jobs use those plist files. See [Live mode](/docs/guides/live-mode/).
 
 ## Protection and its limits
 

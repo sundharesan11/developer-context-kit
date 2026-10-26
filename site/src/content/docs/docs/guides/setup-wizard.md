@@ -46,7 +46,7 @@ node "$KIT/bin/devtwin.mjs" setup apply --pilot "$LIVE_CONFIG" --step hook-verif
 | `job-hub-sync` | Installs the hub sync job (`hub schedule`). Skipped when the scope has no hub. | Yes |
 | `sandbox` | Recommends agent sandbox settings, and a container setup when the scan finds services. Writes no agent setting. | |
 
-Steps for later releases, such as starter output templates and the scheduled radar, advisories and review reminder, are listed as "not available yet" and write nothing.
+The starter output templates step is listed as "not available yet" and writes nothing. The scheduled radar, advisory and review reminder steps run `schedule apply` after the owner dialog. Each one is skipped, with the command to run, until its plist path is approved with `live write-classes --launch-agent`. The radar step also needs a stack approval, and the advisory step needs the radar job on.
 
 ### Starter preferences
 

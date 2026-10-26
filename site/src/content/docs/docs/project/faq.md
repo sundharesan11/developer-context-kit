@@ -13,7 +13,7 @@ Repository instruction files are shared with everyone who can read the repositor
 
 ## Does it send my code or context anywhere?
 
-No. devtwin has no hosted service, and most commands make no network request at all. The exceptions are commands you run on purpose: `stack check` and `stack digest` contact only the hosts you approved, and `skill-sources check`, `preview` and `stage` read public GitHub data. If you join an [organization hub](/docs/guides/organization-hub/), `hub sync` and the hub sync job talk to your organization's own Git remote over SSH. See [Network use](/docs/security/security-model/#network-use).
+No. devtwin has no hosted service, and most commands make no network request at all. The exceptions are commands and jobs you turn on yourself. `stack check`, `stack digest` and the radar jobs contact only the hosts you approved. `skill-sources check`, `preview` and `stage` read public GitHub data. If you join an [organization hub](/docs/guides/organization-hub/), `hub sync` and the hub sync job talk to your organization's own Git remote over SSH. See [Network use](/docs/security/security-model/#network-use).
 
 Your agent is a different matter: whatever you paste into a session, including a brief, may go to that agent's model provider.
 

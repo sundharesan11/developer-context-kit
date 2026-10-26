@@ -34,8 +34,8 @@ All current roots are explicitly configured inside a pilot. In live mode the pil
 | Root | Contents | Belongs in the reusable repository? |
 | --- | --- | --- |
 | `configRoot` | User preferences, the personal profile and its revisions, scopes, project bindings and registry | No |
-| `dataRoot` | Record bodies/metadata, private skill drafts, staged source files, handoff exports, stack digests and saved message drafts | No |
-| `stateRoot` | Locks, run receipts, journals, consumed approvals, and the stack approval, pending digests and seen state | No |
+| `dataRoot` | Record bodies/metadata, private skill drafts, staged source files, handoff exports, stack digests, radar guides and saved message drafts | No |
+| `stateRoot` | Locks, run receipts, journals, consumed approvals, the stack approval, pending digests and seen state, radar items and alert memory, and scheduled-job flags and receipts | No |
 | `inputsRoot` | Explicitly supplied pilot inputs, draft body files, seeded template files and optional local hub fixtures | No |
 | Toolkit checkout | CLI code, schemas, generic skills and skill templates, catalogs, tests and docs | Yes, after privacy and rights review |
 
@@ -55,7 +55,7 @@ A separate personal setup can eventually provide scheduling and approved integra
 
 ## Personal harness layer
 
-The [personal harness layer](HARNESS.md) makes the kit a clonable personal-harness template. A capped, versioned personal profile lives in `configRoot`. Three skill templates under `templates/skills/` become private skills through the skill builder's read-only `skill template-seed` and `skill template-verify` routes. A manual announcement watch (`stack plan`, `stack approve`, `stack check`, `stack digest`) fetches only from approved hosts and writes dated digests to `dataRoot`. `draft save` stores message drafts privately and never sends them. The clone itself holds none of this data; the package audit fails on tracked private state.
+The [personal harness layer](HARNESS.md) makes the kit a clonable personal-harness template. A capped, versioned personal profile lives in `configRoot`. Three skill templates under `templates/skills/` become private skills through the skill builder's read-only `skill template-seed` and `skill template-verify` routes. An announcement watch and radar (`stack plan`, `stack approve`, `stack check`, `stack digest`, `radar guide`) fetches only from approved hosts. It writes dated Markdown or HTML digests to `dataRoot`. The `schedule` jobs run it weekly, check advisories hourly and send a review reminder monthly. `draft save` stores message drafts privately and never sends them. The clone itself holds none of this data; the package audit fails on tracked private state.
 
 ## Optional company knowledge
 

@@ -103,12 +103,30 @@ A live config can hold an optional top-level `writeClasses` block. It names the 
 | `hubRoot` | Folders inside your home for hub clones. Writes are allowed in the folder and below it. | `hub join`, `hub sync`, `hub leave` |
 | `instructionTargets` | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`), `~/.codex/AGENTS.md`, and a `devtwin*.md` file directly in one of those folders. | No command yet |
 | `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) and `~/.codex/hooks.json`. | `agents install --hooks`, `agents uninstall --hooks` |
-| `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. | `hub schedule` |
+| `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. | `hub schedule`, `schedule apply`, `schedule off` |
 
 - Set the classes only with [`live write-classes`](/docs/reference/cli/#live-write-classes). The classes are part of the approved config digest, so a hand edit is refused with `DEVTWIN_GATE_REQUIRED`.
 - Every path must be canonical and inside your home. A link, or a path whose folder is a link, is refused. A hub root must not overlap the store, the kit, a listed repository, a skill folder or another hub root.
 - In a settings or instruction file, devtwin changes only its own JSON entries or the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. It backs up the exact prior bytes to `store/state/runs/<run_id>/backups/` first, and the file keeps its own mode.
 - A disposable pilot can list classes too. Its file targets must have the same shapes inside a listed `agentHomes` folder, and its hub roots must be inside `pilotRoot`.
+
+### Stack-watch exception
+
+The stack watch, the radar digests and the radar jobs fetch from the network. In live mode they run only under the `stackWatch` exception, a separate entry in `live.json` next to the write classes:
+
+```json
+"exceptions": { "stackWatch": { "hosts": ["api.github.com", "changelog.example.com"], "maxRequests": 30 } }
+```
+
+| Key | Meaning |
+| --- | --- |
+| `hosts` | Each host the watch may reach, at most 32. Every host in the stack approval must be in this list, or the run stops with `DEVTWIN_GATE_REQUIRED`, reason `host-not-in-exception`, before any request. |
+| `maxRequests` | The cap for one run, from 1 to 50. Default 30. One scheduled radar run fetches each source once for all scopes. |
+
+- Live requests send no credential.
+- Every live run is for one scope. Without `--scope`, `stack check` and `stack digest` stop with reason `scope-required`.
+- The exception is part of the approved config digest. Set it only with [`live stack-watch`](/docs/reference/cli/#live-stack-watch), never by hand. A disposable pilot cannot hold an exception.
+- A change to the exception makes the stack approval out of date. Run `stack plan` and `stack approve` again.
 
 ## Init preferences
 

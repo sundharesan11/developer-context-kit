@@ -21,6 +21,7 @@ A repository tells an agent what the code is. It rarely says why a decision was 
 | **Organization hub** | Join a Git repository your organization hosts to share accepted lessons with colleagues. Each publish shows you the exact text in a macOS dialog first. Short "working on" notes warn a colleague's agent when you change the same area. See [Organization hub](docs/HUB.md). |
 | **Organization identity routing** *(planned)* | Each scope binds its own GitHub and Slack accounts, and devtwin checks the live identity before acting. This is designed, not built yet; see the [roadmap](docs/ROADMAP.md). |
 | **Personal harness** | Clone it as a personal-harness template: a small private profile, skill templates you turn into your own private skills, and a watch on vendor announcements for your stack. See the [harness guide](docs/HARNESS.md). |
+| **Release radar** | A weekly digest, in Markdown or HTML, of releases in your stack, new agent tools, approaches and adjacent tech, ranked by your stack and interests. Each item can open a short "how to try this" guide. Hourly advisory checks notify you at once about an urgent fix, and each scheduled job has its own consent and off switch. See [the radar](docs/HARNESS.md#the-radar). |
 
 ## How it works
 

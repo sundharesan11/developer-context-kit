@@ -56,15 +56,15 @@ Commands that write follow one of three patterns:
 | Pattern | Commands |
 | --- | --- |
 | Preview, then `--apply` | `init`, `scope add`, `record add`, `record supersede`, `record propose`, `record publish`, `hub propose`, `lesson propose`, `lesson supersede-propose` |
-| Preview, then `--apply --plan-fingerprint <fp>` | `project onboard`, `live *`, `agents install/uninstall/recover`, `locks release`, `draft save`, `stack digest`, `lesson edit/reject/accept/copy`, `lesson notices --ack`, `hub join/leave/schedule`, `note revoke/consent`, `published delete` |
-| Preview command, then a separate apply command with `--plan-fingerprint` | `profile plan` → `profile apply`, `stack plan` → `stack approve`, `setup plan` → `setup apply` |
+| Preview, then `--apply --plan-fingerprint <fp>` | `project onboard`, `live *`, `agents install/uninstall/recover`, `locks release`, `draft save`, `stack digest`, `radar guide`, `schedule off`, `lesson edit/reject/accept/copy`, `lesson notices --ack`, `hub join/leave/schedule`, `note revoke/consent`, `published delete` |
+| Preview command, then a separate apply command with `--plan-fingerprint` | `profile plan` → `profile apply`, `stack plan` → `stack approve`, `setup plan` → `setup apply`, `schedule plan` → `schedule apply` |
 | No preview | `lesson index` and `hook verify` write only devtwin's own state. `hub sync` fetches and pushes items you already approved. |
 
 The skill builder and skill-source installers add separate recorded approvals; see their sections.
 
 ### Owner actions
 
-Some commands need you at the keyboard. When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson accept`, `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `lesson notices`, `note revoke`, `note consent`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` is always denied; its preview is `instructions plan`. Most hub and lesson owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
+Some commands need you at the keyboard. When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson accept`, `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most hub and lesson owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
 
 ### Identifiers
 
@@ -229,6 +229,24 @@ node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" \
 
 The preview shows each class `from` and `to` and the config digest before and after. A path with the wrong shape fails with `DEVTWIN_GATE_REQUIRED`; a request that changes nothing fails with `DEVTWIN_INVALID_INPUT`.
 
+### `live stack-watch`
+
+**Owner** with `--apply`. Sets the `stackWatch` [live-mode exception](/docs/reference/configuration/#stack-watch-exception): the hosts the stack watch and the radar may reach in live mode, and a request cap for one run. See [Stack watch and radar](/docs/guides/stack-watch/#live-mode).
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. The live config. |
+| `--host <host>` | A host the watch may reach. Repeatable, at most 32. The flags replace the whole list. |
+| `--max-requests <n>` | The cap for one run, from 1 to 50. Default 30. |
+| `--off` | Remove the exception. |
+| `--apply --plan-fingerprint <fp>` | Write. |
+
+```sh
+node "$KIT/bin/devtwin.mjs" live stack-watch --pilot "$LIVE_CONFIG" --host api.github.com --host changelog.example.com
+```
+
+Take the hosts from the `hosts` list of `stack plan`. After a change, run `stack plan` and `stack approve` again.
+
 ## Projects and context
 
 ### `project onboard`
@@ -391,6 +409,8 @@ Previews a new profile revision. Writes nothing.
 | `--writing <key>=<value>` | `tone`, `greeting`, `signOff`, `length`, `spelling`, `avoidPhrases` or `formality.<audience>`. Repeatable. |
 | `--seed-from-init` | Fill unset preferences from `init`. |
 | `--proposed-by <agent\|user>` | Who proposed the values. Default `user`. |
+| `--interest <term>[:weak\|:strong]` | A [radar](/docs/guides/stack-watch/#interests-and-ranking) interest. Repeatable. |
+| `--radar-format <md\|html>` | The default digest format. |
 
 ```sh
 devtwin profile plan --pilot "$PILOT" --work 'Backend services' --stack-current 'node=>=22:high'
@@ -415,7 +435,7 @@ Suggests stack entries from a scope's onboarded projects, with citations. Writes
 
 ## Stack watch
 
-See [Stack watch](/docs/guides/stack-watch/). `stack check` and `stack digest` refuse a live config.
+See [Stack watch and radar](/docs/guides/stack-watch/). With a live config, `stack check` and `stack digest` need the [`stackWatch` exception](#live-stack-watch) and `--scope`.
 
 ### `stack plan`
 
@@ -424,7 +444,7 @@ Lists watched items, sources and every host that would be contacted. No network,
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
-| `--with <group>` | `advisories`, `lifecycle` or `versions`. Repeatable. |
+| `--with <group>` | `advisories`, `lifecycle`, `versions` or `radar`. Repeatable. |
 | `--feed <name>=<https URL>` | Add a feed for a declared item. Repeatable. |
 | `--map <name>=<kind>:<id>` | Add a GitHub, endoflife.date or package identifier. Repeatable. |
 | `--clear-overrides` | Drop carried-forward overrides. |
@@ -453,8 +473,65 @@ Preview runs the watch and writes a pending file; apply writes the dated digest 
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
-| `--scope <id>` | Optional. |
+| `--scope <id>` | Optional. Required in live mode. |
+| `--format <md\|html>` | The digest format. Default: the profile's radar format, else `md`. |
 | `--apply --plan-fingerprint <fp>` | Write the digest. |
+
+### `radar guide`
+
+Previews a "how to try this" note for one radar item of the scope's latest applied digest. With `--apply`, writes it under `guides/radar/`. Makes no request.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--scope <id>` | Optional. The scope of the digest. |
+| `--item <id>` | Required. The 12-character `item` value in the digest. |
+| `--apply --plan-fingerprint <fp>` | Write the guide. |
+
+```sh
+devtwin radar guide --pilot "$PILOT" --scope acme --item 0123456789ab
+```
+
+## Schedules
+
+Three jobs run the radar: `radar-weekly`, `advisory-hourly` and `review-monthly`. Each is a user LaunchAgent. See [Schedules](/docs/guides/stack-watch/#schedules).
+
+### `schedule plan`
+
+Shows the LaunchAgent path, the command it runs and the off switch for one job. Writes nothing.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--job <job>` | Required. `radar-weekly`, `advisory-hourly` or `review-monthly`. |
+
+### `schedule apply`
+
+**Owner**. Shows the owner dialog, writes the plist and loads it. The radar and advisory jobs need a stack approval. The advisory job also needs the radar job on and the `advisories` group.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--job <job>` | Required. |
+| `--plan-fingerprint <fp>` | Required. From `schedule plan`. |
+
+### `schedule off`
+
+Unloads the job and removes its plist. Turning off `radar-weekly` also turns off `advisory-hourly`. **Owner** with `--apply`.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--job <job>` | Required. |
+| `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |
+
+### `schedule status`
+
+Reports, for each job, whether it is on, installed and loaded, and its last run. Makes no request. Takes `--pilot`.
+
+### `schedule run`
+
+The command the LaunchAgent runs. Takes `--pilot` and `--job`. It checks the live gate, the job's flag and its last-run receipt before any request. A job that is off writes nothing, and a run inside the job's period is skipped.
 
 ## Drafts
 

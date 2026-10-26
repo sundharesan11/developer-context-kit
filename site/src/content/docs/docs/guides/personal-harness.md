@@ -11,7 +11,7 @@ This guide covers three pieces:
 2. The **`devtwin-setup`** skill: a short, guided first run that writes the profile.
 3. **Skill templates**: generic starting points you render into your own private skills.
 
-The [stack watch](/docs/guides/stack-watch/) uses the profile's stack and has its own guide.
+The [stack watch and radar](/docs/guides/stack-watch/) use the profile's stack and interests and have their own guide.
 
 :::note
 The personal profile is unrelated to the **client profile**, which is the per-project record onboarding generates.
@@ -34,6 +34,8 @@ The profile holds only these fields. Every field is optional.
 | `workingPreferences.notes` | `--preference 'notes=…'` (repeat) | Up to 10 lines |
 | `stackCurrent` | `--stack-current '<entry>'` (repeat) | Up to 40 entries |
 | `stackKnown` | `--stack-known '<entry>'` (repeat) | Up to 40 entries |
+| `radar.interests` | `--interest '<term>[:weak\|:strong]'` (repeat) | Up to 30 terms. They rank [radar](/docs/guides/stack-watch/#interests-and-ranking) items. |
+| `radar.format` | `--radar-format <md\|html>` | The default digest format |
 | `writing.*` | `--writing 'key=value'` (repeat) | `tone`, `greeting`, `signOff`, `length` (`short`/`medium`/`long`), `spelling` (such as `en-GB`), `avoidPhrases`, and `formality.<audience>` (`formal`/`neutral`/`casual`) |
 
 A stack entry is `name[=version][:care]`, where care is `low`, `normal` or `high`. For example `node=>=22:high` or just `react`.
@@ -206,7 +208,7 @@ The body file must be under `inputsRoot`. With `--scope` the draft goes to `data
 
 ## Agents and approval
 
-Agents apply only after you approve the exact preview in the session. That covers `profile apply`, `stack approve`, `stack digest --apply`, `draft save --apply` and writing seeded template files. A fingerprint the agent reads back to the CLI is not your consent.
+Agents apply only after you approve the exact preview in the session. That covers `profile apply`, `stack approve`, `stack digest --apply`, `radar guide --apply`, `draft save --apply` and writing seeded template files. Agents never run `schedule apply`, `schedule off --apply` or `live stack-watch --apply`: the devtwin hook denies them. A fingerprint the agent reads back to the CLI is not your consent.
 
 ## Where your personal data lives
 
@@ -215,6 +217,9 @@ Agents apply only after you approve the exact preview in the session. That cover
 | Personal profile and revisions | `configRoot/profile/` |
 | Stack approval, pending digests, seen state | `stateRoot/stack/` |
 | Digests | `dataRoot/digests/stack/` or `dataRoot/scopes/<scope>/digests/stack/` |
+| Radar guides | `dataRoot/guides/radar/` or `dataRoot/scopes/<scope>/guides/radar/` |
+| Items of the latest digest and advisory alert memory | `stateRoot/radar/` |
+| Job flags and last-run receipts | `stateRoot/schedule/` |
 | Drafts | `dataRoot/drafts/` or `dataRoot/scopes/<scope>/drafts/` |
 | Seeded template files | a directory under `inputsRoot` |
 | Skill workspaces | `dataRoot/personal/skill-workspaces/` (or under a scope) |
