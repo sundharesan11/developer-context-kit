@@ -11,7 +11,7 @@ import { LEGACY_SKILL_PREFIX, LEGACY_DEFAULT_ROOTS } from "./legacy.mjs";
 // The running kit. Tests inject context.kitRoot; production derives it from this file.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const members = ["configRoot", "dataRoot", "stateRoot", "inputsRoot"];
-const keys = ["schemaVersion", "pilotRoot", ...members, "agentHomes", "repos", "forbidden", "live", "writeClasses"];
+const keys = ["schemaVersion", "pilotRoot", ...members, "agentHomes", "repos", "forbidden", "live", "writeClasses", "exceptions"];
 const liveKeys = ["configId", "home", "skillDirs", "kitRoot", "kitCommit"];
 // Skill folders sit inside these protected homes; only the exact named folder is carved out, never the home.
 const SKILL_PARENTS = ["real-claude-home", "real-agents-home", "CLAUDE_CONFIG_DIR"];
@@ -19,6 +19,12 @@ const SKILL_PARENTS = ["real-claude-home", "real-agents-home", "CLAUDE_CONFIG_DI
 export const WRITE_CLASSES = ["hubRoot", "instructionTargets", "hookTargets", "launchAgents"];
 const FILE_CLASSES = WRITE_CLASSES.slice(1);
 const MAX_CLASS_PATHS = 16;
+// U18 (KTD16): live-mode exceptions that are not file paths. stackWatch lets the stack watch and the radar fetch from
+// the listed hosts only, unauthenticated, with at most maxRequests requests in one run. GitHub allows 60
+// unauthenticated requests an hour, so the cap stays below that.
+export const EXCEPTIONS = ["stackWatch"];
+export const STACK_WATCH_MAX_REQUESTS = 50;
+const HOST = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const OWNED_INSTRUCTIONS = /^devtwin[a-z0-9._-]{0,64}\.md$/;
 const LAUNCH_AGENT = /^devtwin\.[a-z0-9][a-z0-9.-]{0,95}\.plist$/;
 const fail = (field, protectedLabel) => { throw new DevtwinError("GATE_REQUIRED", "Pilot fence refused path", { field, ...(protectedLabel ? { protected: protectedLabel } : {}) }); };
@@ -91,6 +97,17 @@ function validateClasses(pilot, context) {
   }
   return files;
 }
+function validateExceptions(pilot) {
+  const exceptions = pilot.exceptions;
+  if (exceptions === undefined) return;
+  if (!pilot.live || !isObject(exceptions) || !Object.keys(exceptions).length || Object.keys(exceptions).some((key) => !EXCEPTIONS.includes(key))) fail("exceptions");
+  const watch = exceptions.stackWatch;
+  if (watch === undefined) return;
+  if (!isObject(watch) || Object.keys(watch).sort().join(",") !== "hosts,maxRequests") fail("exceptions.stackWatch");
+  const { hosts, maxRequests } = watch;
+  if (!Array.isArray(hosts) || !hosts.length || hosts.length > 32 || new Set(hosts).size !== hosts.length || hosts.some((host) => typeof host !== "string" || !HOST.test(host))) fail("exceptions.stackWatch.hosts");
+  if (!Number.isInteger(maxRequests) || maxRequests < 1 || maxRequests > STACK_WATCH_MAX_REQUESTS) fail("exceptions.stackWatch.maxRequests");
+}
 function validateLive(pilot, context) {
   const live = pilot.live;
   if (!isObject(live) || Object.keys(live).some((key) => !liveKeys.includes(key))) fail("live");
@@ -123,6 +140,7 @@ function validate(pilot, context, allowInternal = false) {
   for (const key of ["pilotRoot", ...members]) if (typeof pilot[key] !== "string") fail(key);
   for (const key of ["agentHomes", "repos", "forbidden"]) if (!Array.isArray(pilot[key]) || pilot[key].some((item) => typeof item !== "string")) fail(key);
   const skills = Object.hasOwn(pilot, "live") ? validateLive(pilot, context) : [];
+  validateExceptions(pilot);
   const files = validateClasses(pilot, context), hubs = (pilot.writeClasses?.hubRoot ?? []).map((path) => ["writeClasses.hubRoot", path]);
   const ps = protectedPaths(context);
   validateRoot(pilot.pilotRoot, "pilotRoot");

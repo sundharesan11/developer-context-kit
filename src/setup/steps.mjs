@@ -230,6 +230,32 @@ const jobHubSync = {
   done: (ctx) => hubBindingSync(ctx)?.jobs?.hubSync?.enabled === true
 };
 
+// U20: the radar, advisory and review jobs, through schedule plan and schedule apply (owner steps, like hub sync).
+const scheduleCmd = () => import("../schedule/commands.mjs");
+const jobEnabled = (ctx, job) => { try { return JSON.parse(readFileSync(join(ctx.roots.stateRoot, "schedule", "jobs.json"), "utf8")).jobs?.[job]?.enabled === true; } catch { return false; } };
+const stackApproved = (ctx) => existsSync(join(ctx.roots.stateRoot, "stack", "approval.json"));
+// A job whose plist is not an approved launchAgents path is skipped with the command that approves it.
+const plistApproved = (ctx, job) => (ctx.roots.pilot?.writeClasses?.launchAgents ?? []).some((path) => path.endsWith("/devtwin." + job + ".plist"));
+const jobStep = (id, job, title, what, why, skip) => ({
+  id, title, available: true, owner: true, what, why,
+  skip: (ctx) => plistApproved(ctx, job) ? skip(ctx) : "launch agent not approved; run live write-classes --launch-agent ~/Library/LaunchAgents/devtwin." + job + ".plist",
+  undo: "schedule off --job " + job + ", through preview and apply, unloads the job and removes its plist." + (job === "radar-weekly" ? " It turns off the advisory job too." : ""),
+  plan: async (ctx) => (await scheduleCmd()).schedulePlanCommand.run({ job }, ctx),
+  apply: async (ctx, fingerprint) => (await scheduleCmd()).scheduleApplyCommand.run({ job, "plan-fingerprint": fingerprint }, ctx),
+  done: (ctx) => jobEnabled(ctx, job)
+});
+const jobRadar = jobStep("job-radar", "radar-weekly", "Scheduled job: weekly radar",
+  "Installs a user LaunchAgent, devtwin.radar-weekly.plist, that writes one digest for each scope once a week and shows a short notification. The plist path must be in the launchAgents write class. Runs schedule apply.",
+  "Tells you about relevant changes in your stack, new agent tools and ideas, without a manual run.",
+  (ctx) => stackApproved(ctx) ? null : "no stack approval; run stack plan --with radar, then stack approve");
+const jobAdvisories = jobStep("job-advisories", "advisory-hourly", "Scheduled job: security advisories",
+  "Installs devtwin.advisory-hourly.plist, which checks security advisories for your stack every hour. An urgent advisory shows a notification at once, at most three a day. Runs schedule apply.",
+  "Tells you at once about an urgent fix for a package in your stack.",
+  (ctx) => !stackApproved(ctx) ? "no stack approval with the advisories group" : jobEnabled(ctx, "radar-weekly") ? null : "turn on the weekly radar job first");
+const jobReview = jobStep("job-review-reminder", "review-monthly", "Scheduled job: monthly review reminder",
+  "Installs devtwin.review-monthly.plist, which shows a monthly reminder with a count of waiting preference and lesson proposals. It makes no request. Runs schedule apply.",
+  "Reminds you to review what devtwin keeps and does.", () => null);
+
 const sandbox = {
   id: "sandbox", title: "Sandbox recommendations", available: true,
   what: "Reads the project scan of --repo and recommends agent sandbox settings, and a container setup when the scan finds services. It writes no agent setting. Apply stores the recommendations you accept (--recommendation <id>; with none, all) as personal preference records.",
@@ -253,9 +279,9 @@ export const STEPS = Object.freeze([
   firstProject,
   hubJoin,
   jobHubSync,
-  later("job-radar", "Scheduled job: weekly radar", "P5", "Will schedule the weekly stack radar, with its own consent and off switch (U20).", "Tells you about relevant changes in your stack."),
-  later("job-advisories", "Scheduled job: security advisories", "P5", "Will schedule the security advisory check, with its own consent and off switch (U20).", "Tells you about advisories for your stack."),
-  later("job-review-reminder", "Scheduled job: monthly review reminder", "P5", "Will schedule the monthly setup review reminder, with its own consent and off switch (U20).", "Reminds you to review what devtwin keeps and does."),
+  jobRadar,
+  jobAdvisories,
+  jobReview,
   sandbox
 ].map((step) => Object.freeze(step)));
 export const OWNER_STEPS = Object.freeze(STEPS.filter((step) => step.owner === true).map((step) => step.id));

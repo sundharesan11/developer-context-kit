@@ -5,7 +5,7 @@ description: {{dck:skill-description}}
 
 # Watch announcements for my stack
 
-Check vendor announcements and SDK releases for the stack declared in the personal profile, from approved sources only, and summarize what was fetched. The user plans to run this {{dck:digest-cadence}}; every run is manual and nothing is scheduled. `stack plan` and `stack check` write nothing. `stack approve` and `stack digest --apply` write, and only after explicit approval from the user in the session.
+Check vendor announcements and SDK releases for the stack declared in the personal profile, from approved sources only, and summarize what was fetched. The user plans to run this {{dck:digest-cadence}}. This skill runs the watch only when the user asks. The scheduled radar jobs are separate, and only the user turns them on, with `schedule apply`. `stack plan` and `stack check` write nothing. `stack approve` and `stack digest --apply` write, and only after explicit approval from the user in the session.
 
 ## When to use
 

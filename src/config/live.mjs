@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DevtwinError } from "../errors.mjs";
-import { checkLiveConfig, loadPilot, rootsFromPilot, recordApprovedDigest, approvedDigestPath, skillDirsFor, WRITE_CLASSES } from "./pilot.mjs";
+import { checkLiveConfig, loadPilot, rootsFromPilot, recordApprovedDigest, approvedDigestPath, skillDirsFor, WRITE_CLASSES, STACK_WATCH_MAX_REQUESTS } from "./pilot.mjs";
 import { canonicalJson } from "../storage/canonical.mjs";
 import { ensureRoots, validateRoot } from "./roots.mjs";
 import { info, checkNode, ensurePrivateDir, writeNewFile, atomicReplace, fsyncDir } from "../storage/fsx.mjs";
@@ -13,7 +13,7 @@ import { gitQuery } from "../identity/git.mjs";
 // The running kit. Tests inject ctx.kitRoot; production derives it from this file, as pilot.mjs does.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const AGENTS = ["claude", "codex"];
-export const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live", "writeClasses"];
+export const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live", "writeClasses", "exceptions"];
 const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 // Stands in for the config ID while a new config is validated; apply draws the real ID once.
 const PENDING_ID = "cfg_pending0000";
@@ -161,6 +161,25 @@ const editWriteClasses = ({ set, clear }) => (before, pilot) => {
   if (canonicalJson(writeClasses ?? null) === canonicalJson(before.writeClasses ?? null)) invalid("writeClasses");
   return setWriteClasses(writeClasses)(before, pilot);
 };
+// U18: the stack-watch exception. --host names each host the watch may reach; --off removes the exception.
+export const STACK_WATCH_DEFAULT_REQUESTS = 30;
+export const STACK_WATCH_NOTE = "With this exception, stack check, stack digest and the radar jobs run in live mode. They reach only these hosts, send no credential and make at most the listed number of requests in one run.";
+const setStackWatch = ({ hosts = [], maxRequests, off = false }) => (before) => {
+  const from = before.exceptions?.stackWatch ?? null;
+  let to = null;
+  if (off) { if (!from || hosts.length || maxRequests !== undefined) invalid("stackWatch"); }
+  else {
+    const cap = maxRequests === undefined ? STACK_WATCH_DEFAULT_REQUESTS : /^[0-9]{1,3}$/.test(String(maxRequests)) ? Number(maxRequests) : NaN;
+    if (!Number.isInteger(cap) || cap < 1 || cap > STACK_WATCH_MAX_REQUESTS) invalid("max-requests");
+    if (!hosts.length) invalid("host");
+    to = { hosts: sorted(hosts.map((host) => String(host).toLowerCase())), maxRequests: cap };
+    if (canonicalJson(to) === canonicalJson(from)) invalid("stackWatch");
+  }
+  const rest = { ...(before.exceptions ?? {}) };
+  delete rest.stackWatch;
+  const exceptions = to ? { ...rest, stackWatch: to } : Object.keys(rest).length ? rest : undefined;
+  return { after: { ...before, exceptions }, details: { stackWatch: { from, to }, note: STACK_WATCH_NOTE } };
+};
 const preview = async (promise) => ({ preview: true, ...(await promise) });
 export const planLiveAddRepo = (input, ctx) => preview(planChange("live-add-repo", input, ctx, addRepo(input.repo)).then((r) => r.plan));
 export const applyLiveAddRepo = (input, ctx, options) => applyChange("live-add-repo", input, ctx, addRepo(input.repo), undefined, options);
@@ -171,3 +190,5 @@ export const planLiveSetWriteClasses = (input, ctx) => preview(planChange("live-
 export const applyLiveSetWriteClasses = (input, ctx, options) => applyChange("live-set-write-classes", input, ctx, setWriteClasses(input.writeClasses), undefined, options);
 export const planLiveEditWriteClasses = (input, ctx) => preview(planChange("live-set-write-classes", input, ctx, editWriteClasses(input)).then((r) => r.plan));
 export const applyLiveEditWriteClasses = (input, ctx, options) => applyChange("live-set-write-classes", input, ctx, editWriteClasses(input), undefined, options);
+export const planLiveStackWatch = (input, ctx) => preview(planChange("live-stack-watch", input, ctx, setStackWatch(input)).then((r) => r.plan));
+export const applyLiveStackWatch = (input, ctx, options) => applyChange("live-stack-watch", input, ctx, setStackWatch(input), undefined, options);

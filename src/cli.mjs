@@ -27,6 +27,7 @@ export const COMMANDS = {
   "live add-repo": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveAddRepoCommand },
   "live set-kit": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveSetKitCommand },
   "live write-classes": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveWriteClassesCommand },
+  "live stack-watch": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveStackWatchCommand },
   "live migrate": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveMigrateCommand },
   "record add": { load: async () => (await import("./records/commands.mjs")).recordAddCommand },
   "record supersede": { load: async () => (await import("./records/commands.mjs")).recordSupersedeCommand },
@@ -62,6 +63,7 @@ export const COMMANDS = {
   "stack approve": { load: async () => (await import("./stack/commands.mjs")).stackApproveCommand },
   "stack check": { load: async () => (await import("./stack/commands.mjs")).stackCheckCommand },
   "stack digest": { load: async () => (await import("./stack/commands.mjs")).stackDigestCommand },
+  "radar guide": { load: async () => (await import("./stack/commands.mjs")).radarGuideCommand },
   "draft save": { load: async () => (await import("./drafts/commands.mjs")).draftSaveCommand },
   "context resolve": { load: async () => (await import("./context/commands.mjs")).contextResolveCommand },
   "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand },
@@ -92,6 +94,12 @@ export const COMMANDS = {
   "hub leave": { load: async () => (await import("./hubs/commands.mjs")).hubLeaveCommand },
   "hub status": { load: async () => (await import("./hubs/commands.mjs")).hubStatusCommand },
   "hub schedule": { load: async () => (await import("./hubs/commands.mjs")).hubScheduleCommand },
+  "schedule plan": { load: async () => (await import("./schedule/commands.mjs")).schedulePlanCommand },
+  "schedule apply": { load: async () => (await import("./schedule/commands.mjs")).scheduleApplyCommand },
+  "schedule off": { load: async () => (await import("./schedule/commands.mjs")).scheduleOffCommand },
+  "schedule status": { load: async () => (await import("./schedule/commands.mjs")).scheduleStatusCommand },
+  // The LaunchAgent's own route: it loads the pilot itself, so a failing live gate still records a failed receipt.
+  "schedule run": { rootOptions: false, liveConfig: true, load: async () => (await import("./schedule/commands.mjs")).scheduleRunCommand },
   "published list": { load: async () => (await import("./hubs/commands.mjs")).publishedListCommand },
   "published delete": { load: async () => (await import("./hubs/commands.mjs")).publishedDeleteCommand },
   "skill workspace-create": { load: async () => (await import("./skill-builder/commands.mjs")).workspaceCreateCommand },
@@ -125,8 +133,9 @@ export async function main(argv, options = {}) {
   // stackCatalog, resolvePublicRead, request and lookup are seams for the stack routes; routing will supply the real
   // resolver. Without request and lookup, stack check uses node:https pinned to the checked address (src/stack/fetch.mjs).
   // stdin carries the agent payload for the hook route: a stream in production, a string in tests.
+  // notifier is the seam for desktop notifications (src/schedule/notify.mjs).
   // ownerDialog and launchctl are seams for the owner dialog (src/owner/dialog.mjs) and launchd (src/schedule/launchd.mjs).
-  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot, ownerDialog, launchctl } = options;
+  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot, ownerDialog, launchctl, notifier } = options;
   let command = argv.slice(0, 2).join(" ");
   try {
     const routed = routeFor(argv);
@@ -173,6 +182,7 @@ export async function main(argv, options = {}) {
     if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
     // --body-file - reads the lesson body from stdin.
     if (command === "lesson propose" || command === "lesson edit" || command === "lesson supersede-propose") context.stdin = stdin;
+    if (command.startsWith("schedule ")) Object.assign(context, { notifier, stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (command.startsWith("stack ")) Object.assign(context, { stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (COMMANDS[command].interactive === true) return await impl.run(values, { ...context, stdin, stdout });
     const result = await impl.run(values, context);

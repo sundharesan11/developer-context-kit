@@ -52,6 +52,14 @@ export const liveWriteClassesCommand = {
     return values.apply ? (await live()).applyLiveEditWriteClasses(input, ctx) : (await live()).planLiveEditWriteClasses(input, ctx);
   }
 };
+// U18: the stack-watch live-mode exception (docs/LIVE.md). Preview, then --apply with the plan fingerprint.
+export const liveStackWatchCommand = {
+  options: { ...liveOptions, host: { type: "string", multiple: true }, "max-requests": { type: "string" }, off: { type: "boolean" } },
+  async run(values, ctx) {
+    const input = liveInput(values, { hosts: asList(values.host), maxRequests: values["max-requests"], off: values.off === true });
+    return values.apply ? (await live()).applyLiveStackWatch(input, ctx) : (await live()).planLiveStackWatch(input, ctx);
+  }
+};
 // Copies a live setup made under the former devctx name to a new live config folder. --pilot names the new live config,
 // --from the legacy one. It runs from the new kit; see docs/MIGRATING.md.
 export const liveMigrateCommand = {

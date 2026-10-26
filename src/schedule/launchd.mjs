@@ -50,8 +50,8 @@ export function defaultLaunchctl(args) {
   const r = spawnSync("/bin/launchctl", args, { encoding: "utf8", timeout: 15000, killSignal: "SIGKILL" });
   return { status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
-const launchctlOf = (ctx) => typeof ctx?.launchctl === "function" ? ctx.launchctl : defaultLaunchctl;
-const domain = () => "gui/" + process.getuid();
+export const launchctlOf = (ctx) => typeof ctx?.launchctl === "function" ? ctx.launchctl : defaultLaunchctl;
+export const domain = () => "gui/" + process.getuid();
 // Writes the plist through the owned-file edit (backup record, atomic replace, mode 0600) and loads it.
 export async function installJob(roots, ctx, { label, programArguments, interval, now = () => new Date() }) {
   const path = launchAgentPath(roots, label), content = renderPlist({ label, programArguments, interval });

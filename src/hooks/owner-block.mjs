@@ -17,7 +17,9 @@ export const OWNER_ACTIONS = Object.freeze([
   { words: ["live", "migrate"], apply: true }, { words: ["record", "publish"], apply: true },
   { words: ["agents", "install"], apply: true }, { words: ["agents", "uninstall"], apply: true },
   { words: ["live", "set-kit"], apply: true }, { words: ["live", "add-repo"], apply: true }, { words: ["live", "init"], apply: true },
-  { words: ["live", "write-classes"], apply: true }, { words: ["hub", "leave"], apply: true }, { words: ["hub", "schedule"], apply: true },
+  { words: ["live", "write-classes"], apply: true }, { words: ["live", "stack-watch"], apply: true }, { words: ["hub", "leave"], apply: true }, { words: ["hub", "schedule"], apply: true },
+  // U20: turning a scheduled job on or off. schedule apply is itself the apply; its preview is schedule plan.
+  { words: ["schedule", "apply"] }, { words: ["schedule", "off"], apply: true },
   // U12: acknowledging a replacement notice; an agent may list the notices but not hide them from its developer.
   { words: ["lesson", "notices"], apply: true },
   // U13: stopping or granting the standing note consent.
@@ -26,7 +28,7 @@ export const OWNER_ACTIONS = Object.freeze([
 // U9: setup steps whose apply runs an owner action above (src/setup/steps.mjs marks them owner: true). "setup apply"
 // naming one of them is denied, and so is the "setup" terminal loop, which can apply them. setup status, setup plan
 // and setup apply for any other step stay allowed.
-export const OWNER_SETUP_STEPS = Object.freeze(["skills-claude", "skills-codex", "write-classes-hooks", "hooks-claude", "hooks-codex", "hub-join", "job-hub-sync"]);
+export const OWNER_SETUP_STEPS = Object.freeze(["skills-claude", "skills-codex", "write-classes-hooks", "hooks-claude", "hooks-codex", "hub-join", "job-hub-sync", "job-radar", "job-advisories", "job-review-reminder"]);
 const SETUP_READS = ["status", "plan", "apply"];
 function setupAction(words) {
   if (!words.includes("setup")) return null;

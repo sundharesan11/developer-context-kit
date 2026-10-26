@@ -5,6 +5,6 @@
   "placeholders": [
     { "key": "skill-name", "description": "Name of your new skill, lowercase words joined by hyphens. It cannot use the reserved kit prefix or match a bundled skill.", "kind": "generic", "required": true, "default": null },
     { "key": "skill-description", "description": "One-line description that tells an agent when to use the skill. Letters, digits, spaces and basic punctuation only.", "kind": "generic", "required": false, "default": "Use when the user wants to check vendor announcements and SDK releases for their declared stack and read a dated digest of what was fetched." },
-    { "key": "digest-cadence", "description": "How often you plan to run the watch, in your own words. Runs stay manual; nothing is scheduled.", "kind": "generic", "required": false, "default": "once a week" }
+    { "key": "digest-cadence", "description": "How often you plan to run the watch by hand, in your own words. The scheduled radar jobs are separate; only you turn them on, with schedule apply.", "kind": "generic", "required": false, "default": "once a week" }
   ]
 }

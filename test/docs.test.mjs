@@ -275,9 +275,9 @@ test("harness guide states the template's limits in pinned phrases", async () =>
     "not yet in the bundled installer", "skills/devtwin-create-skill/assets/skill-template.md", "company-audience workspace", "internal-comms", "doc-coauthoring"]) assert.ok(harness.includes(phrase), "docs/HARNESS.md: " + phrase);
   for (const route of ["skill workspace-create", "skill template-list", "skill template-seed", "skill template-verify", "skill requirements-record", "skill draft-validate",
     "profile plan", "profile apply", "stack plan", "stack approve", "stack check", "stack digest"]) assert.ok(harness.includes(route), "docs/HARNESS.md names " + route);
-  const schedule = /```sh\n# Scheduling recipe[^\n]*\n([\s\S]*?)```/.exec(harness);
-  assert.ok(schedule, "scheduling recipe block");
-  for (const line of schedule[1].split("\n").filter(Boolean)) assert.match(line, /^#/, "scheduling recipe ships commented out: " + line);
+  // U20: the schedules section names each job, its consent and its off switch.
+  const schedules = harness.slice(harness.indexOf("## Schedules"));
+  for (const phrase of ["radar-weekly", "advisory-hourly", "review-monthly", "schedule apply", "schedule off", "owner dialog", "also turns off the advisory job", "makes no request"]) assert.ok(schedules.includes(phrase), "docs/HARNESS.md Schedules: " + phrase);
   assert.doesNotMatch(harness, /\bgit init\b(?!`)/, "no git init instruction outside the warning");
   const security = await read("docs/SECURITY-MODEL.md");
   for (const phrase of ["personal profile", "same-user", "Fetched feed and release text is untrusted data", "feed URL rules", "https"]) assert.ok(security.includes(phrase), "docs/SECURITY-MODEL.md: " + phrase);
