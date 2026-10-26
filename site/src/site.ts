@@ -18,6 +18,8 @@ const DOC_PATHS = {
 	whereDataLives: '/docs/concepts/where-data-lives/',
 	codingAgents: '/docs/guides/coding-agents/',
 	personalHarness: '/docs/guides/personal-harness/',
+	lessons: '/docs/guides/lessons-and-hooks/',
+	orgHub: '/docs/guides/organization-hub/',
 	identityRouting: '/docs/guides/identity-routing/',
 	cli: '/docs/reference/cli/',
 	securityModel: '/docs/security/security-model/',

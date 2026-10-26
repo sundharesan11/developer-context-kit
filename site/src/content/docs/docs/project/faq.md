@@ -13,7 +13,7 @@ Repository instruction files are shared with everyone who can read the repositor
 
 ## Does it send my code or context anywhere?
 
-No. devtwin has no hosted service, and most commands make no network request at all. The exceptions are commands you run on purpose: `stack check` and `stack digest` contact only the hosts you approved, and `skill-sources check`, `preview` and `stage` read public GitHub data. See [Network use](/docs/security/security-model/#network-use).
+No. devtwin has no hosted service, and most commands make no network request at all. The exceptions are commands you run on purpose: `stack check` and `stack digest` contact only the hosts you approved, and `skill-sources check`, `preview` and `stage` read public GitHub data. If you join an [organization hub](/docs/guides/organization-hub/), `hub sync` and the hub sync job talk to your organization's own Git remote over SSH. See [Network use](/docs/security/security-model/#network-use).
 
 Your agent is a different matter: whatever you paste into a session, including a brief, may go to that agent's model provider.
 
@@ -39,7 +39,7 @@ macOS is the reference platform. The test suite also runs on Linux, but Linux is
 
 ## Does it remember things automatically?
 
-No. Nothing is recorded unless you, or an agent through a bundled skill, run a record command, and agent writes are proposals until you publish them. A brief reaches a session only when you or a skill fetch it. Automatic session hooks are on the [roadmap](/docs/project/roadmap/).
+No record is written unless you, or an agent through a bundled skill, run a record or lesson command, and agent writes are proposals until you publish or accept them. A brief reaches a session only when you or a skill fetch it. With the [agent hook](/docs/guides/lessons-and-hooks/) installed, matching lesson lines arrive on their own while the agent works.
 
 ## Why does every command need `--pilot`?
 
@@ -55,7 +55,19 @@ You don't edit records in place. Write a successor with `record supersede`; the 
 
 ## Can my team share context?
 
-Not through a shared store: devtwin keeps one private store per machine, with no sync. To pass context on, export selected records as a [handoff packet](/docs/concepts/handoffs/) that anyone can read without devtwin. Team conventions belong in the repository's own instruction files.
+Not through a shared store: devtwin keeps one private store per machine, with no sync. Your team can share **lessons** through an [organization hub](/docs/guides/organization-hub/), a Git repository your organization owns. To pass project context on, export selected records as a [handoff packet](/docs/concepts/handoffs/) that anyone can read without devtwin. Team conventions belong in the repository's own instruction files.
+
+## Do my lessons leave my machine?
+
+Only when you say so. Agent proposals stay on your machine. A lesson goes to a hub only when you run `lesson accept --target hub` or `lesson copy` in your own terminal and click **Approve** in the dialog that shows the exact text. A `general` or `project` lesson never leaves your machine. The one exception to per-item approval is "working on" notes, which post under the consent you give at `hub join`, and which you can stop with `note revoke`.
+
+## What do my colleagues see?
+
+Your accepted hub lessons, labelled as claimed by your handle, and your "working on" notes: one line with your handle, the branch name and the folder areas you edit. Never your records, your prompts or your store. Their agents get a lesson only when they touch a matching file, package or topic. `published list` shows everything devtwin published in your name.
+
+## Can an agent publish for me?
+
+No. An agent can propose up to three lessons per session, but `lesson accept`, `lesson copy`, `published delete` and `hub join` are owner actions. The devtwin hook denies them from an agent shell, and each one shows a macOS dialog that only you can approve.
 
 ## Is my data backed up?
 

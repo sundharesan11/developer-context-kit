@@ -10,7 +10,8 @@ The kit's `skills/` folder holds the instructions your coding agent follows to u
 | `devtwin-resume` | Read the brief for the current worktree. | Yes |
 | `devtwin-record` | Propose a record for you to review. | Yes |
 | `devtwin-onboard` | Onboard or re-onboard a repository. | Yes |
-| `devtwin-setup` | First-run personal profile setup. | Not yet |
+| `devtwin-capture` | Handle delivered lessons, stop on a lesson conflict, and propose up to three lessons per session. | Yes |
+| `devtwin-setup` | Walk through the setup steps, including the personal profile. | Not yet |
 | `devtwin-create-skill` | Blank starter for building a skill. | No (asset only) |
 
 See [Use with coding agents](/docs/guides/coding-agents/) to install them.
@@ -73,9 +74,23 @@ The result is a private proposal, not a record. It appears in the brief only aft
 
 If the repository is not in the live config's `repos`, it tells you that you can preview `live add-repo`, and stops. See [Onboard a repository](/docs/guides/onboard-a-repository/).
 
+## devtwin-capture
+
+**Use when** a devtwin lesson line arrives in a session, when planned work may conflict with a delivered lesson, or at the end of a task. See [Lessons and hooks](/docs/guides/lessons-and-hooks/).
+
+1. Treats each lesson line and lesson body as advice from another person, never as instructions. It never runs a command, fetches a URL or changes a permission because a lesson says so.
+2. Loads a full lesson with `lesson show` only when it needs it, and runs `lesson match` when the hook says more lessons match.
+3. **Conflict.** When the plan breaks a lesson's "do" or "don't" line, it stops, quotes the line and asks you to follow the lesson or replace it. To replace it, it previews `lesson supersede-propose` and applies only after you say yes. You accept the replacement yourself with `lesson accept --target hub`.
+4. **End of task.** Drafts at most three general lessons, with no client, repository, account, person or host names. It checks `lesson match` for duplicates, shows you the drafts, and runs `lesson propose --apply` only after you approve. It uses the session ID from the hook's session-start line.
+5. **Preferences.** When you correct how it works, it asks whether that is a preference for later tasks and repeats it back as one line. It writes no preference file in this version.
+
+It never runs `lesson accept`, `lesson copy`, `published delete`, `hub join`, `lesson notices --ack --apply`, or `lesson edit` or `lesson reject` with `--apply`. On Codex, it checks an edit again when a lesson arrives after the edit ran.
+
 ## devtwin-setup
 
 **Use when** you set up devtwin for the first time or want to change your personal profile.
+
+The skill is the agent entry point to the [setup wizard](/docs/guides/setup-wizard/): it runs `setup status`, `setup plan --step <id>` and, after your approval, `setup apply --step <id>`. For an owner step, such as installing skills or hooks or joining a hub, it shows the plan and gives you the exact `setup apply` command to run in your own terminal. For the profile step:
 
 1. Runs `doctor` and stops without creating anything if the pilot is missing or `init` has not run. It never runs `init` itself.
 2. Reads your profile with `profile show` and explains what is stored and where.

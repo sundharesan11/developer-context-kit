@@ -47,7 +47,7 @@ devtwin refuses rather than guesses. When a check fails, it has not written anyt
 | `DEVTWIN_PROJECT_UNBOUND` | The worktree or project is not onboarded in that scope. `details.reason` is `not-bound-in-scope` or `worktree-not-confirmed`; `details.remedy` gives the command. | Check you used the right scope. If so, [onboard the worktree](/docs/guides/onboard-a-repository/). |
 | `DEVTWIN_SCOPE_UNKNOWN` | The scope has not been added. | Run `scope add`. |
 | `DEVTWIN_BINDING_CONFLICT` | The worktree is bound to another project, or the project belongs to another repository. | Choose the right project ID, or stop and review existing bindings. |
-| `DEVTWIN_NOT_FOUND` | Something named does not exist: a skill workspace, a lock to release, or `init` data for `--seed-from-init`. | Create it first, or check the name. |
+| `DEVTWIN_NOT_FOUND` | Something named does not exist: a skill workspace, a lock to release, `init` data for `--seed-from-init`, a lesson or lesson proposal ID. | Create it first, or check the name and the scope. |
 | `DEVTWIN_RECORD_NOT_EXPORTABLE` | A record selected for `handoff export` is missing, superseded or proposed. | Select the current, effective record. |
 | `DEVTWIN_SCHEMA_UNSUPPORTED` | A stored record has an unsupported schema version. | Stop and check which kit version wrote it. |
 
@@ -56,6 +56,7 @@ devtwin refuses rather than guesses. When a check fails, it has not written anyt
 | Code | Meaning | What to do |
 | --- | --- | --- |
 | `DEVTWIN_SENSITIVE_CONTENT` | Text looks like a credential (`details.types`, such as `credential-assignment`), or a hub proposal names the scope, project, paths or hosts. | Remove the secret. Never store credentials in records, profiles or drafts. |
+| `DEVTWIN_ISOLATION` | Text that leaves a scope names another scope: its ID, display name, a project ID, a bound root path or a remote host, as a whole word. A lesson for your personal store is checked against every scope. | Make the lesson general: drop client, repository, account and host names. |
 | `DEVTWIN_HANDOFF_UNSAFE` | Selected record text can't go into a portable packet: URLs, absolute or home paths, control characters, malformed metadata. | Select different records, or supersede the record with portable text. |
 | `DEVTWIN_POLICY_UNAVAILABLE` | A `required` scope policy could not be read while building a brief. | Restore the policy file in the hub, or make the policy optional. |
 
@@ -63,7 +64,28 @@ devtwin refuses rather than guesses. When a check fails, it has not written anyt
 
 | Code | Meaning | What to do |
 | --- | --- | --- |
-| `DEVTWIN_LIMIT` | A size or count cap was hit: record body (32 KiB), profile (4 KiB), required policies over the brief budget, handoff packet (32 KiB, 12 records), too many sources, Git output over 16 MiB, more than 16 remotes, staged package caps. | Shorten or split the input. Caps are fixed. |
+| `DEVTWIN_LIMIT` | A size or count cap was hit: record body (32 KiB), profile (4 KiB), required policies over the brief budget, handoff packet (32 KiB, 12 records), too many sources, Git output over 16 MiB, more than 16 remotes, staged package caps. Also: a fourth lesson proposal in one session, a lesson too long for the owner dialog, or a hub with more than 5000 note files. | Shorten or split the input. Caps are fixed. Don't change the session ID to get past the proposal cap. |
+
+## Lessons, setup and the owner dialog
+
+| Code | Meaning | What to do |
+| --- | --- | --- |
+| `DEVTWIN_OWNER_DENIED` | The owner dialog was denied or dismissed, or there is no desktop session to show it (also in an SSH session). Nothing was written. | Run the command yourself in a desktop session, and click **Approve** only for text you reviewed. |
+| `DEVTWIN_UNAVAILABLE` | `setup apply` named a step that is not available yet. | Run `setup status` to see which steps are available. |
+| `DEVTWIN_STALE_VERSION` (lessons) | On `lesson accept` of a replacement: another replacement reached the hub first (`already-superseded`). On `published delete`: the file on the hub changed since the preview. | Run `hub sync`, then review what is now on the hub. The proposal stays pending. |
+| `DEVTWIN_CONFLICT` (lessons) | On `lesson supersede-propose`: the lesson was `removed` by its author or is already `superseded`. On `hub join`: the scope already has a hub, or another scope joined this hub. | Drop the draft, or leave the other hub first. |
+
+## Organization hub
+
+| Code | Meaning | What to do |
+| --- | --- | --- |
+| `DEVTWIN_HUB_NOT_JOINED` | The scope has not joined a hub. | Run `hub join`, or use a `project` or `general` lesson target. |
+| `DEVTWIN_HUB_REMOTE_REFUSED` | The remote is not an SSH remote, or holds a password. | Use `ssh://host/path` or `user@host:path`. |
+| `DEVTWIN_HUB_UNREACHABLE` | The remote did not answer, or the clone failed. | Check the SSH key and the remote with `git ls-remote`, then preview again. |
+| `DEVTWIN_HUB_INVALID` | The hub has no `hub.json` or no default branch, a hub file is invalid, or the hub ID changed. | Check the hub repository. A changed hub ID needs `hub leave` and a new `hub join`. |
+| `DEVTWIN_HUB_READ_ONLY` | The hub uses a newer `schemaVersion` than this kit. `hub sync` and `context brief` show the warning `HUB_SCHEMA_NEWER`. | Upgrade the kit. devtwin reads and writes nothing in that hub until then. |
+| `DEVTWIN_HUB_PATH_REFUSED` | A write would touch a file that is not yours: another author's lesson (`other-author`) or another handle's note (`other-handle`). | You can delete only your own items. Ask the author, or the hub admin. |
+| `DEVTWIN_HUB_GIT_FAILED` | A Git step on the hub clone failed. | Run `hub status` and `hub sync` again. Items that could not be pushed stay in the outbox. |
 
 ## Interrupted work, locks and integrity
 

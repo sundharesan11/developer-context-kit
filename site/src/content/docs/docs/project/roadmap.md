@@ -19,6 +19,12 @@ devtwin is an early local tool, not yet a packaged release. The order below favo
 - Private drafts.
 - Skill builder and third-party skill sources, installing into disposable pilot homes.
 - A read-only `doctor`.
+- [Lessons](/docs/guides/lessons-and-hooks/): agents propose, you accept, and the agent hook delivers matching lessons while the agent works.
+- The agent hook for Claude Code and Codex, which also blocks owner-only commands from agent shells.
+- A guided `setup` that walks through each setup step.
+- An [organization hub](/docs/guides/organization-hub/) for sharing accepted lessons and "working on" notes with colleagues.
+
+Lessons, the hook, setup and the hub are tested against local fixtures. They have not yet run against a real hub host.
 
 ## Next
 
@@ -27,10 +33,13 @@ devtwin is an early local tool, not yet a packaged release. The order below favo
 | 1 | **Backup and restore** of private state, with recovery guidance and upgrade compatibility. | Planned. Deferred so live activation could be proven first. |
 | 2 | **Live activation** on a real machine: fresh Claude Code and Codex sessions finding the skills, with rollback verified. | Implemented. First activation on a real machine passed on 2026-10-25, including fresh non-interactive Claude Code and Codex sessions. Interactive sessions are still to be checked. |
 | After 2 | **[Identity routing](/docs/guides/identity-routing/)**: bind each scope to its own GitHub and Slack accounts; read and draft first, sending later. | Designed, sequenced after live activation. |
-| 3 | **Session start and end hooks**: resume and handoff adapters with a reviewable worker lifecycle. | Planned. |
+| 3 | **Session start and end hooks**: resume and handoff adapters with a reviewable worker lifecycle. | Partly done. The agent hook delivers lessons and blocks owner-only commands; resume and handoff adapters are planned. |
 | 4 | **Selective migration** from an existing personal setup: dry-run mapping, approved records only. | Planned. |
 | 5 | **More connectors** beyond GitHub and Slack, with account and workspace verification. | Planned. |
-| 6 | **Company knowledge hub** adapter with reviewed, sanitized promotion. | Planned. |
+| 6 | **Company knowledge hub** adapter with reviewed, sanitized promotion. | Implemented as the [organization hub](/docs/guides/organization-hub/). |
+| Next | **Preferences and templates**: preferences captured from corrections you confirm, a managed block in `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, and output templates. | Planned. |
+| Next | **Release radar**: a weekly digest of vendor releases for your stack, with schedules and notifications. | Planned. |
+| Next | **Setup review**: a monthly reminder to review your setup, and real-agent acceptance checks. | Planned. |
 | 7 | **Skill export**: explicit file selection with privacy and rights review. | Planned. |
 | 8 | **Weekly skill updater** and scheduler, disabled until you enable it. | Planned. |
 | 9 | **Open-source release**: versioned releases and a reviewed release process. | Planned. |

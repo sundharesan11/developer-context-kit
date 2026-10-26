@@ -17,10 +17,10 @@ Every write is still a preview followed by an apply of the exact fingerprint you
     config/ data/ state/ inputs/
 ```
 
-- Outside the store, devtwin writes only `devtwin-*` entries directly inside `~/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) and `~/.agents/skills`. It never creates, removes or changes the mode of those folders.
+- Outside the store, devtwin writes only `devtwin-*` entries directly inside `~/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) and `~/.agents/skills`, plus the exact paths you approve as [write classes](/docs/reference/configuration/#write-classes). It never creates, removes or changes the mode of those folders.
 - Codex skills go to `~/.agents/skills`, never `~/.codex/skills`. `CODEX_HOME` does not change this; the preview warns `CODEX_HOME_IGNORED` if it is set.
 - Live commands run only from the kit clone the live config names, and that clone must be clean and detached at the configured commit.
-- The live config changes only through `live init`, `live add-repo` and `live set-kit`. Each records an approved digest of the config; a `live.json` that differs from the approved one is refused.
+- The live config changes only through `live init`, `live add-repo`, `live set-kit`, `live write-classes` and `live migrate`. Each records an approved digest of the config; a `live.json` that differs from the approved one is refused.
 - Listed repositories are read-only.
 
 :::caution[No backup yet]
@@ -138,7 +138,9 @@ Add one line to your shell profile, for example `~/.zshrc`:
 export DEVTWIN_KIT="$HOME/.devtwin/kit"
 ```
 
-Open a new terminal and check `printenv DEVTWIN_KIT`. devtwin does not edit agent settings files.
+Open a new terminal and check `printenv DEVTWIN_KIT`. devtwin edits agent settings files only through `agents install --hooks` and `agents uninstall --hooks`, after you approve them as write classes.
+
+To turn on lesson delivery and the owner-action block, follow [Turn on the hooks in live mode](/docs/guides/lessons-and-hooks/#turn-on-the-hooks-in-live-mode). To run these steps one at a time with a what, why and undo for each, use the [setup wizard](/docs/guides/setup-wizard/). To share lessons with colleagues, see [Organization hub](/docs/guides/organization-hub/).
 
 ## 10. Try it in a fresh session
 
@@ -150,7 +152,7 @@ the project for the worktree <repo> in scope <scope>. Run only read-only command
 Never use --apply and never edit files.
 ```
 
-The session should list `devtwin-onboard`, `devtwin-record` and `devtwin-resume`, run `context resolve` through `DEVTWIN_KIT`, and name your project. A kit-commit warning means the installed skills came from another commit; reinstall from the current kit.
+The session should list `devtwin-capture`, `devtwin-onboard`, `devtwin-record` and `devtwin-resume`, run `context resolve` through `DEVTWIN_KIT`, and name your project. A kit-commit warning means the installed skills came from another commit; reinstall from the current kit.
 
 ## Add another repository
 
@@ -177,6 +179,8 @@ Upgrade side by side, so the old clone keeps working until the new one is proven
 4. Point `DEVTWIN_KIT` at the new clone.
 
 Installed skills stay owned across a kit change. Don't move or rename a clone after `live set-kit`. To go back, run `live set-kit` from the old clone with its commit.
+
+If you installed the hooks, their entries name the kit clone. After a move to another clone, preview `agents install --hooks` again: it shows the changed entries as `update`. Then run `hook verify` to write a new kit receipt, and trust the changed entries in Codex `/hooks`.
 
 ## Coming from devctx
 

@@ -52,5 +52,6 @@ Plans describe their milestone, not proof that every planned feature shipped. Us
 - [Live activation](plans/2026-10-16-001-feat-live-activation-plan.md)
 - [Personal harness template](plans/2026-10-16-001-feat-personal-harness-template-plan.md)
 - [Organization identity routing](plans/2026-10-17-001-feat-organization-identity-routing-plan.md): planned, not implemented.
+- [devtwin next phase](plans/2026-10-25-001-feat-devtwin-next-phase-plan.md): lessons, hooks, setup, hubs, preferences, release radar and onboarding. Phases P0 to P3 are implemented; P4 to P6 remain.
 - [Skill-collection research](research/skill-collections.md): dated upstream observations, not a live compatibility guarantee.
 - Personal harness research: [context and memory](research/personal-harness/context-and-memory.md), [harness templates](research/personal-harness/harness-templates.md) and [starter skills](research/personal-harness/starter-skills.md).

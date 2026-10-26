@@ -1,0 +1,76 @@
+---
+title: Setup wizard
+description: Walk through devtwin's setup steps one at a time, in a terminal or through an agent, with the what, why and undo of each step before you apply it.
+sidebar:
+  label: Setup wizard
+---
+
+`devtwin setup` walks through every setup step in order. For each step it shows what the step changes, why, how to undo it and the preview of the command it runs. Then it asks. Only `y` or `yes` applies a step.
+
+Each step wraps an existing command and its preview, so the wizard adds no new write. You can also run the steps one at a time, and an agent can run them through the bundled `devtwin-setup` skill.
+
+## Run the wizard
+
+```sh
+node "$KIT/bin/devtwin.mjs" setup --pilot "$LIVE_CONFIG" --scope example --project example.atlas --repo "$REPO"
+```
+
+The wizard needs a terminal. Without one it refuses with `DEVTWIN_GATE_REQUIRED` and points to the `devtwin-setup` skill. It takes the same flags as `setup plan`; each step reads only its own flags. It ends with a count of applied and failed steps.
+
+## Run one step
+
+```sh
+node "$KIT/bin/devtwin.mjs" setup status --pilot "$LIVE_CONFIG"
+node "$KIT/bin/devtwin.mjs" setup plan --pilot "$LIVE_CONFIG" --step hook-verify
+node "$KIT/bin/devtwin.mjs" setup apply --pilot "$LIVE_CONFIG" --step hook-verify --plan-fingerprint '<fingerprint>'
+```
+
+- `setup status` lists the steps with `id`, `title`, `available`, `owner`, `what`, `why`, `undo` and `done`, plus `skipped` or `problem` when they apply, and the `next` step.
+- `setup plan --step <id>` shows one step's preview and its fingerprint. It writes nothing.
+- `setup apply --step <id> --plan-fingerprint <fp>` applies that preview.
+
+## The steps
+
+| Step | What it does | Owner |
+| --- | --- | --- |
+| `live-folder` | Checks that the live config exists and that `init` has run. Only reads. | |
+| `skills-claude`, `skills-codex` | Installs the bundled skills for that agent (`agents install`). | Yes |
+| `write-classes-hooks` | Approves `~/.claude/settings.json` and `~/.codex/hooks.json` as hook targets (`live write-classes --hook-target`). | Yes |
+| `hooks-claude`, `hooks-codex` | Adds devtwin's hook entries for that agent (`agents install --hooks`). | Yes |
+| `hook-verify` | Writes the kit receipt that the hook trusts (`hook verify`). | |
+| `profile` | Writes your personal profile (`profile plan` and `profile apply`). | |
+| `starter-preferences` | Stores the starter preferences you select as personal preference records. | |
+| `scope` | Adds the scope you name with `--scope` (`scope add`). | |
+| `first-project` | Onboards one repository into the scope (`project onboard`). The live config must list it first. | |
+| `hub-join` | Joins an [organization hub](/docs/guides/organization-hub/) (`hub join`). Skipped without `--hub-remote`. | Yes |
+| `job-hub-sync` | Installs the hub sync job (`hub schedule`). Skipped when the scope has no hub. | Yes |
+| `sandbox` | Recommends agent sandbox settings, and a container setup when the scan finds services. Writes no agent setting. | |
+
+Steps for later releases, such as starter output templates and the scheduled radar, advisories and review reminder, are listed as "not available yet" and write nothing.
+
+### Starter preferences
+
+`starter-preferences` offers four preferences: `tests-first`, `ask-destructive`, `small-changes` and `explain-why`. Pass `--starter <id>` for each one you want; with no `--starter`, all are selected.
+
+### Sandbox recommendations
+
+`sandbox` reads the project scan of `--repo`. It looks for compose files, container files and the package and env key names of common services. It never reads an env value. Apply stores the recommendations you accept (`--recommendation <id>`; with none, all) as personal preference records.
+
+## Setup flags
+
+| Flag | Used by |
+| --- | --- |
+| `--step <id>` | `setup plan` and `setup apply`. Required there. |
+| `--home <path>`, `--run-id <id>` | Skill and hook steps with a disposable pilot. |
+| `--work`, `--preference`, `--stack-current`, `--stack-known`, `--writing`, `--seed-from-init`, `--proposed-by` | `profile`. Same values as [`profile plan`](/docs/reference/cli/#profile-plan). |
+| `--starter <id>` | `starter-preferences`. Repeatable. |
+| `--scope`, `--display-name` | `scope`, and the hub steps. |
+| `--project`, `--repo`, `--doc`, `--expect-remote`, `--environment`, `--actor`, `--accept`, `--request-id`, `--keep-previous` | `first-project`. Same values as [`project onboard`](/docs/reference/cli/#project-onboard). `--repo` is also used by `sandbox`. |
+| `--recommendation <id>` | `sandbox`. Repeatable. |
+| `--hub-remote`, `--hub-handle`, `--hub-email`, `--ssh-command`, `--hub-root` | `hub-join`. |
+
+## Owner steps
+
+The steps marked **Owner** run an owner action. The devtwin hook denies `setup apply` for these steps from an agent shell, and denies the `devtwin setup` terminal loop. An agent that uses the `devtwin-setup` skill shows you the plan and gives you the exact `setup apply` command to run in your own terminal.
+
+A terminal prompt protects against accidents. It is not proof that you are at the keyboard.
