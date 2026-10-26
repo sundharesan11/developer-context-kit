@@ -83,6 +83,12 @@ Personal and org records have their own homes. They need no registry entry or pr
 - **Tombstone memory.** `hub sync` and `published delete` keep the IDs of hub lessons whose valid tombstone this machine has seen in `stateRoot/hubs/<hubId>/tombstones.json` (0600), written by atomic replace under the `hub-sync` lock. The index and the hook leave those lessons out. The file holds at most 5000 entries; the oldest go first. A damaged file gives no hub lessons until the next sync writes it again. `hub leave` keeps it.
 - **Notices.** `hub sync` keeps replacements of your own hub lessons in `stateRoot/hubs/<hubId>/notices.json` (0600), written by atomic replace under the `hub-sync` lock. An acknowledged notice keeps its entry with `ackedAt`, so the next sync does not add it again. The file holds at most 200 entries; the oldest acknowledged entries go first.
 
+### Preferences and output templates
+
+- **Preference proposals.** `pref propose` writes one private file per proposal at `dataRoot/pref-proposals/<pref_id>.json` (0600), under `stateRoot/locks/pref_proposals.lock`. The ID is `pref_` and a digest of the session ID and the preference key. The key is a digest of the text without case or spacing differences. `pref decline` and `pref accept` keep the file with the state `declined` or `accepted`, so the same text is refused later.
+- **Preferences.** `pref accept` writes a `preference` record with personal reach to the personal store. `pref retire` adds the record ID to `dataRoot/pref-retired.json` (0600), and the instruction block leaves it out. The record stays. Setup sandbox records (request IDs that start with `req_setup_sandbox_`) hold advice for one repository and are never in the block.
+- **Output templates.** `template from` writes `dataRoot/templates/outputs/<kind>.<md|html>.json` (0600) by atomic replace. It holds the heading levels and texts, the SHA-256 of the source file and the time. It holds no other text of the source. The starters are in the kit at `templates/outputs/`.
+
 ### Isolation checks
 
 `src/records/isolation.mjs` holds the checks for text that leaves a scope or comes from another person.

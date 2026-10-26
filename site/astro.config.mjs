@@ -83,6 +83,7 @@ export default defineConfig({
 						'docs/guides/lessons-and-hooks',
 						'docs/guides/organization-hub',
 						'docs/guides/setup-wizard',
+						'docs/guides/preferences-and-templates',
 						'docs/guides/personal-harness',
 						'docs/guides/stack-watch',
 						'docs/guides/live-mode',
