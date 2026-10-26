@@ -110,10 +110,10 @@ Each command previews first. Run each apply only with explicit approval from the
 | --- | --- | --- |
 | `hub` | One file in the scope's hub | Yes |
 | `hub+general` | The hub file and a record in your personal store | Yes |
-| `project` | A lesson record in the proposal's project, or in `--project` | No |
-| `general` | A record in your personal store | No |
+| `project` | A lesson record in the proposal's project, or in `--project` | Yes |
+| `general` | A record in your personal store | Yes |
 
-- **Dialog.** For `hub` and `hub+general`, the apply shows a macOS dialog with the exact lesson text: the title, the do or don't line, the body and the match rules. Nothing is written until you click Approve. A denied or dismissed dialog writes nothing: no commit, no outbox item and no personal record, and the proposal stays pending. A lesson too long to show in full fails with `LIMIT`. Shorten it with `lesson edit`.
+- **Dialog.** For every target, the apply shows a macOS dialog with the exact lesson text: the title, the do or don't line, the body and the match rules. For `project` and `general`, the dialog says that nothing leaves this machine. Nothing is written until you click Approve. A denied or dismissed dialog writes nothing: no commit, no outbox item and no personal record, and the proposal stays pending. A lesson too long to show in full fails with `LIMIT`. Shorten it with `lesson edit`.
 - **General.** Your personal store follows you to every organization. For this reason, a general target is checked against the names of every scope, also the lesson's own scope. The default target, `hub`, writes no personal copy.
 - **Org copy.** The hub file is the organization's copy of the lesson. Accept writes no second copy to the org home in the store.
 - **Identity.** The lesson ID is `lsn_` and a hash of the hub ID, your handle, the request ID and the creation time. The author is your claimed handle. The file's `localRecordHash` points back to the accepted draft. The full local record is never published.
@@ -236,4 +236,4 @@ A hub that holds more than 5000 note files fails to sync with `LIMIT`. The clean
 
 ## Owner actions
 
-`hub join`, `hub leave --apply`, `hub schedule --apply`, `lesson accept`, `lesson copy`, `lesson notices --ack --apply`, `note revoke --apply`, `note consent --apply` and `published delete` are owner actions. The devtwin hook denies them from an agent shell, also through terminal wrappers. For `published delete`, the hook denies the preview too. Each one but `lesson notices` shows the owner dialog. An agent can list the notices, but it cannot close one, so it cannot hide a replacement from its developer. The previews of `hub leave`, `hub schedule`, `lesson notices --ack`, `note revoke` and `note consent`, and `note list` and `published list`, stay open to agents. A stale `hub-sync` lock is released with `locks release --lock hub-sync`.
+`hub join --apply`, `hub leave --apply`, `hub schedule --apply`, `lesson accept --apply`, `lesson copy --apply`, `lesson notices --ack --apply`, `note revoke --apply`, `note consent --apply` and `published delete --apply` are owner actions. The devtwin hook denies them from an agent shell, also through terminal wrappers. Each one but `lesson notices` shows the owner dialog. The hook reads command text, so the dialog is the second gate when the text check misses an apply. An agent can list the notices, but it cannot close one, so it cannot hide a replacement from its developer. Every preview, and `note list` and `published list`, stay open to agents. An agent can preview `lesson accept` or `published delete` and show its developer the result before the developer runs the apply. A stale `hub-sync` lock is released with `locks release --lock hub-sync`.

@@ -342,9 +342,10 @@ test("published delete is denied from an agent shell by the owner-action block",
   const hub = await hubFixture(t), a = await machine(t, { handle: "alice", onboard: true });
   await a.join(hub);
   const shell = (command) => ownerAction("claude", { tool_name: "Bash", tool_input: { command } });
-  for (const command of ["devtwin published delete --scope example --id lsn_x", "devtwin published delete --scope example --id lsn_x --apply --plan-fingerprint x",
-    "sh -c 'node \"$KIT/bin/devtwin.mjs\" published delete --scope example --id note_x'", "script -q /dev/null devtwin published delete --id lsn_x"]) assert.equal(shell(command), "published delete", command);
-  assert.equal(ownerAction("codex", { tool_name: "shell", tool_input: { command: ["devtwin", "published", "delete", "--id", "lsn_x"] } }), "published delete");
+  for (const command of ["devtwin published delete --scope example --id lsn_x --apply", "devtwin published delete --scope example --id lsn_x --apply --plan-fingerprint x",
+    "sh -c 'node \"$KIT/bin/devtwin.mjs\" published delete --scope example --id note_x --apply'", "script -q /dev/null devtwin published delete --id lsn_x --apply"]) assert.equal(shell(command), "published delete --apply", command);
+  assert.equal(ownerAction("codex", { tool_name: "shell", tool_input: { command: ["devtwin", "published", "delete", "--id", "lsn_x", "--apply"] } }), "published delete --apply");
+  assert.equal(shell("devtwin published delete --scope example --id lsn_x"), null, "the delete preview stays open to agents");
   assert.equal(shell("devtwin published list --scope example"), null, "listing stays open to agents");
   const out = JSON.parse(await a.hookRaw("pre-tool", { session_id: "s-block", cwd: a.repo, hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "devtwin published delete --scope example --id lsn_x --apply --plan-fingerprint x" } }));
   assert.equal(out.hookSpecificOutput.permissionDecision, "deny");

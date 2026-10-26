@@ -350,7 +350,7 @@ test("lesson publish paths never write to a hub without an approved owner dialog
   }
 });
 
-test("lesson edit reject and the local targets work without a dialog", async (t) => {
+test("lesson edit reject and the local targets work behind the owner dialog", async (t) => {
   const m = await machine(t);
   const roots = await m.roots();
   const repo = await makeRepo(join(m.p.reposDir, "atlas"), { "README.md": "# Atlas\n" });
@@ -372,7 +372,11 @@ test("lesson edit reject and the local targets work without a dialog", async (t)
   await m.applied(["lesson", "reject", "--id", toReject]);
   const project = await m.applied(accept(fromStdin, "project"));
   const general = await m.applied(accept(toGeneral, "general"));
-  assert.equal(m.dialogs.length, 0, "local targets show no dialog");
+  // Local targets show the owner dialog too: it names the target and says nothing leaves the machine.
+  assert.equal(m.dialogs.length, 2, "each local accept shows the owner dialog");
+  assert.match(m.dialogs[0].title, /Save a lesson on this machine/);
+  assert.match(m.dialogs[0].body, /lesson of project example\.atlas[\s\S]*Nothing leaves this machine[\s\S]*Seed after migrations/);
+  assert.match(m.dialogs[1].body, /personal store/);
   const records = (await readSnapshot(roots, SCOPE, "example.atlas")).records.filter((r) => r.kind === "lesson");
   assert.deepEqual(records.map((r) => [r.id, r.reach, r.title]), [[project.project.recordId, "project", "Seed after migrations"]]);
   const personal = (await readPersonalSnapshot(roots)).records;

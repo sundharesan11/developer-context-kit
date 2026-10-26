@@ -26,11 +26,11 @@ const claudeBash = (cwd, command, session = "s-owner") => ({ session_id: session
 const isDeny = (result) => result.json?.hookSpecificOutput?.permissionDecision === "deny";
 const KIT = 'node "$DEVTWIN_KIT/bin/devtwin.mjs"';
 const OWNER_COMMANDS = [
-  "devtwin lesson accept --pilot /x/live.json --id rec_1",
-  `${KIT} lesson accept --pilot '/x/live.json' --target hub`,
-  `${KIT} lesson copy --pilot '/x/live.json' --id rec_1`,
-  `${KIT} published delete --pilot '/x/live.json'`,
-  `${KIT} hub join --pilot '/x/live.json'`,
+  "devtwin lesson accept --pilot /x/live.json --id rec_1 --apply",
+  `${KIT} lesson accept --pilot '/x/live.json' --target hub --apply --plan-fingerprint 'sha256:00'`,
+  `${KIT} lesson copy --pilot '/x/live.json' --id rec_1 --apply`,
+  `${KIT} published delete --pilot '/x/live.json' --apply`,
+  `${KIT} hub join --pilot '/x/live.json' --apply`,
   `${KIT} pref accept --pilot '/x/live.json'`,
   `${KIT} instructions apply --pilot '/x/live.json'`,
   `${KIT} live migrate --pilot '/x/live.json' --legacy '/x/old' --apply --plan-fingerprint 'sha256:00'`,
@@ -42,28 +42,33 @@ const OWNER_COMMANDS = [
   `${KIT} live init --pilot '/x/live.json' --agent claude --apply`
 ];
 const WRAPPED = [
-  "script -q /dev/null devtwin lesson accept --id rec_1",
-  "script -q /dev/null node \"$DEVTWIN_KIT/bin/devtwin.mjs\" lesson accept --id rec_1",
-  "bash -c \"devtwin lesson accept --id rec_1\"",
-  "sh -c 'node ~/.devtwin/kit/bin/devtwin.mjs lesson   accept'",
-  "zsh -c 'cd /tmp && devtwin \"lesson\" \"accept\"'",
-  "env X=1 node $DEVTWIN_KIT/bin/devtwin.mjs lesson accept --pilot /x/live.json",
-  "expect -c 'spawn devtwin lesson accept; expect eof'",
-  "unbuffer devtwin hub join --pilot /x",
-  "npx devtwin lesson accept",
+  "script -q /dev/null devtwin lesson accept --id rec_1 --apply",
+  "script -q /dev/null node \"$DEVTWIN_KIT/bin/devtwin.mjs\" lesson accept --id rec_1 --apply",
+  "bash -c \"devtwin lesson accept --id rec_1 --apply\"",
+  "sh -c 'node ~/.devtwin/kit/bin/devtwin.mjs lesson   accept --apply'",
+  "zsh -c 'cd /tmp && devtwin \"lesson\" \"accept\" \"--apply\"'",
+  "env X=1 node $DEVTWIN_KIT/bin/devtwin.mjs lesson accept --pilot /x/live.json --apply",
+  "expect -c 'spawn devtwin lesson accept --apply; expect eof'",
+  "unbuffer devtwin hub join --pilot /x --apply",
+  "npx devtwin lesson accept --apply",
   "npx --yes ./bin/devtwin.mjs pref accept",
-  "nohup devtwin published delete &",
+  "nohup devtwin published delete --apply &",
   "time sudo devtwin instructions apply",
-  "echo accept | xargs devtwin lesson",
-  "A=accept; devtwin lesson $A",
-  "devtwin\\\n lesson accept",
-  "DEVTWIN LESSON ACCEPT"
+  "echo accept | xargs devtwin lesson --apply",
+  "A=accept; devtwin lesson $A --apply",
+  "devtwin\\\n lesson accept --apply",
+  "DEVTWIN LESSON ACCEPT --APPLY"
 ];
 const ALLOWED = [
   `${KIT} lesson match --pilot '/x/live.json' --scope example --path db/a.sql`,
   `${KIT} lesson show --pilot '/x/live.json' --scope example --id rec_1`,
   `${KIT} live migrate --pilot '/x/live.json' --legacy '/x/old'`,
   `${KIT} agents install --pilot '/x/live.json' --agent claude`,
+  // Previews of the four lesson and hub owner actions stay open to agents; only the apply is owner-only.
+  `${KIT} lesson accept --pilot '/x/live.json' --id prop_1 --target hub`,
+  `${KIT} lesson copy --pilot '/x/live.json' --id rec_1 --to-scope example`,
+  `${KIT} published delete --pilot '/x/live.json' --scope example --id lsn_1`,
+  `${KIT} hub join --pilot '/x/live.json' --scope example --remote ssh://git.example.com/hub.git`,
   `${KIT} record propose --pilot '/x/live.json' --scope example --apply`,
   `${KIT} profile apply --pilot '/x/live.json' --plan-fingerprint 'sha256:00'`,
   "git status",
@@ -121,7 +126,7 @@ test("owner block denies a Codex shell payload and keeps lesson delivery decisio
   await rebuildIndex(s.roots, "example");
   await writeKitReceipt(s.roots, { pilotPath: s.path, now: now() });
   const bash = await payload("codex-post-tool-bash", s.repo, { hook_event_name: "PreToolUse" });
-  for (const command of [`${KIT} lesson accept --pilot '${s.path}'`, "bash -lc 'devtwin hub join'"]) {
+  for (const command of [`${KIT} lesson accept --pilot '${s.path}' --apply`, "bash -lc 'devtwin hub join --apply'"]) {
     for (const tool of [{ tool_name: "Bash", tool_input: { command } }, { tool_name: "shell", tool_input: { command: ["bash", "-lc", command] } }]) {
       const result = await hook(s.path, "codex", { ...bash, ...tool });
       assert.ok(isDeny(result), command + " " + tool.tool_name);
@@ -133,7 +138,7 @@ test("owner block denies a Codex shell payload and keeps lesson delivery decisio
   assert.match(read.json.hookSpecificOutput.additionalContext, /Migrations before seeds/);
   assert.doesNotMatch(read.out, /permissionDecision|"decision"/);
   // An owner command that also names a matching file gets only the deny, never lesson lines.
-  const both = await hook(s.path, "claude", claudeBash(s.repo, `${KIT} lesson accept db/migrations/001_init.sql`, "s-both"));
+  const both = await hook(s.path, "claude", claudeBash(s.repo, `${KIT} lesson accept db/migrations/001_init.sql --apply`, "s-both"));
   assert.ok(isDeny(both));
   assert.doesNotMatch(both.out, /additionalContext|Migrations before seeds/);
   // A Claude edit of a matching file gets lesson lines and no decision.

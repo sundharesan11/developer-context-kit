@@ -80,12 +80,12 @@ devtwin lesson accept --pilot "$PILOT" --id prop_0123456789abcdef01234567 --targ
 | --- | --- | --- |
 | `hub` (default) | One file in the scope's hub | Yes |
 | `hub+general` | The hub file and a record in your personal store | Yes |
-| `project` | A lesson record in the proposal's project, or in `--project` | No |
-| `general` | A record in your personal store | No |
+| `project` | A lesson record in the proposal's project, or in `--project` | Yes |
+| `general` | A record in your personal store | Yes |
 
 A general lesson follows you to every scope, so it is checked against the names of every scope, also its own. The hub targets need a joined hub; see [Organization hub](/docs/guides/organization-hub/#publish-a-lesson).
 
-`lesson accept` and `lesson copy` are owner actions. An agent never runs them, and the devtwin hook denies them from an agent shell.
+`lesson accept --apply` and `lesson copy --apply` are owner actions. An agent can run the preview to show you what the accept would write, but the devtwin hook denies the apply from an agent shell, and the dialog asks you first.
 
 ## The agent hook
 
@@ -106,9 +106,9 @@ The hook never fails a tool call. Any error gives exit 0 and no output; the erro
 
 On a `pre-tool` shell call, the hook checks the command text first. When the command runs an owner-only devtwin action, the hook denies the call and tells the agent to ask you to run the command yourself. This covers terminal wrappers such as `sh -c`, `env` and `xargs`.
 
-| Always denied, also the preview | Denied with `--apply` |
+| Denied with `--apply`, previews open | Always denied |
 | --- | --- |
-| `lesson accept`, `lesson copy`, `published delete`, `hub join` | `record publish`, `live init`, `live add-repo`, `live set-kit`, `live migrate`, `live write-classes`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `lesson notices`, `note revoke`, `note consent` |
+| `lesson accept`, `lesson copy`, `published delete`, `hub join`, `record publish`, `live init`, `live add-repo`, `live set-kit`, `live migrate`, `live write-classes`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `lesson notices`, `note revoke`, `note consent` | `pref accept`, `instructions apply` (planned commands) |
 
 The hook also denies the `devtwin setup` terminal loop, and `setup apply` for the owner steps. The block reads command text, so it can deny a harmless command that names these words. It protects only sessions that run the hook. See [Limitations](/docs/security/limitations/#lessons-hooks-and-hubs).
 
