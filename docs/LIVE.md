@@ -43,6 +43,31 @@ A live config can hold an optional `writeClasses` block. It names the only other
 - Before each edit, it writes the exact prior bytes to `store/state/runs/<run_id>/backups/` at mode 0600, with a record that names the path. For a file that did not exist, only the record is written. If the file changed during the edit, the edit stops with `INTEGRITY` and the file is not replaced. The edited file is replaced atomically and keeps its own mode. A file that devtwin creates gets mode 0600.
 - An edited file must be a regular file you own, with one link, that is not group or other writable.
 
+### The stack-watch exception
+
+The stack watch, the radar digests and the radar jobs fetch from the network. In live mode they run only under the `stackWatch` exception, a separate entry in `live.json` next to the write classes:
+
+```json
+"exceptions": { "stackWatch": { "hosts": ["api.github.com", "changelog.example.com"], "maxRequests": 30 } }
+```
+
+- `hosts` lists each host the watch may reach, at most 32. Every host in the stack approval must be in this list, or the run stops with `GATE_REQUIRED`, reason `host-not-in-exception`, before any request.
+- `maxRequests` caps one run, from 1 to 50 (30 by default). Unauthenticated GitHub requests are limited to about 60 an hour, so the cap stays below that. One scheduled radar run fetches each source once for all scopes.
+- Live requests send no credential. The routed public-read binding is not used in live mode.
+- Every live run is for one scope. `stack check` and `stack digest` without `--scope` stop with `GATE_REQUIRED`, reason `scope-required`, so one scope's digest never names another scope's projects.
+- The exception is part of the approved config digest. Set it only with `live stack-watch`. Do not edit it in `live.json` by hand. A disposable pilot cannot hold an exception.
+
+Take the hosts from the `hosts` list of `stack plan`. Preview, review, then apply after approval:
+
+```sh
+node "$KIT/bin/devtwin.mjs" live stack-watch --pilot "$LIVE_CONFIG" --host api.github.com --host changelog.example.com
+node "$KIT/bin/devtwin.mjs" live stack-watch --pilot "$LIVE_CONFIG" --host api.github.com --host changelog.example.com --apply --plan-fingerprint '<fingerprint>'
+```
+
+Each `--host` replaces the whole list. `--max-requests <n>` sets the cap. `--off` removes the exception. The devtwin hook denies `live stack-watch --apply` from an agent shell.
+
+A config change makes the stack approval out of date: `stack check` then stops with `APPROVAL_REQUIRED`. Run `stack plan` and `stack approve` again after `live stack-watch` or `live set-kit`.
+
 ### Set the write classes
 
 `live write-classes` changes the approved classes. Each class flag replaces the paths of that class: `--hub-root`, `--instruction-target`, `--hook-target` and `--launch-agent`. Give a flag once for each path. `--clear <class>` removes a class. A class that you do not name stays as it is. Preview, review, then apply after approval:
@@ -257,6 +282,20 @@ node "$KIT/bin/devtwin.mjs" instructions apply --pilot "$LIVE_CONFIG" --plan-fin
 - **Cap.** The block has at most 1,200 characters. When the preferences do not fit, the plan leaves out the oldest ones and warns with `PREFERENCES_DROPPED`. Retire some with `pref retire`. Each preference is checked again when the block is built, and one that fails, for example because it names a scope added later, is left out with `PREFERENCES_REFUSED`. Sandbox advice from setup is for one repository and stays out of the block.
 - **Owner action.** `instructions apply` shows the owner dialog with the exact block, and the devtwin hook denies it from an agent shell. `--agent claude` or `--agent codex` limits the targets, and `--remove` takes the block out.
 - **After a change.** Run `instructions plan` again after you accept or retire a preference. The block does not update by itself.
+
+### Turn on the radar
+
+The radar jobs need the stack-watch exception above, a stack approval and an approved `launchAgents` path for each job:
+
+```sh
+node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --launch-agent "$HOME/Library/LaunchAgents/devtwin.radar-weekly.plist" --launch-agent "$HOME/Library/LaunchAgents/devtwin.advisory-hourly.plist" --launch-agent "$HOME/Library/LaunchAgents/devtwin.review-monthly.plist"
+node "$KIT/bin/devtwin.mjs" stack plan --pilot "$LIVE_CONFIG" --with radar --with advisories
+node "$KIT/bin/devtwin.mjs" stack approve --pilot "$LIVE_CONFIG" --with radar --with advisories --plan-fingerprint '<fingerprint>'
+node "$KIT/bin/devtwin.mjs" schedule plan --pilot "$LIVE_CONFIG" --job radar-weekly
+node "$KIT/bin/devtwin.mjs" schedule apply --pilot "$LIVE_CONFIG" --job radar-weekly --plan-fingerprint '<fingerprint>'
+```
+
+`--launch-agent` replaces the whole `launchAgents` class, so also list the hub sync plist when you use one. Repeat `schedule plan` and `schedule apply` for `advisory-hourly` and `review-monthly`. Each apply shows the owner dialog, and the devtwin hook denies `schedule apply` and `schedule off --apply` from an agent shell. See [Schedules](HARNESS.md#schedules) for what each job does and how to turn it off.
 
 ## 14. Export DEVTWIN_KIT
 

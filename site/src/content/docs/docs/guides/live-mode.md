@@ -20,7 +20,7 @@ Every write is still a preview followed by an apply of the exact fingerprint you
 - Outside the store, devtwin writes only `devtwin-*` entries directly inside `~/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) and `~/.agents/skills`, plus the exact paths you approve as [write classes](/docs/reference/configuration/#write-classes). It never creates, removes or changes the mode of those folders.
 - Codex skills go to `~/.agents/skills`, never `~/.codex/skills`. `CODEX_HOME` does not change this; the preview warns `CODEX_HOME_IGNORED` if it is set.
 - Live commands run only from the kit clone the live config names, and that clone must be clean and detached at the configured commit.
-- The live config changes only through `live init`, `live add-repo`, `live set-kit`, `live write-classes` and `live migrate`. Each records an approved digest of the config; a `live.json` that differs from the approved one is refused.
+- The live config changes only through `live init`, `live add-repo`, `live set-kit`, `live write-classes`, `live stack-watch` and `live migrate`. Each records an approved digest of the config; a `live.json` that differs from the approved one is refused.
 - Listed repositories are read-only.
 
 :::caution[No backup yet]
@@ -195,6 +195,8 @@ If you set up live mode under the old devctx name, move it with [Migrate from de
 | `GATE_REQUIRED`, field `live.approval` | `live.json` differs from the approved config. Don't edit it by hand. |
 | `GATE_REQUIRED`, field `live.home` | `$HOME` differs from the live config's home. |
 | `GATE_REQUIRED`, `Live skill folder unavailable` | A skill folder is missing or is a link. See step 1. |
+| `GATE_REQUIRED`, reason `no-live-exception`, `scope-required` or `host-not-in-exception` | The stack watch needs the `stackWatch` exception, a `--scope`, and every approved host in the exception. See [Stack watch and radar](/docs/guides/stack-watch/#live-mode). |
+| `APPROVAL_REQUIRED` from `stack check` | The config changed after the stack approval, for example by `live set-kit` or `live stack-watch`. Run `stack plan` and `stack approve` again. |
 | `PATH_UNSAFE`, field `configDir` | `~/.devtwin` is missing, not yours, or not mode 0700. |
 | `BUSY` | A lock is held. If no devtwin command is running, [release the stale lock](/docs/guides/coding-agents/#clear-a-stale-lock). |
 | `RECOVERY_REQUIRED` | An earlier install stopped part way. [Recover it](/docs/guides/coding-agents/#recover-an-interrupted-install). |

@@ -92,7 +92,7 @@ Installing a template-made skill into a real agent home is not available in this
 
 ## The announcement watch
 
-The watch is manual. Nothing runs on a schedule. It reads `stackCurrent` from the profile and resolves each entry against the bundled catalog `catalog/stack-sources.json`, plus any overrides you give.
+You run the watch by hand, or the weekly radar job runs it for you (see [Schedules](#schedules)). It reads `stackCurrent` from the profile and resolves each entry against the bundled catalog `catalog/stack-sources.json`, plus any overrides you give.
 
 ```sh
 node bin/devtwin.mjs stack plan --pilot "$PILOT_FILE"
@@ -105,7 +105,7 @@ node bin/devtwin.mjs stack digest --pilot "$PILOT_FILE" --scope acme --apply --p
 - `stack plan` makes no request and writes nothing. It lists every item, the sources found for it, and items that are not watched with the reason. It also lists each host with the exact feed URLs, identifiers and versions it would receive.
 - `stack approve` stores the approval at `stateRoot/stack/approval.json`. The approval binds the item names and versions, feed URLs, identifiers, source groups, hosts, authentication mode and run mode. A plan with no source cannot be approved.
 - `stack check` fetches from the approved hosts only and writes nothing. Any difference from the stored approval fails with `APPROVAL_REQUIRED` before a request is made. A change in care level alone keeps the approval.
-- `stack digest` without `--apply` runs the watch, renders the Markdown digest and writes only a pending file under `stateRoot/stack/pending/`. With `--apply` and that fingerprint it makes no request. It writes the dated digest and records the reported entries in that scope's seen state, so the next digest lists them as previously reported.
+- `stack digest` without `--apply` runs the watch, renders the digest and writes only a pending file under `stateRoot/stack/pending/`. The digest is Markdown, or HTML with `--format html` or with the profile's radar format set to `html`. With `--apply` and that fingerprint it makes no request. It writes the dated digest and records the reported entries in that scope's seen state, so the next digest lists them as previously reported.
 
 Pass `--scope` only for the scope you mean. With a scope, the watch reads that scope's current accepted records to find project links, and the digest goes under `dataRoot/scopes/<scope>/digests/stack/`. Without one, it goes under `dataRoot/digests/stack/`.
 
@@ -123,7 +123,30 @@ The default source group, `announcements`, is vendor changelog feeds and GitHub 
 - `--with lifecycle`: endoflife.date release cycles.
 - `--with versions`: the latest version from the npm, PyPI or crates.io registry.
 
+- `--with radar`: the radar sources in the catalog. See [The radar](#the-radar).
+
 `--feed '<name>=https://…'` adds a feed for a declared item, and `--map '<name>=<kind>:<id>'` adds a GitHub, endoflife.date or package identifier. Overrides given once carry forward to the next plan until you give new ones or `--clear-overrides`.
+
+### The radar
+
+The radar adds three kinds of item to the releases of your stack: new agent tools and skills, approaches and design ideas, and adjacent tech to try. Its sources are the `radar` list in `catalog/stack-sources.json`. Turn it on with `--with radar` in `stack plan` and `stack approve`, so its hosts are part of the approval you review.
+
+Set your interests in the profile. Each interest is a term, optionally with `:weak` or `:strong`:
+
+```sh
+node bin/devtwin.mjs profile plan --pilot "$PILOT_FILE" --interest 'Rust:strong' --interest 'event sourcing' --radar-format html
+```
+
+Radar items are ranked locally. A match with a project in the digest's scope scores 100 and a match with your stack scores 60. A strong interest adds 30, an interest adds 15 and a weak interest adds 5. An item below 15 is counted, not listed, so an item that matches only a weak interest is left out. The digest lists at most 30 radar items, grouped by kind, with the highest score first.
+
+Each listed item has a 12-character item ID. `radar guide` writes a short "how to try this" note for one item of the scope's latest applied digest:
+
+```sh
+node bin/devtwin.mjs radar guide --pilot "$PILOT_FILE" --scope acme --item 0123456789ab
+node bin/devtwin.mjs radar guide --pilot "$PILOT_FILE" --scope acme --item 0123456789ab --apply --plan-fingerprint "$FINGERPRINT"
+```
+
+The guide is a fixed template with the item's catalog name, its kind, its links and the steps to try it in a scratch folder. It never copies feed text, so an instruction in a title or summary cannot reach the guide. It goes under `dataRoot/scopes/<scope>/guides/radar/` and creates nothing else: no sandbox, no project change. When the result is worth keeping, propose it as a lesson with `lesson propose`.
 
 ### Network hosts, feed URL rules and approval
 
@@ -143,7 +166,9 @@ Fetched feed and release text is untrusted. The digest quotes titles and excerpt
 
 ### Live mode
 
-`stack check` and `stack digest` refuse a live config with `GATE_REQUIRED`. They work only with a disposable pilot until the watch's live-mode exception lands together with organization identity routing.
+With a live config, `stack check`, `stack digest` and the radar jobs run only under the approved `stackWatch` live-mode exception. Without it they refuse with `GATE_REQUIRED`, reason `no-live-exception`. The exception names the hosts the watch may reach and a request cap of at most 50 for one run (30 by default). Every approved host must be in the exception, live requests send no credential, and every live run is for one scope (`--scope`). Set the exception with `live stack-watch`; see [Live-mode exceptions](LIVE.md#live-mode-exceptions).
+
+A stack approval made under another config, for example before a kit re-pin or an exception change, no longer counts. The next run asks for approval again with `APPROVAL_REQUIRED`.
 
 ## Drafts
 
@@ -160,7 +185,7 @@ The Slack-update template is draft only until routing's send increment lands. It
 
 ## Agents and approval
 
-Agents apply only after explicit approval from the user in the session. That covers `profile apply`, `stack approve`, `stack digest --apply`, `draft save --apply` and writing seeded template files. An agent shows the preview, waits for the user to approve that exact preview, and then passes the fingerprint. A fingerprint the agent passes back is not consent. Agents never run `record publish --apply`.
+Agents apply only after explicit approval from the user in the session. That covers `profile apply`, `stack approve`, `stack digest --apply`, `radar guide --apply`, `draft save --apply` and writing seeded template files. Agents never run `schedule apply`, `schedule off --apply` or `live stack-watch --apply`: the devtwin hook denies them. An agent shows the preview, waits for the user to approve that exact preview, and then passes the fingerprint. A fingerprint the agent passes back is not consent. Agents never run `record publish --apply`.
 
 ## Keep the clone generic
 
@@ -171,6 +196,9 @@ Personal state lives under the pilot's private roots, outside the clone:
 | Personal profile and revisions | `configRoot/profile/` |
 | Stack approval, pending digests and seen state | `stateRoot/stack/` |
 | Digests | `dataRoot/digests/stack/` or `dataRoot/scopes/<scope>/digests/stack/` |
+| Radar guides | `dataRoot/guides/radar/` or `dataRoot/scopes/<scope>/guides/radar/` |
+| Items of the latest digest and advisory alert memory | `stateRoot/radar/` |
+| Job flags and last-run receipts | `stateRoot/schedule/` |
 | Drafts | `dataRoot/drafts/` or `dataRoot/scopes/<scope>/drafts/` |
 | Seeded template files | a directory under `inputsRoot` |
 | Skill workspaces | the skill builder's private workspace root |
@@ -179,17 +207,31 @@ Personal state lives under the pilot's private roots, outside the clone:
 
 **Versioning your private instance.** The kit does not sync anything. To keep history of your profile, digests or template-made skills, copy them or export them (for example `profile export`) into a separate private repository or dotfiles manager. The private roots themselves must stay outside Git, so never `git init` in them: the profile routes refuse to write inside a Git worktree.
 
-## Scheduling recipe
+## Schedules
 
-Schedules are disabled by default, and enabling one is outside this stage. The recipe below ships commented out. It previews a digest for a disposable pilot; the preview writes only a pending file, and applying it still needs your approval. It cannot run against the live config today, which refuses with `GATE_REQUIRED`.
+Three jobs run the radar for you. Each job is disabled by default. Each one is a user LaunchAgent with its own consent and its own off switch:
+
+| Job | Runs | What it does |
+| --- | --- | --- |
+| `radar-weekly` | Once a week | Writes one digest for each scope and shows a short notification |
+| `advisory-hourly` | Once an hour | Checks security advisories for your stack. An urgent (critical or high) advisory shows a notification at once: one for each advisory, at most three a day |
+| `review-monthly` | Once a month | Reminds you that a setup review is available, with a count of waiting preference and lesson proposals |
 
 ```sh
-# Scheduling recipe (commented out; enabling a schedule is outside this stage).
-# cron, Mondays at 09:00, disposable pilot only:
-# 0 9 * * 1 cd "$DEVTWIN_KIT" && node bin/devtwin.mjs stack digest --pilot "$PILOT_FILE" >> "$PILOT_LOG" 2>&1
-# launchd: a user agent with ProgramArguments node, bin/devtwin.mjs, stack, digest, --pilot and the pilot path,
-# and StartCalendarInterval Weekday 1, Hour 9. Do not load it in this stage.
+node bin/devtwin.mjs schedule plan --pilot "$PILOT_FILE" --job radar-weekly
+node bin/devtwin.mjs schedule apply --pilot "$PILOT_FILE" --job radar-weekly --plan-fingerprint "$FINGERPRINT"
+node bin/devtwin.mjs schedule status --pilot "$PILOT_FILE"
+node bin/devtwin.mjs schedule off --pilot "$PILOT_FILE" --job radar-weekly
+node bin/devtwin.mjs schedule off --pilot "$PILOT_FILE" --job radar-weekly --apply --plan-fingerprint "$FINGERPRINT"
 ```
+
+- `schedule plan` writes nothing. It shows the LaunchAgent path, the command it runs and the off switch. The plist must be an approved `launchAgents` path named `devtwin.<job>.plist`.
+- `schedule apply` shows the owner dialog, writes the plist and loads it. The radar and advisory jobs need a stack approval first, and the advisory job needs the radar job on and the `advisories` group in the approval.
+- `schedule off` unloads the job and removes its plist. Turning off the radar also turns off the advisory job.
+- `schedule status` reports, for each job, whether it is on, installed and loaded, and its last run. It makes no request.
+- `schedule run --job <job>` is what the LaunchAgent runs. It checks the live gate, the job's flag and its last-run receipt before any request. A job that is off makes no request and writes nothing. A run inside the job's period is skipped, so missed runs collapse into one run and two runs in one week write one digest. A run whose live gate fails writes a failed receipt and makes no request.
+
+Notifications use `osascript`. The script is fixed, and the title and message reach it only as arguments, with control characters, quotes and backslashes removed and the length capped.
 
 ## Optional companions
 

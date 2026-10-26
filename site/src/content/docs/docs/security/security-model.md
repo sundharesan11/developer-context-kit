@@ -83,10 +83,18 @@ Most commands make no network request. The exceptions are explicit:
 | Command | Contacts | Sends |
 | --- | --- | --- |
 | `skill-sources check`, `preview`, `stage` | `api.github.com` (unauthenticated) | Repository, release, tag, commit and selected-file requests |
-| `stack check`, `stack digest` (preview) | Only hosts in your stored approval | Feed URLs and identifiers; exact versions to OSV only when advisories are enabled |
+| `stack check`, `stack digest` (preview), the `radar-weekly` and `advisory-hourly` jobs | Only hosts in your stored approval | Feed URLs and identifiers; exact versions to OSV only when advisories are enabled |
 | `hub join`, `hub sync`, `lesson accept` and `lesson copy` to a hub, `lesson supersede-propose --apply`, `published delete` | Your hub remote, over SSH | Accepted lessons, your "working on" notes and your tombstones |
 
 Hosts still see your IP address and the request time. The stack watch never follows redirects, refuses hosts that resolve to private or reserved addresses, and caps request count, size and time. Fetched text is rendered as inert, fenced text. No environment variable or record is read for a token.
+
+### Stack watch, radar and schedules
+
+- **Approvals.** The stack approval and pending digests live in `stateRoot` with record hashes. The hashes detect accidental change, not same-user tampering. An approval made under another pilot config counts as no approval.
+- **Live mode.** The watch runs in live mode only under the approved `stackWatch` [exception](/docs/reference/configuration/#stack-watch-exception). Every approved host must be in the exception, and the exception caps each run at its request count (at most 50). Live requests send no credential. Each run is for one scope, so a digest never names another scope's projects.
+- **Radar.** Radar sources come from the kit catalog and enter the approval like any other host. Ranking is local. A radar guide is a fixed template with the catalog name, the kind and the links. It never copies feed text. The HTML digest escapes all fetched text, has no script and declares a content security policy that loads nothing.
+- **Schedules and notifications.** Each job has its own owner consent and off switch. The hook denies `schedule apply` and `schedule off --apply` from agent shells. A run checks the live gate, the job flag and its receipt before any request. When the live gate refuses a run, the run writes only a failed receipt, and only into an existing private `schedule/receipts` folder under the config's state root.
+- **Notification text.** Text reaches `osascript` only as an argument. The script lines are fixed, and the text has no control characters, quotes or backslashes and is capped. Advisory alerts are limited to one for each advisory and three a day.
 
 Skill-source acquisition never clones, extracts archives, or runs upstream code. Staged files are verified by Git object hash and SHA-256 and stored with mode 0600, executable bits removed. The release tag and commit you pin are **caller-supplied and unverified**.
 

@@ -69,13 +69,16 @@ See the [security model](/docs/security/security-model/).
 - Observes only the exporting worktree's current state. It is not a historical snapshot and proves nothing about application tests or deployment.
 - Writes are exclusive but not atomic. Discard any packet with a missing or invalid footer.
 
-## Personal harness and stack watch
+## Personal harness, stack watch and radar
 
 - Evaluated with synthetic fixtures only. How a live model behaves with `devtwin-setup` or a template-made skill is not evaluated.
 - Installing a template-made skill into your real agent homes is not available yet.
-- The stack watch is manual; there are no schedules. It refuses a live config with `DEVTWIN_GATE_REQUIRED` for now.
-- GitHub requests are unauthenticated, limited to roughly 60 per hour.
-- The bundled stack catalog covers eight items and no vendor changelog feeds; add feeds with `--feed`.
+- In live mode the stack watch and the radar run only under the `stackWatch` exception.
+- Live requests are always unauthenticated, so GitHub allows roughly 60 of them an hour.
+- The bundled stack catalog covers eight items and five radar sources, and no vendor changelog feeds; add feeds with `--feed`.
+- Radar ranking uses your stack and stated interests only. Package names that are in a project but not in your profile stack do not rank.
+- The radar jobs use macOS launchd and `osascript`. On other systems you cannot install the jobs, and devtwin shows no notifications.
+- The monthly review reminder counts waiting preference and lesson proposals only, until the setup review lands.
 - Relevance is whole-word term matching: it can miss announcements and match unrelated ones.
 - Nothing reads or sends Slack messages. Drafts saved with `draft save` cannot be sent later.
 

@@ -15,7 +15,9 @@ devtwin is an early local tool, not yet a packaged release. The order below favo
 - Bundled skills for Claude Code and Codex, with journaled install, uninstall, recovery and rollback check.
 - Live mode: a private store under `~/.devtwin`, a pinned kit clone and your real skill folders.
 - Personal profile, `devtwin-setup` skill and skill templates.
-- Manual stack watch with approved hosts and dated digests.
+- Stack watch with approved hosts and dated Markdown or HTML digests.
+- The [release radar](/docs/guides/stack-watch/#the-radar): ranked agent tools, approaches and adjacent tech, try-it guides, and weekly radar, hourly advisory and monthly review jobs.
+- A `stackWatch` live-mode exception, so the watch and the radar run against your live config.
 - Private drafts.
 - Skill builder and third-party skill sources, installing into disposable pilot homes.
 - A read-only `doctor`.
@@ -39,8 +41,8 @@ Lessons, the hook, setup and the hub are tested against local fixtures. They hav
 | 5 | **More connectors** beyond GitHub and Slack, with account and workspace verification. | Planned. |
 | 6 | **Company knowledge hub** adapter with reviewed, sanitized promotion. | Implemented as the [organization hub](/docs/guides/organization-hub/). |
 | Next | **Preferences and templates**: preferences captured from corrections you confirm, a managed block in `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, and output templates. | Implemented; see [Preferences and templates](/docs/guides/preferences-and-templates/). |
-| Next | **Release radar**: a weekly digest of vendor releases for your stack, with schedules and notifications. | Planned. |
-| Next | **Setup review**: a monthly reminder to review your setup, and real-agent acceptance checks. | Planned. |
+| Next | **Release radar**: a weekly digest of vendor releases for your stack, with schedules and notifications. | Implemented; see [Stack watch and radar](/docs/guides/stack-watch/). |
+| Next | **Setup review**: a review of your setup, and real-agent acceptance checks. | Planned. The monthly reminder job ships with the radar. |
 | 7 | **Skill export**: explicit file selection with privacy and rights review. | Planned. |
 | 8 | **Weekly skill updater** and scheduler, disabled until you enable it. | Planned. |
 | 9 | **Open-source release**: versioned releases and a reviewed release process. | Planned. |
