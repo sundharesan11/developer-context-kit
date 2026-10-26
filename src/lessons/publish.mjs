@@ -1,12 +1,12 @@
 // U11 (R13, R18, KTD3, KTD9): lesson accept and lesson copy. Both preview, then apply with the plan fingerprint.
-// A target that leaves the machine (hub, hub+general, and every copy) shows the owner dialog with the exact lesson
-// text before the first write; a dismissed or denied dialog writes nothing. The hub copy is the organization's copy of
+// Every accept and every copy shows the owner dialog with the exact lesson text before the first write; a dismissed or
+// denied dialog writes nothing. A target that leaves the machine (hub, hub+general) says so in the dialog. The hub copy is the organization's copy of
 // a lesson: accept writes no second copy to the org home under dataRoot/scopes/<scope>/org.
 //
 // Targets:   hub          one file in the scope's hub (publishToHub; a rejected push goes to the outbox)
 //            hub+general  the hub file and a personal-store record, after the all-scope isolation check
-//            project      a project lesson record in the proposal's project; local, no dialog
-//            general      a personal-store record only; local, no dialog, the all-scope isolation check still runs
+//            project      a project lesson record in the proposal's project; local
+//            general      a personal-store record only; local, the all-scope isolation check still runs
 //
 // U12: a replacement proposal (lesson supersede-propose) accepts to the hub target only. Its hub file names the
 // predecessor as supersedes: [{ id, hash }]. The predecessor is checked against the local clone at preview and on the
@@ -62,7 +62,14 @@ function lessonDialog(title, header, lesson) {
 }
 const replacesLines = (replaces) => replaces ? ["Replaces lesson: " + replaces.title + " [" + replaces.id + "], claimed by " + replaces.author,
   "The replaced lesson stops reaching agents once this one is on the hub, and its author is told."] : [];
-const acceptDialog = (plan) => lessonDialog(plan.replaces ? "Publish a replacement lesson to an organization hub" : "Publish a lesson to an organization hub", [
+// A local target writes only on this machine, but the owner still approves it: the agent hook reads command text and
+// cannot always tell a preview from an apply, so the dialog is the second gate for every accept.
+const localDialog = (plan) => lessonDialog("Save a lesson on this machine", [
+  "Scope: " + plan.scope,
+  plan.target === "project" ? "Saves it as a lesson of project " + plan.project + "." : "Saves it to your personal store, which every organization's sessions read.",
+  "Nothing leaves this machine."
+], plan.lesson);
+const acceptDialog = (plan) => !leavesMachine(plan.target) ? localDialog(plan) : lessonDialog(plan.replaces ? "Publish a replacement lesson to an organization hub" : "Publish a lesson to an organization hub", [
   "Scope: " + plan.scope, "Hub: " + plan.hub.hubId, "Author: " + plan.hub.author, ...replacesLines(plan.replaces),
   plan.target === "hub+general" ? "Also saves it to your personal store, which every organization's sessions read." : "Hub only. Your personal store does not get a copy.",
   "Everyone with access to this hub can read it. Git history keeps the text."
@@ -82,7 +89,7 @@ export async function planAccept(roots, { id, target, scope, project }) {
   if (proposal.supersedes && target !== "hub") throw new DevtwinError("INVALID_INPUT", "A replacement lesson goes to the hub only", { field: "target", allowed: ["hub"] });
   if (general(target)) assertOutboundClean(lessonText(lesson), await isolationTerms(roots));
   const requestId = requestIdFor("lsn", { proposalId: id, revision: proposal.revision, target });
-  const plan = { kind: "lesson-accept", proposalId: id, proposalHash: proposalHash(proposal), revision: proposal.revision, scope: proposal.scope, target, requestId, lesson, dialog: leavesMachine(target) };
+  const plan = { kind: "lesson-accept", proposalId: id, proposalHash: proposalHash(proposal), revision: proposal.revision, scope: proposal.scope, target, requestId, lesson, dialog: true };
   if (leavesMachine(target)) {
     const binding = await writableBinding(roots, proposal.scope);
     let supersedes = null;

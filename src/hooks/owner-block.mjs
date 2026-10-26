@@ -7,7 +7,10 @@ const SHELL_TOOLS = new Set(["Bash", "shell", "local_shell", "exec_command"]);
 const MAX_COMMAND_BYTES = 65536;
 // words: the two route words. apply: the action is owner-only only with --apply (its preview stays allowed).
 export const OWNER_ACTIONS = Object.freeze([
-  { words: ["lesson", "accept"] }, { words: ["lesson", "copy"] }, { words: ["published", "delete"] }, { words: ["hub", "join"] },
+  // The owner decided on 2026-10-26 that agents may preview these four; the apply stays owner-only, and each apply
+  // shows the owner dialog as a second gate.
+  { words: ["lesson", "accept"], apply: true }, { words: ["lesson", "copy"], apply: true },
+  { words: ["published", "delete"], apply: true }, { words: ["hub", "join"], apply: true },
   { words: ["pref", "accept"] }, { words: ["instructions", "apply"] },
   { words: ["live", "migrate"], apply: true }, { words: ["record", "publish"], apply: true },
   { words: ["agents", "install"], apply: true }, { words: ["agents", "uninstall"], apply: true },

@@ -111,7 +111,7 @@ node "$DEVTWIN_KIT/bin/devtwin.mjs" lesson propose --pilot "<pilot.json>" --scop
 - `--path`, `--package` and `--topic` can repeat. Give at least one. `--body-file <file>` reads the body from the pilot inputs folder, and `--body-file -` reads it from stdin. `--project <project>` names the project of a lesson that belongs to one.
 - The draft passes the record draft check, the credential check (`SENSITIVE_CONTENT`) and the check against the names of every other scope (`ISOLATION`). Control, format and bidi characters fail with `INVALID_INPUT`.
 
-The developer reviews proposals with `lesson proposals`, changes one with `lesson edit` and drops one with `lesson reject`. These preview first and apply with `--apply` and the plan fingerprint. `lesson accept` and `lesson copy` are owner-only actions: an agent never runs them. See [Organization hub](HUB.md#publish-a-lesson).
+The developer reviews proposals with `lesson proposals`, changes one with `lesson edit` and drops one with `lesson reject`. These preview first and apply with `--apply` and the plan fingerprint. An agent may run the preview of `lesson accept` or `lesson copy` to show the developer what it would write. The apply is an owner-only action: an agent never runs it, and it shows the owner dialog for every target. See [Organization hub](HUB.md#publish-a-lesson).
 
 ### Replace a lesson
 
@@ -130,7 +130,7 @@ node "$DEVTWIN_KIT/bin/devtwin.mjs" lesson supersede-propose --pilot "<pilot.jso
 - `NOT_FOUND`: no hub lesson has that ID. `CONFLICT` with the reason `removed` or `superseded`: the lesson was removed by its author, or it already has a replacement. Tell the developer, and do not retry with another session ID.
 - The developer accepts the replacement with `lesson accept --target hub` in their own terminal. `STALE_VERSION` from that accept means another replacement got there first. The proposal stays pending; run `hub sync` and show the developer the lesson that won.
 
-`published list --scope <scope>` lists what devtwin published in the developer's name: their hub lessons with status, their notes, their tombstones and the outbox. `published delete` is an owner-only action, and the hook denies its preview too. When the developer wants an item removed, tell them the command. `lesson notices --scope <scope>` lists the replacements of the developer's own lessons. An agent can list them and preview `--ack`, but `lesson notices --ack --apply` is an owner-only action. Until the managed instruction block exists, the `devtwin-capture` skill alone carries the conflict-stop rule. See [Organization hub](HUB.md#replace-a-lesson).
+`published list --scope <scope>` lists what devtwin published in the developer's name: their hub lessons with status, their notes, their tombstones and the outbox. An agent can preview `published delete` and show the developer what the delete removes, but `published delete --apply` is an owner-only action. When the developer wants an item removed, tell them the command. `lesson notices --scope <scope>` lists the replacements of the developer's own lessons. An agent can list them and preview `--ack`, but `lesson notices --ack --apply` is an owner-only action. Until the managed instruction block exists, the `devtwin-capture` skill alone carries the conflict-stop rule. See [Organization hub](HUB.md#replace-a-lesson).
 
 ### Agent hook
 

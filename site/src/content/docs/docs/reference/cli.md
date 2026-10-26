@@ -64,7 +64,7 @@ The skill builder and skill-source installers add separate recorded approvals; s
 
 ### Owner actions
 
-Some commands need you at the keyboard. When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson accept`, `lesson copy`, `published delete` and `hub join` are denied also as a preview. `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `lesson notices`, `note revoke` and `note consent` are denied with `--apply`. Most hub and lesson owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
+Some commands need you at the keyboard. When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson accept`, `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `lesson notices`, `note revoke` and `note consent` are denied with `--apply`; their previews stay open to agents. Most hub and lesson owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
 
 ### Identifiers
 
@@ -620,7 +620,7 @@ Drops a pending proposal. Takes `--id <prop_id>`; apply with `--apply --plan-fin
 
 ### `lesson accept`
 
-**Owner**, also the preview. Accepts a proposal.
+**Owner** with `--apply`. Accepts a proposal. Every target shows the owner dialog.
 
 | Flag | |
 | --- | --- |
@@ -634,7 +634,7 @@ A replacement accepts to `hub` only. `DEVTWIN_STALE_VERSION` means another repla
 
 ### `lesson copy`
 
-**Owner**, also the preview. Publishes a lesson from your personal store to the hub of another scope, after the owner dialog.
+**Owner** with `--apply`. Publishes a lesson from your personal store to the hub of another scope, after the owner dialog.
 
 | Flag | |
 | --- | --- |
@@ -693,7 +693,7 @@ These commands work with a live config. See [Organization hub](/docs/guides/orga
 
 ### `hub join`
 
-**Owner**, also the preview. Joins a scope to a hub and clones it into an approved hub root.
+**Owner** with `--apply`. Joins a scope to a hub and clones it into an approved hub root.
 
 | Flag | |
 | --- | --- |
@@ -754,7 +754,7 @@ Lists what devtwin published in your name: your hub lessons with their status, y
 
 ### `published delete`
 
-**Owner**, also the preview. Removes one of your lessons (and adds a tombstone) or one of your notes, in one commit.
+**Owner** with `--apply`. Removes one of your lessons (and adds a tombstone) or one of your notes, in one commit.
 
 | Flag | |
 | --- | --- |

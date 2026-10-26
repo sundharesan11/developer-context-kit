@@ -289,7 +289,8 @@ test("owner dialog passes its text only as arguments", () => {
 
 test("owner block denies hub join and hub leave from agent shells", () => {
   const bash = (command) => ({ tool_name: "Bash", tool_input: { command } });
-  assert.equal(ownerAction("claude", bash('node "$DEVTWIN_KIT/bin/devtwin.mjs" hub join --pilot /x --scope example')), "hub join");
+  assert.equal(ownerAction("claude", bash('node "$DEVTWIN_KIT/bin/devtwin.mjs" hub join --pilot /x --scope example --apply')), "hub join --apply");
+  assert.equal(ownerAction("claude", bash("devtwin hub join --pilot /x --scope example")), null, "the join preview stays allowed");
   assert.equal(ownerAction("codex", { tool_name: "exec_command", tool_input: { command: ["script", "-q", "/dev/null", "devtwin", "hub", "leave", "--apply"] } }), "hub leave --apply");
   assert.equal(ownerAction("claude", bash("devtwin hub schedule --scope example --apply --plan-fingerprint x")), "hub schedule --apply");
   assert.equal(ownerAction("claude", bash("devtwin hub leave --scope example")), null, "the leave preview stays allowed");

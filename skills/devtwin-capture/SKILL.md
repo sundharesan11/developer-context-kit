@@ -96,7 +96,7 @@ When the user corrects how you work, ask whether the correction is a preference 
 
 ## Owner-only actions
 
-Some devtwin commands need the owner at the keyboard. These include `lesson accept`, `lesson copy`, `published delete`, `hub join`, `pref accept`, `instructions apply` and `live migrate` with `--apply`. When devtwin's hook is installed, it denies these commands from an agent shell. Never run them, and never try to run them through another program, a script or a different shell. If your developer wants one of them, tell them the command and ask them to run it themselves.
+Some devtwin commands need the owner at the keyboard. These include `lesson accept`, `lesson copy`, `published delete`, `hub join` and `live migrate` with `--apply`, and `pref accept` and `instructions apply`. You may run the preview of `lesson accept`, `lesson copy`, `published delete` or `hub join` (without `--apply`) to show your developer what it would do. When devtwin's hook is installed, it denies the apply from an agent shell. Never run them, and never try to run them through another program, a script or a different shell. If your developer wants one of them, tell them the command and ask them to run it themselves.
 
 ## Output
 

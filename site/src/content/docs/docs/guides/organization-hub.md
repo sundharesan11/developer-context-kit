@@ -160,10 +160,11 @@ A tombstone removes a lesson on other machines only when its handle matches the 
 
 These commands need you at the keyboard. The devtwin hook denies them from an agent shell, and each one except `lesson notices` shows the owner dialog:
 
-- `hub join`, `lesson accept`, `lesson copy` and `published delete`, also their previews.
-- `hub leave`, `hub schedule`, `lesson notices --ack`, `note revoke` and `note consent`, with `--apply`.
+- `hub join`, `lesson accept`, `lesson copy`, `published delete`, `hub leave`, `hub schedule`, `lesson notices --ack`, `note revoke` and `note consent`, with `--apply`.
 
-Without a desktop session, the dialog denies. `hub status`, `hub sync`, `note list`, `published list` and the other previews stay open to agents.
+An agent can run the previews and show you what an action would do.
+
+Without a desktop session, the dialog denies. `hub status`, `hub sync`, `note list`, `published list` and every preview stay open to agents.
 
 ## Trust model
 
