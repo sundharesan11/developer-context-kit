@@ -235,6 +235,29 @@ node "$KIT/bin/devtwin.mjs" agents install --hooks --pilot "$LIVE_CONFIG" --agen
 
 `agents status` reports each agent's hook entries as `installed`, `missing`, `modified`, `outdated` or `foreign-entry`, per event. It also reports the kit receipt, and it gives an `AMBIGUOUS_ROOT` note for a repository root that is bound in more than one scope. The hook gives such a root no lessons.
 
+### Deliver the instruction block
+
+The managed instruction block carries your accepted preferences and devtwin's working rules into every Claude Code and Codex session. It needs these `instructionTargets` paths approved in the live config:
+
+```sh
+node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --instruction-target "$HOME/.claude/CLAUDE.md" --instruction-target "$HOME/.claude/devtwin.md" --instruction-target "$HOME/.codex/AGENTS.md"
+```
+
+Then preview, review and apply after approval:
+
+```sh
+node "$KIT/bin/devtwin.mjs" instructions plan --pilot "$LIVE_CONFIG"
+node "$KIT/bin/devtwin.mjs" instructions apply --pilot "$LIVE_CONFIG" --plan-fingerprint '<fingerprint>'
+```
+
+- **Claude Code.** devtwin writes the block to `~/.claude/devtwin.md`, a file it owns, and adds a marker block to `~/.claude/CLAUDE.md` with one import line, `@<path of devtwin.md>`.
+- **Codex.** devtwin writes the block between the markers in `~/.codex/AGENTS.md`.
+- **Your text.** Every byte outside `<!-- devtwin:begin -->` and `<!-- devtwin:end -->` stays the same. Malformed markers are `conflict` with the reason `markers`, and the apply writes nothing. Each edit writes a backup first, as in [Live-mode exceptions](#live-mode-exceptions).
+- **Repository files.** A repository's own `AGENTS.md` or `CLAUDE.md` is never a target. The write class refuses any path that is not one of the shapes above.
+- **Cap.** The block has at most 1,200 characters. When the preferences do not fit, the plan leaves out the oldest ones and warns with `PREFERENCES_DROPPED`. Retire some with `pref retire`. Each preference is checked again when the block is built, and one that fails, for example because it names a scope added later, is left out with `PREFERENCES_REFUSED`. Sandbox advice from setup is for one repository and stays out of the block.
+- **Owner action.** `instructions apply` shows the owner dialog with the exact block, and the devtwin hook denies it from an agent shell. `--agent claude` or `--agent codex` limits the targets, and `--remove` takes the block out.
+- **After a change.** Run `instructions plan` again after you accept or retire a preference. The block does not update by itself.
+
 ## 14. Export DEVTWIN_KIT
 
 The skills find the kit through `DEVTWIN_KIT`. Ask the owner before editing the shell profile. Then add one line, for example to `~/.zshrc`:

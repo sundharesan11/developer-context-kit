@@ -108,7 +108,7 @@ On a `pre-tool` shell call, the hook checks the command text first. When the com
 
 | Denied with `--apply`, previews open | Always denied |
 | --- | --- |
-| `lesson accept`, `lesson copy`, `published delete`, `hub join`, `record publish`, `live init`, `live add-repo`, `live set-kit`, `live migrate`, `live write-classes`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `lesson notices`, `note revoke`, `note consent` | `pref accept`, `instructions apply` (planned commands) |
+| `lesson accept`, `lesson copy`, `published delete`, `hub join`, `record publish`, `live init`, `live add-repo`, `live set-kit`, `live migrate`, `live write-classes`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `lesson notices`, `note revoke`, `note consent`, `pref accept`, `pref retire` | `instructions apply` (its preview is `instructions plan`) |
 
 The hook also denies the `devtwin setup` terminal loop, and `setup apply` for the owner steps. The block reads command text, so it can deny a harmless command that names these words. It protects only sessions that run the hook. See [Limitations](/docs/security/limitations/#lessons-hooks-and-hubs).
 

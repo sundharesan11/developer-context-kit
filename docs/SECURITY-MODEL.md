@@ -67,6 +67,13 @@ The full guide is [HUB.md](HUB.md).
 - "Working on" notes are the one item that leaves the machine with no per-item yes, under the note consent that `hub join` or `note consent` records. Only the hook edit path posts one, at most six per session; no command posts a note. The line is built from the branch name and the areas only, and the checks above run before the note is queued. Colleague notes reach agents only as fenced, attributed data.
 - `hub join --apply`, `hub leave --apply`, `hub schedule --apply`, `lesson accept --apply` (every target), `lesson copy --apply`, `published delete --apply`, `note revoke --apply` and `note consent --apply` are owner actions. The devtwin hook denies them from agent shells, and each shows a macOS dialog with the exact content. Their previews stay open to agents. The dialog text reaches `osascript` only as arguments, never as script text. Without a desktop session, the dialog denies.
 
+## Preferences and the instruction block
+
+- Preferences reach agents through user-level files only: `~/.claude/devtwin.md`, a marker block in `~/.claude/CLAUDE.md` and a marker block in `~/.codex/AGENTS.md`. Each must be an approved `instructionTargets` path. A repository's own instruction files are never a target.
+- Preference text is checked at propose, accept and render time. It must be one plain rule: no Markdown structure, no devtwin markers, no `@` import and no text that tells the agent to ignore other instructions. It also passes the sensitive-content check and the check against the names of every scope.
+- `pref accept --apply`, `pref retire --apply` and `instructions apply` are owner actions. The hook denies them from agent shells, and each shows the owner dialog with the exact text. Their previews stay open to agents.
+- Preferences never enter a hub or a handoff packet. Handoff export reads project records only.
+
 ## Setup
 
 `setup status`, `setup plan --step <id>` and `setup apply --step <id>` (and the `devtwin setup` terminal loop) add no write location. Each step wraps an existing command and its preview, and its apply needs the fingerprint of that preview.

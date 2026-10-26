@@ -64,7 +64,7 @@ The skill builder and skill-source installers add separate recorded approvals; s
 
 ### Owner actions
 
-Some commands need you at the keyboard. When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson accept`, `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `lesson notices`, `note revoke` and `note consent` are denied with `--apply`; their previews stay open to agents. Most hub and lesson owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
+Some commands need you at the keyboard. When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson accept`, `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `lesson notices`, `note revoke`, `note consent`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` is always denied; its preview is `instructions plan`. Most hub and lesson owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
 
 ### Identifiers
 
@@ -628,7 +628,7 @@ Drops a pending proposal. Takes `--id <prop_id>`; apply with `--apply --plan-fin
 | `--id <prop_id>` | Required. |
 | `--target <target>` | `hub` (default), `hub+general`, `project` or `general`. See [Review proposals](/docs/guides/lessons-and-hooks/#review-proposals). |
 | `--scope <id>`, `--project <id>` | The project for a `project` target when the proposal names none. |
-| `--apply --plan-fingerprint <fp>` | Write. The `hub` targets show the owner dialog first. |
+| `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |
 
 A replacement accepts to `hub` only. `DEVTWIN_STALE_VERSION` means another replacement reached the hub first.
 
@@ -764,6 +764,87 @@ Lists what devtwin published in your name: your hub lessons with their status, y
 | `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |
 
 Git history and colleagues' existing clones keep the text. Another author's item fails with `DEVTWIN_HUB_PATH_REFUSED`.
+
+## Preferences
+
+See [Preferences and templates](/docs/guides/preferences-and-templates/).
+
+### `pref propose`
+
+Writes a private preference proposal after a correction. Without `--apply`, it runs every check and writes nothing.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--session <id>` | Required. The session ID from the hook's session-start line. |
+| `--title <text>` | Required. Up to 80 characters. |
+| `--text <text>` | Required. One plain rule, up to 300 characters. |
+| `--topic <topic>` | The kind of correction, such as `testing`. One proposal per topic per session. |
+| `--apply` | Write. |
+
+Fails with `DEVTWIN_LIMIT` after three proposals in a session, with `DEVTWIN_CONFLICT` and the reason `declined` or `accepted` for a preference you already answered, and with `DEVTWIN_INVALID_INPUT` and a `reason` for text that is not one plain rule.
+
+### `pref proposals`
+
+Lists pending proposals; `--all` lists every state. Read-only.
+
+### `pref accept`
+
+**Owner** with `--apply`. Takes `--pilot`, `--id <pref_id>` and `--apply --plan-fingerprint <fp>`. After the owner dialog, writes a `preference` record to your personal store.
+
+### `pref decline`
+
+Takes `--pilot`, `--id <pref_id>` and `--apply --plan-fingerprint <fp>`. The same preference is refused later.
+
+### `pref list`
+
+Lists the active preferences that the instruction block delivers. Read-only.
+
+### `pref retire`
+
+**Owner** with `--apply`. Takes `--pilot`, `--id <record id>` and `--apply --plan-fingerprint <fp>`. Stops delivering a preference. The record stays.
+
+## Instruction block
+
+### `instructions plan`
+
+Previews the managed instruction block and each file it changes. Read-only.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--home <path>` | Required with a disposable pilot. Omit in live mode. |
+| `--agent <claude\|codex>` | Repeatable. Default: both. |
+| `--remove` | Preview taking the block out. |
+
+Each action is `create`, `update`, `remove`, `unchanged`, `blocked` (the path is not an approved `instructionTargets` path) or `conflict` (an unsafe file or malformed markers). The result also holds the `block`, its `chars` and any `PREFERENCES_DROPPED` or `PREFERENCES_REFUSED` warning.
+
+### `instructions apply`
+
+**Owner**. Same flags as `instructions plan`, plus `--plan-fingerprint <fp>` (required) and `--run-id <id>`. Shows the owner dialog with the exact block, then writes each file with a backup. A `blocked` or `conflict` action fails the apply with `DEVTWIN_CONFLICT` before the dialog.
+
+## Output templates
+
+### `template list`
+
+Lists the starter and personal output templates, by kind and format. Read-only.
+
+### `template show`
+
+Takes `--pilot`, `--kind <kind>` (required) and `--format <md|html>` (default `md`). Returns your personal template when you saved one, or the starter. Read-only.
+
+### `template from`
+
+Saves the heading structure of an output you liked as your personal template of that kind.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--file <file>` | Required. A `.md` or `.html` file inside the pilot's `inputsRoot`. |
+| `--kind <kind>` | Required. Such as `rca`, `report` or `decision`. |
+| `--apply --plan-fingerprint <fp>` | Save. |
+
+Fails with `DEVTWIN_SENSITIVE_CONTENT` and the `line` for a credential, with `DEVTWIN_INVALID_INPUT` and the reason `no-structure` for a file with no headings, and with `DEVTWIN_ISOLATION` for a heading that names a scope.
 
 ## Skill builder
 

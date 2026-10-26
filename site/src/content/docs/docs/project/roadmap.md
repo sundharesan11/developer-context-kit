@@ -23,6 +23,7 @@ devtwin is an early local tool, not yet a packaged release. The order below favo
 - The agent hook for Claude Code and Codex, which also blocks owner-only commands from agent shells.
 - A guided `setup` that walks through each setup step.
 - An [organization hub](/docs/guides/organization-hub/) for sharing accepted lessons and "working on" notes with colleagues.
+- [Preferences](/docs/guides/preferences-and-templates/) captured from your corrections and delivered through a managed block in your own agent instruction files, and output templates for an RCA, a report and a decision note.
 
 Lessons, the hook, setup and the hub are tested against local fixtures. They have not yet run against a real hub host.
 
@@ -37,7 +38,7 @@ Lessons, the hook, setup and the hub are tested against local fixtures. They hav
 | 4 | **Selective migration** from an existing personal setup: dry-run mapping, approved records only. | Planned. |
 | 5 | **More connectors** beyond GitHub and Slack, with account and workspace verification. | Planned. |
 | 6 | **Company knowledge hub** adapter with reviewed, sanitized promotion. | Implemented as the [organization hub](/docs/guides/organization-hub/). |
-| Next | **Preferences and templates**: preferences captured from corrections you confirm, a managed block in `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, and output templates. | Planned. |
+| Next | **Preferences and templates**: preferences captured from corrections you confirm, a managed block in `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, and output templates. | Implemented; see [Preferences and templates](/docs/guides/preferences-and-templates/). |
 | Next | **Release radar**: a weekly digest of vendor releases for your stack, with schedules and notifications. | Planned. |
 | Next | **Setup review**: a monthly reminder to review your setup, and real-agent acceptance checks. | Planned. |
 | 7 | **Skill export**: explicit file selection with privacy and rights review. | Planned. |

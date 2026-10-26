@@ -101,6 +101,9 @@ Lessons, the agent hook and the organization hub add these:
 | `data/personal/records/` | Your personal lessons and preferences. They follow you to every scope. |
 | `data/scopes/<scope>/org/records/` | The scope's org home for lesson records. |
 | `data/lesson-proposals/` | Lesson proposals from agents, one file each, until you accept or reject them. |
+| `data/pref-proposals/` | Preference proposals from agents, one file each. Declined ones stay, so they are not proposed again. |
+| `data/pref-retired.json` | Preferences you retired. The instruction block leaves them out. |
+| `data/templates/outputs/` | Your own output templates: heading structure only. |
 | `config/hubs/<scope>.json` | The hub binding: hub ID, handle, commit email and note consent. |
 | `state/lessons/<scope>.json` | The lesson index for a scope. A cache that `lesson index` and `hub sync` rebuild. |
 | `state/hooks/` | The kit receipt, per-session files, the budget log and the hook log. They hold no prompt text. |

@@ -33,7 +33,7 @@ See the [security model](/docs/security/security-model/).
 - **Fresh-session discovery is proven narrowly.** The first live activation, on one machine with one repository, showed fresh non-interactive Claude Code and Codex sessions finding the skills and resolving the project. Interactive sessions have not been checked yet, and one machine is not broad compatibility. Installing skill files alone does not prove a session uses them.
 - Cursor reads `~/.agents/skills` and will see the skills, but is untested.
 - `devtwin-setup` is not yet installed by `agents install`.
-- No preference command and no managed block in `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md` yet. The stop-and-ask rule on a lesson conflict comes only from the `devtwin-capture` skill, so an agent that does not load it gets lesson lines but no prompt to stop.
+- **Preferences arrive after `instructions apply`.** An accepted or retired preference changes nothing in the agent files until you apply the instruction block again. The Claude Code block depends on Claude Code reading the `@<path>` import in `~/.claude/CLAUDE.md`. The injection check refuses common shapes, not every phrasing, so the owner dialog is the real review.
 - CLI records are attributed to `actor: "human"` with a fixed run ID, whoever runs the command. `record publish --apply` always acts as the controller; the CLI does not check who is running it.
 - The bundled skills are checked for valid command routes, not for every flag they pass.
 

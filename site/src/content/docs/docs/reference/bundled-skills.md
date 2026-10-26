@@ -82,7 +82,8 @@ If the repository is not in the live config's `repos`, it tells you that you can
 2. Loads a full lesson with `lesson show` only when it needs it, and runs `lesson match` when the hook says more lessons match.
 3. **Conflict.** When the plan breaks a lesson's "do" or "don't" line, it stops, quotes the line and asks you to follow the lesson or replace it. To replace it, it previews `lesson supersede-propose` and applies only after you say yes. You accept the replacement yourself with `lesson accept --target hub`.
 4. **End of task.** Drafts at most three general lessons, with no client, repository, account, person or host names. It checks `lesson match` for duplicates, shows you the drafts, and runs `lesson propose --apply` only after you approve. It uses the session ID from the hook's session-start line.
-5. **Preferences.** When you correct how it works, it asks whether that is a preference for later tasks and repeats it back as one line. It writes no preference file in this version.
+5. **Preferences.** When you correct how it works, it asks whether that is a preference for later tasks. If you say yes, it saves a private proposal with `pref propose`, at most once for each kind of correction. You accept it yourself; see [Preferences and templates](/docs/guides/preferences-and-templates/).
+6. **Output templates.** For an RCA, a report or a decision note, it follows `template show`: your own template, or the starter.
 
 It never runs `lesson accept`, `lesson copy`, `published delete`, `hub join`, `lesson notices --ack --apply`, or `lesson edit` or `lesson reject` with `--apply`. On Codex, it checks an edit again when a lesson arrives after the edit ran.
 

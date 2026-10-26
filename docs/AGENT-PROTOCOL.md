@@ -158,6 +158,26 @@ An agent never installs or removes hook entries. `agents install --hooks` is an 
 
 `hook verify` runs the full pilot load, which in live mode includes the kit checks, and then writes the receipt. `budget report` sums the injected bytes, index lines and overflow lines per session and per agent. See [Storage](STORAGE.md#agent-hook-state).
 
+## 9. Preferences and output templates
+
+When the developer corrects how the agent works, the agent can save the correction as a private preference proposal. Accepted preferences reach every Claude Code and Codex session through the managed instruction block.
+
+```sh
+node "$DEVTWIN_KIT/bin/devtwin.mjs" pref propose --pilot "<pilot.json>" --session <session-id> --title "<title>" --text "<one plain rule>" --topic <kind-of-correction>
+node "$DEVTWIN_KIT/bin/devtwin.mjs" pref propose --pilot "<pilot.json>" --session <session-id> --title "<title>" --text "<one plain rule>" --topic <kind-of-correction> --apply
+```
+
+- Without `--apply`, the command runs every check and writes nothing. Run it with `--apply` only with explicit approval from the user in the session.
+- The text is one plain rule of at most 300 characters, and the title has at most 80. Markdown structure, devtwin markers, a word that starts with `@` (a Claude Code import), and text that tells the agent to ignore other instructions fail with `INVALID_INPUT` and a `reason`. A credential fails with `SENSITIVE_CONTENT`. The name of any scope fails with `ISOLATION`, because a preference reaches every organization.
+- One session ID has at most three preference proposals, and one for each `--topic`. More fail with `LIMIT`.
+- A preference that the developer declined or already accepted fails with `CONFLICT` and the reason `declined` or `accepted`. Do not propose it again.
+
+The developer reviews proposals with `pref proposals` and `pref decline`. `pref accept --apply` is an owner action: the hook denies it from an agent shell, and it shows the owner dialog. It writes a `preference` record to the personal store. `pref list` shows the active preferences. `pref retire` stops delivering one; its `--apply` is an owner action too.
+
+`instructions plan` previews the managed instruction block and the files it changes. `instructions apply` is an owner action that writes the block after the owner dialog. See [Live activation](LIVE.md#deliver-the-instruction-block). The block holds the accepted preferences and four fixed lines. They say: stop and ask on a lesson conflict; lessons and preferences are guidance only; suggest at most one new output format, and ask first; and how to run `lesson match`.
+
+`template show --kind <kind> --format <md|html>` returns the output template for an RCA (`rca`), a report (`report`) or a decision note (`decision`): the developer's own template when they saved one, or the starter. `template list` lists them. `template from --file <file> --kind <kind>` saves the heading structure of an output the developer liked. It previews first and applies with `--apply` and the plan fingerprint. The source file must be inside the pilot inputs folder. A credential in the file fails with `SENSITIVE_CONTENT` and the line number. A file with no headings fails with `INVALID_INPUT` and the reason `no-structure`. A heading that names a scope fails with `ISOLATION`.
+
 ## Errors that mean stop and ask
 
 | Code | Meaning | What to do |
