@@ -143,7 +143,7 @@ const starterPreferences = {
   id: "starter-preferences", title: "Starter preferences", available: true,
   what: "Stores the starter preferences you select as personal preference records in the store (personal/records). Pass --starter <id> for each one; with no --starter, all are selected.",
   why: "Preferences follow you across projects. Agents read them with your profile.",
-  undo: "No command removes a personal record yet. A later preference with the same subject replaces it once preference review ships (P4).",
+  undo: "Run devtwin pref retire --id <record id> to stop delivering one. The record stays in the personal store.",
   plan: starterPlan,
   async apply(ctx, fingerprint) {
     const plan = await starterPlan(ctx);

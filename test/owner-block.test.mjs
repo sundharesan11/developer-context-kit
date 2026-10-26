@@ -31,7 +31,7 @@ const OWNER_COMMANDS = [
   `${KIT} lesson copy --pilot '/x/live.json' --id rec_1 --apply`,
   `${KIT} published delete --pilot '/x/live.json' --apply`,
   `${KIT} hub join --pilot '/x/live.json' --apply`,
-  `${KIT} pref accept --pilot '/x/live.json'`,
+  `${KIT} pref accept --pilot '/x/live.json' --apply`,
   `${KIT} instructions apply --pilot '/x/live.json'`,
   `${KIT} live migrate --pilot '/x/live.json' --legacy '/x/old' --apply --plan-fingerprint 'sha256:00'`,
   `${KIT} record publish --pilot '/x/live.json' --apply`,
@@ -51,7 +51,7 @@ const WRAPPED = [
   "expect -c 'spawn devtwin lesson accept --apply; expect eof'",
   "unbuffer devtwin hub join --pilot /x --apply",
   "npx devtwin lesson accept --apply",
-  "npx --yes ./bin/devtwin.mjs pref accept",
+  "npx --yes ./bin/devtwin.mjs pref accept --apply",
   "nohup devtwin published delete --apply &",
   "time sudo devtwin instructions apply",
   "echo accept | xargs devtwin lesson --apply",
@@ -90,7 +90,7 @@ test("owner block denies devtwin owner-only actions run directly from an agent s
     assert.match(out.permissionDecisionReason, /Ask your developer to run it themselves/);
     assert.doesNotMatch(result.out, /additionalContext/);
   }
-  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson accept", "lesson copy", "lesson notices", "live add-repo", "live init", "live migrate", "live set-kit", "live write-classes", "note consent", "note revoke", "pref accept", "published delete", "record publish"]);
+  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson accept", "lesson copy", "lesson notices", "live add-repo", "live init", "live migrate", "live set-kit", "live write-classes", "note consent", "note revoke", "pref accept", "pref retire", "published delete", "record publish"]);
 });
 
 test("owner block denies owner-only actions through terminal wrappers", async (t) => {
