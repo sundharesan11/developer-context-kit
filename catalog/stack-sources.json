@@ -1,13 +1,20 @@
 {
   "version": 1,
   "items": [
-    { "name": "django", "terms": ["Django"], "endoflife": "django", "package": { "ecosystem": "pypi", "name": "django" } },
-    { "name": "next", "aliases": ["nextjs", "next.js"], "terms": ["Next.js"], "github": ["vercel/next.js"], "package": { "ecosystem": "npm", "name": "next" } },
-    { "name": "node", "aliases": ["nodejs", "node.js"], "terms": ["Node.js"], "github": ["nodejs/node"], "endoflife": "nodejs" },
-    { "name": "postgres", "aliases": ["postgresql"], "terms": ["PostgreSQL", "Postgres"], "endoflife": "postgresql" },
-    { "name": "python", "aliases": ["cpython"], "terms": ["Python"], "endoflife": "python" },
-    { "name": "react", "terms": ["React"], "github": ["facebook/react"], "package": { "ecosystem": "npm", "name": "react" } },
-    { "name": "typescript", "aliases": ["ts"], "terms": ["TypeScript"], "github": ["microsoft/TypeScript"], "package": { "ecosystem": "npm", "name": "typescript" } },
-    { "name": "vite", "terms": ["Vite"], "github": ["vitejs/vite"], "package": { "ecosystem": "npm", "name": "vite" } }
+    {"name": "django", "terms": ["Django"], "endoflife": "django", "package": {"ecosystem": "pypi", "name": "django"}},
+    {"name": "next", "aliases": ["nextjs", "next.js"], "terms": ["Next.js"], "github": ["vercel/next.js"], "package": {"ecosystem": "npm", "name": "next"}},
+    {"name": "node", "aliases": ["nodejs", "node.js"], "terms": ["Node.js"], "github": ["nodejs/node"], "endoflife": "nodejs"},
+    {"name": "postgres", "aliases": ["postgresql"], "terms": ["PostgreSQL", "Postgres"], "endoflife": "postgresql"},
+    {"name": "python", "aliases": ["cpython"], "terms": ["Python"], "endoflife": "python"},
+    {"name": "react", "terms": ["React"], "github": ["facebook/react"], "package": {"ecosystem": "npm", "name": "react"}},
+    {"name": "typescript", "aliases": ["ts"], "terms": ["TypeScript"], "github": ["microsoft/TypeScript"], "package": {"ecosystem": "npm", "name": "typescript"}},
+    {"name": "vite", "terms": ["Vite"], "github": ["vitejs/vite"], "package": {"ecosystem": "npm", "name": "vite"}}
+  ],
+  "radar": [
+    {"id": "claude-code", "kind": "agent-tools", "terms": ["Claude Code"], "github": ["anthropics/claude-code"]},
+    {"id": "codex", "kind": "agent-tools", "terms": ["Codex"], "github": ["openai/codex"]},
+    {"id": "martin-fowler", "kind": "approaches", "terms": ["Martin Fowler"], "feeds": ["https://martinfowler.com/feed.atom"]},
+    {"id": "simon-willison", "kind": "approaches", "terms": ["Simon Willison"], "feeds": ["https://simonwillison.net/atom/everything/"]},
+    {"id": "github-changelog", "kind": "adjacent", "terms": ["GitHub Changelog"], "feeds": ["https://github.blog/changelog/feed/"]}
   ]
 }

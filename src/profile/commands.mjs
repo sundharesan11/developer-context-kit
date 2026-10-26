@@ -60,6 +60,12 @@ export function composeProfile(base, flags, seed) {
     if (flags[flag] === undefined) continue;
     profile[key] = unique(list(flags[flag]).map((item) => item === "" ? "" : formatStackEntry(parseStackEntry(item))));
   }
+  if (flags.interest !== undefined) {
+    const radar = profile.radar ??= {};
+    // An empty --interest "" clears the list.
+    radar.interests = unique(list(flags.interest));
+  }
+  if (flags["radar-format"] !== undefined) (profile.radar ??= {}).format = flags["radar-format"];
   if (flags.preference !== undefined) setKeys(profile.workingPreferences ??= {}, pairs(flags.preference, "preference"), PREFERENCE_KEYS, "preference");
   if (flags.writing !== undefined) {
     const writing = profile.writing ??= {}, plain = [];
@@ -80,7 +86,9 @@ const FIELDS = (profile) => [
   ["stackCurrent", profile.stackCurrent],
   ["stackKnown", profile.stackKnown],
   ...PREFERENCE_KEYS.map((key) => ["workingPreferences." + key, profile.workingPreferences?.[key]]),
-  ...WRITING_FIELDS.map((key) => ["writing." + key, profile.writing?.[key]])
+  ...WRITING_FIELDS.map((key) => ["writing." + key, profile.writing?.[key]]),
+  ["radar.interests", profile.radar?.interests],
+  ["radar.format", profile.radar?.format]
 ];
 function changes(before, after, proposedBy) {
   const old = new Map(FIELDS(before ?? {}));
@@ -98,7 +106,7 @@ async function proposal(values, ctx) {
   const current = await readProfile(ctx.roots);
   return { proposedBy, derive, current, profile: derive(current.profile) };
 }
-const profileOptions = { work: { type: "string" }, "stack-current": { type: "string", multiple: true }, "stack-known": { type: "string", multiple: true }, preference: { type: "string", multiple: true }, writing: { type: "string", multiple: true }, "seed-from-init": { type: "boolean" }, "proposed-by": { type: "string" } };
+const profileOptions = { work: { type: "string" }, "stack-current": { type: "string", multiple: true }, "stack-known": { type: "string", multiple: true }, preference: { type: "string", multiple: true }, writing: { type: "string", multiple: true }, "seed-from-init": { type: "boolean" }, "proposed-by": { type: "string" }, interest: { type: "string", multiple: true }, "radar-format": { type: "string" } };
 export const profilePlanCommand = {
   options: profileOptions,
   async run(values, ctx) {

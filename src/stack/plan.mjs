@@ -9,7 +9,8 @@ import { readProfile } from "../profile/store.mjs";
 import { parseStackEntry } from "../profile/validate.mjs";
 import { checkFeedUrl, checkIdentifier, findCatalogItem } from "./catalog.mjs";
 
-export const GROUPS = Object.freeze(["advisories", "lifecycle", "versions"]);
+// radar (U19): the catalog's radar sources (agent tools, approaches, adjacent tech), fetched like announcements.
+export const GROUPS = Object.freeze(["advisories", "lifecycle", "versions", "radar"]);
 export const MAP_KINDS = Object.freeze(["github", "endoflife", "npm", "pypi", "crates"]);
 export const MODE = "manual";
 export const GITHUB_HOST = "api.github.com", OSV_HOST = "api.osv.dev", EOL_HOST = "endoflife.date";
@@ -63,8 +64,10 @@ export async function readStackApproval(roots) {
   catch (error) { if (error.code === "ENOENT") return null; throw error; }
   const { recordHash, ...body } = value ?? {};
   if (!value || typeof value !== "object" || Object.keys(value).length !== APPROVAL_KEYS.length || APPROVAL_KEYS.some((key) => !Object.hasOwn(value, key)) ||
-      value.schemaVersion !== 1 || value.kind !== "stack-sources" || value.pilotDigest !== roots.pilot.digest || recordHash !== digest(body)) throw new DevtwinError("INTEGRITY", "Stack approval invalid");
-  return value;
+      value.schemaVersion !== 1 || value.kind !== "stack-sources" || recordHash !== digest(body)) throw new DevtwinError("INTEGRITY", "Stack approval invalid");
+  // An approval made under another pilot config (for example before a live kit re-pin or a new live-mode exception) is
+  // not damaged, only out of date: it counts as no approval, so the next run asks for approval again.
+  return value.pilotDigest === roots.pilot.digest ? value : null;
 }
 // Overrides given on this call replace the set; with none given, the current approval's overrides carry forward
 // unless --clear-overrides drops them (KTD7). Carried overrides for items no longer declared are dropped and listed.
@@ -138,7 +141,9 @@ export async function planStack(roots, input = {}, { catalog, resolvePublicRead 
   const approval = await readStackApproval(roots);
   const overrides = chooseOverrides(given, approval, input.clearOverrides === true, declared);
   const resolved = entries.map((entry) => resolveItem(entry, catalog, overrides, groups));
-  const hosts = hostsFrom(resolved.flatMap((r) => r.fetches));
+  const radar = groups.includes("radar") ? (catalog.radar ?? []).map((r) => ({ id: r.id, kind: r.kind, label: r.terms[0], sources: { feeds: [...r.feeds], github: [...r.github] } })) : [];
+  const radarFetches = radar.flatMap((r) => [...r.sources.feeds.map((feed) => ({ host: new URL(feed).hostname, group: "radar", feed })), ...r.sources.github.map((id) => ({ host: GITHUB_HOST, group: "radar", identifier: id }))]);
+  const hosts = hostsFrom([...resolved.flatMap((r) => r.fetches), ...radarFetches]);
   // Only whether the binding exists is asked; any other field the resolver returns is ignored and never stored.
   // A typed refusal from the resolver (for example TOKEN_TOO_BROAD) means GitHub requests stay unauthenticated.
   let bound = false, refused = null;
@@ -152,7 +157,7 @@ export async function planStack(roots, input = {}, { catalog, resolvePublicRead 
     preview: true, kind: "stack-sources", mode: MODE,
     profile: { generation: current.generation, revisionHash: current.revisionHash },
     itemListHash: itemListHash(entries), items, notWatched: items.filter((i) => !i.watched).map((i) => i.name),
-    groups, overrides, hosts,
+    groups, overrides, hosts, ...(radar.length ? { radar } : {}),
     authentication: { github: authentication, ...(refused ? { refused } : {}), note: bound ? "GitHub requests are authenticated as the GitHub account of the routed public-read binding; that account is visible to GitHub." : refused ? "The routed public-read binding was refused; GitHub requests are unauthenticated." : "GitHub requests are unauthenticated." },
     requestContent: REQUEST_CONTENT,
     hostsStillSee: ["IP address", "request time", "fixed user agent " + USER_AGENT, ...(bound ? ["the GitHub account of the routed public-read binding (" + GITHUB_HOST + " only)"] : [])],

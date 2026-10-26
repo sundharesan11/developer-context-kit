@@ -72,10 +72,29 @@ function validateItem(entry, field) {
   }
   return item;
 }
-// Shape: {version: 1, items: [{name, aliases?, terms, feeds?, github?, endoflife?, package?: {ecosystem, name}}]}.
+// U19: the radar's own sources, beyond the developer's stack. Each names one kind of item (R28) and serves the radar
+// group only: {id, kind, terms, feeds?, github?}.
+export const RADAR_KINDS = Object.freeze(["agent-tools", "approaches", "adjacent"]);
+const RADAR_KEYS = ["id", "kind", "terms", "feeds", "github"];
+function validateRadarSource(entry, field) {
+  if (!isObject(entry)) bad(field);
+  for (const key of Object.keys(entry)) if (!RADAR_KEYS.includes(key)) bad(`${field}.${key}`);
+  if (typeof entry.id !== "string" || !NAME.test(entry.id)) bad(`${field}.id`);
+  if (!RADAR_KINDS.includes(entry.kind)) bad(`${field}.kind`);
+  const terms = strings(entry.terms, `${field}.terms`, { max: 20, length: 80, check: (item, f) => /^[^\r\n]+$/.test(item) ? item : bad(f) });
+  if (!terms.length) bad(`${field}.terms`);
+  const feeds = strings(entry.feeds, `${field}.feeds`, { max: 5, length: 2048, check: (item, f) => checkFeedUrl(item, f) === item ? item : bad(f) });
+  const github = strings(entry.github, `${field}.github`, { max: 5, length: 140, check: (item, f) => checkIdentifier("github", item, f) });
+  if (!feeds.length && !github.length) bad(`${field}.feeds`);
+  return { id: entry.id, kind: entry.kind, terms, feeds, github };
+}
+// Shape: {version: 1, items: [{name, aliases?, terms, feeds?, github?, endoflife?, package?: {ecosystem, name}}], radar?}.
 // Names and aliases are lowercase and unique across the catalog; feeds and github serve the default group only.
 export function validateStackCatalog(value) {
-  if (!isObject(value) || Object.keys(value).length !== 2 || value.version !== 1 || !Array.isArray(value.items) || value.items.length > 200) bad("catalog");
+  if (!isObject(value) || Object.keys(value).some((key) => !["version", "items", "radar"].includes(key)) || value.version !== 1 || !Array.isArray(value.items) || value.items.length > 200) bad("catalog");
+  if (value.radar !== undefined && (!Array.isArray(value.radar) || value.radar.length > 40)) bad("radar");
+  const radar = (value.radar ?? []).map((entry, index) => validateRadarSource(entry, `radar[${index}]`));
+  if (new Set(radar.map((r) => r.id)).size !== radar.length) bad("radar");
   const names = new Set();
   const items = value.items.map((entry, index) => {
     const item = validateItem(entry, `items[${index}]`);
@@ -85,7 +104,7 @@ export function validateStackCatalog(value) {
     }
     return item;
   });
-  return freeze({ version: 1, items });
+  return freeze({ version: 1, items, radar });
 }
 export function loadStackCatalog() {
   const info = statSync(CATALOG_PATH);

@@ -14,6 +14,7 @@ export const formatStackEntry = ({ name, version, care }) => name + (version ? "
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const LINE = /^[^\r\n]*$/;
 const AUDIENCE = /^[a-z][a-z0-9-]{0,39}$/;
+export const INTEREST = /^([^\r\n:]*[^\s:])(?::(weak|strong))?$/;
 function object(value, field, keys) {
   if (!isObject(value)) invalid(field);
   for (const key of Object.keys(value)) if (!keys.includes(key)) invalid(field ? field + "." + key : key);
@@ -34,7 +35,7 @@ function list(value, field, { items, max }) {
 export function validateProfile(value) {
   if (!isObject(value)) invalid("profile");
   if (findForbiddenFields(value).length) throw new DevtwinError("INVALID_INPUT", "Forbidden profile field", { fields: findForbiddenFields(value) });
-  object(value, "", ["workingPreferences", "workKind", "stackCurrent", "stackKnown", "writing"]);
+  object(value, "", ["workingPreferences", "workKind", "stackCurrent", "stackKnown", "writing", "radar"]);
   if (value.workingPreferences !== undefined) {
     const prefs = object(value.workingPreferences, "workingPreferences", ["explanationStyle", "diagrams", "autonomy", "notes"]);
     oneOf(prefs.explanationStyle, "workingPreferences.explanationStyle", ["concise", "detailed"]);
@@ -61,6 +62,13 @@ export function validateProfile(value) {
     oneOf(writing.length, "writing.length", ["short", "medium", "long"]);
     if (writing.spelling !== undefined && (typeof writing.spelling !== "string" || !/^[a-z]{2}(-[A-Z]{2})?$/.test(writing.spelling))) invalid("writing.spelling");
     list(writing.avoidPhrases, "writing.avoidPhrases", { items: 20, max: 80 });
+  }
+  // U19: radar interests rank items that match no stack entry. "term:weak" ranks below the digest threshold on its own.
+  if (value.radar !== undefined) {
+    const radar = object(value.radar, "radar", ["interests", "format"]);
+    list(radar.interests, "radar.interests", { items: 30, max: 80 });
+    for (const item of radar.interests ?? []) if (!INTEREST.test(item)) invalid("radar.interests");
+    oneOf(radar.format, "radar.format", ["md", "html"]);
   }
   const size = Buffer.byteLength(canonicalJson(value));
   if (size > PROFILE_CAP) throw new DevtwinError("LIMIT", "Profile exceeds size cap", { size, cap: PROFILE_CAP });

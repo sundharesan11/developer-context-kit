@@ -92,7 +92,7 @@ test("setup runs every available step on a fixture home and reaches a working br
   }
   const after = await h.ok(["setup", "status", "--pilot", h.liveConfig, ...h.inputs]);
   // In solo mode (no --hub-remote) the hub steps are skipped, not done.
-  for (const step of after.steps) assert.equal(step.done || /^(?:solo mode|no hub joined)/.test(step.skipped ?? ""), step.available === true, step.id);
+  for (const step of after.steps) assert.equal(step.done || /^(?:solo mode|no hub joined|launch agent not approved)/.test(step.skipped ?? ""), step.available === true, step.id);
   const brief = await h.ok(["context", "brief", "--pilot", h.liveConfig, "--scope", "example", "--cwd", h.repo]);
   assert.equal(brief.project, "example.atlas");
   assert.ok(brief.records.length > 0, "the brief holds the onboarded records");
@@ -137,7 +137,7 @@ test("setup re-run shows completed steps as done and changes nothing", async (t)
   const again = await drive(h);
   assert.equal(again.code, 0, again.text);
   assert.deepEqual(again.asked, []);
-  for (const id of available()) assert.match(again.text, new RegExp("\\[" + id + "\\][^\\n]*\\n[^\\n]*(?:done|Skipped: (?:solo mode|no hub joined))", "m"), id);
+  for (const id of available()) assert.match(again.text, new RegExp("\\[" + id + "\\][^\\n]*\\n[^\\n]*(?:done|Skipped: (?:solo mode|no hub joined|launch agent not approved))", "m"), id);
   assert.equal(await treeSnapshot(h.home), before);
   const status = await h.ok(["setup", "status", "--pilot", h.liveConfig, ...h.inputs]);
   assert.deepEqual(status.steps.filter((s) => s.available === true && !s.done && !s.skipped).map((s) => s.id), []);
@@ -167,7 +167,8 @@ test("setup previews show what, why and undo for each step before any write", as
   assert.equal((await h.cli(["setup", "plan", "--pilot", h.liveConfig, "--step", "nope"])).json.error.code, "DEVTWIN_INVALID_INPUT");
   const stale = await h.cli(["setup", "apply", "--pilot", h.liveConfig, "--step", "profile", ...h.inputs, "--plan-fingerprint", "sha256:" + "0".repeat(64)]);
   assert.equal(stale.json.error.code, "DEVTWIN_PLAN_MISMATCH");
-  assert.equal((await h.cli(["setup", "apply", "--pilot", h.liveConfig, "--step", "job-radar", "--plan-fingerprint", "sha256:00"])).json.error.code, "DEVTWIN_UNAVAILABLE");
+  assert.equal((await h.cli(["setup", "apply", "--pilot", h.liveConfig, "--step", "starter-templates", "--plan-fingerprint", "sha256:00"])).json.error.code, "DEVTWIN_UNAVAILABLE");
+  assert.equal((await h.cli(["setup", "apply", "--pilot", h.liveConfig, "--step", "job-radar", "--plan-fingerprint", "sha256:00"])).json.error.code, "DEVTWIN_GATE_REQUIRED", "a job without an approved plist is skipped");
   assert.equal((await h.cli(["setup", "apply", "--pilot", h.liveConfig, "--step", "hub-join", "--plan-fingerprint", "sha256:00"])).json.error.code, "DEVTWIN_GATE_REQUIRED", "solo mode skips the hub step");
   assert.equal((await h.ok(["profile", "show", "--pilot", h.liveConfig])).generation, 0, "a refused apply writes no profile");
 });

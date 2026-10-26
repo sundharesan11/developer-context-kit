@@ -134,54 +134,78 @@ async function publicReadValue(approval, resolvePublicRead) {
     return { bearer: null, refused: error.code };
   }
 }
-// deps: {catalog, resolvePublicRead, request, lookup, now, reader (record snapshot reader), limits}.
+// U18 (KTD16): in live mode the watch runs only under the approved stackWatch exception (docs/LIVE.md). It runs for one
+// scope, so a digest never lists another scope's projects. Returns the exception, or null outside live mode.
+export function liveStackWatch(roots, { scope = null } = {}) {
+  if (!roots.pilot?.live) return null;
+  const watch = roots.pilot.exceptions?.stackWatch;
+  if (!watch) throw new DevtwinError("GATE_REQUIRED", "Stack watch needs the stackWatch live-mode exception", { field: "live", reason: "no-live-exception", remedy: "live stack-watch --host <host>" });
+  if (scope === null) throw new DevtwinError("GATE_REQUIRED", "Live stack watch runs for one scope", { field: "scope", reason: "scope-required" });
+  return watch;
+}
+// Every host the approval reaches must be in the exception; the exception's cap replaces a larger request cap.
+function liveLimits(watch, hosts, limits = {}) {
+  if (!watch) return limits;
+  const missing = hosts.filter((host) => !watch.hosts.includes(host));
+  if (missing.length) throw new DevtwinError("GATE_REQUIRED", "Approved host is not in the stackWatch exception", { field: "exceptions.stackWatch.hosts", reason: "host-not-in-exception", hosts: missing });
+  return { ...limits, calls: Math.min(limits.calls ?? watch.maxRequests, watch.maxRequests) };
+}
+// deps: {catalog, resolvePublicRead, request, lookup, now, reader (record snapshot reader), limits, only}.
+// only: the source kinds to fetch (for example ["advisories"] for the hourly advisory job); default all approved ones.
 export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
-  const { catalog, resolvePublicRead = noPublicReadBinding, request = httpsRequest, lookup = systemLookup, now = () => new Date(), reader = readSnapshot, limits } = deps;
-  // Live mode stays offline until the watch's entry lands in the "Live-mode exceptions" section (U5 live-mode step).
-  if (roots.pilot?.live) throw new DevtwinError("GATE_REQUIRED", "Stack watch is not allowed in live mode yet", { field: "live", reason: "no-live-exception" });
+  const { catalog, resolvePublicRead = noPublicReadBinding, request = httpsRequest, lookup = systemLookup, now = () => new Date(), reader = readSnapshot, limits, only = null, cache = null } = deps;
   if (scope !== null) assertScopeId(scope);
+  const watch = liveStackWatch(roots, { scope });
   const stored = await readStackApproval(roots);
   const plan = await planStack(roots, { groups: (stored?.groups ?? []).filter((g) => g !== "announcements") }, { catalog, resolvePublicRead });
   const approval = await assertStackApproved(roots, plan);
+  const caps = liveLimits(watch, approval.hosts, limits);
   const projects = scope !== null ? await readScopeRecords(roots, scope, { reader }) : null;
   const seen = await readSeenState(roots, scope);
-  const { bearer, refused } = await publicReadValue(approval, resolvePublicRead);
-  const fetcher = createFetcher({ request, lookup, hosts: approval.hosts, bearer, limits });
+  // Live requests stay unauthenticated (KTD16): the routed public-read binding is not asked for its value.
+  const { bearer, refused } = watch ? { bearer: null, refused: null } : await publicReadValue(approval, resolvePublicRead);
+  const fetcher = createFetcher({ request, lookup, hosts: approval.hosts, bearer, limits: caps, cache });
+  const wants = (kind) => only === null || only.includes(kind);
   const clock = now(), fetchedAt = clock.toISOString();
   const terms = itemTerms(plan.items);
   const groups = approval.groups;
   const items = [], entries = [], findings = [], failures = [];
-  for (const planned of plan.items) {
-    const { name, sources } = planned;
-    const version = planned.version ?? null;
-    const record = { name, version, watched: planned.watched, sources: [], notes: [] };
-    const attempt = async (kind, url, run) => {
-      try { const n = await run(); record.sources.push({ kind, url, status: "ok", count: n }); }
-      catch (error) { const failure = failureOf(name, kind, url, error); failures.push(failure); record.sources.push({ kind, url, status: "failed", code: failure.code }); }
-    };
-    for (const feed of sources.feeds) await attempt("feed", feed, async () => {
+  // Feeds and GitHub releases for one stack item or one radar source; each entry carries the item it was fetched for.
+  const announcements = async (name, sources, attempt, extra = {}) => {
+    for (const feed of wants("feed") ? sources.feeds : []) await attempt("feed", feed, async () => {
       const { bytes } = await fetcher.fetchResource(feed, { accept: "application/rss+xml, application/atom+xml, application/feed+json, application/xml;q=0.9, application/json;q=0.8", types: FEED_TYPES });
-      const parsed = parseFeed(bytes).entries.map((raw) => entryOf(name, "feed", feed, new URL(feed).hostname, raw));
+      const parsed = parseFeed(bytes).entries.map((raw) => ({ ...entryOf(name, "feed", feed, new URL(feed).hostname, raw), ...extra }));
       entries.push(...parsed);
       return parsed.length;
     });
-    for (const id of sources.github) {
+    for (const id of wants("github-release") ? sources.github : []) {
       const [owner, repo] = id.split("/");
       const url = "https://" + GITHUB_HOST + "/repos/" + encodeURIComponent(owner) + "/" + encodeURIComponent(repo) + "/releases?per_page=" + RELEASES_PER_PAGE;
       await attempt("github-release", url, async () => {
         const { bytes } = await fetcher.fetchResource(url, { accept: "application/vnd.github+json", types: JSON_TYPES, auth: true });
         const releases = releaseData(bytes);
         for (const { raw, lines } of releases) {
-          const entry = entryOf(name, "github-release", url, "github.com", raw);
+          const entry = { ...entryOf(name, "github-release", url, "github.com", raw), ...extra };
           entries.push(entry);
           // A matching release-note line is quoted as an inert excerpt with its release URL; nothing else claims a break.
-          for (const excerpt of lines) findings.push(findingOf(name, "announcements", "release-note", "info", { title: "Release note line from " + (raw.title || "a release"), excerpt, url: entry.linkLive ? raw.link : null, sourceUrl: url }, fetchedAt));
+          if (!extra.radar) for (const excerpt of lines) findings.push(findingOf(name, "announcements", "release-note", "info", { title: "Release note line from " + (raw.title || "a release"), excerpt, url: entry.linkLive ? raw.link : null, sourceUrl: url }, fetchedAt));
         }
         return releases.length;
       });
     }
+  };
+  const attemptFor = (record) => async (kind, url, run) => {
+    try { const n = await run(); record.sources.push({ kind, url, status: "ok", count: n }); }
+    catch (error) { const failure = failureOf(record.name, kind, url, error); failures.push(failure); record.sources.push({ kind, url, status: "failed", code: failure.code }); }
+  };
+  for (const planned of plan.items) {
+    const { name, sources } = planned;
+    const version = planned.version ?? null;
+    const record = { name, version, watched: planned.watched, sources: [], notes: [] };
+    const attempt = attemptFor(record);
+    await announcements(name, sources, attempt);
     const pkg = sources.package;
-    if (groups.includes("advisories")) {
+    if (groups.includes("advisories") && wants("advisories")) {
       if (!pkg) record.notes.push({ group: "advisories", note: "advisories not covered" });
       else if (version === null) record.notes.push({ group: "advisories", note: "version unknown" });
       else if (!EXACT_VERSION.test(version)) record.notes.push({ group: "advisories", note: "version not exact" });
@@ -197,7 +221,7 @@ export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
         });
       }
     }
-    if (groups.includes("lifecycle")) {
+    if (groups.includes("lifecycle") && wants("lifecycle")) {
       if (!sources.endoflife) record.notes.push({ group: "lifecycle", note: "lifecycle not covered" });
       else if (version === null) record.notes.push({ group: "lifecycle", note: "version unknown" });
       else if (!/^\d/.test(bareVersion(version))) record.notes.push({ group: "lifecycle", note: "version not exact" });
@@ -211,7 +235,7 @@ export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
         });
       }
     }
-    if (groups.includes("versions")) {
+    if (groups.includes("versions") && wants("versions")) {
       if (!pkg) record.notes.push({ group: "versions", note: "versions not covered" });
       else {
         const url = registryUrl(pkg);
@@ -228,6 +252,15 @@ export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
     if (!planned.watched) record.reason = planned.reason;
     items.push(record);
   }
+  // U19: the radar sources, when the approval includes the radar group. Their entries carry the radar kind.
+  const radar = [];
+  for (const source of groups.includes("radar") && wants("radar") ? plan.radar ?? [] : []) {
+    const record = { name: "radar:" + source.id, kind: source.kind, sources: [] };
+    await announcements(record.name, source.sources, attemptFor(record), { radar: { id: source.id, kind: source.kind, label: source.label } });
+    const failed = record.sources.filter((s) => s.status === "failed").length;
+    record.status = !record.sources.length ? "skipped" : failed === record.sources.length ? "failed" : failed ? "partial" : "ok";
+    radar.push(record);
+  }
   const classified = entries.map((entry) => ({ ...entry, ...classifyEntry(entry, terms, projects), previouslyReported: seen.has(entry.hash) }))
     .sort((a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level) || (b.date ?? "").localeCompare(a.date ?? "") || (a.hash < b.hash ? -1 : 1));
   const marked = findings.map((f) => ({ ...f, previouslyReported: seen.has(f.hash) }));
@@ -236,10 +269,11 @@ export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
     kind: "stack-check", mode: MODE, scope, fetchedAt,
     approval: { planFingerprint: approval.planFingerprint, recordHash: approval.recordHash },
     groups: [...groups],
+    ...(watch ? { live: { exception: "stackWatch", maxRequests: caps.calls } } : {}),
     authentication: { approved: approval.authentication, used: bearer ? "routed-public-read" : "unauthenticated",
       ...(refused ? { refused, note: "The routed public-read binding was refused; GitHub requests ran unauthenticated and the approval's authentication state no longer matches, so the next run asks for approval again." } : {}) },
     ...(projects ? { projectsUnavailable: projects.filter((p) => p.unavailable).map((p) => ({ project: p.project, code: p.unavailable })) } : {}),
-    items, entries: classified, findings: marked, notWatched: plan.notWatched, failures,
+    items, ...(radar.length ? { radar } : {}), entries: classified, findings: marked, notWatched: plan.notWatched, failures,
     counts: { entries: classified.length, project: count("project"), stack: count("stack"), background: count("background"),
       previouslyReported: classified.filter((e) => e.previouslyReported).length + marked.filter((f) => f.previouslyReported).length, findings: marked.length, failures: failures.length },
     requests: fetcher.calls, seenBase: seenBase(seen)

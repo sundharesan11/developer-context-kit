@@ -82,7 +82,9 @@ async function* chunksOf(body) {
 }
 // One fetcher per run: it holds the approved host set, the call and byte budgets and the optional bearer value for
 // api.github.com. fetchResource returns {bytes, contentType, url} or throws a typed DevtwinError for that source only.
-export function createFetcher({ request = httpsRequest, lookup = systemLookup, hosts, bearer = null, limits = {} } = {}) {
+// cache (U20): an optional Map shared by the runs of one scheduled job, so each source is fetched once for all scopes.
+// A cached answer or failure is not a request. The call cap counts the requests of every run that shares the cache.
+export function createFetcher({ request = httpsRequest, lookup = systemLookup, hosts, bearer = null, limits = {}, cache = null } = {}) {
   const caps = { ...FETCH_LIMITS, ...limits };
   const allowed = new Set(hosts);
   const started = Date.now();
@@ -90,7 +92,16 @@ export function createFetcher({ request = httpsRequest, lookup = systemLookup, h
   async function fetchResource(target, { method = "GET", body, accept, types, auth = false } = {}) {
     const url = new URL(target);
     if (url.protocol !== "https:" || url.username || url.password || url.port || !allowed.has(url.hostname)) fail("HOST_NOT_APPROVED", "Host is not in the approval", { host: url.hostname });
-    if (++calls > caps.calls) fail("CALL_LIMIT", "Per-run request limit reached");
+    const key = method + " " + url.href + " " + (body ?? "");
+    if (cache?.has(key)) { const hit = cache.get(key); if (hit.error) throw hit.error; return hit; }
+    const budget = cache ? (cache.budget ??= { calls: 0 }) : null;
+    if (budget ? ++budget.calls > caps.calls : ++calls > caps.calls) fail("CALL_LIMIT", "Per-run request limit reached");
+    if (budget) calls++;
+    try { return await request1(url, { method, body, accept, types, auth }); }
+    catch (error) { if (cache && error instanceof DevtwinError && error.code !== "DEVTWIN_CALL_LIMIT") cache.set(key, { error }); throw error; }
+  }
+  async function request1(url, { method, body, accept, types, auth }) {
+    const key = method + " " + url.href + " " + (body ?? "");
     if (Date.now() - started >= caps.runMs) fail("NETWORK_TIMEOUT", "Run deadline exceeded");
     let answers;
     try { answers = await lookup(url.hostname); } catch { fail("NETWORK_UNAVAILABLE", "Host could not be resolved"); }
@@ -128,7 +139,9 @@ export function createFetcher({ request = httpsRequest, lookup = systemLookup, h
         fail(controller.signal.aborted ? "NETWORK_TIMEOUT" : "UPSTREAM_INVALID", "Response body read failed");
       }
       if (declared !== null && /^\d+$/.test(declared) && size !== Number(declared)) fail("UPSTREAM_INVALID", "Truncated response");
-      return { bytes: Buffer.concat(parts, size), contentType, url: url.href };
+      const result = { bytes: Buffer.concat(parts, size), contentType, url: url.href };
+      cache?.set(key, result);
+      return result;
     } finally {
       clearTimeout(timer);
       try { response?.cancel?.(); } catch { /* already closed */ }

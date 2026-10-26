@@ -19,7 +19,7 @@ export function mentionsIdentifier(content, identifiers) {
   const lower = content.toLowerCase();
   return identifiers.some((term) => lower.includes(term.toLowerCase()));
 }
-async function configuredScopes(roots) {
+export async function configuredScopes(roots) {
   let names;
   try { names = await readdir(join(roots.configRoot, "scopes")); } catch (error) { if (error.code === "ENOENT") return []; throw error; }
   return names.filter((name) => name.endsWith(".json")).map((name) => name.slice(0, -5)).filter((id) => SCOPE_ID.test(id));
