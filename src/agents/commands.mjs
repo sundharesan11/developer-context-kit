@@ -40,3 +40,12 @@ export const agentsRecoverCommand = { options: { apply: { type: "boolean" }, rel
 } };
 // Read-only: compares the skill folders now with an install run's pre-apply inventory.
 export const agentsRollbackCheckCommand = { options: { "run-id": { type: "string" } }, run: (values, ctx) => rollbackCheck(ctx.roots, ctx.pilot, { runId: values["run-id"] }) };
+// U16: instructions plan previews the managed instruction block and each target file; instructions apply writes it
+// with the plan fingerprint, after the owner dialog. --remove takes the block out. apply is an owner action.
+const instructionOptions = { home: { type: "string" }, agent: { type: "string", multiple: true }, remove: { type: "boolean" } };
+const instructionInput = (values, ctx) => ({ targetHome: values.home, agents: values.agent === undefined ? ["claude", "codex"] : agents(values.agent), remove: values.remove === true, kitRoot: ctx.kitRoot });
+export const instructionsPlanCommand = { options: instructionOptions, run: async (values, ctx) => (await import("./instructions.mjs")).planInstructions(ctx.roots, ctx.pilot, instructionInput(values, ctx)) };
+export const instructionsApplyCommand = { options: { ...instructionOptions, "plan-fingerprint": { type: "string" }, "run-id": { type: "string" } }, async run(values, ctx) {
+  if (!values["plan-fingerprint"]) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");
+  return (await import("./instructions.mjs")).applyInstructions(ctx.roots, ctx.pilot, instructionInput(values, ctx), { fingerprint: values["plan-fingerprint"], runId: values["run-id"] ?? "run_" + randomBytes(12).toString("hex"), ctx });
+} };

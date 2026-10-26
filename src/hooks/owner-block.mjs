@@ -11,7 +11,9 @@ export const OWNER_ACTIONS = Object.freeze([
   // shows the owner dialog as a second gate.
   { words: ["lesson", "accept"], apply: true }, { words: ["lesson", "copy"], apply: true },
   { words: ["published", "delete"], apply: true }, { words: ["hub", "join"], apply: true },
-  { words: ["pref", "accept"] }, { words: ["instructions", "apply"] },
+  // U15 and U16: the preview of pref accept stays open, as above. instructions apply is itself the apply; its preview is
+  // instructions plan.
+  { words: ["pref", "accept"], apply: true }, { words: ["pref", "retire"], apply: true }, { words: ["instructions", "apply"] },
   { words: ["live", "migrate"], apply: true }, { words: ["record", "publish"], apply: true },
   { words: ["agents", "install"], apply: true }, { words: ["agents", "uninstall"], apply: true },
   { words: ["live", "set-kit"], apply: true }, { words: ["live", "add-repo"], apply: true }, { words: ["live", "init"], apply: true },
@@ -41,9 +43,10 @@ function commandText(input) {
   if (typeof command !== "string") return "";
   return Buffer.byteLength(command) <= MAX_COMMAND_BYTES ? command : command.slice(0, MAX_COMMAND_BYTES);
 }
-// Lower-case words with quotes, backslashes and shell operators removed. "A=accept" gives "a" and "accept", so a value
+// Lower-case words with quotes, backslashes and shell operators removed. Quotes and backslashes are deleted, not
+// turned into spaces, because the shell joins "--ap""ply" into --apply. "A=accept" gives "a" and "accept", so a value
 // set in a variable still counts.
-const wordsOf = (text) => text.toLowerCase().replace(/["'`\\]/g, " ").split(/[\s;|&()<>{}$=]+/).filter(Boolean);
+const wordsOf = (text) => text.toLowerCase().replace(/\\\n/g, " ").replace(/["'`\\]/g, "").split(/[\s;|&()<>{}$=]+/).filter(Boolean);
 // The owner action a payload's shell command runs, or null. Only shell tools are checked.
 export function ownerAction(agent, payload) {
   if (!["claude", "codex"].includes(agent) || !SHELL_TOOLS.has(payload?.tool_name)) return null;
