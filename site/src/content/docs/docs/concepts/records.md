@@ -3,7 +3,7 @@ title: Records
 description: What a devtwin record is, the kinds and statuses it can have, where its evidence comes from, and how to replace one without losing history.
 ---
 
-A record is one piece of project knowledge: a decision, a fact, a command, an open question. Records are what a [brief](/docs/concepts/briefs/) is made of. Each one belongs to exactly one project and is stored privately on your disk.
+A record is one piece of project knowledge: a decision, a fact, a command, an open question. Records are what a [brief](/docs/concepts/briefs/) is made of. Most records belong to exactly one project. Lessons and preferences can also live in your personal store. Every record is stored privately on your disk.
 
 ## Anatomy of a record
 
@@ -18,7 +18,7 @@ devtwin record add --pilot "$PILOT" --scope example --project example.atlas \
 
 | Part | What it is | Limits |
 | --- | --- | --- |
-| Kind | What sort of knowledge this is. See [kinds](#kinds). | One of ten values |
+| Kind | What sort of knowledge this is. See [kinds](#kinds). | One of twelve values |
 | Status | How much weight it carries. See [statuses](#statuses). | Defaults to `observed` |
 | Title | A one-line summary. | 1 to 200 characters, no line breaks |
 | Body | The detail, as plain text or Markdown. | Up to 32,768 bytes |
@@ -45,8 +45,28 @@ Instead of `--body`, put the text in a file under your pilot's `inputsRoot` fold
 | `experiment` | Something tried, and what happened. |
 | `handoff` | Where a session stopped and what comes next. See [Handoffs](/docs/concepts/handoffs/). |
 | `unknown` | An open question that someone still needs to answer. |
+| `lesson` | Advice that applies to some files, packages or topics. See [Lessons and hooks](/docs/guides/lessons-and-hooks/). |
+| `preference` | How you like to work. It follows you across projects, so it never lives in a project store. |
 
 Briefs list records in this order of kind, so constraints and decisions come before commands and facts, and open questions come last.
+
+## Class, reach and match
+
+New records use schema 2, which adds three fields. Readers accept schema 1 and 2, and a schema 1 record is never rewritten.
+
+| Field | Values | Rule |
+| --- | --- | --- |
+| `class` | `fact` or `lesson` | A fact stays in its project. A `lesson` record always has class `lesson`. |
+| `reach` | `personal`, `project` or `org` | A fact has project reach. A preference never has project reach. |
+| `match` | `paths`, `packages` and `topics` | At most 20, 20 and 10 entries. Only a lesson or preference with a match block reaches an agent through the hook. |
+
+Each reach has its own home:
+
+| Reach | Home | Holds |
+| --- | --- | --- |
+| `project` | The project's records | Every kind except `preference` |
+| `personal` | Your personal store, `data/personal/records/` | `lesson` and `preference`. It is part of every scope's lesson index. |
+| `org` | The scope's org home, `data/scopes/<scope>/org/records/` | `lesson`. No command writes here yet: for a scope with a hub, the [hub](/docs/guides/organization-hub/) holds the organization's copy. |
 
 ## Statuses
 

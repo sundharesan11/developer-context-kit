@@ -32,6 +32,10 @@ Then follow the [Quickstart](/docs/getting-started/quickstart/). It builds a thr
 		Claude Code and Codex read the same brief, through the same CLI. Switching agents does not mean
 		re-explaining the project.
 	</Card>
+	<Card title="Lessons at the right moment" icon="approve-check">
+		A lesson is one "do" or "don't" tied to paths, packages or topics. The devtwin hook shows it to the agent
+		when it reads or edits matching code. Join your org's hub to share approved lessons with colleagues.
+	</Card>
 	<Card title="The right account per organization" icon="random">
 		Identity routing will pick the right GitHub and Slack account for each organization you work for. The
 		guide covers the design and what exists today.
@@ -47,13 +51,14 @@ Then follow the [Quickstart](/docs/getting-started/quickstart/). It builds a thr
 1. **Onboard** a repository. devtwin reads a few files, such as the README and package manifest, and shows you what it would record. You approve that exact plan.
 2. **Read a brief** at the start of a session and give it to your agent, or let the bundled `devtwin-resume` skill fetch it.
 3. **Record** decisions and findings as you work, so the next session has them.
-4. **Export a handoff** when you want to pass selected records to someone else.
+4. **Learn as you go.** Agents propose lessons at the end of a task. You accept the ones worth keeping, for yourself or for your team.
+5. **Export a handoff** when you want to pass selected records to someone else.
 
 Every write is previewed first and applied only when you ask. See [How it works](/docs/concepts/how-it-works/) for the full picture.
 
 ## Your data stays on your disk
 
-The kit you clone is public code: the CLI, schemas, generic templates and tests. Everything you add, such as project records, your profile and drafts, lives in separate private folders outside that clone, with private file modes. Nothing is synchronized from your private store into the public kit, and nothing is sent to a hosted service.
+The kit you clone is public code: the CLI, schemas, generic templates and tests. Everything you add, such as project records, your profile and drafts, lives in separate private folders outside that clone, with private file modes. Nothing is synchronized from your private store into the public kit, and nothing is sent to a hosted service. If you join an organization hub, a Git repository your organization hosts, only the lessons you accept and short "working on" notes go to it.
 
 devtwin also never writes into the project repositories it reads. What it learns goes into your private store, not into the repository.
 
@@ -68,6 +73,8 @@ devtwin runs from a Git checkout with `node bin/devtwin.mjs`; it is not on npm y
 	<LinkCard title="Installation" description="Requirements, the self-check and a devtwin alias." href="/docs/getting-started/installation/" />
 	<LinkCard title="How devtwin compares" description="AGENTS.md and CLAUDE.md, built-in agent memory, and devtwin side by side." href="/docs/concepts/comparison/" />
 	<LinkCard title="Use it with coding agents" description="Install the bundled skills for Claude Code and Codex." href="/docs/guides/coding-agents/" />
+	<LinkCard title="Lessons and agent hooks" description="Deliver lessons to agents as they work, and review what they propose." href="/docs/guides/lessons-and-hooks/" />
+	<LinkCard title="Organization hub" description="Share approved lessons and working-on notes with colleagues." href="/docs/guides/organization-hub/" />
 	<LinkCard title="Personal harness" description="Set up your profile and make private skills from templates." href="/docs/guides/personal-harness/" />
 	<LinkCard title="FAQ" description="Short answers to the questions people ask first." href="/docs/project/faq/" />
 </CardGrid>

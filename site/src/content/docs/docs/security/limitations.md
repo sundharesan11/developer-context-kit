@@ -29,12 +29,31 @@ See the [security model](/docs/security/security-model/).
 
 ## Agents and sessions
 
-- **No automatic session hooks.** Nothing injects the brief when a session starts or records a handoff when it ends. You or a skill pull context explicitly.
+- **Hooks deliver lessons, not the brief.** The [agent hook](/docs/guides/lessons-and-hooks/) delivers matching lesson lines and blocks owner-only commands. Nothing injects the brief when a session starts or records a handoff when it ends. You or a skill pull the brief explicitly.
 - **Fresh-session discovery is proven narrowly.** The first live activation, on one machine with one repository, showed fresh non-interactive Claude Code and Codex sessions finding the skills and resolving the project. Interactive sessions have not been checked yet, and one machine is not broad compatibility. Installing skill files alone does not prove a session uses them.
 - Cursor reads `~/.agents/skills` and will see the skills, but is untested.
 - `devtwin-setup` is not yet installed by `agents install`.
+- No preference command and no managed block in `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md` yet. The stop-and-ask rule on a lesson conflict comes only from the `devtwin-capture` skill, so an agent that does not load it gets lesson lines but no prompt to stop.
 - CLI records are attributed to `actor: "human"` with a fixed run ID, whoever runs the command. `record publish --apply` always acts as the controller; the CLI does not check who is running it.
 - The bundled skills are checked for valid command routes, not for every flag they pass.
+
+## Lessons, hooks and hubs
+
+- **Tested against fixtures only.** Hub tests use local bare repositories behind a fixture SSH command. A real SSH host has not been checked.
+- **Codex coverage.** The hook sees Codex edits through `apply_patch`, but not files that Codex reads through the shell. On Codex, a `post-tool` lesson arrives after the edit ran. Shell paths are a best-effort guess.
+- **No lock on session caps.** Two hook calls in one session at the same time can both send a lesson, and both can post a note past the six-note cap.
+- **Exact roots.** A root reached through another symlink or a moved checkout does not match. A folder bound in two scopes gets no lessons.
+- **The owner-action block is text-based.** It reads command text, not a parsed shell command. A command built in a way the text does not show can pass, and a harmless command that names an owner action can be denied. It does not protect a session that runs without the hook, or an agent that edits its settings files.
+- **The hub trusts push access.** Anyone who can push can add lessons and notes under any handle. devtwin does not verify the handle or the commit email.
+- **Deleted text stays in Git.** `published delete` removes the file and adds a tombstone, but Git history and colleagues' clones keep the text. A history rewrite is a manual step for the hub admin.
+- **Tombstones.** A machine that never synced while a lesson file was there cannot tie a later tombstone to its author. It never delivered that lesson, but it does not remember the tombstone.
+- **Deleting a replacement brings back the old lesson.** When you delete the only replacement of a lesson, the replaced lesson reaches agents again.
+- **Contested replacements.** Two replacements pushed before either client fetched both land. devtwin delivers both as `contested` and does not choose a winner.
+- **Notes are slow.** A note moves only when `hub sync` runs on both machines: up to about 20 minutes with the hub sync job. A note that waits in the outbox for more than half its 72-hour expiry is dropped.
+- **Note cleanup.** Each developer's devtwin deletes only that developer's expired notes. A hub with more than 5000 note files fails to sync with `DEVTWIN_LIMIT` until the admin prunes it.
+- **One lost item.** A publish that stops between its commit and its outbox write can lose that one item.
+- **macOS only for owner actions and the job.** The owner dialog needs a macOS desktop session, so owner actions deny over SSH. The hub sync job is a macOS LaunchAgent.
+- **Isolation checks match whole names.** A bare project short name without its scope prefix is not matched. Review "general" lessons before you accept them.
 
 ## Onboarding and briefs
 

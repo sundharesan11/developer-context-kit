@@ -86,6 +86,30 @@ The live config is a pilot file with a `live` block. `live init` writes it; you 
 
 Live mode relaxes the fence for exactly these named skill folders (only `devtwin-*` entries inside them) and the listed repositories (read-only). The approved digest is stored at `store/state/live/approved-config.json`; a `live.json` that differs from it is refused.
 
+### Write classes
+
+A live config can hold an optional top-level `writeClasses` block. It names the only other paths outside the store that devtwin may write. Each class is a list of exact absolute paths, at most 16 per class.
+
+```json
+"writeClasses": {
+  "hubRoot": ["/Users/<you>/.devtwin/hubs"],
+  "hookTargets": ["/Users/<you>/.claude/settings.json", "/Users/<you>/.codex/hooks.json"],
+  "launchAgents": ["/Users/<you>/Library/LaunchAgents/devtwin.hub-sync.example.plist"]
+}
+```
+
+| Class | Allowed paths | Written by |
+| --- | --- | --- |
+| `hubRoot` | Folders inside your home for hub clones. Writes are allowed in the folder and below it. | `hub join`, `hub sync`, `hub leave` |
+| `instructionTargets` | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`), `~/.codex/AGENTS.md`, and a `devtwin*.md` file directly in one of those folders. | No command yet |
+| `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) and `~/.codex/hooks.json`. | `agents install --hooks`, `agents uninstall --hooks` |
+| `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. | `hub schedule` |
+
+- Set the classes only with [`live write-classes`](/docs/reference/cli/#live-write-classes). The classes are part of the approved config digest, so a hand edit is refused with `DEVTWIN_GATE_REQUIRED`.
+- Every path must be canonical and inside your home. A link, or a path whose folder is a link, is refused. A hub root must not overlap the store, the kit, a listed repository, a skill folder or another hub root.
+- In a settings or instruction file, devtwin changes only its own JSON entries or the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. It backs up the exact prior bytes to `store/state/runs/<run_id>/backups/` first, and the file keeps its own mode.
+- A disposable pilot can list classes too. Its file targets must have the same shapes inside a listed `agentHomes` folder, and its hub roots must be inside `pilotRoot`.
+
 ## Init preferences
 
 `init --preference` stores working preferences in `configRoot/user.json`, alongside the actor references from `--actor`:

@@ -5,14 +5,16 @@ sidebar:
   label: Coding agents
 ---
 
-devtwin ships skills that teach a coding agent how to call the CLI: resume a project, propose a record, onboard a repository. `agents install` copies them into your agents' skill folders. Every install is previewed, approved by fingerprint, journaled and reversible.
+devtwin ships skills that teach a coding agent how to call the CLI: resume a project, propose a record, onboard a repository, handle lessons. `agents install` copies them into your agents' skill folders. Every install is previewed, approved by fingerprint, journaled and reversible.
+
+In live mode, `agents install --hooks` also adds the devtwin agent hook, which delivers matching lessons while the agent works and blocks owner-only commands. See [Lessons and hooks](/docs/guides/lessons-and-hooks/).
 
 ## What gets installed
 
 | Agent | Skill folder | Skills |
 | --- | --- | --- |
-| Claude Code | `.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) | `devtwin-onboard`, `devtwin-resume`, `devtwin-record` |
-| Codex | `.agents/skills` | the same three |
+| Claude Code | `.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) | `devtwin-onboard`, `devtwin-resume`, `devtwin-record`, `devtwin-capture` |
+| Codex | `.agents/skills` | the same four |
 
 Each installed entry is a folder holding `SKILL.md` and a `.devtwin-owned.json` ownership receipt. devtwin only ever writes, updates or removes `devtwin-*` entries it owns. Codex skills go to `.agents/skills`, never `.codex/skills`.
 

@@ -15,7 +15,9 @@ A repository tells an agent what the code is. It rarely says why a decision was 
 | Pillar | What you get |
 | --- | --- |
 | **Project context** | Onboard a repository read-only, then keep its facts, decisions, constraints, commands, unknowns and handoffs as reviewable records. Each record links to its sources by hash, so a brief can tell you when evidence has changed. Records are superseded, never silently overwritten. |
-| **Every coding agent** | Bundled `devtwin-onboard`, `devtwin-resume` and `devtwin-record` skills give Claude Code and Codex the same context through the same CLI. |
+| **Every coding agent** | Bundled `devtwin-onboard`, `devtwin-resume`, `devtwin-record` and `devtwin-capture` skills give Claude Code and Codex the same context through the same CLI. |
+| **Lessons when they apply** | A lesson is one "do" or "don't" with a reason, tied to paths, packages or topics. The devtwin agent hook shows a short index line when an agent reads or edits matching code, at most four per session. Agents propose lessons; only you accept them. See [Agent protocol](docs/AGENT-PROTOCOL.md#8-lessons-for-the-work-in-hand). |
+| **Organization hub** | Join a Git repository your organization hosts to share accepted lessons with colleagues. Each publish shows you the exact text in a macOS dialog first. Short "working on" notes warn a colleague's agent when you change the same area. See [Organization hub](docs/HUB.md). |
 | **Organization identity routing** *(planned)* | Each scope binds its own GitHub and Slack accounts, and devtwin checks the live identity before acting. This is designed, not built yet; see the [roadmap](docs/ROADMAP.md). |
 | **Personal harness** | Clone it as a personal-harness template: a small private profile, skill templates you turn into your own private skills, and a watch on vendor announcements for your stack. See the [harness guide](docs/HARNESS.md). |
 
@@ -27,7 +29,8 @@ A repository tells an agent what the code is. It rarely says why a decision was 
 2. **Review.** Every write is a preview first. You approve the exact plan fingerprint before devtwin stores anything.
 3. **Keep private.** Records live in local stores outside the repository, with private file modes.
 4. **Brief.** `context brief` returns at most 12 items and 24 KiB, with sources, freshness and unknowns.
-5. **Learn.** New decisions go back in as records, or out as a [selected-record handoff](docs/HANDOFF.md).
+5. **Deliver lessons.** The agent hook adds matching lesson lines while the agent works. It never uses the network.
+6. **Learn.** New decisions go back in as records, new lessons as proposals you review, or out as a [selected-record handoff](docs/HANDOFF.md).
 
 More in [Architecture](docs/ARCHITECTURE.md).
 
@@ -65,6 +68,7 @@ Next steps:
 - [Guided onboarding](docs/ONBOARDING.md): preview, approve, brief and record on a synthetic project, step by step.
 - [Live activation](docs/LIVE.md): run devtwin on your own machine against real repositories and agent skill folders.
 - [Migrating from devctx](docs/MIGRATING.md): `devtwin live migrate` moves a setup made under the old name.
+- [Organization hub](docs/HUB.md): join a hub, share lessons and post "working on" notes.
 
 ## How it compares
 
@@ -80,10 +84,10 @@ devtwin complements repository instruction files rather than replacing them: rep
 
 ## Status and requirements
 
-- **Status.** devtwin is a local package candidate at version `0.0.0-local`. Live mode is implemented, and its first activation on a real machine passed, including fresh non-interactive Claude Code and Codex sessions that found the skills and read the brief. Backup and restore, session hooks and organization identity routing are on the [roadmap](docs/ROADMAP.md); known gaps are in [Limitations](docs/LIMITATIONS.md).
+- **Status.** devtwin is a local package candidate at version `0.0.0-local`. Live mode is implemented, and its first activation on a real machine passed, including fresh non-interactive Claude Code and Codex sessions that found the skills and read the brief. Lessons, the agent hook, the setup wizard and the organization hub are implemented and tested against local fixtures. They are not yet activated on a real machine or tested on a real hub host. Backup and restore and organization identity routing are on the [roadmap](docs/ROADMAP.md); known gaps are in [Limitations](docs/LIMITATIONS.md).
 - **Install.** Run devtwin from a checkout. A global `devtwin` command is NOT currently installed by cloning; use the alias above. The npm name `devtwin` is reserved with a placeholder package; the CLI is not published to npm yet, and `package.json` stays `"private": true` to prevent accidental publication.
 - **Requirements.** Node.js `>=22.13.0` and Git. macOS is the reference platform. CI also runs on Ubuntu, but Linux support is not claimed yet. Windows is unsupported.
-- **Safety.** Every stateful command needs an explicit pilot file: a disposable pilot for evaluation, or a live config for one real machine. There is no automatic private-to-public synchronization, and the pilot fence is not a sandbox: it limits this CLI, not your agent or other processes. Read the [security model](docs/SECURITY-MODEL.md) before using private data.
+- **Safety.** Every stateful command needs an explicit pilot file: a disposable pilot for evaluation, or a live config for one real machine. There is no automatic private-to-public synchronization. An organization hub receives only the lessons you accept and the "working on" notes you consent to. The pilot fence is not a sandbox: it limits this CLI, not your agent or other processes. Read the [security model](docs/SECURITY-MODEL.md) before using private data.
 
 ## Contributing
 

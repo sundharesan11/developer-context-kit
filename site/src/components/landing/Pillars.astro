@@ -9,6 +9,7 @@ const kitTree = `<span class="d">devtwin/</span>
 │  ├─ devtwin-resume/
 │  ├─ devtwin-record/
 │  ├─ devtwin-onboard/
+│  ├─ devtwin-capture/
 │  └─ devtwin-setup/
 ├─ templates/skills/
 └─ LICENSE  <span class="muted">Apache-2.0</span>`;
@@ -20,6 +21,7 @@ const dataTree = `<span class="d">~/.devtwin/</span>  <span class="muted">0700</
    ├─ data/scopes/
    │  ├─ acme/
    │  └─ globex/
+   ├─ data/personal/  <span class="muted">lessons, preferences</span>
    ├─ data/exports/
    └─ state/`;
 // Each tree line gets its own span so the trees can print in line by line (motion on only).
@@ -127,10 +129,49 @@ const lines = (tree: string) =>
     </article>
 
     <!-- Pillar 3 -->
-    <article class="pillar" id="accounts" aria-labelledby="p3">
+    <article class="pillar" id="lessons" aria-labelledby="p3">
       <div class="p-copy reveal">
-        <div class="p-num"><span>03</span> Accounts</div>
-        <h3 id="p3">The right account, in every org.</h3>
+        <div class="p-num"><span>03</span> Team lessons</div>
+        <h3 id="p3">The lesson arrives when the agent opens the file.</h3>
+        <p>A lesson is one "do" or "don't" with a reason, tied to paths, packages or topics. When an agent reads or edits matching code, the devtwin hook adds a short index line to the session. Join your org's hub and your colleagues' lessons arrive the same way.</p>
+        <ul class="ticks">
+          <li><span><b>Just in time.</b> At most four short lines per session. The full lesson loads only when the agent asks.</span></li>
+          <li><span><b>Agents draft, you approve.</b> Agents <code>lesson propose</code>; only you <code>lesson accept</code>, after a dialog that shows the exact text.</span></li>
+          <li><span><b>See overlap early.</b> "Working on" notes tell a colleague's agent that you are changing the same area.</span></li>
+        </ul>
+        <a class="p-more" href={DOCS.lessons}>How lessons reach your agents <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="frame reveal">
+        <div class="frame-in">
+          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">Claude Code · acme.atlas</span><span class="right"><span class="pill acc">hook live</span></span></div>
+          <div class="f-body">
+            <div class="agent-line">
+              <span class="cmd"><span class="p">›</span> Edit src/billing/client/retry.ts</span>
+              <span class="pill">pre-tool</span>
+            </div>
+            <div class="brief">
+              <div class="brief-h"><span><b>devtwin lessons</b> <span class="muted">· data from teammates</span></span><span class="muted">2 of 4 lines</span></div>
+              <div class="bsec"><h4>Matched by path</h4>
+                <div class="brow"><span class="dot"></span><span>Don't retry 4xx from the billing API</span><span class="src">handle:priya</span></div>
+                <div class="brow"><span class="dot"></span><span>Keep retry jitter on; the queue spikes without it</span><span class="src">you</span></div>
+              </div>
+              <div class="bsec"><h4>Working on</h4>
+                <div class="brow"><span class="dot q"></span><span>priya on fix/billing-timeouts touching src/billing</span><span class="src">until Thu</span></div>
+              </div>
+              <div class="bsec"><h4>Session end</h4>
+                <div class="brow"><span class="dot c"></span><span>1 lesson proposed · waiting for your review</span><span class="src">lesson proposals</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Pillar 4 -->
+    <article class="pillar flip" id="accounts" aria-labelledby="p4">
+      <div class="p-copy reveal">
+        <div class="p-num"><span>04</span> Accounts</div>
+        <h3 id="p4">The right account, in every org.</h3>
         <p>Work for two companies? Each one is its own scope, with its own projects and its own records. Identity routing binds each scope to its own GitHub and Slack account, so the project, not whatever you happen to be logged into, decides who the agent acts as.</p>
         <ul class="ticks">
           <li><span><b>Scoped by repo.</b> <code>context resolve</code> maps the working tree to its scope and project.</span></li>
@@ -166,11 +207,11 @@ const lines = (tree: string) =>
       </div>
     </article>
 
-    <!-- Pillar 4 -->
-    <article class="pillar flip" id="harness" aria-labelledby="p4">
+    <!-- Pillar 5 -->
+    <article class="pillar" id="harness" aria-labelledby="p5">
       <div class="p-copy reveal">
-        <div class="p-num"><span>04</span> Your harness</div>
-        <h3 id="p4">Make it yours. Then make more.</h3>
+        <div class="p-num"><span>05</span> Your harness</div>
+        <h3 id="p5">Make it yours. Then make more.</h3>
         <p>devtwin is also a template for your own harness. Set up a small private profile and turn generic skill templates into private skills of your own. The kit ships the patterns; your profile supplies the taste.</p>
         <ul class="ticks">
           <li><span><b>Stack watch.</b> Vendor announcements that touch what you build: a new Claude model, an auth-provider release.</span></li>
@@ -217,15 +258,15 @@ const lines = (tree: string) =>
       </div>
     </article>
 
-    <!-- Pillar 5 -->
-    <article class="pillar" id="disk" aria-labelledby="p5">
+    <!-- Pillar 6 -->
+    <article class="pillar flip" id="disk" aria-labelledby="p6">
       <div class="p-copy reveal">
-        <div class="p-num"><span>05</span> Local-first</div>
-        <h3 id="p5">Yours. On your disk.</h3>
-        <p>The public kit and your private data live in separate places. Records, profiles and exports stay on your machine in 0700 folders and 0600 files. Nothing syncs anywhere, and onboarding only ever reads your repos.</p>
+        <div class="p-num"><span>06</span> Local-first</div>
+        <h3 id="p6">Yours. On your disk.</h3>
+        <p>The public kit and your private data live in separate places. Records, profiles and exports stay on your machine in 0700 folders and 0600 files. Onboarding only ever reads your repos. Nothing leaves your machine unless you join a hub, and then only the lessons you approve and short "working on" notes.</p>
         <ul class="ticks">
           <li><span><b>Public kit, private data.</b> Update the kit without touching your context.</span></li>
-          <li><span><b>No account, no server.</b> Plain files you can read, back up and diff.</span></li>
+          <li><span><b>No account, no server.</b> Plain files you can read, back up and diff. A hub is a Git repo your org already hosts.</span></li>
           <li><span><b><code>devtwin doctor</code></b> checks roots, locks and bound repos for you.</span></li>
         </ul>
         <a class="p-more" href={DOCS.whereDataLives}>Where your data lives <span aria-hidden="true">→</span></a>

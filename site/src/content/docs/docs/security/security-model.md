@@ -38,7 +38,12 @@ The fence controls what **this CLI** writes. It does not limit what your agent h
 
 Every write is a preview followed by an apply. Applies are bound to a **fingerprint** of the exact plan, so a plan that changed after you reviewed it is refused.
 
-A fingerprint is not proof that *you* approved. An agent can read a preview and pass its fingerprint back. That is why the bundled skills ask you in the session and never apply a plan you did not approve, and why some actions are reserved for you: `record publish --apply`, live config changes, and (when [identity routing](/docs/guides/identity-routing/) ships) account bindings, which will also require a code typed at an interactive terminal.
+A fingerprint is not proof that *you* approved. An agent can read a preview and pass its fingerprint back. That is why the bundled skills ask you in the session and never apply a plan you did not approve, and why some actions are reserved for you: `record publish --apply`, live config changes, hook and skill installs, every hub publish and delete, and (when [identity routing](/docs/guides/identity-routing/) ships) account bindings.
+
+Two controls protect these owner actions:
+
+- **The hook block.** When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies owner-only commands from an agent shell, also through terminal wrappers. It reads command text, so it is a guard against mistakes, not a sandbox.
+- **The owner dialog.** Hub joins, publishes, deletes and consent changes show a macOS dialog with the exact content. Nothing is written until you click **Approve**. The text reaches `osascript` only as arguments, never as script text. Without a desktop session, for example over SSH, the dialog denies.
 
 Approval responses recorded by the skill builder and skill-source installers (`--interaction-ref`, `--response`) are evidence of your decision, not authentication.
 
@@ -57,6 +62,20 @@ devtwin scans titles, bodies, profiles, drafts and handoff packets for credentia
 
 Never put credentials in records, proposals, plans, profiles or command arguments.
 
+## Organization hubs
+
+The full contract is in the [Organization hub](/docs/guides/organization-hub/) guide.
+
+- **Identity is push access.** Anyone with push access can add files under any handle. devtwin does not verify the handle or the commit email. Agents show hub lessons as "claimed by" the handle. A tombstone removes a lesson only when its handle matches the lesson's author.
+- **SSH only.** HTTPS, `git://`, `file://`, local paths, transport helpers and a password in the remote are refused. Hub Git calls keep global config, hooks and filters off.
+- **Hub content is untrusted input.** Clones keep symlinks off and use no submodules. Each file is read without following links, with caps on size, count and JSON depth. Lesson and note text reaches agents only as fenced, attributed data.
+- **Outbound checks.** Every lesson and note passes the credential check and the check against the names of every scope before it is queued, and again when it is pushed. devtwin never force-pushes.
+- **Notes are the one standing consent.** "Working on" notes leave your machine with no per-item yes, under the consent you gave at `hub join`. Only the hook's edit path posts one. The line is built from the branch name and folder areas only.
+
+## Live-mode write classes
+
+The approved [write classes](/docs/reference/configuration/#write-classes) are the only writes outside the store and the skill folders. They widen the fence by exact paths only, and they are covered by the approved config digest. In an agent settings file, devtwin changes only its own entries, and backs up the exact prior bytes first.
+
 ## Network use
 
 Most commands make no network request. The exceptions are explicit:
@@ -65,6 +84,7 @@ Most commands make no network request. The exceptions are explicit:
 | --- | --- | --- |
 | `skill-sources check`, `preview`, `stage` | `api.github.com` (unauthenticated) | Repository, release, tag, commit and selected-file requests |
 | `stack check`, `stack digest` (preview) | Only hosts in your stored approval | Feed URLs and identifiers; exact versions to OSV only when advisories are enabled |
+| `hub join`, `hub sync`, `lesson accept` and `lesson copy` to a hub, `lesson supersede-propose --apply`, `published delete` | Your hub remote, over SSH | Accepted lessons, your "working on" notes and your tombstones |
 
 Hosts still see your IP address and the request time. The stack watch never follows redirects, refuses hosts that resolve to private or reserved addresses, and caps request count, size and time. Fetched text is rendered as inert, fenced text. No environment variable or record is read for a token.
 
