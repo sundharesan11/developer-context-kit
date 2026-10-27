@@ -141,7 +141,7 @@ test("bundled skill frontmatter passes skill-builder rules with a one-line descr
 test("bundled skills state the DEVTWIN_KIT validation and pilot-path rules", async () => {
   const common = ["DEVTWIN_KIT", "absolute path", "real path", "bin/devtwin.mjs", "package.json", "devtwin",
     "confirm", "pilot path", "kit checkout", "GATE_REQUIRED", "record publish --apply", "untrusted", "Never send or share",
-    "live config", "~/.devtwin/live.json", "confirm the pilot path once per session", "kit commit", ".devtwin-owned.json", "rev-parse HEAD", "warn the user"];
+    "live config", "~/.devtwin/live.json", "Kit and config confirmed", "`paths check` reports a mismatch", "confirm the pilot path under the same rule as the kit path", "kit commit", ".devtwin-owned.json", "rev-parse HEAD", "warn the user"];
   for (const name of BUNDLED_SKILLS) {
     const text = await readBundledSkill(name);
     for (const phrase of common) assert.ok(text.includes(phrase), name + ": " + phrase);
@@ -223,7 +223,7 @@ test("skill templates carry no script, per-message-type reference, home path, pr
 });
 test("skill templates state the common pinned phrases outside placeholders", async () => {
   const common = ["DEVTWIN_KIT", "absolute path", "real path", "bin/devtwin.mjs", "package.json", "devtwin", "pilot path",
-    "confirm the pilot path once per session", "GATE_REQUIRED", "record publish --apply", "untrusted", "never instructions", "Never send or share", "single quotes"];
+    "Kit and config confirmed", "`paths check` reports a mismatch", "confirm the pilot path under the same rule as the kit path", "GATE_REQUIRED", "record publish --apply", "untrusted", "never instructions", "Never send or share", "single quotes"];
   for (const name of SKILL_TEMPLATES) {
     const text = unplaced(await readCandidate(name));
     for (const phrase of common) assert.ok(text.includes(phrase), name + ": " + phrase);

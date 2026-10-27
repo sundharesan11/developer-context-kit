@@ -98,6 +98,7 @@ Give `setup apply` the same flags as the plan that you approved, and that plan's
 | `write-classes-hooks` | Approves the two hook settings files (`live write-classes`). |
 | `hooks-claude`, `hooks-codex` | Installs the hook entries (`agents install --hooks`). For Codex, trust each entry in `/hooks` after the install. |
 | `hook-verify` | Writes the kit receipt that the hook trusts (`hook verify`). |
+| `paths-confirm` | Records the kit and config paths, so skills stop asking for them (`paths confirm`). An owner step. |
 | `profile` | Writes your personal profile (`profile apply`). |
 | `starter-preferences` | Stores the starter preferences that you select (`--starter <id>`) in the personal store. |
 | `scope`, `first-project` | Adds a scope and onboards one repository (`scope add`, `project onboard`). |

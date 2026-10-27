@@ -11,7 +11,7 @@ import { LEGACY_SKILL_PREFIX, LEGACY_DEFAULT_ROOTS } from "./legacy.mjs";
 // The running kit. Tests inject context.kitRoot; production derives it from this file.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const members = ["configRoot", "dataRoot", "stateRoot", "inputsRoot"];
-const keys = ["schemaVersion", "pilotRoot", ...members, "agentHomes", "repos", "forbidden", "live", "writeClasses", "exceptions"];
+const keys = ["schemaVersion", "pilotRoot", ...members, "agentHomes", "repos", "forbidden", "live", "writeClasses", "exceptions", "approval"];
 const liveKeys = ["configId", "home", "skillDirs", "kitRoot", "kitCommit"];
 // Skill folders sit inside these protected homes; only the exact named folder is carved out, never the home.
 const SKILL_PARENTS = ["real-claude-home", "real-agents-home", "CLAUDE_CONFIG_DIR"];
@@ -25,6 +25,9 @@ const MAX_CLASS_PATHS = 16;
 // unauthenticated requests an hour, so the cap stays below that.
 export const EXCEPTIONS = ["stackWatch"];
 export const STACK_WATCH_MAX_REQUESTS = 50;
+// U26 (KTD34): how the owner dialog may be answered. "dialog" (the default, also when the key is absent) needs the macOS
+// dialog; "dialog-or-tty" also accepts a code typed on the controlling terminal when there is no GUI session.
+export const APPROVAL_MODES = Object.freeze(["dialog", "dialog-or-tty"]);
 const HOST = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const OWNED_INSTRUCTIONS = /^devtwin[a-z0-9._-]{0,64}\.md$/;
 const LAUNCH_AGENT = /^devtwin\.[a-z0-9][a-z0-9.-]{0,95}\.plist$/;
@@ -143,6 +146,7 @@ function validate(pilot, context, allowInternal = false) {
   for (const key of ["agentHomes", "repos", "forbidden"]) if (!Array.isArray(pilot[key]) || pilot[key].some((item) => typeof item !== "string")) fail(key);
   const skills = Object.hasOwn(pilot, "live") ? validateLive(pilot, context) : [];
   validateExceptions(pilot);
+  if (pilot.approval !== undefined && (!pilot.live || !APPROVAL_MODES.includes(pilot.approval))) fail("approval");
   const files = validateClasses(pilot, context), hubs = FOLDER_CLASSES.flatMap((name) => (pilot.writeClasses?.[name] ?? []).map((path) => ["writeClasses." + name, path]));
   const ps = protectedPaths(context);
   validateRoot(pilot.pilotRoot, "pilotRoot");

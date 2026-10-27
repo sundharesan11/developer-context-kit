@@ -669,5 +669,16 @@
   "the daily backup job needs a backup folder, writes one archive a day and skips with BUSY while a store lock is held",
   "backupTargets allows writes inside and refuses siblings, the store and other classes",
   "live write-classes approves a backup folder with --backup-target",
-  "restore is an owner action: a denied dialog writes nothing"
+  "restore is an owner action: a denied dialog writes nothing",
+  "paths confirm previews, applies after the owner dialog and paths check reports each field",
+  "paths confirm reads a detached HEAD and packed refs without Git",
+  "paths confirm --apply from a hooked agent shell is denied",
+  "hook session start says kit and config confirmed and renews the receipt",
+  "hook drops the confirmation and does not renew after a config edit or a new kit HEAD",
+  "hook warns at session start when the receipt expires within three days and is not renewed",
+  "owner tty approves with the right code in dialog-or-tty mode with no GUI session",
+  "owner tty is not used in a GUI session even with SSH_TTY set",
+  "owner tty denies a wrong code, no answer, no terminal and the default mode",
+  "owner tty mode is set by live approval after the owner dialog and keeps stdout to one JSON line",
+  "owner tty mode switch from a hooked agent shell is denied"
 ]

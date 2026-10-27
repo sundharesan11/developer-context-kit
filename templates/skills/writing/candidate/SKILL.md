@@ -22,8 +22,8 @@ Check all of these before the first CLI call. If any check fails, stop and ask t
 2. Resolve its real path, for example with `realpath "$DEVTWIN_KIT"`. Resolve the real path of the current working directory too (`git rev-parse --show-toplevel` inside Git, or `pwd -P` outside it).
 3. The kit's real path must not be inside the current repository or worktree.
 4. The kit contains `bin/devtwin.mjs` and a `package.json` whose `name` is `devtwin`.
-5. Show the user the kit's real path and ask them to confirm it. Do this once per session, before the first CLI call.
-6. Use the live config the user set up (see `docs/LIVE.md` in the kit), or a disposable pilot path the user supplies. Pass it as an absolute path, resolved with `realpath`. Ask the user to confirm the pilot path once per session, before the first CLI call. Never guess another path or create one. Refuse a pilot path whose real path is inside the current repository or inside the kit checkout.
+5. Show the user the kit's real path and ask them to confirm it before the first CLI call. Ask only when the devtwin hook's session-start line does not say "Kit and config confirmed", or when `paths check` reports a mismatch.
+6. Use the live config the user set up (see `docs/LIVE.md` in the kit), or a disposable pilot path the user supplies. Pass it as an absolute path, resolved with `realpath`. Ask the user to confirm the pilot path under the same rule as the kit path. Never guess another path or create one. Refuse a pilot path whose real path is inside the current repository or inside the kit checkout.
 7. When project context is wanted, the user states the scope explicitly. Pass it with `--scope`. Never infer it from a folder name.
 
 Each call prints one JSON line: `{"ok": true, "command": ..., "result": ...}` or `{"ok": false, "command": ..., "error": ...}`. Error codes appear with a `DEVTWIN_` prefix, such as `DEVTWIN_GATE_REQUIRED`.

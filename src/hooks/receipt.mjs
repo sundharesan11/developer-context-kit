@@ -10,7 +10,8 @@ import { readPrivateJson, ensurePrivatePath, atomicReplace } from "../storage/fs
 // Shape: { schemaVersion: 1, pilotPath, pilotSha256, kitRoot, kitCommit, verifiedAt, ttlSeconds }.
 // pilotSha256 is the SHA-256 of the pilot file bytes, so any edit to the config makes the receipt stale.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-export const RECEIPT_TTL_SECONDS = 7 * 24 * 3600;
+// U27 (KTD35): 30 days by default; the session start renews it while the confirmed paths match (renewReceipt).
+export const RECEIPT_TTL_SECONDS = 30 * 24 * 3600;
 const MAX_TTL_SECONDS = 30 * 24 * 3600, MAX_PILOT_BYTES = 65536, SKEW_MS = 5 * 60 * 1000;
 export const receiptPath = (stateRoot) => join(stateRoot, "hooks", "kit-receipt.json");
 export function runningKit(kitRoot) { return realpathSync(kitRoot ?? KIT); }
@@ -50,4 +51,18 @@ export async function receiptProblem(stateRoot, { pilotPath, pilotBytes, kitRoot
     catch { return "kit-changed"; }
   }
   return null;
+}
+// U27 (KTD35): the session start's renewal. It runs only after receiptProblem found the receipt usable and the confirmed
+// paths match, so every field but verifiedAt is still true; it moves verifiedAt to now with no pilot load and no lock.
+// Returns the receipt's expiry before renewal, for the near-expiry warning when renewal is not allowed.
+export async function receiptExpiry(stateRoot) {
+  try {
+    const receipt = await readPrivateJson(receiptPath(stateRoot), 4096);
+    const at = Date.parse(receipt.verifiedAt);
+    return Number.isFinite(at) && Number.isInteger(receipt.ttlSeconds) ? new Date(at + receipt.ttlSeconds * 1000) : null;
+  } catch { return null; }
+}
+export async function renewReceipt(stateRoot, now) {
+  const path = receiptPath(stateRoot), receipt = await readPrivateJson(path, 4096);
+  await atomicReplace(path, JSON.stringify({ ...receipt, verifiedAt: now.toISOString() }) + "\n");
 }

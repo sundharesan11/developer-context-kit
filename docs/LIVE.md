@@ -69,6 +69,22 @@ Each `--host` replaces the whole list. `--max-requests <n>` sets the cap. `--off
 
 A config change makes the stack approval out of date: `stack check` then stops with `APPROVAL_REQUIRED`. Run `stack plan` and `stack approve` again after `live stack-watch` or `live set-kit`.
 
+### Answer owner prompts over SSH
+
+By default, an always-ask action needs the macOS owner dialog, so it is denied in a session with no GUI, such as an SSH login. The live config key `approval` changes this. It is off by default:
+
+```sh
+node "$KIT/bin/devtwin.mjs" live approval --pilot "$LIVE_CONFIG" --mode dialog-or-tty
+node "$KIT/bin/devtwin.mjs" live approval --pilot "$LIVE_CONFIG" --mode dialog-or-tty --apply --plan-fingerprint '<fingerprint>'
+```
+
+- With `dialog-or-tty`, devtwin reads the launchd session type (`launchctl managername`). In a GUI session (`Aqua`) the dialog is still required. With no GUI session, devtwin writes the prompt and a random six-letter code to the terminal (`/dev/tty`). Type the code and press Return to approve. Anything else, no answer in 300 seconds or no terminal denies.
+- The prompt and your answer use the terminal, not the JSON result line on stdout.
+- The `SSH_*` variables play no part in this choice.
+- The devtwin hook still denies always-ask commands from agent shells.
+- This is an owner action. The apply shows the owner dialog, and the devtwin hook denies `live approval --apply` from an agent shell. `--mode dialog` removes the key again.
+- The key is part of the approved config digest, so a change ends the path confirmation. Run `paths confirm` again after it.
+
 ### Set the write classes
 
 `live write-classes` changes the approved classes. Each class flag replaces the paths of that class: `--hub-root`, `--instruction-target`, `--hook-target`, `--launch-agent` and `--backup-target`. Give a flag once for each path. `--clear <class>` removes a class. A class that you do not name stays as it is. Preview, review, then apply after approval:
@@ -261,6 +277,22 @@ node "$KIT/bin/devtwin.mjs" agents install --hooks --pilot "$LIVE_CONFIG" --agen
 
 `agents status` reports each agent's hook entries as `installed`, `missing`, `modified`, `outdated` or `foreign-entry`, per event. It also reports the kit receipt, and it gives an `AMBIGUOUS_ROOT` note for a repository root that is bound in more than one scope. The hook gives such a root no lessons.
 
+### Confirm the kit and config paths
+
+Confirm the paths once, so that skills stop asking for them and the kit receipt stays current. Preview, review, then apply in your own terminal:
+
+```sh
+node "$KIT/bin/devtwin.mjs" paths confirm --pilot "$LIVE_CONFIG"
+node "$KIT/bin/devtwin.mjs" paths confirm --pilot "$LIVE_CONFIG" --apply --plan-fingerprint '<fingerprint>'
+```
+
+- The apply shows the owner dialog with both paths. It writes `store/state/confirmed-paths.json`: the real paths of the kit and the live config, the kit's `.git/HEAD` (and the commit of the branch it names) and the SHA-256 of the config. The setup step `paths-confirm` runs the same command.
+- This is an owner action. The devtwin hook denies `paths confirm --apply` from an agent shell.
+- At each session start, the hook compares these values with small file reads, with no Git process and no lock. While they match, the line ends with "Kit and config confirmed." and the hook moves the receipt's `verifiedAt` to now. You do not need to run `hook verify` each week.
+- A kit upgrade or a config change ends the confirmation. The line then says that the kit or the config changed, and skills ask for the paths again. Run `paths confirm` again after you check the new paths.
+- `paths check --pilot "$LIVE_CONFIG"` is read-only. It reports `match` or `mismatch` for each value.
+- The receipt lasts 30 days. When it is not renewed and expires within three days, the session-start line says so. Run `hook verify`, or confirm the paths.
+
 ### Deliver the instruction block
 
 The managed instruction block carries your accepted preferences and devtwin's working rules into every Claude Code and Codex session. It needs these `instructionTargets` paths approved in the live config:
@@ -384,6 +416,7 @@ Upgrade side by side. The old clone stays usable until the new one is proven.
 
 3. From now on every live command runs from the new clone. Preview `agents install` for each agent; changed skills show `update`. Apply after approval.
 4. Point `DEVTWIN_KIT` at the new clone, with the owner's approval.
+5. Run `paths confirm` from the new clone, preview then apply. The new kit path ends the old confirmation.
 
 Installs stay owned across a kit change, because receipts bind to the config ID, not to the kit. The kit commit in a receipt is provenance. The bundled skills warn when it differs from the commit at `DEVTWIN_KIT`.
 

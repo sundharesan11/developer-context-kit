@@ -120,6 +120,12 @@
           }
         }
       }
+    },
+    "approval": {
+      "enum": [
+        "dialog",
+        "dialog-or-tty"
+      ]
     }
   }
 }

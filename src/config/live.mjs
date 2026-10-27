@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DevtwinError } from "../errors.mjs";
-import { checkLiveConfig, loadPilot, rootsFromPilot, recordApprovedDigest, approvedDigestPath, skillDirsFor, WRITE_CLASSES, STACK_WATCH_MAX_REQUESTS } from "./pilot.mjs";
+import { checkLiveConfig, loadPilot, rootsFromPilot, recordApprovedDigest, approvedDigestPath, skillDirsFor, WRITE_CLASSES, STACK_WATCH_MAX_REQUESTS, APPROVAL_MODES } from "./pilot.mjs";
 import { canonicalJson } from "../storage/canonical.mjs";
 import { ensureRoots, validateRoot } from "./roots.mjs";
 import { info, checkNode, ensurePrivateDir, writeNewFile, atomicReplace, fsyncDir } from "../storage/fsx.mjs";
@@ -13,7 +13,7 @@ import { gitQuery } from "../identity/git.mjs";
 // The running kit. Tests inject ctx.kitRoot; production derives it from this file, as pilot.mjs does.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const AGENTS = ["claude", "codex"];
-export const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live", "writeClasses", "exceptions"];
+export const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live", "writeClasses", "exceptions", "approval"];
 const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 // Stands in for the config ID while a new config is validated; apply draws the real ID once.
 const PENDING_ID = "cfg_pending0000";
@@ -180,6 +180,14 @@ const setStackWatch = ({ hosts = [], maxRequests, off = false }) => (before) => 
   const exceptions = to ? { ...rest, stackWatch: to } : Object.keys(rest).length ? rest : undefined;
   return { after: { ...before, exceptions }, details: { stackWatch: { from, to }, note: STACK_WATCH_NOTE } };
 };
+// U26 (KTD34): the owner-answer mode. "dialog" removes the key, so the config is the one it was before the opt-in.
+export const APPROVAL_NOTE = "With dialog-or-tty, an always-ask prompt in a session with no macOS GUI, such as SSH, asks for a six-letter code on the terminal instead of the dialog. With a GUI session the dialog is still required, and agent shells are still denied.";
+const setApproval = (mode) => (before) => {
+  if (!APPROVAL_MODES.includes(mode)) invalid("mode");
+  const from = before.approval ?? "dialog";
+  if (from === mode) invalid("mode");
+  return { after: { ...before, approval: mode === "dialog" ? undefined : mode }, details: { approval: { from, to: mode }, note: APPROVAL_NOTE } };
+};
 const preview = async (promise) => ({ preview: true, ...(await promise) });
 export const planLiveAddRepo = (input, ctx) => preview(planChange("live-add-repo", input, ctx, addRepo(input.repo)).then((r) => r.plan));
 export const applyLiveAddRepo = (input, ctx, options) => applyChange("live-add-repo", input, ctx, addRepo(input.repo), undefined, options);
@@ -192,3 +200,11 @@ export const planLiveEditWriteClasses = (input, ctx) => preview(planChange("live
 export const applyLiveEditWriteClasses = (input, ctx, options) => applyChange("live-set-write-classes", input, ctx, editWriteClasses(input), undefined, options);
 export const planLiveStackWatch = (input, ctx) => preview(planChange("live-stack-watch", input, ctx, setStackWatch(input)).then((r) => r.plan));
 export const applyLiveStackWatch = (input, ctx, options) => applyChange("live-stack-watch", input, ctx, setStackWatch(input), undefined, options);
+export const planLiveApproval = (input, ctx) => preview(planChange("live-approval", input, ctx, setApproval(input.mode)).then((r) => r.plan));
+// The apply shows the owner dialog, in the mode the current config allows, before the change is approved.
+export async function applyLiveApproval(input, ctx, options) {
+  const { pilot, plan } = await planChange("live-approval", input, ctx, setApproval(input.mode));
+  assertFingerprint(plan, input.fingerprint);
+  await (await import("../owner/dialog.mjs")).requireOwnerApproval({ ...ctx, pilot }, { title: "Change how devtwin asks you", body: "Approval mode: " + plan.approval.from + " -> " + plan.approval.to + "\n\n" + APPROVAL_NOTE });
+  return applyChange("live-approval", input, ctx, setApproval(input.mode), undefined, options);
+}

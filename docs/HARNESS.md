@@ -54,6 +54,8 @@ node bin/devtwin.mjs profile apply --pilot "$PILOT_FILE" --work 'Backend service
 
 The hook entries are separate from the skills. `agents install --hooks` previews and, after approval, writes them to the approved agent settings files. `agents status` reports them. The hook also denies owner-only devtwin commands from agent shells. See [Live activation](LIVE.md#install-the-hooks).
 
+After `paths confirm`, the session-start line says "Kit and config confirmed." while the kit and the config stay the same. The skills then skip the path question, and the hook keeps its 30-day receipt current, so a weekly `hook verify` is not needed. See [Confirm the kit and config paths](LIVE.md#confirm-the-kit-and-config-paths).
+
 ## Skill templates
 
 The kit ships three skill templates under `templates/skills/`:

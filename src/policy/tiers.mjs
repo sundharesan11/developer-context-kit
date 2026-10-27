@@ -16,7 +16,7 @@ const A = "automatic", C = "consented", ASK = "always-ask", R = READ;
 const REVIEW = { tier: ASK, via: "activity review" };
 // setup apply has the tier of the step it applies; the owner steps run an always-ask action.
 const SETUP_STEPS = { "live-folder": R, "skills-claude": ASK, "skills-codex": ASK, "write-classes-hooks": ASK, "hooks-claude": ASK, "hooks-codex": ASK,
-  "hook-verify": A, profile: A, "starter-preferences": A, "starter-templates": R, scope: A, "first-project": A, "hub-join": ASK, "job-hub-sync": ASK,
+  "hook-verify": A, "paths-confirm": ASK, profile: A, "starter-preferences": A, "starter-templates": R, scope: A, "first-project": A, "hub-join": ASK, "job-hub-sync": ASK,
   "job-radar": ASK, "job-advisories": ASK, "job-review-reminder": ASK, "consent-repo": ASK, "consent-hub": ASK, sandbox: A };
 const TABLE = {
   version: R, help: R,
@@ -26,11 +26,15 @@ const TABLE = {
   "skill-sources local-apply": A, "skill-sources local-status": R,
   doctor: R, init: A, "scope add": A,
   "live init": ASK, "live add-repo": ASK, "live set-kit": ASK, "live write-classes": ASK, "live stack-watch": ASK, "live migrate": ASK,
+  // U26 (KTD34): letting a terminal answer the owner prompt weakens it, so the switch is always ask.
+  "live approval": ASK,
   "record add": A, "record supersede": A, "record propose": A, "record publish": ASK,
   "lesson match": R, "lesson show": R, "lesson index": R, "lesson propose": A, "lesson proposals": R, "lesson edit": A, "lesson reject": A,
   "lesson accept": { project: A, hub: { tier: C, consent: "hub-publish" }, "hub+general": REVIEW, general: REVIEW },
   "lesson copy": ASK, "lesson supersede-propose": A, "lesson notices": ASK,
   hook: A, "hook verify": A, "budget report": R,
+  // U27 (KTD35): a confirmation makes skills stop asking for the paths, so only the owner records it.
+  "paths confirm": ASK, "paths check": R,
   setup: ASK, "setup status": R, "setup plan": R, "setup apply": SETUP_STEPS,
   "project onboard": A,
   "profile show": R, "profile plan": R, "profile apply": A, "profile export": R, "profile suggest-stack": R,

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { readFile, writeFile, realpath, utimes, readdir, chmod } from "node:fs/promises";
+import { readFile, writeFile, realpath, utimes, readdir, chmod, mkdir, stat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import { onboardFixture, draftFor, runCli, fixtureGit, makeRepo, now } from "./helpers.mjs";
@@ -317,4 +317,81 @@ test("hook state and logs are private files under stateRoot/hooks", async (t) =>
   assert.ok(!log.includes("db/migrations") && !log.includes(s.repo));
   await chmod(receiptPath(s.stateRoot), 0o644);
   assert.equal((await hook(s, "claude", "pre-tool", await payload("claude-pre-tool-edit", s.repo, { session_id: "loose" }))).out, "");
+});
+
+// U27: confirmed kit and config paths. A kit folder with a Git HEAD on a branch; no Git process runs.
+async function confirmedStore(t, { receiptAt = new Date(now().getTime() - 10 * 86400000) } = {}) {
+  const s = await store(t, { receipt: false });
+  const kit = join(s.sandbox, "kit");
+  await mkdir(join(kit, ".git/refs/heads"), { recursive: true });
+  await writeFile(join(kit, ".git/HEAD"), "ref: refs/heads/main\n");
+  await writeFile(join(kit, ".git/refs/heads/main"), "a".repeat(40) + "\n");
+  const kitRoot = await realpath(kit);
+  await writeKitReceipt(s.roots, { pilotPath: s.path, kitRoot, now: receiptAt });
+  const confirm = async () => {
+    const run = async (args) => { const chunks = []; await main([...args, "--pilot", s.path], { stdout: { write(v) { chunks.push(v); return true; } }, now, env: {}, kitRoot, ownerDialog: () => "approved" }); return JSON.parse(chunks.join("")); };
+    const preview = await run(["paths", "confirm"]);
+    assert.equal(preview.ok, true, JSON.stringify(preview.error));
+    assert.equal((await run(["paths", "confirm", "--apply", "--plan-fingerprint", preview.result.fingerprint])).ok, true);
+  };
+  const start = async (at = now()) => {
+    const chunks = [];
+    await main(["hook", "--event", "session-start", "--agent", "claude", "--pilot", s.path], { stdout: { write(v) { chunks.push(v); return true; } }, stdin: JSON.stringify(await payload("claude-session-start", s.repo)), now: () => at, kitRoot });
+    return chunks.length ? JSON.parse(chunks.join("")).hookSpecificOutput.additionalContext : "";
+  };
+  const verifiedAt = async () => JSON.parse(await readFile(receiptPath(s.stateRoot), "utf8")).verifiedAt;
+  return { ...s, kit: kitRoot, confirm, start, verifiedAt };
+}
+
+test("hook session start says kit and config confirmed and renews the receipt", async (t) => {
+  const s = await confirmedStore(t);
+  const before = await s.verifiedAt();
+  assert.doesNotMatch(await s.start(), /Kit and config confirmed/, "no confirmation yet");
+  assert.equal(await s.verifiedAt(), before, "no renewal without a confirmation");
+  await s.confirm();
+  const line = await s.start();
+  assert.match(line, /^devtwin hook live: 1 lesson for example\.atlas\./);
+  assert.ok(line.endsWith(" Kit and config confirmed."), line);
+  assert.equal(await s.verifiedAt(), now().toISOString(), "verifiedAt moves to the session start");
+  const receipt = JSON.parse(await readFile(receiptPath(s.stateRoot), "utf8"));
+  assert.equal(receipt.ttlSeconds, 30 * 24 * 3600);
+  assert.equal((await stat(receiptPath(s.stateRoot))).mode & 0o777, 0o600);
+  // 29 days later the renewed receipt is still current, and a session start renews it again.
+  const later = new Date(now().getTime() + 29 * 86400000);
+  assert.match(await s.start(later), /Kit and config confirmed\.$/);
+  assert.equal(await s.verifiedAt(), later.toISOString());
+});
+
+test("hook drops the confirmation and does not renew after a config edit or a new kit HEAD", async (t) => {
+  const s = await confirmedStore(t);
+  await s.confirm();
+  const before = await s.verifiedAt();
+  // A new kit commit: the receipt (kitCommit null for a disposable pilot) stays usable, the confirmation does not.
+  await writeFile(join(s.kit, ".git/refs/heads/main"), "b".repeat(40) + "\n");
+  const moved = await s.start();
+  assert.doesNotMatch(moved, /Kit and config confirmed/);
+  assert.match(moved, /Kit or config changed since `devtwin paths confirm`\./);
+  assert.equal(await s.verifiedAt(), before);
+  await writeFile(join(s.kit, ".git/refs/heads/main"), "a".repeat(40) + "\n");
+  await writeFile(join(s.kit, ".git/HEAD"), "ref: refs/heads/other\n");
+  assert.doesNotMatch(await s.start(), /Kit and config confirmed/);
+  await writeFile(join(s.kit, ".git/HEAD"), "ref: refs/heads/main\n");
+  // An edited config: even with a fresh receipt for the new bytes, the confirmation no longer matches.
+  await writeFile(s.path, (await readFile(s.path, "utf8")) + "\n");
+  await writeKitReceipt(s.roots, { pilotPath: s.path, kitRoot: s.kit, now: new Date(now().getTime() - 86400000) });
+  const edited = await s.start();
+  assert.doesNotMatch(edited, /Kit and config confirmed/);
+  assert.equal(await s.verifiedAt(), new Date(now().getTime() - 86400000).toISOString(), "no renewal");
+  const log = await hookLog(s);
+  assert.ok(log.some((entry) => entry.code === "paths-changed"), JSON.stringify(log));
+});
+
+test("hook warns at session start when the receipt expires within three days and is not renewed", async (t) => {
+  const s = await confirmedStore(t, { receiptAt: new Date(now().getTime() - 28 * 86400000) });
+  const line = await s.start();
+  assert.match(line, /The kit receipt expires in 2 days; run `devtwin hook verify`\.$/);
+  assert.match(line, /^devtwin hook live: 1 lesson/);
+  // A confirmation renews it instead, and the warning goes away.
+  await s.confirm();
+  assert.match(await s.start(), /Kit and config confirmed\.$/);
 });
