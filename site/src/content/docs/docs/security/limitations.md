@@ -101,6 +101,17 @@ See the [security model](/docs/security/security-model/).
 - Path rules reject some legitimate secret-looking file names, such as some `id_mapping` or database files.
 - Default agent homes are protected automatically. Other custom discovery folders are not detected; add them to the pilot's `forbidden` list.
 
+## Not covered
+
+These are outside what devtwin does, even when it runs in the background:
+
+- **A lesson line cannot stop a command.** The hook adds guidance to the agent's context. It never returns a deny for a lesson, so a matching command still runs. Rules such as "ask before you push" work only when the agent reads them before it decides.
+- **Secrets printed to a terminal.** devtwin does not watch terminal output. The sensitive-text check runs only on text that devtwin stores or sends.
+- **Commands that break when pasted.** devtwin does not check or repair shell commands for your shell.
+- **Polling long jobs.** devtwin does not watch a job and tell you when it ends.
+
+Automatic items are reviewed after they land: you read the weekly digest and reverse an item with `undo`. An agent that writes outside text again in its own words makes an agent write, which only that later review catches. The cap of 20 automatic writes per session counts only writes that name a session. Backups go only to folders inside your home folder, so a copy off the machine needs a folder that a sync service copies.
+
 ## Development status
 
 Skill-builder and skill-source feature work is frozen except for bug and safety fixes until the daily-use priorities ship. See the [roadmap](/docs/project/roadmap/).
