@@ -107,6 +107,17 @@
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9-]{0,47}$"
           }
+        },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9][a-z0-9._+-]*(?: [a-z0-9][a-z0-9._+-]*){0,2}$"
+          }
         }
       }
     },
@@ -163,6 +174,44 @@
     },
     "createdAt": {
       "type": "string"
+    },
+    "locations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "where"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "kind": {
+            "enum": [
+              "file",
+              "directory",
+              "host",
+              "service",
+              "secret-store"
+            ]
+          },
+          "where": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "not": {
+              "pattern": "^(?:/|~(?!/)|[A-Za-z]:)|\\\\|="
+            }
+          }
+        }
+      }
     }
   },
   "allOf": [
@@ -198,8 +247,27 @@
               "required": [
                 "match"
               ]
+            },
+            {
+              "required": [
+                "locations"
+              ]
             }
           ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "locations"
+        ]
+      },
+      "then": {
+        "properties": {
+          "kind": {
+            "const": "environment"
+          }
         }
       }
     }

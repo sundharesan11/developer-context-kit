@@ -77,6 +77,10 @@ function capBytes(text) {
   for (const ch of text) { const n = Buffer.byteLength(ch); if (bytes + n > INBOUND_BODY_BYTES) break; out += ch; bytes += n; }
   return out + "\n[truncated]";
 }
+// U29: one stored line rendered as data, with the same character rules as renderInbound and no line breaks.
+export const inboundLine = (text) => String(text).replace(/[\r\n\t]+/g, " ").replace(UNSAFE, "");
+// An environment record's locations, one per line: "<name> (<kind>): <where>".
+export const renderLocations = (locations) => locations.map((entry) => inboundLine(entry.name + " (" + entry.kind + "): " + entry.where));
 // Another person's lesson or note text: control, format and bidi characters removed, body capped, fenced and attributed as a claim.
 export function renderInbound(text, { handle }) {
   assertActorRef(handle);

@@ -40,7 +40,7 @@ Instead of `--body`, put the text in a file under your pilot's `inputsRoot` fold
 | `decision` | A choice that was made, and why. |
 | `map` | Where things live in the codebase. |
 | `command` | How to build, test or run something. |
-| `environment` | A named environment, such as `staging`. Names only, never credentials. |
+| `environment` | A named environment, such as `staging`. It can also list where things live, such as "DB URL: `.env`". Names and places only, never credentials or values. |
 | `fact` | Something observed to be true. |
 | `experiment` | Something tried, and what happened. |
 | `handoff` | Where a session stopped and what comes next. See [Handoffs](/docs/concepts/handoffs/). |

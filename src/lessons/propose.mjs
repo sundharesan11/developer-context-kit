@@ -37,7 +37,7 @@ export const lessonBody = ({ summary, text }) => summary ? summary + "\n" + (tex
 // The draft that validateDraft checks. Personal reach has no project, so the same check covers every target.
 export const lessonDraft = (lesson, { reach = "personal", status = "proposed" } = {}) => ({ kind: "lesson", class: "lesson", reach, status, title: lesson.title, body: lessonBody(lesson), match: lesson.match });
 // All text a lesson carries outside the machine: title, summary, body and match terms.
-export const lessonText = (lesson) => [lesson.title, lessonBody(lesson), ...lesson.match.paths, ...lesson.match.packages, ...lesson.match.topics].join("\n");
+export const lessonText = (lesson) => [lesson.title, lessonBody(lesson), ...lesson.match.paths, ...lesson.match.packages, ...lesson.match.topics, ...(lesson.match.commands ?? [])].join("\n");
 
 // Shape checks, then the draft check (which includes the sensitive-content tripwire), then the isolation check
 // against every scope but the lesson's own. The general targets check against the lesson's own scope too, at accept.
@@ -47,8 +47,9 @@ export async function checkLesson(roots, scope, lesson) {
   if (typeof title !== "string" || !title.trim()) invalid("title");
   if (summary !== null && (typeof summary !== "string" || !summary.trim() || [...summary].length > SUMMARY_CHARS || LINE_UNSAFE.test(summary))) invalid("summary");
   if (typeof text !== "string" || (!text.trim() && !summary) || TEXT_UNSAFE.test(text)) invalid("body");
-  const clean = { title, summary, text, match: { paths: match?.paths ?? [], packages: match?.packages ?? [], topics: match?.topics ?? [] } };
-  if (!["paths", "packages", "topics"].some((key) => clean.match[key].length)) invalid("match");
+  // U32: commands is kept only when given, as in the record match block (src/records/schema.mjs).
+  const clean = { title, summary, text, match: { paths: match?.paths ?? [], packages: match?.packages ?? [], topics: match?.topics ?? [], ...(match?.commands?.length ? { commands: match.commands } : {}) } };
+  if (!["paths", "packages", "topics", "commands"].some((key) => clean.match[key]?.length)) invalid("match");
   // U37 (KTD43): the plain-rule checks; the body may use Markdown structure (src/audit/checks.mjs).
   checkAutomaticText({ lines: [title, ...(summary ? [summary] : [])], body: text });
   validateDraft(lessonDraft(clean), { recordedBy: { actor: "other" } });

@@ -7,14 +7,21 @@ import { recordIdFor } from "../identity/ids.mjs";
 import { cliRecorder } from "../policy/actor.mjs";
 import { tierOf } from "../policy/tiers.mjs";
 import { addRecord, supersedeRecord, previewRecord, proposeRecord, publishProposal, requireCommittedProject, readSnapshot } from "./store.mjs";
-import { validateDraft, assertProjectReach } from "./schema.mjs";
+import { validateDraft, assertProjectReach, locationLines } from "./schema.mjs";
 import { isolationTerms, assertOutboundClean } from "./isolation.mjs";
 const list = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
 // U37 (KTD38, KTD40, KTD42, KTD43): record add and record supersede are automatic. recordedBy names the caller. A write of
 // observed or proposed knowledge passes the plain-rule and scope-name checks, then appends an audit entry with the
 // caller's --session before the record is written. confirmed still needs a human reviewer (validateDraft), and an
 // agent may not supersede a confirmed record: that changes only through the owner.
-const options = { session: { type: "string" }, scope: { type: "string" }, project: { type: "string" }, kind: { type: "string" }, title: { type: "string" }, body: { type: "string" }, "body-file": { type: "string" }, status: { type: "string" }, source: { type: "string", multiple: true }, reviewer: { type: "string" }, "request-id": { type: "string" }, apply: { type: "boolean" }, target: { type: "string", multiple: true }, "expect-hash": { type: "string", multiple: true }, proposal: { type: "string" } };
+const options = { session: { type: "string" }, scope: { type: "string" }, project: { type: "string" }, kind: { type: "string" }, title: { type: "string" }, body: { type: "string" }, "body-file": { type: "string" }, status: { type: "string" }, source: { type: "string", multiple: true }, reviewer: { type: "string" }, "request-id": { type: "string" }, apply: { type: "boolean" }, target: { type: "string", multiple: true }, "expect-hash": { type: "string", multiple: true }, proposal: { type: "string" }, location: { type: "string", multiple: true } };
+// U29 (KTD36): --location <kind>:<name>:<where>, repeatable, on an environment record. The name holds no colon; the
+// place is everything after the second one. The error never echoes the text, which may be a value.
+function parseLocation(text) {
+  const first = text.indexOf(":"), second = first < 0 ? -1 : text.indexOf(":", first + 1);
+  if (first < 1 || second < 0) throw new DevtwinError("INVALID_INPUT", "Location must be <kind>:<name>:<where>", { field: "location" });
+  return { name: text.slice(first + 1, second), kind: text.slice(0, first), where: text.slice(second + 1) };
+}
 async function inputFrom(values, ctx) {
   if (values.body !== undefined && values["body-file"] !== undefined) throw new DevtwinError("USAGE", "Choose one body input");
   let body = values.body ?? "";
@@ -26,7 +33,7 @@ async function inputFrom(values, ctx) {
     if (read.skipped || Buffer.byteLength(read.text) > 32768) throw new DevtwinError("INVALID_INPUT", "Body file unavailable");
     body = read.text;
   }
-  return { scope: values.scope, project: values.project, requestId: values["request-id"], recordedBy: cliRecorder(ctx.env ?? process.env), draft: { kind: values.kind, status: values.status ?? "observed", title: values.title, body, sources: list(values.source).map((ref) => ({ ref })), applicability: { level: "project" }, review: values.reviewer ? { reviewer: values.reviewer } : null } };
+  return { scope: values.scope, project: values.project, requestId: values["request-id"], recordedBy: cliRecorder(ctx.env ?? process.env), draft: { kind: values.kind, status: values.status ?? "observed", title: values.title, body, sources: list(values.source).map((ref) => ({ ref })), applicability: { level: "project" }, review: values.reviewer ? { reviewer: values.reviewer } : null, ...(values.location !== undefined && { locations: list(values.location).map(parseLocation) }) } };
 }
 const AUDITED = ["observed", "proposed"];
 // The checks that run before the audit entry, so a write refused here leaves no entry behind.
@@ -48,8 +55,8 @@ async function automaticWrite(ctx, route, input, session, { targets = [], expect
   }
   if (!AUDITED.includes(input.draft.status)) return null;
   const { checkAutomaticText } = await import("../audit/checks.mjs");
-  checkAutomaticText({ lines: [input.draft.title], body: input.draft.body });
-  assertOutboundClean(input.draft.title + "\n" + input.draft.body, await isolationTerms(ctx.roots), { except: input.scope });
+  checkAutomaticText({ lines: [input.draft.title, ...locationLines(input.draft.locations)], body: input.draft.body });
+  assertOutboundClean([input.draft.title, input.draft.body, ...locationLines(input.draft.locations)].join("\n"), await isolationTerms(ctx.roots), { except: input.scope });
   const { appendEntry } = await import("../audit/log.mjs");
   return appendEntry(ctx.roots, { kind: "record", tier: tierOf({ route }), route, home: "project", scope: input.scope, project: input.project, recordIds: [recordId], supersedes: targets, actor: input.recordedBy.actor, session: session ?? null, requestId: input.requestId }, { now: ctx.now });
 }

@@ -1,8 +1,10 @@
 import { termPattern } from "../stack/match.mjs";
+import { startsWithWords } from "../hooks/shell-words.mjs";
 // U6: pure lesson matching over an index from src/lessons/index.mjs. No file, Git or network access, so the hook
 // fast path (KTD6) can call it directly. Globs are matched segment by segment without building a regular expression.
 export const INDEX_LINE_BYTES = 240;
-const STRENGTH = { path: 3, package: 2, topic: 1 };
+// U32 (KTD31): a command match sits between package and topic.
+const STRENGTH = { path: 4, package: 3, command: 2, topic: 1 };
 const PACKAGE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
 const UNSAFE = /[\p{Cc}\p{Cf}\u2028\u2029]/gu;
 const MAX_PATH_BYTES = 4096, MAX_TEXT_BYTES = 16384;
@@ -72,7 +74,8 @@ export function prepareIndex(index) {
     globs: (entry.match?.paths ?? []).map(compileGlob).filter(Boolean),
     packages: new Set(entry.match?.packages ?? []),
     packageWords: (entry.match?.packages ?? []).map(wordTest),
-    topicWords: (entry.match?.topics ?? []).map(wordTest)
+    topicWords: (entry.match?.topics ?? []).map(wordTest),
+    commands: (entry.match?.commands ?? []).map((prefix) => prefix.split(" "))
   }));
   return { prepared: true, scope: index.scope, entries };
 }
@@ -97,20 +100,21 @@ export function indexLine(entry, { stale = false, contested = entry.contested ==
   const text = summary && summary !== title ? title + ": " + summary : title;
   return prefix + capBytes(text, INDEX_LINE_BYTES - Buffer.byteLength(prefix + suffix)) + suffix;
 }
-// Input {paths, packages, text, project, now}. paths are repo-relative; packages are import specifiers; text is a
-// prompt. A project-reach lesson from another project is skipped when project is set. Stronger matches come first
-// (path, then package, then topic), then the newest. The index holds effective lessons only, so nothing superseded returns.
-export function matchLessons(index, { paths = [], packages = [], text = "", project = null, now = new Date() } = {}) {
+// Input {paths, packages, text, commands, project, now}. paths are repo-relative; packages are import specifiers; text is
+// a prompt; commands are word lists from src/hooks/shell-words.mjs, matched against each lesson's command prefixes. A project-reach lesson from another project is skipped when project is set. Stronger matches come first
+// (path, then package, then command, then topic), then the newest. The index holds effective lessons only, so nothing superseded returns.
+export function matchLessons(index, { paths = [], packages = [], text = "", commands = [], project = null, now = new Date() } = {}) {
   const prepared = prepareIndex(index);
   const pathSegments = paths.map(normalizeRelPath).filter(Boolean).map((p) => p.split("/"));
   const names = new Set(packages.map(packageName).filter(Boolean));
   const prompt = capBytes(String(text ?? ""), MAX_TEXT_BYTES), lowerPrompt = prompt.toLowerCase();
   const out = [];
-  for (const { entry, globs, packages: own, packageWords, topicWords } of prepared.entries) {
+  for (const { entry, globs, packages: own, packageWords, topicWords, commands: prefixes } of prepared.entries) {
     if (project && entry.reach === "project" && entry.project !== project) continue;
     const matchedBy = [];
     if (globs.some((glob) => pathSegments.some((path) => segmentsMatch(glob, path)))) matchedBy.push("path");
     if (names.size && [...names].some((name) => own.has(name)) || (prompt && packageWords.some((test) => test(prompt, lowerPrompt)))) matchedBy.push("package");
+    if (commands.length && prefixes.some((prefix) => commands.some((words) => startsWithWords(words, prefix)))) matchedBy.push("command");
     if (prompt && topicWords.some((test) => test(prompt, lowerPrompt))) matchedBy.push("topic");
     if (!matchedBy.length) continue;
     const stale = isStale(entry, now);

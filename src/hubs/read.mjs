@@ -71,7 +71,7 @@ function checkLessonMeta(meta) {
   if (meta.localRecordHash !== undefined && meta.localRecordHash !== null && !(typeof meta.localRecordHash === "string" && HASH.test(meta.localRecordHash))) bad();
   if (meta.supersedes !== undefined && meta.supersedes !== null) checkSupersedes(meta.supersedes, meta.id);
   try { validateMatch(meta.match ?? {}); } catch { bad(); }
-  if (!["paths", "packages", "topics"].some((key) => meta.match?.[key]?.length)) bad();
+  if (!["paths", "packages", "topics", "commands"].some((key) => meta.match?.[key]?.length)) bad();
   return meta;
 }
 export function renderHubLesson(meta, body) {

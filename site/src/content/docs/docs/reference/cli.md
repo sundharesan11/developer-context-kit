@@ -353,6 +353,7 @@ Returns `records`, `packetHash`, `fileHash`, `bytes`, `output` and `"publication
 | `--status <status>` | `observed` (default), `confirmed`, `disputed` or `proposed`. |
 | `--reviewer <actor>` | Required for `confirmed`. |
 | `--source <ref>` | Repeatable, up to 20. `file:`, `commit:`, `record:`, `issue:`, `user:` or `url:`. |
+| `--location <kind>:<name>:<where>` | `environment` records only. Repeatable, up to 20. Says where something lives, never its value. See [Locations](#locations). |
 | `--request-id <id>` | Required with `--apply`. |
 | `--session <id>` | Optional. The session ID from the hook's session-start line. It lets that session undo its own writes, and counts toward the session cap. |
 | `--apply` | Write. Without it, the command previews and returns the `recordId`. |
@@ -368,6 +369,23 @@ devtwin record add --pilot "$PILOT" --scope example --project example.atlas \
   --kind decision --title "Use server-side search" --body "Filter on the server." \
   --request-id req_atlas_decision_01 --apply
 ```
+
+### Locations
+
+An `environment` record can say where things live. Each `--location` has three parts:
+
+- `kind` is `file`, `directory`, `host`, `service` or `secret-store`.
+- `name` is a short label, up to 80 characters, with no colon.
+- `where` is a repository-relative path, a path under `~/`, a host name or a named service. Everything after the second colon belongs to it, so a port is fine.
+
+```sh
+devtwin record add --pilot "$PILOT" --scope example --project example.atlas \
+  --kind environment --title "Environment staging" \
+  --location "file:DB URL:.env" --location "host:Queue:queue.example.com:5672" \
+  --request-id req_atlas_env_01 --apply
+```
+
+A place that looks like a value is refused with `DEVTWIN_SENSITIVE_CONTENT`: a credential, a URL with a user name or a query, anything with `=`, or a long random-looking string. Absolute paths and `..` segments are refused with `DEVTWIN_INVALID_INPUT`. The brief shows each location on its own line, as `DB URL (file): .env`.
 
 ### `record supersede`
 
@@ -650,7 +668,7 @@ See [Lessons and hooks](/docs/guides/lessons-and-hooks/).
 
 ### `lesson match`
 
-Lists the lessons and preferences that match a path, a package or prompt text. Read-only.
+Lists the lessons and preferences that match a path, a package, prompt text or a shell command. Read-only.
 
 | Flag | |
 | --- | --- |
@@ -660,6 +678,7 @@ Lists the lessons and preferences that match a path, a package or prompt text. R
 | `--path <path>` | Repo-relative, or absolute inside the worktree. Repeatable. |
 | `--package <name>` | Repeatable. |
 | `--text <text>` | Prompt text to match against package names and topics. |
+| `--command <text>` | A shell command, split and matched as the hook matches a shell call. |
 
 ```sh
 devtwin lesson match --pilot "$PILOT" --scope example --cwd "$REPO" --path src/billing/client.js
@@ -687,7 +706,7 @@ Writes a private lesson proposal. Without `--apply`, runs every check and writes
 | `--title <text>` | Required. |
 | `--summary <text>` | Required. One "do" or "don't" line. |
 | `--body <text>` or `--body-file <file>` | The reason. `--body-file -` reads stdin. |
-| `--path <glob>`, `--package <name>`, `--topic <word>` | The match rules. Repeatable. Give at least one. |
+| `--path <glob>`, `--package <name>`, `--topic <word>`, `--command <words>` | The match rules. Repeatable. Give at least one. `--command` is one to three lower-case words that start a shell command, such as `git push`. |
 | `--project <id>` | The project of a lesson that belongs to one. |
 | `--apply` | Write. |
 
@@ -711,7 +730,7 @@ Lists pending lesson proposals. Read-only.
 
 ### `lesson edit`
 
-Changes a pending proposal. Takes `--id <prop_id>` and the `lesson propose` flags you want to change: `--title`, `--summary`, `--body`, `--body-file`, and `--path`, `--package` and `--topic`, which replace the whole match block. Apply with `--apply --plan-fingerprint <fp>`.
+Changes a pending proposal. Takes `--id <prop_id>` and the `lesson propose` flags you want to change: `--title`, `--summary`, `--body`, `--body-file`, and `--path`, `--package`, `--topic` and `--command`, which replace the whole match block. Apply with `--apply --plan-fingerprint <fp>`.
 
 ### `lesson reject`
 

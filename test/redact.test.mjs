@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assertNoSensitive, scanSensitive, findForbiddenFields } from "../src/records/redact.mjs";
+import { assertNoSensitive, scanSensitive, findForbiddenFields, scanValueLike, assertNoValueLike } from "../src/records/redact.mjs";
 import { toJson } from "../src/errors.mjs";
 test("sensitive content and forbidden field names are rejected", () => {
   const fakeKey = ["api", "_key"].join("") + " = " + "abcdef" + "123456";
@@ -14,4 +14,17 @@ test("common provider token formats and suffixed key names are caught", () => {
   for (const [type, text] of samples) assert.ok(scanSensitive(text).some((x) => x.type === type), type);
   for (const text of ["max_tokens: 4096", "sk-learn is a library", "task-runner and mask-key notes"]) assert.deepEqual(scanSensitive(text), [], text);
   assert.deepEqual(findForbiddenFields({ access_token: 1, clientSecret: 2, githubToken: 3, max_tokens: 4, tokenizer: 5 }), ["access_token", "clientSecret", "githubToken"]);
+});
+test("value-like scan finds URLs with user info or a query, assignments and random runs", () => {
+  const types = (text) => [...new Set(scanValueLike(text).map((x) => x.type))].sort();
+  assert.deepEqual(types("post" + "gres://u:p@db.example.com/app"), ["url-userinfo"]);
+  assert.deepEqual(types("redis://default@cache.example.com"), ["url-userinfo"]);
+  assert.deepEqual(types("https://vault.example.com/ui?team=core"), ["assignment", "url-query"]);
+  assert.deepEqual(types("DB_HOST" + "=" + "db.example.com"), ["assignment"]);
+  assert.deepEqual(types("q7Xk2Lm9" + "Pz4Rt8Vw" + "3Nb6Yc1H" + "s5Dj0Gf2"), ["high-entropy"]);
+  assert.deepEqual(types("cache/" + "3f9a6c1e8b2d" + "4f70a5c9e1b3"), ["high-entropy"]);
+  for (const text of [".env", "~/.config/gh/hosts.yml", "db.internal.example.com:5432", "https://vault.example.com/ui/secrets", "AbstractSingletonProxyFactoryBean", "DeveloperContextKitConfiguration", "config/environments/production-database-primary.yml"]) assert.deepEqual(scanValueLike(text), [], text);
+  const secret = "q7Xk2Lm9" + "Pz4Rt8Vw" + "3Nb6Yc1H" + "s5Dj0Gf2";
+  assert.throws(() => assertNoValueLike("vault/" + secret), (e) => e.code === "DEVTWIN_SENSITIVE_CONTENT" && e.details.types.includes("high-entropy") && !JSON.stringify(toJson(e)).includes(secret));
+  assert.throws(() => assertNoValueLike(["api", "_key"].join("") + ": " + "abcdef" + "123456"), (e) => e.details.types.includes("credential-assignment"));
 });

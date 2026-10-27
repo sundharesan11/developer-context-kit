@@ -8,6 +8,7 @@ import { readApprovedSource, checkSourceFreshness } from "../storage/source-read
 import { scanSensitive } from "../records/redact.mjs";
 import { readSnapshot } from "../records/store.mjs";
 import { isDelivered } from "../records/schema.mjs";
+import { renderLocations } from "../records/isolation.mjs";
 import { readProfile } from "../profile/store.mjs";
 import { validateProfile } from "../profile/validate.mjs";
 import { resolveContext } from "./resolve.mjs";
@@ -84,11 +85,13 @@ export async function buildBrief(roots, pilot, { scope, cwd, now = new Date() })
     b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
   for (const record of ordered) {
     if (record.status === "proposed") { review.push({ id: record.id, title: record.title }); continue; }
-    const size = Buffer.byteLength(record.body);
+    // U29 (KTD36): an environment record's locations, one rendered line each, count toward the byte budget.
+    const locations = record.locations ? renderLocations(record.locations) : null;
+    const size = Buffer.byteLength(record.body) + (locations ? Buffer.byteLength(locations.join("\n")) : 0);
     if (records.length + policies.length >= BRIEF_LIMITS.maxItems || bytes + size > BRIEF_LIMITS.maxBodyBytes) { omittedIds.push(record.id); continue; }
     bytes += size;
     const current = await freshness(record, resolved.binding, resolved.worktree);
-    const item = { id: record.id, recordHash: record.recordHash, kind: record.kind, status: record.status, title: record.title, body: record.body, sources: record.sources, applicability: record.applicability, freshness: current };
+    const item = { id: record.id, recordHash: record.recordHash, kind: record.kind, status: record.status, title: record.title, body: record.body, sources: record.sources, applicability: record.applicability, freshness: current, ...(locations && { locations }) };
     records.push(item);
     recordReceipt.selected.push({ id: record.id, recordHash: record.recordHash });
     if (current !== "current") recordReceipt.staleIds.push(record.id);

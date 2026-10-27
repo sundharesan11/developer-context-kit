@@ -680,5 +680,17 @@
   "owner tty is not used in a GUI session even with SSH_TTY set",
   "owner tty denies a wrong code, no answer, no terminal and the default mode",
   "owner tty mode is set by live approval after the owner dialog and keeps stdout to one JSON line",
-  "owner tty mode switch from a hooked agent shell is denied"
+  "owner tty mode switch from a hooked agent shell is denied",
+  "shell words match git push through wrappers, variables, -C, sh -c and a path executable",
+  "shell words do not match git pushd, echoed text, quoted operators or another subcommand",
+  "shell words read Claude Code Bash text and Codex argv arrays and ignore other tools",
+  "lesson match by command prefix sits between package and topic and matches whole words",
+  "lesson propose and edit take --command and refuse a prefix over three words or with shell operators",
+  "hook delivers a git push command lesson once per session for Claude Code Bash and Codex shell calls",
+  "hook sends a fifth command lesson match as the overflow line",
+  "an environment record stores a location and the brief shows it on its own line (AE7)",
+  "a location that holds a value is refused (AE7)",
+  "locations hold at most twenty entries and only on environment records",
+  "record add --location from an agent is an automatic write with an audit entry",
+  "value-like scan finds URLs with user info or a query, assignments and random runs"
 ]

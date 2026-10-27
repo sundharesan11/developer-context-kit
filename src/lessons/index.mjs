@@ -60,7 +60,8 @@ export const SOURCES = [
     return { records: hubRecords(binding, read), unavailable: [] };
   } }
 ];
-const hasMatch = (match) => ["paths", "packages", "topics"].some((key) => match?.[key]?.length);
+// U32: a lesson that matches only commands is live too.
+const hasMatch = (match) => ["paths", "packages", "topics", "commands"].some((key) => match?.[key]?.length);
 // U37: a retraction is never delivered (it is not a lesson kind either).
 const isLive = (r) => r.schemaVersion === 2 && isDelivered(r) && ["lesson", "preference"].includes(r.kind) && LIVE.includes(r.effective) && hasMatch(r.match);
 function capBytes(text, limit) {
