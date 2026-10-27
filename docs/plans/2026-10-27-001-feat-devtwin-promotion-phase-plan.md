@@ -112,7 +112,7 @@ The outside-source rule covers only content devtwin fetched or synced itself. Te
 - AE5. A session stops with three changed files and no handoff. The next session start in that worktree reports "Last session stopped ... 3 changed files; no handoff".
 - AE6. A `type: user` memory "Keep answers short" waits for `activity review` as a preference. It reaches the global instruction block only after the owner dialog.
 - AE9. An agent shell runs `undo --since 2026-01-01`; the hook denies it. `undo --id` of an entry from another session is denied too.
-- AE7. "DB URL: `.env` in the repo root" is stored. "DB URL: `postgres://user:secret@host/db`" is refused.
+- AE7. "DB URL: `.env` in the repo root" is stored. A DB URL given as a connection string with a user name and password is refused.
 - AE8. `backup restore` into a non-empty folder fails. Restore into an empty folder reports every file verified.
 
 ### Success Criteria

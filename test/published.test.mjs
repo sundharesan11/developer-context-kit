@@ -82,6 +82,8 @@ async function machine(t, { handle, onboard = false }) {
   const applied = async (args, extra) => { const plan = await ok(args, extra); return ok([...args, "--apply", "--plan-fingerprint", plan.fingerprint], extra); };
   const join_ = async (hub) => {
     const result = await applied(["hub", "join", "--scope", SCOPE, "--remote", hub.remote, "--handle", handle, "--email", handle + "@example.com", "--ssh-command", hub.ssh]);
+    // U36: lesson accept --target hub needs the hub-publish consent.
+    await applied(["consent", "grant", "--kind", "hub-publish", "--scope", SCOPE]);
     if (onboard) await writeKitReceipt(await roots(), { pilotPath: path, now: now() });
     return result;
   };

@@ -65,7 +65,24 @@ The full guide is [HUB.md](HUB.md).
 - Hub content is untrusted input. Clones keep symlinks off and use no submodules. Each hub file is read through the no-follow, regular-file, size-capped reader, and only when Git's index lists it as a regular file. File size, file count and JSON depth have caps. Lesson text reaches agents only as fenced, attributed data.
 - Outbound hub items pass the sensitive-content check and the all-scope name check before they are queued and again when they are pushed. devtwin never force-pushes.
 - "Working on" notes are the one item that leaves the machine with no per-item yes, under the note consent that `hub join` or `note consent` records. Only the hook edit path posts one, at most six per session; no command posts a note. The line is built from the branch name and the areas only, and the checks above run before the note is queued. Colleague notes reach agents only as fenced, attributed data.
-- `hub join --apply`, `hub leave --apply`, `hub schedule --apply`, `lesson accept --apply` (every target), `lesson copy --apply`, `published delete --apply`, `note revoke --apply` and `note consent --apply` are owner actions. The devtwin hook denies them from agent shells, and each shows a macOS dialog with the exact content. Their previews stay open to agents. The dialog text reaches `osascript` only as arguments, never as script text. Without a desktop session, the dialog denies.
+- `hub join --apply`, `hub leave --apply`, `hub schedule --apply`, `lesson copy --apply`, `published delete --apply`, `note revoke --apply` and `note consent --apply` are owner actions. The devtwin hook denies them from agent shells, and each shows a macOS dialog with the exact content.
+- `lesson accept --target hub` publishes with no dialog, but only while a valid `hub-publish` consent exists for the scope. See [Tiers](#tiers). Their previews stay open to agents. The dialog text reaches `osascript` only as arguments, never as script text. Without a desktop session, the dialog denies.
+
+## Tiers
+
+`src/policy/tiers.mjs` holds one frozen table that gives each CLI route a tier. A test checks that every route in `src/cli.mjs` has a line, and that the always-ask routes match the routes that the hook denies.
+
+| Tier | Who runs it | Examples |
+| --- | --- | --- |
+| Automatic | Agents and jobs, with no prompt | `record add`, `record supersede`, `lesson accept --target project`, `handoff export`, `project onboard` |
+| Consented | Agents and jobs, while a standing consent for the target is valid | `lesson accept --target hub` |
+| Always ask | The owner only, after the owner dialog | `consent grant`, `consent revoke`, `pref accept`, `lesson copy`, `hub join`, `instructions apply` and the other owner actions |
+
+- `lesson accept` refuses `--target general` and `--target hub+general` with `GATE_REQUIRED`. A lesson in the personal store reaches every organization, so it waits for the weekly `activity review`.
+- A consent stores the target, the hold time in hours (1 to 168, 24 by default), the time it was granted and the digest of its rules. The rules list the checks that the consented action runs. A change to the rules changes the digest, and the stored consent is then void. A consented action with no valid consent fails with `APPROVAL_REQUIRED` and the message "Needs consent".
+- There are two consent kinds. `repo-push` names the real path of a bound repository root. `hub-publish` names a scope that joined a hub. Consents live at `stateRoot/consents/<kind>/<sha256 of the target>.json`, in folders at mode 0700 and files at mode 0600, written by atomic replace under a lock.
+- `consent list` is read-only. It also shows the note consent of each hub, which `note consent` and `note revoke` manage.
+- A record that a CLI write makes names its caller in `recordedBy`: `claude` when `CLAUDECODE` is set, `codex` when a `CODEX_` variable is set, and `human` otherwise. This is a label for the audit trail, not a gate. A `confirmed` record still needs a human reviewer.
 
 ## Preferences and the instruction block
 

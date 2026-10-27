@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { mkdir, writeFile, readFile, readdir, chmod } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { initPilot, fixtureGit, makeRepo, sandbox, now } from "./helpers.mjs";
 import { main } from "../src/cli.mjs";
 import { loadPilot, rootsFromPilot } from "../src/config/pilot.mjs";
@@ -56,14 +57,18 @@ async function machine(t, { handle = "alice", scopes = [SCOPE] } = {}) {
   };
   const ok = async (args, extra) => { const out = await cli(args, extra); assert.equal(out.json.ok, true, args.join(" ") + ": " + JSON.stringify(out.json.error)); return out.json.result; };
   const fail = async (args, code, extra) => { const out = await cli(args, extra); assert.equal(out.json.ok, false, args.join(" ")); assert.equal(out.json.error.code, code, args.join(" ") + ": " + JSON.stringify(out.json.error)); return out.json.error; };
-  const join_ = async (hub, scope = SCOPE) => {
-    const args = ["hub", "join", "--scope", scope, "--remote", hub.remote, "--handle", handle, "--email", handle + "@example.com", "--ssh-command", hub.ssh];
-    const plan = await ok(args);
-    return ok([...args, "--apply", "--plan-fingerprint", plan.fingerprint]);
-  };
   // Preview, then apply with the fingerprint, as the owner runs it.
   const applied = async (args) => { const plan = await ok(args); return ok([...args, "--apply", "--plan-fingerprint", plan.fingerprint]); };
-  return { p, path, roots, cli, ok, fail, applied, join: join_, dialogs, setDialog: (value) => { decision = value; }, handle };
+  // U36: the owner joins the hub and grants the hub-publish consent for the scope, unless consent is false.
+  const consent = (scope = SCOPE) => applied(["consent", "grant", "--kind", "hub-publish", "--scope", scope]);
+  const join_ = async (hub, scope = SCOPE, { consent: grant = true } = {}) => {
+    const args = ["hub", "join", "--scope", scope, "--remote", hub.remote, "--handle", handle, "--email", handle + "@example.com", "--ssh-command", hub.ssh];
+    const plan = await ok(args);
+    const joined = await ok([...args, "--apply", "--plan-fingerprint", plan.fingerprint]);
+    if (grant) await consent(scope);
+    return joined;
+  };
+  return { p, path, roots, cli, ok, fail, applied, join: join_, consent, dialogs, setDialog: (value) => { decision = value; }, handle };
 }
 
 const lessonArgs = ({ session = "ses_one", scope = SCOPE, title = "Retry the billing client", summary = "Do wrap billing calls in the retry helper.", body = "A billing call can fail once under load. The helper retries with backoff.\n", paths = ["src/billing/**"], extra = [] } = {}) =>
@@ -73,7 +78,7 @@ const propose = async (m, opts) => (await m.ok([...lessonArgs(opts), "--apply"])
 const matchIds = async (m, rel, clock = now) => (await m.ok(["lesson", "match", "--scope", SCOPE, "--path", rel], { clock })).matches.map((x) => x.id);
 const accept = (id, target, extra = []) => ["lesson", "accept", "--id", id, "--target", target, ...extra];
 
-test("lesson propose then accept to the hub after dialog approval reaches a colleague through hub sync", async (t) => {
+test("lesson propose then accept to the hub under the hub-publish consent reaches a colleague through hub sync", async (t) => {
   const hub = await hubFixture(t), a = await machine(t), b = await machine(t, { handle: "bob" });
   await a.join(hub);
   await b.join(hub);
@@ -91,14 +96,14 @@ test("lesson propose then accept to the hub after dialog approval reaches a coll
   const dialogsBefore = a.dialogs.length;
   const plan = await a.ok(accept(id, "hub"));
   assert.equal(plan.target, "hub");
+  assert.deepEqual([plan.tier, plan.consent], ["consented", "hub-publish"]);
   assert.match(plan.hub.lessonId, /^lsn_[a-f0-9]{24}$/);
   assert.equal(plan.hub.author, "handle:alice");
   assert.equal(await hub.head(), headBefore, "the preview publishes nothing");
   assert.equal(a.dialogs.length, dialogsBefore, "the preview shows no dialog");
   const result = await a.ok([...accept(id, "hub"), "--apply", "--plan-fingerprint", plan.fingerprint]);
-  assert.equal(a.dialogs.length, dialogsBefore + 1, "the apply shows the owner dialog once");
-  const shown = a.dialogs.at(-1);
-  for (const text of ["Retry the billing client", "Do wrap billing calls in the retry helper.", "The helper retries with backoff.", "paths: src/billing/**", "Hub: example-hub", "Hub only"]) assert.ok(shown.body.includes(text), "dialog shows " + text);
+  assert.equal(a.dialogs.length, dialogsBefore, "under the consent the apply shows no owner dialog");
+  assert.equal(result.tier, "consented");
   assert.equal(result.hub.pushed, true);
   assert.equal(result.hub.lessonId, plan.hub.lessonId);
   assert.equal(result.personal, undefined, "hub only writes no personal copy");
@@ -121,33 +126,41 @@ test("lesson propose then accept to the hub after dialog approval reaches a coll
   await a.fail(accept(id, "hub"), "DEVTWIN_CONFLICT");
 });
 
-test("lesson accept to the hub with the dialog dismissed publishes nothing and keeps the proposal pending", async (t) => {
+test("lesson accept to the hub without a valid consent publishes nothing and keeps the proposal pending", async (t) => {
   const hub = await hubFixture(t), m = await machine(t);
-  await m.join(hub);
+  await m.join(hub, SCOPE, { consent: false });
   const id = await propose(m);
   const head = await hub.head();
-  for (const target of ["hub", "hub+general"]) {
-    const plan = await m.ok(accept(id, target));
-    m.setDialog(target === "hub" ? "denied" : { decision: "dismissed", reason: "gave-up" });
-    const before = m.dialogs.length;
-    const error = await m.fail([...accept(id, target), "--apply", "--plan-fingerprint", plan.fingerprint], "DEVTWIN_OWNER_DENIED");
-    assert.equal(m.dialogs.length, before + 1, target);
-    assert.ok(error.details.reason);
-  }
+  const plan = await m.ok(accept(id, "hub"));
+  const error = await m.fail([...accept(id, "hub"), "--apply", "--plan-fingerprint", plan.fingerprint], "DEVTWIN_APPROVAL_REQUIRED");
+  assert.match(error.message, /Needs consent/);
+  assert.deepEqual([error.details.consent, error.details.target, error.details.reason], ["hub-publish", SCOPE, "none"]);
+  // consent list shows the note consent that hub join recorded, read-only, next to the standing consents.
+  const listed = await m.ok(["consent", "list"]);
+  assert.deepEqual(listed.consents, []);
+  assert.deepEqual(listed.notes.map((n) => [n.scope, n.hubId, n.valid, n.readOnly]), [[SCOPE, "example-hub", true, true]]);
+  // A consent granted under other rules is void.
+  await m.consent();
+  assert.deepEqual((await m.ok(["consent", "list"])).consents.map((c) => [c.kind, c.target, c.valid]), [["hub-publish", SCOPE, true]]);
+  const roots = await m.roots();
+  const file = join(roots.stateRoot, "consents", "hub-publish", createHash("sha256").update(SCOPE).digest("hex") + ".json");
+  await writeFile(file, JSON.stringify({ ...JSON.parse(await readFile(file, "utf8")), ruleDigest: "sha256:" + "2".repeat(64) }));
+  const dialogs = m.dialogs.length;
+  assert.equal((await m.fail([...accept(id, "hub"), "--apply", "--plan-fingerprint", plan.fingerprint], "DEVTWIN_APPROVAL_REQUIRED")).details.reason, "rules-changed");
+  assert.equal(m.dialogs.length, dialogs, "a refused accept shows no dialog");
   assert.equal(await hub.head(), head, "no commit reaches the hub");
-  const roots = await m.roots(), binding = await readHubBinding(roots, SCOPE);
+  const binding = await readHubBinding(roots, SCOPE);
   assert.deepEqual(await listOutbox(roots, binding), [], "no outbox item");
   assert.equal((await fixtureGit(binding.clone, ["rev-parse", "HEAD"])).trim(), head, "the clone has no local commit");
   assert.deepEqual((await readPersonalSnapshot(roots)).records, [], "no personal copy");
   assert.deepEqual((await m.ok(["lesson", "proposals"])).proposals.map((x) => [x.id, x.state]), [[id, "pending"]]);
-  // A stale fingerprint is refused before the dialog.
-  m.setDialog("approved");
-  const before = m.dialogs.length;
+  // A stale fingerprint is refused too.
+  await m.consent();
   await m.fail([...accept(id, "hub"), "--apply", "--plan-fingerprint", "sha256:" + "0".repeat(64)], "DEVTWIN_PLAN_MISMATCH");
-  assert.equal(m.dialogs.length, before);
+  assert.equal(await hub.head(), head);
 });
 
-test("lesson accept through a terminal wrapper from a hooked agent shell is denied before the dialog", async (t) => {
+test("lesson copy through a terminal wrapper from a hooked agent shell is denied and lesson accept is not", async (t) => {
   const hub = await hubFixture(t), m = await machine(t);
   await m.join(hub);
   const id = await propose(m);
@@ -155,8 +168,8 @@ test("lesson accept through a terminal wrapper from a hooked agent shell is deni
   const before = m.dialogs.length;
   const kit = 'node "$DEVTWIN_KIT/bin/devtwin.mjs"';
   for (const command of [
-    `script -q /dev/null ${kit} lesson accept --pilot '${m.path}' --id '${id}' --target hub --apply --plan-fingerprint '${plan.fingerprint}'`,
-    `unbuffer devtwin lesson accept --id ${id} --target hub+general --apply`,
+    `script -q /dev/null ${kit} lesson copy --pilot '${m.path}' --id rec_x --to-scope ${OTHER} --apply --plan-fingerprint 'sha256:00'`,
+    `unbuffer devtwin lesson copy --id rec_x --to-scope ${OTHER} --apply`,
     `bash -c "devtwin lesson copy --id rec_x --to-scope ${OTHER} --apply"`
   ]) {
     const payload = { session_id: "s-agent", cwd: m.p.reposDir, hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command, description: "run" }, tool_use_id: "toolu_01Example" };
@@ -170,6 +183,10 @@ test("lesson accept through a terminal wrapper from a hooked agent shell is deni
   }
   assert.equal(m.dialogs.length, before, "the denied command never reached the dialog");
   assert.deepEqual((await m.ok(["lesson", "proposals"])).proposals.map((x) => x.state), ["pending"]);
+  // U36: lesson accept left the owner-only list; the route itself refuses what its tier does not allow.
+  for (const command of [`script -q /dev/null ${kit} lesson accept --pilot '${m.path}' --id '${id}' --target hub --apply --plan-fingerprint '${plan.fingerprint}'`, `unbuffer devtwin lesson accept --id ${id} --target general --apply`]) {
+    assert.equal(ownerAction("claude", { tool_name: "Bash", tool_input: { command } }), null, command);
+  }
   // The agent-callable routes stay allowed.
   for (const command of ["devtwin lesson propose --session s --scope example --apply", "devtwin lesson proposals", "devtwin lesson match --scope example --path a.js"]) {
     assert.equal(ownerAction("claude", { tool_name: "Bash", tool_input: { command } }), null, command);
@@ -219,27 +236,23 @@ test("lesson accept with a rejected push after three tries lands in the outbox a
   assert.equal((await m.ok(["hub", "status", "--scope", SCOPE], { clock: at(0.2) })).outbox, 0);
 });
 
-test("lesson accept as hub+general also writes the personal store", async (t) => {
+test("lesson accept as hub+general waits for the activity review and hub only still publishes", async (t) => {
   const hub = await hubFixture(t), m = await machine(t, { scopes: [SCOPE, OTHER] });
   await m.join(hub);
   const id = await propose(m);
-  const result = await m.applied(accept(id, "hub+general"));
-  assert.equal(result.hub.pushed, true);
-  assert.match(m.dialogs.at(-1).body, /Also saves it to your personal store/);
-  const personal = (await readPersonalSnapshot(await m.roots())).records;
-  assert.deepEqual(personal.map((r) => [r.id, r.kind, r.reach, r.title]), [[result.personal.recordId, "lesson", "personal", "Retry the billing client"]]);
-  assert.deepEqual(personal[0].match.paths, ["src/billing/**"]);
-  assert.ok((await hub.files()).includes("lessons/" + result.hub.lessonId + ".md"));
-  // The personal copy follows the developer to the other organization's index; the hub copy does not.
-  assert.deepEqual(result.index.map((x) => x.scope).sort(), [OTHER, SCOPE]);
-  const other = await m.ok(["lesson", "match", "--scope", OTHER, "--path", "src/billing/a.js"]);
-  assert.deepEqual(other.matches.map((x) => x.id), [result.personal.recordId]);
-  assert.deepEqual((await matchIds(m, "src/billing/a.js")).sort(), [result.hub.lessonId, result.personal.recordId].sort());
-  // A general target is checked against the lesson's own scope too: text that names it stays out of the personal store.
+  const head = await hub.head();
+  const error = await m.fail(accept(id, "hub+general"), "DEVTWIN_GATE_REQUIRED");
+  assert.match(error.message, /activity review/);
+  await m.fail([...accept(id, "hub+general"), "--apply", "--plan-fingerprint", "sha256:" + "0".repeat(64)], "DEVTWIN_GATE_REQUIRED");
+  assert.equal(await hub.head(), head);
+  assert.deepEqual((await readPersonalSnapshot(await m.roots())).records, [], "no personal copy");
+  // A lesson that names its own scope may still go to that scope's hub: the hub belongs to that scope.
   const named = await propose(m, { title: "Example billing retries", session: "ses_named" });
-  await m.fail(accept(named, "hub+general"), "DEVTWIN_ISOLATION");
-  await m.fail(accept(named, "general"), "DEVTWIN_ISOLATION");
-  assert.equal((await m.ok(accept(named, "hub"))).target, "hub", "hub only is allowed: the hub belongs to that scope");
+  await m.fail(accept(named, "general"), "DEVTWIN_GATE_REQUIRED");
+  const result = await m.applied(accept(named, "hub"));
+  assert.equal(result.hub.pushed, true);
+  assert.equal(result.personal, undefined);
+  assert.deepEqual(result.index.map((x) => x.scope), [SCOPE], "a hub-only accept rebuilds only its own scope");
 });
 
 test("lesson propose refuses another scope's project name", async (t) => {
@@ -304,10 +317,10 @@ test("lesson copy publishes a personal lesson to another scope's hub only after 
   await m.fail(["lesson", "copy", "--id", clean.recordId, "--to-scope", "northwind"], "DEVTWIN_HUB_NOT_JOINED");
 });
 
-test("lesson publish paths never write to a hub without an approved owner dialog", async (t) => {
+test("lesson publish paths never write to a hub without a consent or an approved owner dialog", async (t) => {
   const hubA = await hubFixture(t), hubB = await hubFixture(t, { hubId: "contoso-hub" }), m = await machine(t, { scopes: [SCOPE, OTHER] });
-  await m.join(hubA, SCOPE);
-  await m.join(hubB, OTHER);
+  await m.join(hubA, SCOPE, { consent: false });
+  await m.join(hubB, OTHER, { consent: false });
   const roots = await m.roots();
   const heads = async () => [await hubA.head(), await hubB.head()];
   const start = await heads();
@@ -316,33 +329,31 @@ test("lesson publish paths never write to a hub without an approved owner dialog
   let n = 0;
   for (const answer of ["denied", { decision: "denied", reason: "no-gui-session" }, undefined, async () => { throw new Error("dialog crashed"); }]) {
     const ownerDialog = typeof answer === "function" ? answer : async () => answer;
-    for (const target of TARGETS.filter(leavesMachine)) {
-      const id = await propose(m, { session: "ses_deny_" + ++n, title: "Denied lesson " + target });
-      const plan = await planAccept(roots, { id, target });
-      assert.equal(plan.dialog, true, target);
-      await assert.rejects(applyAccept(roots, { id, target }, { fingerprint: plan.fingerprint, now, ctx: { ownerDialog } }), (e) => e.code === "DEVTWIN_OWNER_DENIED", target);
-      assert.equal((await m.ok(["lesson", "proposals"])).proposals.find((x) => x.id === id).state, "pending");
-      await m.applied(["lesson", "reject", "--id", id]);
-    }
+    // No owner dialog answer stands in for the hub-publish consent.
+    const id = await propose(m, { session: "ses_deny_" + ++n, title: "Denied lesson " + n });
+    const plan = await planAccept(roots, { id, target: "hub" });
+    await assert.rejects(applyAccept(roots, { id, target: "hub" }, { fingerprint: plan.fingerprint, now, ctx: { ownerDialog: async () => "approved" } }), (e) => e.code === "DEVTWIN_APPROVAL_REQUIRED");
+    assert.equal((await m.ok(["lesson", "proposals"])).proposals.find((x) => x.id === id).state, "pending");
+    await m.applied(["lesson", "reject", "--id", id]);
     const copy = await planCopy(roots, { id: personal.recordId, toScope: OTHER });
     await assert.rejects(applyCopy(roots, { id: personal.recordId, toScope: OTHER }, { fingerprint: copy.fingerprint, now, ctx: { ownerDialog } }), (e) => e.code === "DEVTWIN_OWNER_DENIED");
   }
-  // Without an injected dialog and without a desktop session, the dialog denies.
-  const id = await propose(m, { session: "ses_nogui", title: "No GUI lesson" });
-  const plan = await planAccept(roots, { id, target: "hub" });
-  await assert.rejects(applyAccept(roots, { id, target: "hub" }, { fingerprint: plan.fingerprint, now, ctx: { env: { SSH_CONNECTION: "x" } } }), (e) => e.code === "DEVTWIN_OWNER_DENIED");
+  // Without an injected dialog and without a desktop session, the copy dialog denies.
+  const copy = await planCopy(roots, { id: personal.recordId, toScope: OTHER });
+  await assert.rejects(applyCopy(roots, { id: personal.recordId, toScope: OTHER }, { fingerprint: copy.fingerprint, now, ctx: { env: { SSH_CONNECTION: "x" } } }), (e) => e.code === "DEVTWIN_OWNER_DENIED");
   assert.deepEqual(await heads(), start, "no hub got a commit");
   for (const scope of [SCOPE, OTHER]) assert.deepEqual(await listOutbox(roots, await readHubBinding(roots, scope)), [], scope);
   assert.deepEqual((await readPersonalSnapshot(roots)).records.map((r) => r.id), [personal.recordId], "no personal copy from a denied accept");
-  // Source check: the only calls to publishToHub in the lesson code sit behind requireOwnerApproval.
+  // Source check: the only calls to publishToHub in the lesson code sit behind the consent check (accept) or the owner
+  // dialog (copy).
   const source = await readFile(join(import.meta.dirname, "..", "src", "lessons", "publish.mjs"), "utf8");
   assert.equal(source.match(/publishToHub\(/g).length, 1, "one publish call");
   assert.equal(source.match(/publishLesson\(/g).length, 3, "the helper and its two callers");
-  for (const fn of ["applyAccept", "applyCopy"]) {
+  for (const [fn, gate] of [["applyAccept", "requireConsent("], ["applyCopy", "requireOwnerApproval("]]) {
     const body = source.slice(source.indexOf("export async function " + fn));
     const end = body.indexOf("\n}\n");
     const text = body.slice(0, end);
-    assert.ok(text.indexOf("requireOwnerApproval") > 0 && text.indexOf("requireOwnerApproval") < text.indexOf("publishLesson("), fn + " shows the dialog before it publishes");
+    assert.ok(text.indexOf(gate) > 0 && text.indexOf(gate) < text.indexOf("publishLesson("), fn + " checks " + gate + " before it publishes");
   }
   for (const name of await readdir(join(import.meta.dirname, "..", "src", "lessons"))) {
     if (name === "publish.mjs") continue;
@@ -350,7 +361,7 @@ test("lesson publish paths never write to a hub without an approved owner dialog
   }
 });
 
-test("lesson edit reject and the local targets work behind the owner dialog", async (t) => {
+test("lesson edit reject and the project target work with no owner dialog", async (t) => {
   const m = await machine(t);
   const roots = await m.roots();
   const repo = await makeRepo(join(m.p.reposDir, "atlas"), { "README.md": "# Atlas\n" });
@@ -371,20 +382,17 @@ test("lesson edit reject and the local targets work behind the owner dialog", as
   await m.fail(["lesson", "edit", "--id", toGeneral, "--summary", "Do pass a fixed clock to time-based tests.", "--topic", "testing"], "DEVTWIN_INVALID_INPUT");
   await m.applied(["lesson", "reject", "--id", toReject]);
   const project = await m.applied(accept(fromStdin, "project"));
-  const general = await m.applied(accept(toGeneral, "general"));
-  // Local targets show the owner dialog too: it names the target and says nothing leaves the machine.
-  assert.equal(m.dialogs.length, 2, "each local accept shows the owner dialog");
-  assert.match(m.dialogs[0].title, /Save a lesson on this machine/);
-  assert.match(m.dialogs[0].body, /lesson of project example\.atlas[\s\S]*Nothing leaves this machine[\s\S]*Seed after migrations/);
-  assert.match(m.dialogs[1].body, /personal store/);
+  // U36: the project target is automatic and the general target waits for the activity review.
+  assert.equal(project.tier, "automatic");
+  await m.fail(accept(toGeneral, "general"), "DEVTWIN_GATE_REQUIRED");
+  assert.equal(m.dialogs.length, 0, "no accept shows the owner dialog");
   const records = (await readSnapshot(roots, SCOPE, "example.atlas")).records.filter((r) => r.kind === "lesson");
   assert.deepEqual(records.map((r) => [r.id, r.reach, r.title]), [[project.project.recordId, "project", "Seed after migrations"]]);
-  const personal = (await readPersonalSnapshot(roots)).records;
-  assert.deepEqual(personal.map((r) => [r.id, r.title, r.body.split("\n")[0]]), [[general.personal.recordId, "Pin the test clock", "Do pass a fixed clock to time-based tests."]]);
-  assert.deepEqual((await m.ok(["lesson", "proposals", "--all"])).proposals.map((x) => x.state).sort(), ["accepted", "accepted", "rejected"]);
+  assert.deepEqual((await readPersonalSnapshot(roots)).records, []);
+  assert.deepEqual((await m.ok(["lesson", "proposals", "--all"])).proposals.map((x) => x.state).sort(), ["accepted", "pending", "rejected"]);
   assert.deepEqual(await matchIds(m, "db/001.sql"), [project.project.recordId]);
   await m.fail(["lesson", "reject", "--id", toReject], "DEVTWIN_CONFLICT");
-  await m.fail(accept(toReject, "general"), "DEVTWIN_CONFLICT");
+  await m.fail(accept(toReject, "project"), "DEVTWIN_CONFLICT");
   await m.fail(accept("prop_" + "0".repeat(24), "hub"), "DEVTWIN_NOT_FOUND");
   // Without a hub, a hub target is refused at preview.
   const solo = await propose(m, { session: "ses_solo", title: "Solo lesson" });
