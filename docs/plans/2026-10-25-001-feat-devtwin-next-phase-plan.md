@@ -738,6 +738,8 @@ flowchart TB
 
 ### Phase P6: Review and agent checks
 
+U21 and U23 moved to P9 of `docs/plans/2026-10-27-001-feat-devtwin-promotion-phase-plan.md`, which extends them. The text below is kept for reference.
+
 ### U21. Setup review
 
 **Goal:** Offer a monthly, developer-driven review of the setup.
