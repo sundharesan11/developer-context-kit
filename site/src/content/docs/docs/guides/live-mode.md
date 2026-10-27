@@ -20,11 +20,11 @@ Every write is still a preview followed by an apply of the exact fingerprint you
 - Outside the store, devtwin writes only `devtwin-*` entries directly inside `~/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) and `~/.agents/skills`, plus the exact paths you approve as [write classes](/docs/reference/configuration/#write-classes). It never creates, removes or changes the mode of those folders.
 - Codex skills go to `~/.agents/skills`, never `~/.codex/skills`. `CODEX_HOME` does not change this; the preview warns `CODEX_HOME_IGNORED` if it is set.
 - Live commands run only from the kit clone the live config names, and that clone must be clean and detached at the configured commit.
-- The live config changes only through `live init`, `live add-repo`, `live set-kit`, `live write-classes`, `live stack-watch` and `live migrate`. Each records an approved digest of the config; a `live.json` that differs from the approved one is refused.
+- The live config changes only through `live init`, `live add-repo`, `live set-kit`, `live write-classes`, `live stack-watch`, `live approval` and `live migrate`. Each records an approved digest of the config; a `live.json` that differs from the approved one is refused.
 - Listed repositories are read-only.
 
-:::caution[No backup yet]
-Losing `~/.devtwin` loses your records, decisions and journals, and leaves installed skills unowned. Onboarding copies some repository text into the store, protected only by mode 0700 and your disk encryption. Backup and restore is the top roadmap item; see [Limitations](/docs/security/limitations/).
+:::caution[Turn on backups]
+Until you approve a backup folder, there is no backup: losing `~/.devtwin` loses your records, decisions and journals, and leaves installed skills unowned. Onboarding copies some repository text into the store, protected only by mode 0700 and your disk encryption. See [Backup and restore](#backup-and-restore).
 :::
 
 The steps below use these variables:
@@ -140,7 +140,7 @@ export DEVTWIN_KIT="$HOME/.devtwin/kit"
 
 Open a new terminal and check `printenv DEVTWIN_KIT`. devtwin edits agent settings files only through `agents install --hooks` and `agents uninstall --hooks`, after you approve them as write classes.
 
-To turn on lesson delivery and the owner-action block, follow [Turn on the hooks in live mode](/docs/guides/lessons-and-hooks/#turn-on-the-hooks-in-live-mode). To run these steps one at a time with a what, why and undo for each, use the [setup wizard](/docs/guides/setup-wizard/). To share lessons with colleagues, see [Organization hub](/docs/guides/organization-hub/).
+To turn on lesson delivery and the owner-action block, follow [Turn on the hooks in live mode](/docs/guides/lessons-and-hooks/#turn-on-the-hooks-in-live-mode). Then run [`paths confirm`](/docs/guides/lessons-and-hooks/#confirm-the-kit-and-config-paths) once, so that the skills stop asking for the kit and config paths and the hook keeps its receipt current. To run these steps one at a time with a what, why and undo for each, use the [setup wizard](/docs/guides/setup-wizard/). To share lessons with colleagues, see [Organization hub](/docs/guides/organization-hub/).
 
 ## 10. Try it in a fresh session
 
@@ -153,6 +153,69 @@ Never use --apply and never edit files.
 ```
 
 The session should list `devtwin-capture`, `devtwin-onboard`, `devtwin-record` and `devtwin-resume`, run `context resolve` through `DEVTWIN_KIT`, and name your project. A kit-commit warning means the installed skills came from another commit; reinstall from the current kit.
+
+## Backup and restore
+
+devtwin can keep encrypted backups of the store in a folder that you approve. There is no sync.
+
+- `backup create` writes one archive into an approved `backupTargets` folder. Agents and the `backup-daily` job may run it. Each folder keeps the newest 14 archives.
+- The archive holds the config, data and state roots, without caches such as the lesson index and hook session files. It is encrypted with AES-256-GCM.
+- The key is 32 random bytes in your macOS Keychain, made on the first `backup create`. Without the key, an archive cannot be read.
+- `backup restore` writes only to a new folder inside an approved backup folder. It never writes the live store.
+- `backup key export` prints the key once. Only you can run it, after the owner dialog. Until it has run once, the activity digest warns that backups cannot be restored on another machine.
+
+### Turn on daily backups
+
+Pick a folder inside your home that is not in `~/.devtwin`, such as a folder that a cloud drive or an external copy job saves. Preview each command, review it, then apply it:
+
+```sh
+node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --backup-target "$HOME/devtwin-backups"
+node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --launch-agent "$HOME/Library/LaunchAgents/devtwin.backup-daily.plist"
+node "$KIT/bin/devtwin.mjs" schedule plan --pilot "$LIVE_CONFIG" --job backup-daily
+node "$KIT/bin/devtwin.mjs" schedule apply --pilot "$LIVE_CONFIG" --job backup-daily --plan-fingerprint '<fingerprint>'
+```
+
+The `--launch-agent` flag replaces the whole `launchAgents` list, so also give every plist that you approved before. Then export the key once, in your own terminal and outside any agent session:
+
+```sh
+node "$KIT/bin/devtwin.mjs" backup key export --pilot "$LIVE_CONFIG"
+node "$KIT/bin/devtwin.mjs" backup key export --pilot "$LIVE_CONFIG" --apply --plan-fingerprint '<fingerprint>'
+```
+
+Store the key in a password manager, then clear the terminal.
+
+### Restore a backup
+
+1. Run `backup status` to list the archives in each approved folder.
+2. Preview the restore into a new folder inside the backup folder:
+
+   ```sh
+   node "$KIT/bin/devtwin.mjs" backup restore --pilot "$LIVE_CONFIG" --from "$HOME/devtwin-backups/<archive>.dtb" --to "$HOME/devtwin-backups/restored"
+   ```
+
+3. Check the file count and the archive time in the preview.
+4. Run the same command with `--apply --plan-fingerprint '<fingerprint>'`, and approve the owner dialog.
+5. Read the result. It gives the number of files written and the number verified.
+
+Restore decrypts and checks the whole archive in memory before it writes. A changed archive or a wrong key fails with `DEVTWIN_INTEGRITY`, and nothing is written. The restored files are plain text: when a cloud drive copies the backup folder, move the restored folder out of it or delete it after use.
+
+The restored folder holds `config`, `data` and `state`, the same layout as `~/.devtwin/store`. No command points the live config at it. To use it, stop every agent session and move the current store aside. Then move the restored folders into `~/.devtwin/store` by hand, and make an empty `inputs` folder at mode 0700.
+
+To restore on another machine, add the exported key to that machine's Keychain with `security add-generic-password -s devtwin-backup -a "$USER" -w`, and paste the key when it asks for the password. Then copy the archive into an approved backup folder there and follow the steps above.
+
+## Answer owner prompts over SSH
+
+By default, an always-ask action needs the macOS owner dialog, so it is denied in a session with no GUI, such as an SSH login. To answer on the terminal instead, opt in once:
+
+```sh
+node "$KIT/bin/devtwin.mjs" live approval --pilot "$LIVE_CONFIG" --mode dialog-or-tty
+node "$KIT/bin/devtwin.mjs" live approval --pilot "$LIVE_CONFIG" --mode dialog-or-tty --apply --plan-fingerprint '<fingerprint>'
+```
+
+- In a GUI session the dialog is still required. With no GUI session, devtwin writes the prompt and a random six-letter code to the terminal. Type the code and press Return to approve. Anything else, or no answer in 300 seconds, denies.
+- The devtwin hook still denies always-ask commands from agent shells.
+- This is an owner action, and the apply shows the owner dialog. `--mode dialog` turns it off again.
+- The key is part of the approved config, so a change ends the path confirmation. Run `paths confirm` again after it.
 
 ## Add another repository
 
@@ -177,6 +240,7 @@ Upgrade side by side, so the old clone keeps working until the new one is proven
 
 3. From now on run every live command from the new clone. Preview `agents install` for each agent; changed skills show `update`.
 4. Point `DEVTWIN_KIT` at the new clone.
+5. Run `paths confirm` from the new clone, preview first. The new kit path ends the old confirmation.
 
 Installed skills stay owned across a kit change. Don't move or rename a clone after `live set-kit`. To go back, run `live set-kit` from the old clone with its commit.
 
@@ -194,6 +258,7 @@ If you set up live mode under the old devctx name, move it with [Migrate from de
 | `GATE_REQUIRED`, field `live.kitCommit`, reason `dirty`, `attached` or `commit` | The kit has changes, is on a branch, or is at another commit. A stray file such as `.DS_Store` under `bin`, `src`, `skills`, `scripts`, `schemas` or `catalog` counts; list them with `git -C "$KIT" ls-files --others --ignored --exclude-standard -- bin src skills scripts schemas catalog`. |
 | `GATE_REQUIRED`, field `live.approval` | `live.json` differs from the approved config. Don't edit it by hand. |
 | `GATE_REQUIRED`, field `live.home` | `$HOME` differs from the live config's home. |
+| `GATE_REQUIRED`, field `writeClasses.backupTargets` or `to` | No backup folder is approved, or the folder you named is not one. Approve it with `live write-classes --backup-target`. |
 | `GATE_REQUIRED`, `Live skill folder unavailable` | A skill folder is missing or is a link. See step 1. |
 | `GATE_REQUIRED`, reason `no-live-exception`, `scope-required` or `host-not-in-exception` | The stack watch needs the `stackWatch` exception, a `--scope`, and every approved host in the exception. See [Stack watch and radar](/docs/guides/stack-watch/#live-mode). |
 | `APPROVAL_REQUIRED` from `stack check` | The config changed after the stack approval, for example by `live set-kit` or `live stack-watch`. Run `stack plan` and `stack approve` again. |
@@ -203,6 +268,6 @@ If you set up live mode under the old devctx name, move it with [Migrate from de
 
 ## If the store is lost
 
-Without the store, installed `devtwin-*` entries have no matching journal, become unowned, and devtwin refuses to update or remove them. Remove them by hand: check each entry is a real directory holding only `SKILL.md` and `.devtwin-owned.json`, that the receipt's `kind` is `skill-bundled` and its `configId` is your old one, then move it into a private holding folder. Move the old `live.json` aside too, since `live init` refuses an existing config or a non-empty store, and start again from step 5.
+If you have a backup, [restore it](#restore-a-backup) into a new folder and move it into place. Without the store, installed `devtwin-*` entries have no matching journal, become unowned, and devtwin refuses to update or remove them. Remove them by hand: check each entry is a real directory holding only `SKILL.md` and `.devtwin-owned.json`, that the receipt's `kind` is `skill-bundled` and its `configId` is your old one, then move it into a private holding folder. Move the old `live.json` aside too, since `live init` refuses an existing config or a non-empty store, and start again from step 5.
 
 The approved digest catches accidental edits to `live.json`, not deliberate tampering by your own user account. See the [security model](/docs/security/security-model/).

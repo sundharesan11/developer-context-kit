@@ -207,7 +207,7 @@ The scheduled jobs are owner actions. The devtwin hook denies `schedule apply`, 
 
 ## Known CLI caveats
 
-- CLI record commands attribute every record to `recordedBy: {actor: "human", runId: "run_cli00001"}`. This label is not an identity attestation; an agent running the CLI is recorded as `human`.
+- CLI record commands set `recordedBy` to `{actor, runId: "run_cli00001"}`. The actor is `claude` when `CLAUDECODE` is set, `codex` when a `CODEX_` variable is set, and `human` otherwise. This label is not an identity attestation.
 - `record publish --apply` always passes `controller: true`. The CLI does not check who the controller is.
 - Bundled skills are tested for real command routes, not for each command's flags.
 

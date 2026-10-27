@@ -202,7 +202,7 @@ The guide goes under `dataRoot/scopes/<scope>/guides/radar/` and creates nothing
 
 ## Schedules
 
-Three jobs run the radar for you. Each job is a user LaunchAgent with its own consent and its own off switch.
+Three jobs run the radar for you. Each job is a user LaunchAgent with its own consent and its own off switch. Two more jobs use the same commands: `activity-weekly` sends a weekly notification with counts of what devtwin learned, and `backup-daily` writes a [daily encrypted backup](/docs/guides/live-mode/#backup-and-restore).
 
 | Job | Runs | What it does |
 | --- | --- | --- |

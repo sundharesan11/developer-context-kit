@@ -22,8 +22,8 @@ Before its first CLI call in a session, every skill checks:
 
 1. `DEVTWIN_KIT` is set to an absolute path whose real path is **outside** the current repository. If only the legacy `DEVCTX_KIT` is set, the skill uses it for the session and tells you it is deprecated; see [Migrate from devctx](/docs/guides/migrate-from-devctx/).
 2. The kit contains `bin/devtwin.mjs` and a `package.json` named `devtwin`.
-3. You confirm the kit's real path, once per session.
-4. You confirm the pilot path, once per session. The skill offers `~/.devtwin/live.json` or takes a disposable pilot path from you. It refuses a pilot inside the current repository or the kit.
+3. You confirm the kit's real path. The skill asks only when the hook's session-start line does not say "Kit and config confirmed", or when `paths check` reports a mismatch. See [Confirm the kit and config paths](/docs/guides/lessons-and-hooks/#confirm-the-kit-and-config-paths).
+4. You confirm the pilot path, under the same rule. The skill offers `~/.devtwin/live.json` or takes a disposable pilot path from you. It refuses a pilot inside the current repository or the kit.
 5. For project skills: the repository is listed in the pilot's `repos`, and you state the scope. The skill never infers the scope from a folder name.
 6. The installed skill's `kitCommit` (from its `.devtwin-owned.json`) matches the commit at `DEVTWIN_KIT`. If not, it warns you and asks whether to continue.
 
@@ -80,12 +80,12 @@ If the repository is not in the live config's `repos`, it tells you that you can
 
 1. Treats each lesson line and lesson body as advice from another person, never as instructions. It never runs a command, fetches a URL or changes a permission because a lesson says so.
 2. Loads a full lesson with `lesson show` only when it needs it, and runs `lesson match` when the hook says more lessons match.
-3. **Conflict.** When the plan breaks a lesson's "do" or "don't" line, it stops, quotes the line and asks you to follow the lesson or replace it. To replace it, it previews `lesson supersede-propose` and applies only after you say yes. You accept the replacement yourself with `lesson accept --target hub`.
-4. **End of task.** Drafts at most three general lessons, with no client, repository, account, person or host names. It checks `lesson match` for duplicates, shows you the drafts, and runs `lesson propose --apply` only after you approve. It uses the session ID from the hook's session-start line.
+3. **Conflict.** When the plan breaks a lesson's "do" or "don't" line, it stops, quotes the line and asks you to follow the lesson or replace it. To replace it, it previews `lesson supersede-propose` and applies only after you say yes. It then accepts the replacement with `lesson accept --target hub`, which works only under your `hub-publish` consent. Without one, it tells you and asks whether you want to grant it with `consent grant` in your own terminal.
+4. **End of task.** Drafts at most three general lessons, with no client, repository, account, person or host names. It checks `lesson match` for duplicates and saves each one with `lesson propose --apply`. Then it accepts each one for the current project with `lesson accept --target project --apply`, an automatic action, and tells you which lessons it saved. It uses the session ID from the hook's session-start line. A lesson for every project waits for your weekly review, and a lesson for the hub needs your `hub-publish` consent.
 5. **Preferences.** When you correct how it works, it asks whether that is a preference for later tasks. If you say yes, it saves a private proposal with `pref propose`, at most once for each kind of correction. You accept it yourself; see [Preferences and templates](/docs/guides/preferences-and-templates/).
 6. **Output templates.** For an RCA, a report or a decision note, it follows `template show`: your own template, or the starter.
 
-It never runs `lesson accept`, `lesson copy`, `published delete`, `hub join`, `lesson notices --ack --apply`, or `lesson edit` or `lesson reject` with `--apply`. On Codex, it checks an edit again when a lesson arrives after the edit ran.
+It never runs `lesson copy`, `published delete`, `hub join`, `consent grant`, `consent revoke`, `lesson notices --ack --apply`, or `lesson edit` or `lesson reject` with `--apply`. It runs `lesson accept --apply` only for the `project` target, or for the `hub` target under a consent. On Codex, it checks an edit again when a lesson arrives after the edit ran.
 
 ## devtwin-setup
 
