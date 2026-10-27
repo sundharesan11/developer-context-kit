@@ -7,8 +7,9 @@ import { renderInbound } from "../records/isolation.mjs";
 import { LESSON_ID } from "../hubs/read.mjs";
 import { buildIndex, rebuildIndex, readIndex, findLesson, findRepoRoot, readCommonDir, resolveRepo } from "./index.mjs";
 import { matchLessons, normalizeRelPath, packageName, isStale } from "./match.mjs";
+import { commandWords } from "../hooks/shell-words.mjs";
 const list = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
-const options = { scope: { type: "string" }, cwd: { type: "string" }, path: { type: "string", multiple: true }, package: { type: "string", multiple: true }, text: { type: "string" }, id: { type: "string" } };
+const options = { scope: { type: "string" }, cwd: { type: "string" }, path: { type: "string", multiple: true }, package: { type: "string", multiple: true }, text: { type: "string" }, command: { type: "string" }, id: { type: "string" } };
 const invalid = (field) => { throw new DevtwinError("INVALID_INPUT", "Invalid lesson match input", { field }); };
 // The worktree for --cwd, resolved through the index's path-to-scope map, as the hook does.
 function repoFor(index, cwd) {
@@ -38,7 +39,8 @@ export const lessonMatchCommand = { options, async run(values, ctx) {
   const located = values.cwd === undefined ? null : repoFor(index, values.cwd);
   const paths = list(values.path).map((p) => relativePath(p, located?.root));
   const packages = list(values.package).map((p) => packageName(p) ?? invalid("package"));
-  const matches = matchLessons(index, { paths, packages, text: values.text ?? "", project: located?.repo.project ?? null, now: ctx.now() });
+  // U32: --command is shell text, split as the hook splits a shell call.
+  const matches = matchLessons(index, { paths, packages, text: values.text ?? "", commands: commandWords(values.command ?? ""), project: located?.repo.project ?? null, now: ctx.now() });
   return { scope, repo: located?.repo ?? null, index: state, matches };
 } };
 // The full lesson as fenced, claimed, capped data (KTD11). Only an effective lesson in the scope's index is shown.
@@ -56,7 +58,7 @@ export const lessonIndexCommand = { options: { scope: { type: "string" } }, run:
 // U11: lesson propose (agent-callable, private, at most three per session) and the owner's proposals, edit, reject,
 // accept and copy. Each state change previews first. propose applies with --apply, as record propose does; reject,
 // edit, accept and copy apply with --apply and the plan fingerprint. accept to a hub and copy show the owner dialog.
-const lessonOptions = { session: { type: "string" }, scope: { type: "string" }, project: { type: "string" }, title: { type: "string" }, summary: { type: "string" }, body: { type: "string" }, "body-file": { type: "string" }, path: { type: "string", multiple: true }, package: { type: "string", multiple: true }, topic: { type: "string", multiple: true }, apply: { type: "boolean" } };
+const lessonOptions = { session: { type: "string" }, scope: { type: "string" }, project: { type: "string" }, title: { type: "string" }, summary: { type: "string" }, body: { type: "string" }, "body-file": { type: "string" }, path: { type: "string", multiple: true }, package: { type: "string", multiple: true }, topic: { type: "string", multiple: true }, command: { type: "string", multiple: true }, apply: { type: "boolean" } };
 const BODY_BYTES = 32768;
 async function readStdin(stdin) {
   if (typeof stdin === "string") return stdin;
@@ -83,7 +85,9 @@ async function bodyFrom(values, ctx) {
   if (read.skipped || Buffer.byteLength(read.text) > BODY_BYTES) throw new DevtwinError("INVALID_INPUT", "Body file unavailable", { field: "body-file" });
   return read.text;
 }
-const matchFrom = (values) => values.path === undefined && values.package === undefined && values.topic === undefined ? undefined : { paths: list(values.path), packages: list(values.package), topics: list(values.topic) };
+// U32: --command is a command prefix of one to three lower-case words, such as "git push".
+const matchFrom = (values) => values.path === undefined && values.package === undefined && values.topic === undefined && values.command === undefined ? undefined
+  : { paths: list(values.path), packages: list(values.package), topics: list(values.topic), ...(values.command === undefined ? {} : { commands: list(values.command) }) };
 const needPlan = (values) => { if (!values["plan-fingerprint"]) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required"); };
 const planOptions = { id: { type: "string" }, apply: { type: "boolean" }, "plan-fingerprint": { type: "string" } };
 export const lessonProposeCommand = { options: lessonOptions, async run(values, ctx) {

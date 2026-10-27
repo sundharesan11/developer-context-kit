@@ -160,6 +160,60 @@ test("hook sends four index lines then one overflow line at the session cap", as
   assert.equal(after.agents.codex.lines, 0);
 });
 
+// U32: a Claude Code Bash call, built from the Edit fixture.
+async function bash(s, command, session) {
+  const edit = await payload("claude-pre-tool-edit", s.repo, session ? { session_id: session } : {});
+  return { ...edit, tool_name: "Bash", tool_input: { command, description: "Run a command" } };
+}
+const pushLesson = (requestId, title = "Ask before pushing") => lesson(requestId, { title, match: { commands: ["git push"] } });
+
+test("hook delivers a git push command lesson once per session for Claude Code Bash and Codex shell calls", async (t) => {
+  const s = await store(t);
+  const id = (await addRecord(s.roots, pushLesson("req_hookcmd01"), { now })).recordId;
+  await rebuildIndex(s.roots, SCOPE);
+  const [expected] = (await runCli(["lesson", "match", "--pilot", s.path, "--scope", SCOPE, "--command", "git push"])).json.result.matches;
+  const first = await hook(s, "claude", "pre-tool", await bash(s, "git push origin main"));
+  assert.equal(first.json.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.ok(first.context.startsWith(NOTICE), first.context);
+  assert.deepEqual(indexLines(first.context), ["- " + expected.line]);
+  assert.equal(expected.id, id);
+  assert.doesNotMatch(first.out, /permissionDecision|"decision"/);
+  // Once per session: the same lesson through git -C does not repeat.
+  assert.equal((await hook(s, "claude", "pre-tool", await bash(s, "git -C app push"))).out, "");
+  let n = 0;
+  for (const command of ["git -C app push", "FOO=1 env git push", "cd x && git push", 'bash -c "git push"', "/usr/bin/git push"]) {
+    assert.deepEqual(indexLines((await hook(s, "claude", "pre-tool", await bash(s, command, "s-match-" + n++))).context), ["- " + expected.line], command);
+  }
+  for (const command of ["git pushd", "echo git push", 'git commit -m "a; git push"', "git status"]) {
+    assert.equal((await hook(s, "claude", "pre-tool", await bash(s, command, "s-quiet-" + n++))).out, "", command);
+  }
+  // Codex sends text or an argv array; a post-tool call does not deliver command lessons.
+  const codex = await payload("codex-post-tool-bash", s.repo, { hook_event_name: "PreToolUse", session_id: "thr_cmd0001", tool_name: "exec_command", tool_input: { command: ["bash", "-lc", "git -C app push"] } });
+  assert.deepEqual(indexLines((await hook(s, "codex", "pre-tool", codex)).context), ["- " + expected.line]);
+  const post = await payload("codex-post-tool-bash", s.repo, { session_id: "thr_cmd0002", tool_input: { command: "git push" } });
+  assert.equal((await hook(s, "codex", "post-tool", post)).out, "");
+  // The budget log records the delivered lesson IDs and never the command text.
+  const log = await readFile(join(s.stateRoot, "hooks/budget.jsonl"), "utf8");
+  assert.ok(!log.includes("git push") && !log.includes("app"), log);
+  const rows = log.trim().split("\n").map((l) => JSON.parse(l));
+  assert.equal(rows.length, 7);
+  for (const row of rows) assert.deepEqual(row.lessons, [id]);
+  const report = (await runCli(["budget", "report", "--pilot", s.path])).json.result;
+  assert.deepEqual([report.totals.events, report.totals.lines, report.totals.overflow], [7, 7, 0]);
+});
+
+test("hook sends a fifth command lesson match as the overflow line", async (t) => {
+  const s = await store(t);
+  for (let i = 1; i <= 5; i++) await addRecord(s.roots, pushLesson("req_hookcmd1" + i, "Push lesson " + i), { now });
+  await rebuildIndex(s.roots, SCOPE);
+  const first = await hook(s, "claude", "pre-tool", await bash(s, "cd app && git push origin main"));
+  assert.equal(indexLines(first.context).length, 4);
+  assert.equal(first.context.split("\n").at(-1), "1 more lesson matches; run `devtwin lesson match`");
+  assert.equal((await hook(s, "claude", "pre-tool", await bash(s, "git push"))).out, "");
+  const report = (await runCli(["budget", "report", "--pilot", s.path])).json.result;
+  assert.deepEqual([report.totals.events, report.totals.lines, report.totals.overflow, report.totals.bytes], [1, 4, 1, Buffer.byteLength(first.context)]);
+});
+
 test("hook gives a linked worktree of a bound project that project's lessons", async (t) => {
   const s = await store(t);
   const linked = join(s.reposDir, "atlas-linked");

@@ -9,6 +9,7 @@ import { addRecord, supersedeRecord } from "../src/records/store.mjs";
 import { addOrgRecord, addPersonalRecord } from "../src/records/personal.mjs";
 import { buildIndex, rebuildIndex, readIndex, indexPath, readCommonDir, resolveRepo } from "../src/lessons/index.mjs";
 import { globMatch, normalizeRelPath, packageName, matchLessons, prepareIndex, INDEX_LINE_BYTES } from "../src/lessons/match.mjs";
+import { commandWords } from "../src/hooks/shell-words.mjs";
 
 const SCOPE = "example", PROJECT = "example.atlas", OWNER = "email:owner@example.com";
 const human = { actor: "human", runId: "run_fixture01" };
@@ -67,6 +68,48 @@ test("lesson match orders path then package then topic matches and newest first"
   assert.deepEqual(ids, [path.recordId, pkgNew.recordId, pkgOld.recordId, org.recordId, topic.recordId]);
   // A package name in the prompt text matches as a whole word, and personal lessons reach every scope.
   assert.deepEqual(matchLessons(index, { text: "Why does node-fetch hang?", now: now() }).map((m) => [m.id, m.matchedBy]), [[personal.recordId, ["package"]]]);
+});
+
+test("lesson match by command prefix sits between package and topic and matches whole words", async (t) => {
+  const s = await project(t);
+  const topic = await addRecord(s.roots, lesson("req_lessonc01", { title: "Topic lesson", match: { topics: ["release"] } }), { now: at("2026-10-03T00:00:00.000Z") });
+  const command = await addRecord(s.roots, lesson("req_lessonc02", { title: "Ask before pushing", match: { commands: ["git push"] } }), { now: at("2026-09-01T00:00:00.000Z") });
+  const pkg = await addRecord(s.roots, lesson("req_lessonc03", { title: "Package lesson", match: { packages: ["pg"] } }), { now: at("2026-08-01T00:00:00.000Z") });
+  const index = await buildIndex(s.roots, SCOPE);
+  // A record without commands keeps its match block as before; a command lesson indexes its prefixes.
+  assert.deepEqual(index.entries.find((e) => e.id === pkg.recordId).match, { paths: [], packages: ["pg"], topics: [] });
+  assert.deepEqual(index.entries.find((e) => e.id === command.recordId).match.commands, ["git push"]);
+  const ordered = matchLessons(index, { packages: ["pg"], commands: commandWords("git -C app push origin main"), text: "Write the release notes.", now: now() });
+  assert.deepEqual(ordered.map((m) => [m.id, m.matchedBy]), [[pkg.recordId, ["package"]], [command.recordId, ["command"]], [topic.recordId, ["topic"]]]);
+  for (const text of ["git push origin main", "git -C app push", "FOO=1 env git push", "cd x && git push", 'bash -c "git push"', "/usr/bin/git push"]) {
+    assert.deepEqual(matchLessons(index, { commands: commandWords(text), now: now() }).map((m) => m.id), [command.recordId], text);
+  }
+  for (const text of ["git pushd", "echo git push", 'git commit -m "a; git push"', "git status"]) assert.deepEqual(matchLessons(index, { commands: commandWords(text), now: now() }), [], text);
+  // Prompt text never matches a command lesson.
+  assert.deepEqual(matchLessons(index, { text: "please git push now", now: now() }), []);
+  const cli = await runCli(["lesson", "match", "--pilot", s.path, "--scope", SCOPE, "--command", "FOO=1 env git push"]);
+  assert.equal(cli.code, 0, JSON.stringify(cli.json));
+  assert.deepEqual(cli.json.result.matches.map((m) => [m.id, m.matchedBy]), [[command.recordId, ["command"]]]);
+});
+
+test("lesson propose and edit take --command and refuse a prefix over three words or with shell operators", async (t) => {
+  const s = await project(t);
+  const propose = (extra) => runCli(["lesson", "propose", "--pilot", s.path, "--scope", SCOPE, "--session", "ses_cmd", "--title", "Ask before pushing", "--summary", "Do ask before you push.", "--body", "Pushes reach the team.\n", ...extra]);
+  const preview = await propose(["--command", "git push"]);
+  assert.equal(preview.code, 0, JSON.stringify(preview.json));
+  assert.deepEqual(preview.json.result.lesson.match, { paths: [], packages: [], topics: [], commands: ["git push"] });
+  for (const bad of ["git push origin main", "git push && rm", "git|push", "git; push", "Git push", "git  push", "git push ", "$(git) push", ""]) {
+    const out = await propose(["--command", bad]);
+    assert.equal(out.json.ok, false, bad);
+    assert.equal(out.json.error.code, "DEVTWIN_INVALID_INPUT", bad);
+  }
+  await assert.rejects(addRecord(s.roots, lesson("req_lessonc04", { match: { commands: ["a b c d"] } }), { now }), { code: "DEVTWIN_INVALID_INPUT" });
+  await assert.rejects(addRecord(s.roots, lesson("req_lessonc05", { match: { commands: ["git push > out"] } }), { now }), { code: "DEVTWIN_INVALID_INPUT" });
+  // Edit replaces the match block with the new command prefix.
+  const id = (await propose(["--path", "deploy/**", "--apply"])).json.result.proposalId;
+  const edit = await runCli(["lesson", "edit", "--pilot", s.path, "--id", id, "--command", "npm publish", "--command", "git push"]);
+  assert.equal(edit.code, 0, JSON.stringify(edit.json));
+  assert.deepEqual(edit.json.result.lesson.match, { paths: [], packages: [], topics: [], commands: ["npm publish", "git push"] });
 });
 
 test("superseded tombstoned proposed and disputed lessons never match", async (t) => {

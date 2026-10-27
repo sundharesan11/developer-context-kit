@@ -61,7 +61,7 @@ function hubFile(binding, { requestId, createdAt, lesson, localRecordHash, super
   const meta = { schemaVersion: 1, id, author: binding.actorRef, title: lesson.title, match: lesson.match, createdAt, localRecordHash, ...(supersedes ? { supersedes } : {}) };
   return { hubId: binding.hubId, scope: binding.scope, author: binding.actorRef, lessonId: id, rel: "lessons/" + id + ".md", content: renderHubLesson(meta, lessonBody(lesson)), ...(supersedes ? { supersedes } : {}) };
 }
-const matchLine = (match) => ["paths", "packages", "topics"].filter((key) => match[key].length).map((key) => key + ": " + match[key].join(", ")).join("; ");
+const matchLine = (match) => ["paths", "packages", "topics", "commands"].filter((key) => match[key]?.length).map((key) => key + ": " + match[key].join(", ")).join("; ");
 // The owner dialog shows the exact lesson text. A lesson too long to show in full is refused, never cut.
 function lessonDialog(title, header, lesson) {
   const content = { title, body: [...header, "", "Title: " + lesson.title, ...(lesson.summary ? ["Do or don't: " + lesson.summary] : []), "", lesson.text.trim() || "(no further text)", "", "Matches " + matchLine(lesson.match)].join("\n") };

@@ -77,7 +77,7 @@ function appendLine(stateRoot, path, value) {
   const fd = openSync(path, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
   try { checkNode(fstatSync(fd), path); writeSync(fd, JSON.stringify(value) + "\n"); } finally { closeSync(fd); }
 }
-// Logged per injection: no prompt text, path or lesson text, only counts.
+// Logged per injection: no prompt text, command text, path or lesson text, only counts and the delivered lesson IDs.
 export function logBudget(stateRoot, entry) { appendLine(stateRoot, budgetLogPath(stateRoot), entry); }
 // Hook failures, as error codes only. Logging itself never throws into the hook.
 export function logHook(stateRoot, entry) { try { appendLine(stateRoot, hookLogPath(stateRoot), entry); } catch { /* Fail open. */ } }

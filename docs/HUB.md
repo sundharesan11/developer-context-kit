@@ -102,7 +102,7 @@ node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> 
 node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> --target hub --apply --plan-fingerprint '<fingerprint>'
 ```
 
-Each command previews first. Run each apply only with explicit approval from the owner. `lesson edit` takes `--title`, `--summary`, `--body`, `--body-file`, and `--path`, `--package` and `--topic`, which replace the whole `match` block. Its preview shows the new lesson.
+Each command previews first. Run each apply only with explicit approval from the owner. `lesson edit` takes `--title`, `--summary`, `--body`, `--body-file`, and `--path`, `--package`, `--topic` and `--command`, which replace the whole `match` block. Its preview shows the new lesson.
 
 `--target` selects where the lesson goes:
 
