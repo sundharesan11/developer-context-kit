@@ -192,6 +192,14 @@ test("a location that holds a value is refused (AE7)", () => {
   for (const where of [".env", "config/settings.yml", "~/.config/gh/hosts.yml", "db.internal.example.com:5432", "1Password vault Engineering", "https://vault.example.com/ui/secrets", "ApplicationSupportDevtwin2024"]) assert.doesNotThrow(() => validateDraft(located(where), { recordedBy: human }), where);
 });
 
+test("a location name that holds a value is refused", () => {
+  const named = (name) => envInput("req_location05", [{ name, kind: "file", where: ".env" }]).draft;
+  for (const name of ["DATABASE_HOST" + "=" + "db.example.com", "q7Xk2Lm9" + "Pz4Rt8Vw" + "3Nb6Yc1H" + "s5Dj0Gf2", "post" + "gres://u:p" + "@db.example.com/app"]) {
+    assert.throws(() => validateDraft(named(name), { recordedBy: human }), { code: "DEVTWIN_SENSITIVE_CONTENT" }, name);
+  }
+  assert.doesNotThrow(() => validateDraft(named("DB URL"), { recordedBy: human }));
+});
+
 test("locations hold at most twenty entries and only on environment records", () => {
   const many = (n) => Array.from({ length: n }, (_, i) => ({ name: "Place " + i, kind: "file", where: "config/place-" + i + ".yml" }));
   refused(envInput("req_location02", many(21)).draft);

@@ -83,6 +83,8 @@ function stripTags(text) {
   out.push(text.slice(i).replaceAll("<", " "));
   return out.join("");
 }
+// Script and style elements and comments removed, tags kept (U34 reads table markup from what is left).
+export const withoutScripts = (text) => stripComments(stripElements(String(text)));
 // HTML is reduced to text before matching and rendering: tags (with their attributes) go, then entities decode.
 export function reduceHtml(text, max) {
   return plainText(decodeEntities(stripTags(stripComments(stripElements(String(text)))), HTML_ENTITIES), max);

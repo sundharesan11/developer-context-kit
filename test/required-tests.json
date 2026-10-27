@@ -717,5 +717,20 @@
   "stop stub: two worktrees of one project keep separate stubs",
   "stop stub: a Git status timeout writes no stub and exits quietly",
   "stop stub: more than ten changed files stores ten paths and the full count",
-  "hook install shows the new Stop entry and keeps the PreCompact entry byte-identical"
+  "hook install shows the new Stop entry and keeps the PreCompact entry byte-identical",
+  "fresh --session values do not lift the cap: 100 automatic writes per caller and UTC day, whichever limit comes first",
+  "replacing a disputed record needs the owner dialog whoever calls",
+  "undo of a supersede of an environment record restores its locations",
+  "a location name that holds a value is refused",
+  "shell words split a background &, drop leading shell keywords and unwrap timeout, exec, nice and shell -o values",
+  "stop stub: repository config that could run a filter writes no stub and the filter never runs",
+  "stop stub: an untracked file is counted but its name is never stored or shown",
+  "stop stub: a 300-character branch and ten long multibyte paths still make a stub the next start reads",
+  "summary labels a hub lesson with its author even though the hub marks it confirmed",
+  "a deprecation page with three retirements yields three digest entries with their dates",
+  "instruction-like prose on a deprecation page yields only model IDs and dates",
+  "zero rows after a non-empty applied digest is a source failure, not no retirements",
+  "a deprecation page host outside the stackWatch exception is refused before any request",
+  "the HTML digest escapes every retirement field",
+  "a deprecations source names https pages only, and other radar kinds cannot name pages"
 ]

@@ -8,6 +8,7 @@ import { planStack, assertStackApproved, readStackApproval, noPublicReadBinding,
 import { parseFeed, decodeUtf8, reduceHtml, plainText, cleanLink, FEED_LIMITS } from "./feed.mjs";
 import { createFetcher, httpsRequest, systemLookup } from "./fetch.mjs";
 import { itemTerms, readScopeRecords, classifyEntry } from "./match.mjs";
+import { PAGE_TYPES, extractRetirements, assertRows, upcoming, daysUntil, checkPageRows } from "./deprecations.mjs";
 
 // U5: the bounded announcement watch. runStackCheck fetches from the approved hosts only, parses, matches and marks
 // entries already in this scope's seen state. It writes nothing; U6's digest reuses it and owns every write.
@@ -47,6 +48,17 @@ export async function readSeenState(roots, scope) {
   if (!isObject(value) || Object.keys(value).length !== 5 || body.schemaVersion !== 1 || body.kind !== "stack-seen" || body.scope !== (scope ?? null) ||
       !Array.isArray(body.hashes) || body.hashes.some((h) => typeof h !== "string" || !HASH.test(h)) || recordHash !== digest(body)) throw new DevtwinError("INTEGRITY", "Stack seen state invalid");
   return new Set(body.hashes);
+}
+
+// U19: the entries the last applied digest listed, for radar guide. U34 adds pageRows: each deprecation page's row
+// count at that digest, so a page that loses its rows reads as a failure (KTD37).
+export const radarItemsPath = (roots, scope) => join(roots.stateRoot, "radar", "items", scope ? "scopes" : "", (scope ? assertScopeId(scope) : "none") + ".json");
+export async function readPageRows(roots, scope) {
+  let value;
+  try { value = await readPrivateJson(radarItemsPath(roots, scope), 1048576); }
+  catch (error) { if (error.code === "ENOENT") return {}; throw error; }
+  if (!isObject(value) || value.kind !== "radar-items" || value.scope !== (scope ?? null)) throw new DevtwinError("INTEGRITY", "Radar items invalid");
+  return checkPageRows(value.pageRows);
 }
 
 function entryOf(item, sourceKind, sourceUrl, liveHost, raw) {
@@ -114,6 +126,11 @@ function versionFindings(item, version, pkg, bytes, fetchedAt, sourceUrl) {
   else if (major(latest) !== null && major(version) !== null && major(latest) > major(version)) findings.push(findingOf(item, "versions", "new-major-version", "medium", { latest, title: item + " " + latest + " is a new major version", url, sourceUrl }, fetchedAt));
   // Minor and patch releases are patch-level noise and are not reported (R25).
   return { findings, notes };
+}
+// U34: one finding for each model that retires within the window. Only the model ID and the date come from the page.
+function retirementFindings(item, label, rows, now, fetchedAt, sourceUrl) {
+  return upcoming(rows, now).map(({ model, date }) => findingOf(item, "retirements", "model-retirement", daysUntil(date, now) <= 90 ? "high" : "medium",
+    { vendor: label, model, retireDate: date, title: model + " retires on " + date, url: sourceUrl, sourceUrl }, fetchedAt));
 }
 function failureOf(item, source, url, error) {
   const code = error instanceof DevtwinError ? error.code : "DEVTWIN_NETWORK_UNAVAILABLE";
@@ -254,9 +271,23 @@ export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
   }
   // U19: the radar sources, when the approval includes the radar group. Their entries carry the radar kind.
   const radar = [];
-  for (const source of groups.includes("radar") && wants("radar") ? plan.radar ?? [] : []) {
+  const runRadar = groups.includes("radar") && wants("radar");
+  const previousRows = runRadar ? await readPageRows(roots, scope) : {};
+  // Counts carry forward for the pages still in the plan, so a failed fetch keeps the last known count.
+  const pages = new Set((runRadar ? plan.radar ?? [] : []).flatMap((r) => r.sources.pages ?? []));
+  const pageRows = Object.fromEntries(Object.entries(previousRows).filter(([url]) => pages.has(url)));
+  for (const source of runRadar ? plan.radar ?? [] : []) {
     const record = { name: "radar:" + source.id, kind: source.kind, sources: [] };
-    await announcements(record.name, source.sources, attemptFor(record), { radar: { id: source.id, kind: source.kind, label: source.label } });
+    const attempt = attemptFor(record);
+    await announcements(record.name, source.sources, attempt, { radar: { id: source.id, kind: source.kind, label: source.label } });
+    // U34: a deprecation page is read by the fixed extractor only; zero rows after a non-empty run is a failure.
+    for (const url of source.sources.pages ?? []) await attempt("deprecations", url, async () => {
+      const { bytes } = await fetcher.fetchResource(url, { accept: "text/html, application/xhtml+xml;q=0.9", types: PAGE_TYPES });
+      const rows = assertRows(extractRetirements(bytes), previousRows[url]);
+      pageRows[url] = rows.length;
+      findings.push(...retirementFindings(record.name, source.label, rows, clock, fetchedAt, url));
+      return rows.length;
+    });
     const failed = record.sources.filter((s) => s.status === "failed").length;
     record.status = !record.sources.length ? "skipped" : failed === record.sources.length ? "failed" : failed ? "partial" : "ok";
     radar.push(record);
@@ -273,7 +304,7 @@ export async function runStackCheck(roots, { scope = null } = {}, deps = {}) {
     authentication: { approved: approval.authentication, used: bearer ? "routed-public-read" : "unauthenticated",
       ...(refused ? { refused, note: "The routed public-read binding was refused; GitHub requests ran unauthenticated and the approval's authentication state no longer matches, so the next run asks for approval again." } : {}) },
     ...(projects ? { projectsUnavailable: projects.filter((p) => p.unavailable).map((p) => ({ project: p.project, code: p.unavailable })) } : {}),
-    items, ...(radar.length ? { radar } : {}), entries: classified, findings: marked, notWatched: plan.notWatched, failures,
+    items, ...(radar.length ? { radar } : {}), ...(runRadar ? { pageRows } : {}), entries: classified, findings: marked, notWatched: plan.notWatched, failures,
     counts: { entries: classified.length, project: count("project"), stack: count("stack"), background: count("background"),
       previouslyReported: classified.filter((e) => e.previouslyReported).length + marked.filter((f) => f.previouslyReported).length, findings: marked.length, failures: failures.length },
     requests: fetcher.calls, seenBase: seenBase(seen)

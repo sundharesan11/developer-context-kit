@@ -12,7 +12,9 @@
 //
 // KTD43: an agent session (by --session) makes at most SESSION_CAP automatic knowledge writes; later ones wait for the
 // weekly activity review. Writes with no --session count in one bucket per caller and UTC day (actor:<actor>:<date>)
-// with the same cap, so leaving out --session does not lift it. Undo entries do not count.
+// with the same cap, so leaving out --session does not lift it. Fresh --session values do not lift it either: each caller
+// makes at most DAY_CAP automatic writes per UTC day across all its sessions (bucket day:<actor>:<date>). Whichever
+// limit is reached first refuses, and the error names that bucket. Undo entries do not count.
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { openSync, closeSync, fstatSync, writeSync, fsyncSync, constants } from "node:fs";
@@ -29,7 +31,7 @@ import { projectRecordFile } from "../records/store.mjs";
 import { homeRecordFile } from "../records/personal.mjs";
 
 export const AUDIT_ID = /^aud_[a-f0-9]{24}$/;
-export const SESSION_CAP = 20;
+export const SESSION_CAP = 20, DAY_CAP = 100;
 export const HOMES = Object.freeze(["project", "personal", "org"]);
 const MONTH = /^\d{4}-\d{2}\.jsonl$/, ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const KIND = /^[a-z][a-z-]{0,31}$/, MONTH_BYTES = 16 << 20;
@@ -96,6 +98,8 @@ function appendLine(path, value) {
 }
 // The cap bucket of an entry: its session, or its caller and UTC day when it has none.
 const capBucket = (entry, at) => entry.session ? "session:" + entry.session : "actor:" + entry.actor + ":" + at.slice(0, 10);
+// The day bucket: every automatic write by this caller on this UTC day, whatever its session.
+const dayBucket = (entry, at) => "day:" + entry.actor + ":" + at.slice(0, 10);
 // Appends the intent entry for one write and returns it. A second call for the same route and request ID returns the
 // first entry and appends nothing. cap: false skips the session cap (undo entries).
 export async function appendEntry(roots, fields, { now = () => new Date(), cap = true } = {}) {
@@ -109,6 +113,9 @@ export async function appendEntry(roots, fields, { now = () => new Date(), cap =
       const bucket = capBucket(clean, at);
       const used = new Set(entries.filter((e) => e.kind !== "undo" && capBucket(e, e.at) === bucket).map((e) => e.requestId)).size;
       if (used >= SESSION_CAP) throw new DevtwinError("GATE_REQUIRED", "This session already made " + SESSION_CAP + " automatic writes; later ones wait for the weekly activity review", { session: clean.session, bucket, max: SESSION_CAP, via: "activity review" });
+      const day = dayBucket(clean, at);
+      const today = new Set(entries.filter((e) => e.kind !== "undo" && e.tier === "automatic" && dayBucket(e, e.at) === day).map((e) => e.requestId)).size;
+      if (today >= DAY_CAP) throw new DevtwinError("GATE_REQUIRED", "This caller already made " + DAY_CAP + " automatic writes today; later ones wait for the weekly activity review", { session: clean.session, bucket: day, max: DAY_CAP, via: "activity review" });
     }
     const entry = { schemaVersion: 1, id: "aud_" + randomBytes(12).toString("hex"), at, ...clean, state: "intent" };
     ensurePrivatePath(roots.stateRoot, ["audit"]);

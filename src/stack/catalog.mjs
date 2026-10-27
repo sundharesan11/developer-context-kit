@@ -73,9 +73,10 @@ function validateItem(entry, field) {
   return item;
 }
 // U19: the radar's own sources, beyond the developer's stack. Each names one kind of item (R28) and serves the radar
-// group only: {id, kind, terms, feeds?, github?}.
-export const RADAR_KINDS = Object.freeze(["agent-tools", "approaches", "adjacent"]);
-const RADAR_KEYS = ["id", "kind", "terms", "feeds", "github"];
+// group only: {id, kind, terms, feeds?, github?}. U34 (KTD37): a `deprecations` source names fixed vendor pages
+// instead, {id, kind: "deprecations", terms, pages}, read by the fixed extractor in src/stack/deprecations.mjs.
+export const RADAR_KINDS = Object.freeze(["agent-tools", "approaches", "adjacent", "deprecations"]);
+const RADAR_KEYS = ["id", "kind", "terms", "feeds", "github", "pages"];
 function validateRadarSource(entry, field) {
   if (!isObject(entry)) bad(field);
   for (const key of Object.keys(entry)) if (!RADAR_KEYS.includes(key)) bad(`${field}.${key}`);
@@ -85,6 +86,13 @@ function validateRadarSource(entry, field) {
   if (!terms.length) bad(`${field}.terms`);
   const feeds = strings(entry.feeds, `${field}.feeds`, { max: 5, length: 2048, check: (item, f) => checkFeedUrl(item, f) === item ? item : bad(f) });
   const github = strings(entry.github, `${field}.github`, { max: 5, length: 140, check: (item, f) => checkIdentifier("github", item, f) });
+  const pages = strings(entry.pages, `${field}.pages`, { max: 5, length: 2048, check: (item, f) => checkFeedUrl(item, f) === item ? item : bad(f) });
+  if (entry.kind === "deprecations") {
+    if (!pages.length) bad(`${field}.pages`);
+    if (feeds.length || github.length) bad(`${field}.feeds`);
+    return { id: entry.id, kind: entry.kind, terms, feeds, github, pages };
+  }
+  if (entry.pages !== undefined) bad(`${field}.pages`);
   if (!feeds.length && !github.length) bad(`${field}.feeds`);
   return { id: entry.id, kind: entry.kind, terms, feeds, github };
 }

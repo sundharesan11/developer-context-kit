@@ -101,7 +101,7 @@ devtwin undo --pilot "$PILOT" --id aud_0123456789abcdef01234567
 - `undo --id` reverses one entry. A record gets a retraction, so the next session no longer sees it.
 - `undo --since <time>` reverses every entry after a time.
 - Every undo is an owner action: the hook denies `undo --apply` from an agent shell, and the apply shows the owner dialog. A lesson published to a hub is removed with `published delete` instead.
-- An agent session makes at most 20 automatic writes, and writes with no `--session` share one count per caller and UTC day. After that, a write fails with `DEVTWIN_GATE_REQUIRED`.
+- An agent session makes at most 20 automatic writes, and writes with no `--session` share one count per caller and UTC day. A caller makes at most 100 automatic writes per UTC day across all sessions. After that, a write fails with `DEVTWIN_GATE_REQUIRED`.
 - The `activity-weekly` job sends one notification each week with the counts. Turn it on with `schedule plan` and `schedule apply --job activity-weekly`.
 
 ## The agent hook
@@ -138,18 +138,18 @@ unreviewed, from agent: last handoff 2026-10-27 09:00 UTC, next step: run the mi
 ```
 ````
 
-A line that was not confirmed starts with its source and "unreviewed". Each line passes the text checks for automatic writes again before it is shown, and a line that names another scope is left out. When the summary is too long, the last lines are dropped whole.
+A line that was not confirmed starts with its source and "unreviewed", and so does every hub lesson, with its author. Each line passes the text checks for automatic writes again before it is shown, and a line that names another scope is left out. When the summary is too long, the last lines are dropped whole.
 
 The hook reads a stored copy under `stateRoot/summaries/`. Record writes, lesson index rebuilds and `undo` keep that copy current. A missing or damaged copy gives the one-line output. `budget report` counts the summary bytes with the line.
 
 ### Where the last session stopped
 
-On `stop` and `pre-compact` in a bound project, the hook writes a small stub for the worktree under `stateRoot/handoffs/<scope>/<project>/`. It holds the time, the branch, the short commit, the number of changed files, at most ten of their paths and the session. Each worktree has its own stub. The stub is derived, so it is not audited. When `git status` takes more than 2 seconds or fails, the hook writes nothing. A repository whose own Git config defines a filter or an include gets no stub.
+On `stop` and `pre-compact` in a bound project, the hook writes a small stub for the worktree under `stateRoot/handoffs/<scope>/<project>/`. It holds the time, the branch, the short commit, the number of changed files, at most ten paths of tracked files and the session. Untracked files count but are never named, because anyone can add a file whose name reads like an instruction. Each worktree has its own stub. The stub is derived, so it is not audited. When `git status` takes more than 2 seconds or fails, the hook writes nothing. A repository whose own Git config mentions a filter or an include anywhere, or puts a second section header on one line, gets no stub.
 
 At the next session start in that worktree, the summary adds one line when no handoff from that session exists:
 
 ```text
-Last session stopped 2026-10-27 14:02 UTC on branch `search-paging` with 3 changed files: `src/a.ts`, `src/b.ts`, `README.md`. No handoff was written.
+Last session stopped 2026-10-27 14:02 UTC on branch `search-paging` with 3 changed files (file names from the repository: `src/a.ts`, `src/b.ts`, `README.md`). No handoff was written.
 ```
 
 An agent answers the stub with [`handoff write`](/docs/concepts/handoffs/#write-a-handoff-from-an-agent). The managed instruction block asks agents to write one at each stopping point.

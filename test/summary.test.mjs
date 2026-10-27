@@ -6,7 +6,7 @@ import { applyOnboard } from "../src/onboarding/onboard.mjs";
 import { applyScopeAdd } from "../src/config/store.mjs";
 import { addRecord } from "../src/records/store.mjs";
 import { rebuildIndex } from "../src/lessons/index.mjs";
-import { SUMMARY_CHARS, summaryPath, readSummary, renderSummary, buildSummary } from "../src/context/summary.mjs";
+import { SUMMARY_CHARS, summaryPath, readSummary, renderSummary, buildSummary, summaryCandidates } from "../src/context/summary.mjs";
 
 const SCOPE = "example", PROJECT = "example.atlas";
 async function store(t) {
@@ -113,4 +113,13 @@ test("summary read fails closed on a changed cache and returns null when none ex
   await assert.rejects(readSummary(s.stateRoot, SCOPE, PROJECT), { code: "DEVTWIN_INTEGRITY" });
   await writeFile(path, "{not json");
   await assert.rejects(readSummary(s.stateRoot, SCOPE, PROJECT), { code: "DEVTWIN_INTEGRITY" });
+});
+
+test("summary labels a hub lesson with its author even though the hub marks it confirmed", () => {
+  const entry = { id: "rec_" + "h".repeat(24), reach: "org", project: null, source: "hub", status: "confirmed", actor: "human", claimedBy: "github:example-dev", createdAt: "2026-10-01T00:00:00.000Z",
+    title: "Ask before force-pushing", summary: "Confirm with the team first.", match: { commands: ["git push"] } };
+  const local = { ...entry, id: "rec_" + "l".repeat(24), source: "project", project: PROJECT, reach: "project" };
+  const lines = summaryCandidates({ project: PROJECT, index: { entries: [entry, local] } }).map((c) => c.line);
+  assert.ok(lines.includes("unreviewed, from github:example-dev: ask before: Ask before force-pushing: Confirm with the team first."), JSON.stringify(lines));
+  assert.ok(lines.includes("ask before: Ask before force-pushing: Confirm with the team first."), "a confirmed project lesson stays unlabeled");
 });

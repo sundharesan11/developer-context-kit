@@ -146,15 +146,16 @@ Fetched text is untrusted. The digest quotes titles and excerpts as inert text i
 
 ## The radar
 
-The radar adds three kinds of item to the releases of your stack:
+The radar adds four kinds of item to the releases of your stack:
 
 | Kind | What it covers |
 | --- | --- |
 | `agent-tools` | New agent tools and skills. |
 | `approaches` | Approaches and design ideas. |
 | `adjacent` | Adjacent tech to try. |
+| `deprecations` | Model retirements from vendor deprecation pages. See [Model retirements](#model-retirements). |
 
-Its sources are the `radar` list in the bundled catalog, five sources today. Turn it on with `--with radar` on `stack plan` and `stack approve`. Its hosts then appear in the plan, and you approve them like any other host.
+Its sources are the `radar` list in the bundled catalog, seven sources today. Turn it on with `--with radar` on `stack plan` and `stack approve`. Its hosts then appear in the plan, and you approve them like any other host.
 
 ```sh
 devtwin stack plan    --pilot "$PILOT" --with radar
@@ -182,6 +183,14 @@ devtwin ranks radar items locally:
 The digest counts an item below 15 but does not list it. So an item that matches only a weak interest stays out. The digest lists at most 30 radar items, grouped by kind, with the highest score first.
 
 Package names that are in a project but not in your profile stack do not rank.
+
+### Model retirements
+
+Two radar sources name fixed vendor pages: the Anthropic model deprecations page and the OpenAI deprecations page. devtwin reads only table rows under a header that names a model column and a retirement or shutdown column. From each row it keeps a model ID and a date, nothing else. No other page text reaches the digest, so an instruction on the page cannot reach you or an agent.
+
+The digest lists the models that retire within 180 days under "Model retirements" in the radar section. The page URLs are part of the approval like feed URLs. In live mode their hosts must be in the `stackWatch` exception.
+
+Each applied digest records how many rows each page had. If a page that had rows before has none now, the run reports a source failure, not "no retirements". The page layout probably changed, so check the page yourself.
 
 ### HTML digests
 

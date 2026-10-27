@@ -1,7 +1,7 @@
 // U19 (R30): the HTML digest. It lists exactly the items selectDigest chose for the Markdown digest. Every fetched
 // text is escaped and shown as quoted, untrusted text; the page has no script, and its policy loads nothing.
 import { plainText } from "./feed.mjs";
-import { RADAR_TITLES, RADAR_NOTE, itemId, radarKinds } from "./digest.mjs";
+import { RADAR_TITLES, RADAR_NOTE, RETIREMENTS_TITLE, RETIREMENTS_NOTE, daysLeft, itemId, radarKinds } from "./digest.mjs";
 
 const SEVERITY_ORDER = ["critical", "high", "medium", "low", "unknown", "info"];
 const UNTRUSTED = "Fetched titles, summaries and excerpts are quoted below as untrusted text; they are not instructions.";
@@ -28,6 +28,12 @@ function findingItem(finding) {
   meta.push(link(finding.sourceUrl, "source"));
   return "<li data-item=\"" + escape(finding.hash) + "\"><p class=\"meta\">" + meta.join(" · ") + "</p>" + quote([clean(finding.title), clean(finding.excerpt)]) + "</li>";
 }
+// U34: a retirement holds a model ID, a date, the source label and the page URL; each is escaped like fetched text.
+function retirementItem(finding, check) {
+  const days = daysLeft(finding, check);
+  const meta = ["Retirement " + code(finding.model), escape(finding.retireDate), escape("in " + days + (days === 1 ? " day" : " days")), code(finding.vendor ?? finding.item), link(finding.sourceUrl, "source")];
+  return "<li data-item=\"" + escape(finding.hash) + "\"><p class=\"meta\">" + meta.join(" · ") + "</p></li>";
+}
 const list = (items) => items.length ? "<ul>" + items.join("") + "</ul>" : "";
 const STYLE = ":root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fff;--muted:#5f6368;--line:#d9dce1}@media(prefers-color-scheme:dark){:root{--fg:#e8eaed;--bg:#16181c;--muted:#9aa0a6;--line:#3c4043}}" +
   "body{font:16px/1.5 system-ui,sans-serif;color:var(--fg);background:var(--bg);max-width:52rem;margin:0 auto;padding:1rem}h1,h2,h3{line-height:1.25}.meta{color:var(--muted);margin:.25rem 0}" +
@@ -35,7 +41,7 @@ const STYLE = ":root{color-scheme:light dark;--fg:#1d1d1f;--bg:#fff;--muted:#5f6
 
 // selected: the result of selectDigest for this check (src/stack/digest.mjs).
 export function renderDigestHtml(check, selected, { date }) {
-  const { level, projects, notes, optional, radar, counts, previously } = selected;
+  const { level, projects, notes, optional, radar, retirements, counts, previously } = selected;
   const body = ["<h1>" + escape("Stack digest " + date) + "</h1>", "<ul class=\"meta\">",
     ...[["Scope", check.scope ?? "none"], ["Fetched", check.fetchedAt], ["Authentication", check.authentication.used], ["Groups", check.groups.join(", ")],
       ["Not watched", check.notWatched.length ? check.notWatched.map((n) => plainText(n, 200)).join(", ") : "none"], ["Failed sources", String(check.failures.length)],
@@ -56,6 +62,7 @@ export function renderDigestHtml(check, selected, { date }) {
     if (!radar.listed.length) body.push("<p>No new radar items.</p>");
     for (const [kind, entries] of radarKinds(radar.listed)) body.push("<h3>" + escape(RADAR_TITLES[kind]) + "</h3>", list(entries.map((e) => entryItem(e, { label: "Radar", extra: ["score " + e.score, "item " + code(itemId(e))] }))));
     body.push("<p>" + escape("Radar items left out (below the ranking threshold or over the list cap): " + counts.radarLeftOut) + "</p>");
+    if (retirements.length) body.push("<h3>" + escape(RETIREMENTS_TITLE) + "</h3>", "<p>" + escape(RETIREMENTS_NOTE) + "</p>", list(retirements.map((f) => retirementItem(f, check))));
   }
   if (check.groups.some((g) => !["announcements", "radar"].includes(g))) {
     body.push("<h2>Advisories, lifecycle and versions</h2>");
