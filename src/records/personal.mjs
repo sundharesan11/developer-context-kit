@@ -24,6 +24,8 @@ function homeFor(roots, reach, scope) {
 }
 const baseDir = (roots, home) => join(roots.dataRoot, ...home.segments);
 const recDir = (roots, home, id) => join(baseDir(roots, home), "records", id);
+// U37: where a personal or org record lands, for the audit log.
+export const homeRecordFile = (roots, reach, scope, id) => join(recDir(roots, homeFor(roots, reach, scope), id), "record.json");
 const mismatch = () => new DevtwinError("INTEGRITY", "Bundle mismatch");
 async function readHomeBundle(roots, home, id) {
   try {

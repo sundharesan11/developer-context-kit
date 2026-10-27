@@ -54,7 +54,8 @@
         "unknown",
         "handoff",
         "lesson",
-        "preference"
+        "preference",
+        "retraction"
       ]
     },
     "class": {

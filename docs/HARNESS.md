@@ -209,13 +209,14 @@ Personal state lives under the pilot's private roots, outside the clone:
 
 ## Schedules
 
-Three jobs run the radar for you. Each job is disabled by default. Each one is a user LaunchAgent with its own consent and its own off switch:
+Four jobs run in the background for you. Each job is disabled by default. Each one is a user LaunchAgent with its own consent and its own off switch:
 
 | Job | Runs | What it does |
 | --- | --- | --- |
 | `radar-weekly` | Once a week | Writes one digest for each scope and shows a short notification |
 | `advisory-hourly` | Once an hour | Checks security advisories for your stack. An urgent (critical or high) advisory shows a notification at once: one for each advisory, at most three a day |
 | `review-monthly` | Once a month | Reminds you that a setup review is available, with a count of waiting preference and lesson proposals |
+| `activity-weekly` | Once a week | Shows one notification with counts of what devtwin learned, holds for sending and has waiting for you. It does nothing else and makes no request |
 
 ```sh
 node bin/devtwin.mjs schedule plan --pilot "$PILOT_FILE" --job radar-weekly
@@ -232,6 +233,23 @@ node bin/devtwin.mjs schedule off --pilot "$PILOT_FILE" --job radar-weekly --app
 - `schedule run --job <job>` is what the LaunchAgent runs. It checks the live gate, the job's flag and its last-run receipt before any request. A job that is off makes no request and writes nothing. A run inside the job's period is skipped, so missed runs collapse into one run and two runs in one week write one digest. A run whose live gate fails writes a failed receipt and makes no request.
 
 Notifications use `osascript`. The script is fixed, and the title and message reach it only as arguments, with control characters, quotes and backslashes removed and the length capped.
+
+## Activity and undo
+
+devtwin records each automatic knowledge write in its audit log (see [Storage](STORAGE.md#audit-log)). Two routes read and reverse it:
+
+```sh
+node bin/devtwin.mjs activity --pilot "$PILOT_FILE" --since 2026-10-01T00:00:00Z
+node bin/devtwin.mjs undo --pilot "$PILOT_FILE" --id "$ENTRY"
+node bin/devtwin.mjs undo --pilot "$PILOT_FILE" --id "$ENTRY" --apply --plan-fingerprint "$FINGERPRINT"
+node bin/devtwin.mjs undo --pilot "$PILOT_FILE" --since 2026-10-20T00:00:00Z
+```
+
+- `activity` is read-only. It lists what devtwin learned in the last seven days, or since `--since`: the entry ID, time, route, target, record IDs, the caller and whether the write landed. It also lists held items and items that wait for you. `--held` shows only the held items, with their full text.
+- `undo --id` reverses one entry. A record gets a retraction, so the next session no longer sees it. When the record was replaced later, the retraction covers the newest version. When the entry itself replaced an earlier record, the earlier version comes back as a new record.
+- `undo --since` reverses every entry after a time, newest first. It always shows the owner dialog.
+- Each undo adds its own entry to the log and rebuilds the lesson indexes. An undo of an undo is refused. An entry whose write never landed is reported, and undo leaves it alone.
+- The `activity-weekly` job sends the weekly counts as one notification.
 
 ## Optional companions
 

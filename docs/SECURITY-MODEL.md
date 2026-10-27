@@ -74,14 +74,17 @@ The full guide is [HUB.md](HUB.md).
 
 | Tier | Who runs it | Examples |
 | --- | --- | --- |
-| Automatic | Agents and jobs, with no prompt | `record add`, `record supersede`, `lesson accept --target project`, `handoff export`, `project onboard` |
+| Automatic | Agents and jobs, with no prompt | `record add`, `record supersede`, `lesson accept --target project`, `handoff export`, `project onboard`, `undo --id` of an entry from the calling session |
 | Consented | Agents and jobs, while a standing consent for the target is valid | `lesson accept --target hub` |
-| Always ask | The owner only, after the owner dialog | `consent grant`, `consent revoke`, `pref accept`, `lesson copy`, `hub join`, `instructions apply` and the other owner actions |
+| Always ask | The owner only, after the owner dialog | `consent grant`, `consent revoke`, `pref accept`, `lesson copy`, `hub join`, `instructions apply`, `undo --since`, `undo --id` of another session's entry and the other owner actions |
 
 - `lesson accept` refuses `--target general` and `--target hub+general` with `GATE_REQUIRED`. A lesson in the personal store reaches every organization, so it waits for the weekly `activity review`.
 - A consent stores the target, the hold time in hours (1 to 168, 24 by default), the time it was granted and the digest of its rules. The rules list the checks that the consented action runs. A change to the rules changes the digest, and the stored consent is then void. A consented action with no valid consent fails with `APPROVAL_REQUIRED` and the message "Needs consent".
 - There are two consent kinds. `repo-push` names the real path of a bound repository root. `hub-publish` names a scope that joined a hub. Consents live at `stateRoot/consents/<kind>/<sha256 of the target>.json`, in folders at mode 0700 and files at mode 0600, written by atomic replace under a lock.
 - `consent list` is read-only. It also shows the note consent of each hub, which `note consent` and `note revoke` manage.
+- `undo --id <entry> --session <id>` is automatic when the session is the one that made the entry. `undo --id` of any other entry, or of a `confirmed` record, shows the owner dialog. `undo --since <time>` is always ask: the hook denies `undo --since --apply` from agent shells, and the apply shows the owner dialog. An undo is never undone.
+- An agent session makes at most 20 automatic knowledge writes. The 21st fails with `GATE_REQUIRED` and waits for the weekly activity review.
+- Automatic lesson and record text passes the plain-rule checks that preferences use, plus the sensitive and scope-name checks. Titles and summaries get every check. Bodies get the marker and override checks only, because a body can use Markdown structure and package names such as `@types/node`.
 - A record that a CLI write makes names its caller in `recordedBy`: `claude` when `CLAUDECODE` is set, `codex` when a `CODEX_` variable is set, and `human` otherwise. This is a label for the audit trail, not a gate. A `confirmed` record still needs a human reviewer.
 
 ## Preferences and the instruction block

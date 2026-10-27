@@ -13,6 +13,7 @@ import { ensurePrivatePath } from "../src/storage/fsx.mjs";
 import { ownerAction } from "../src/hooks/owner-block.mjs";
 import { osascriptArgs, notificationText } from "../src/schedule/notify.mjs";
 import { receiptPath } from "../src/schedule/jobs.mjs";
+import { appendEntry } from "../src/audit/log.mjs";
 import { createFetcher } from "../src/stack/fetch.mjs";
 
 const fixture = (name) => readFileSync(new URL("./fixtures/stack/" + name, import.meta.url));
@@ -44,7 +45,7 @@ function fakeLaunchctl() {
   };
   return { run, loaded, calls };
 }
-const JOB_LABELS = ["devtwin.radar-weekly", "devtwin.advisory-hourly", "devtwin.review-monthly"];
+const JOB_LABELS = ["devtwin.radar-weekly", "devtwin.advisory-hourly", "devtwin.review-monthly", "devtwin.activity-weekly"];
 // A disposable pilot whose fake agent home has the three job plists approved, with a stack approval for acme-sdk.
 async function setup(t, { labels = JOB_LABELS, groups = ["advisories"] } = {}) {
   const p = await makePilot(t), home = p.agentHomes[0], agents = join(home, "Library", "LaunchAgents");
@@ -165,9 +166,31 @@ test("status reports installed, loaded and last run for each job", async (t) => 
   assert.deepEqual(jobs.map((j) => [j.job, j.enabled, j.installed, j.loaded, j.lastRunAt, j.result]), [
     ["radar-weekly", true, true, true, null, null],
     ["advisory-hourly", false, false, false, null, null],
-    ["review-monthly", true, true, true, now().toISOString(), "ok"]
+    ["review-monthly", true, true, true, now().toISOString(), "ok"],
+    ["activity-weekly", false, false, false, null, null]
   ]);
   assert.equal(s.net.log.length, 0, "the review job and status make no request");
+});
+
+test("the weekly activity job sends one notification with learned, held and waiting counts and does nothing else", async (t) => {
+  const s = await setup(t);
+  const roots = await s.roots();
+  await appendEntry(roots, { kind: "record", tier: "automatic", route: "record add", home: "project", scope: "alpha", project: "alpha.atlas", recordIds: ["rec_" + "c".repeat(24)], actor: "claude", session: "ses_week", requestId: "req_weekly001" }, { now });
+  const plan = await s.ok(["schedule", "plan", "--job", "activity-weekly"]);
+  assert.match(plan.runs, /weekly notification/);
+  await s.on("activity-weekly");
+  const before = s.notes.length;
+  const run = await s.ok(["schedule", "run", "--job", "activity-weekly"]);
+  assert.deepEqual(run.counts, { learned: 1, held: 0, waiting: 0 });
+  assert.equal(s.notes.length, before + 1);
+  assert.equal(s.notes.at(-1).at(-1), "devtwin activity");
+  assert.equal(s.notes.at(-1).at(-2), "This week devtwin learned 1 item, holds 0 for sending and has 0 waiting for you. Run devtwin activity to see them.");
+  assert.equal((await s.ok(["schedule", "run", "--job", "activity-weekly"])).skipped, "ran-recently");
+  assert.equal(s.notes.length, before + 1);
+  assert.equal(s.net.log.length, 0, "the activity job makes no request");
+  assert.deepEqual(await s.digests(), []);
+  s.advance(8 * DAY);
+  assert.deepEqual((await s.ok(["schedule", "run", "--job", "activity-weekly"])).counts, { learned: 0, held: 0, waiting: 0 });
 });
 
 test("a job with a failing live gate records a failed receipt and makes no request", async (t) => {

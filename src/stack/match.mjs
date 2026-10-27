@@ -2,6 +2,7 @@ import { readRegistry } from "../config/registry.mjs";
 import { loadScope } from "../config/store.mjs";
 import { assertScopeId } from "../identity/ids.mjs";
 import { readSnapshot } from "../records/store.mjs";
+import { isDelivered } from "../records/schema.mjs";
 
 // KTD18: local, deterministic, scope-explicit relevance. A term matches as a whole word, case-insensitively; a letter,
 // digit or underscore on either side means it is part of another word and does not match.
@@ -23,7 +24,7 @@ export async function readScopeRecords(roots, scope, { reader = readSnapshot } =
   for (const project of projects) {
     try {
       const snapshot = await reader(roots, scope, project);
-      const records = snapshot.records.filter((r) => r.status !== "proposed" && r.effective !== "superseded")
+      const records = snapshot.records.filter((r) => r.status !== "proposed" && r.effective !== "superseded" && isDelivered(r))
         .map((r) => ({ id: r.id, text: r.title + "\n" + r.body })).sort((a, b) => a.id < b.id ? -1 : 1);
       out.push({ project, records });
     } catch (error) { out.push({ project, records: [], unavailable: error.code ?? "DEVTWIN_INTERNAL" }); }

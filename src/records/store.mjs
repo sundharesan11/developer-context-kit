@@ -14,6 +14,8 @@ import { buildRecord, validateRecord, validateDraft, recordHash, assertProjectRe
 import { assertNoSensitive, findForbiddenFields } from "./redact.mjs";
 const dirFor = (roots, scope, project) => join(roots.dataRoot, "scopes", scope, "projects", project);
 const recDir = (roots, scope, project, id) => join(dirFor(roots, scope, project), "records", id);
+// U37: where a record lands, so the audit log can tell whether an entry's write landed.
+export const projectRecordFile = (roots, scope, project, id) => join(recDir(roots, scope, project, id), "record.json");
 const recovery = () => new DevtwinError("RECOVERY_REQUIRED", "Incomplete committed project");
 async function readBundle(roots, scope, project, id) {
   try {

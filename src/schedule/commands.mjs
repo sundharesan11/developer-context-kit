@@ -1,4 +1,4 @@
-// U20: schedule plan | apply | off | status | run, for the radar-weekly, advisory-hourly and review-monthly jobs.
+// U20: schedule plan | apply | off | status | run, for the radar-weekly, advisory-hourly, review-monthly and activity-weekly jobs.
 // apply and off --apply are owner actions: the hook denies them from agent shells, and each shows the owner dialog.
 // run is what the LaunchAgent calls; it loads the pilot itself so that a failing live gate still leaves a receipt.
 import { DevtwinError } from "../errors.mjs";

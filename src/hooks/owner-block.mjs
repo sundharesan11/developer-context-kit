@@ -26,7 +26,10 @@ export const OWNER_ACTIONS = Object.freeze([
   // U13: stopping or granting the standing note consent.
   { words: ["note", "revoke"], apply: true }, { words: ["note", "consent"], apply: true },
   // U36: granting or revoking a standing consent (KTD39).
-  { words: ["consent", "grant"], apply: true }, { words: ["consent", "revoke"], apply: true }
+  { words: ["consent", "grant"], apply: true }, { words: ["consent", "revoke"], apply: true },
+  // U37: undoing every entry after a time. The second word is the flag, so undo --id stays open to agents; undo --id of
+  // another session's entry shows the owner dialog instead (src/audit/undo.mjs).
+  { words: ["undo", "--since"], apply: true }
 ].map((action) => Object.freeze({ ...action, words: Object.freeze(action.words) })));
 // U9: setup steps whose apply runs an owner action above (src/setup/steps.mjs marks them owner: true). "setup apply"
 // naming one of them is denied, and so is the "setup" terminal loop, which can apply them. setup status, setup plan

@@ -65,6 +65,15 @@ A worker proposes. A controller publishes. These are separate steps.
 - A proposal file that carries an operation ID is refused with `INVALID_INPUT`.
 - Agents should not run `record publish --apply`. That is the user's decision.
 
+### Audit and undo
+
+`record add`, `record supersede` and `lesson accept --target project` are automatic writes. Each one adds an entry to the audit log. Pass `--session <id>` with the session ID from the hook's session-start line, so that the session can undo its own writes.
+
+- `undo --id <entry> --session <id>` reverses an entry from your own session with no prompt. Preview it first, then apply it with the plan fingerprint.
+- Do not run `undo --since`. The hook denies its apply. `undo --id` of another session's entry shows the owner dialog, so ask your developer instead.
+- A session makes at most 20 automatic writes. After that, a write fails with `GATE_REQUIRED` and waits for the weekly activity review.
+- Automatic text must read as plain notes. A title or summary with Markdown structure, an `@` import, a devtwin marker or text that tells the reader to ignore other instructions is refused.
+
 ## 6. Hub proposals
 
 `hub propose --scope <scope> --project <project> --record <id> --hub <hub-id>` prepares a company learning proposal. Without `--apply` it previews.
