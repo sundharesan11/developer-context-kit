@@ -220,6 +220,17 @@ test("live write-classes previews, applies, clears and refuses a path outside th
   assert.equal(JSON.parse(await readFile(h.liveConfig, "utf8")).writeClasses, undefined);
 });
 
+test("live write-classes approves a backup folder with --backup-target", async (t) => {
+  const h = await setupHome(t);
+  const backups = join(h.home, "devtwin-backups");
+  const args = ["live", "write-classes", "--pilot", h.liveConfig, "--backup-target", backups];
+  const preview = await h.ok(args);
+  assert.deepEqual(preview.writeClasses, { from: null, to: { backupTargets: [backups] } });
+  await h.ok([...args, "--apply", "--plan-fingerprint", preview.fingerprint]);
+  assert.deepEqual(JSON.parse(await readFile(h.liveConfig, "utf8")).writeClasses, { backupTargets: [backups] });
+  assert.equal((await h.cli(["doctor", "--pilot", h.liveConfig])).json.ok, true);
+});
+
 test("owner block denies live write-classes apply, owner setup steps and the setup loop from an agent shell", async (t) => {
   const p = await makePilot(t);
   const bash = (command) => ({ session_id: "s-setup", cwd: p.reposDir, hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command }, tool_use_id: "toolu_01Example" });

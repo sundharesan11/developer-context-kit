@@ -22,7 +22,7 @@ A live config is a pilot file with a `live` block. It names the config ID, the h
 - The home is the process home. A run with a different `$HOME` is refused.
 - The live config changes only through `live init`, `live add-repo`, `live set-kit` and `live migrate` ([Migrating from devctx](MIGRATING.md)). Each one records the approved config digest in `store/state/live/approved-config.json`. A live config that differs from the approved one is refused.
 - Listed repositories are read-only. Onboarding never writes to them.
-- There is no backup. See [No backup](#no-backup).
+- A daily job can write an encrypted backup of the store to an approved folder. See [Backup and restore](#backup-and-restore).
 
 ## Live-mode exceptions
 
@@ -34,9 +34,10 @@ A live config can hold an optional `writeClasses` block. It names the only other
 | `instructionTargets` | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`), `~/.codex/AGENTS.md`, and a devtwin-owned file named `devtwin*.md` directly in one of those two folders. |
 | `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) and `~/.codex/hooks.json`. |
 | `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. |
+| `backupTargets` | Folders inside the home for backup archives and restores. Writes are allowed in the folder and below it, never in a sibling or a parent. |
 
 - The classes are part of the approved config digest. A live config whose classes differ from the approved ones is refused with `GATE_REQUIRED`, `live.approval`. Set the classes only with `live write-classes` (see [Set the write classes](#set-the-write-classes)). Do not edit them in `live.json` by hand.
-- Every path must be canonical and inside the home. A path whose folder is a link, or that is itself a link, is refused. A `hubRoot` folder must not overlap the store, the kit, a listed repository, a skill folder, a protected agent home or another hub root.
+- Every path must be canonical and inside the home. A path whose folder is a link, or that is itself a link, is refused. A `hubRoot` or `backupTargets` folder must not overlap the store, the kit, a listed repository, a skill folder, a protected agent home or another approved folder.
 - A write outside the store is allowed only when the writing code names one class and the path is exactly in it. Every other file in `~/.claude`, `~/.codex`, `~/.agents` and `~/Library/LaunchAgents` stays refused.
 - `hub join`, `hub sync` and `hub leave` write only inside an approved `hubRoot` folder, and `hub schedule` writes only its own `devtwin.hub-sync.<scope>.plist` in `launchAgents` ([HUB.md](HUB.md)).
 - Only `agents install --hooks`, `agents uninstall --hooks` and `hub schedule` edit files in a file class, and each edits only its own class. See [Install the hooks](#install-the-hooks). The shared edit step works as follows. In `CLAUDE.md` and `AGENTS.md`, it changes only the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. Every byte outside the markers stays the same. Malformed markers stop the edit with `CONFLICT`. In a JSON settings file, it changes only devtwin's own hook entries; the other values stay, but the file can be re-indented.
@@ -70,7 +71,7 @@ A config change makes the stack approval out of date: `stack check` then stops w
 
 ### Set the write classes
 
-`live write-classes` changes the approved classes. Each class flag replaces the paths of that class: `--hub-root`, `--instruction-target`, `--hook-target` and `--launch-agent`. Give a flag once for each path. `--clear <class>` removes a class. A class that you do not name stays as it is. Preview, review, then apply after approval:
+`live write-classes` changes the approved classes. Each class flag replaces the paths of that class: `--hub-root`, `--instruction-target`, `--hook-target`, `--launch-agent` and `--backup-target`. Give a flag once for each path. `--clear <class>` removes a class. A class that you do not name stays as it is. Preview, review, then apply after approval:
 
 ```sh
 node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --hook-target "$HOME/.claude/settings.json" --hook-target "$HOME/.codex/hooks.json"
@@ -214,7 +215,7 @@ Check that `repoWrites` is empty. Review the candidates, unknowns and conflicts 
 node "$KIT/bin/devtwin.mjs" project onboard --pilot "$LIVE_CONFIG" --scope '<scope>' --project '<project>' --repo "$REPO" --request-id '<request-id>' --accept '<selection>' --apply --plan-fingerprint '<fingerprint>'
 ```
 
-Onboarding copies some repository text, such as scanned facts and commands, into the store. See [No backup](#no-backup).
+Onboarding copies some repository text, such as scanned facts and commands, into the store. See [Backup and restore](#backup-and-restore).
 
 ## 12. Snapshot after onboarding
 
@@ -441,9 +442,63 @@ Without the store, installed `devtwin-*` entries have no matching journal and be
 4. Move the old `live.json` aside too. `live init` refuses an existing live config or a non-empty store.
 5. Start again from step 6.
 
-## No backup
+## Backup and restore
 
-There is no backup or sync in this stage. Losing `~/.devtwin` loses the store: records, decisions, journals and evidence. Onboarding copies some client repository text into the store. That text is protected only by mode 0700 and the machine's disk encryption. A lost laptop can expose it and can lose the only copy. Backup and restore is roadmap priority 1.
+devtwin can keep encrypted backups of the store in a folder that you approve. There is no sync. The archive format and the files it leaves out are in [Storage](STORAGE.md#backups).
+
+- `backup create` writes one archive into an approved `backupTargets` folder. Agents and the `backup-daily` job may run it. Each folder keeps the newest 14 archives.
+- The key is 32 random bytes in your macOS Keychain, made on the first `backup create`. Without the key, an archive cannot be read.
+- `backup restore` writes only to a new folder inside an approved `backupTargets` folder. It never writes the live store.
+- `backup key export` prints the key once. Only you can run it, after the owner dialog. Until it has run once, the activity digest warns that backups cannot be restored on another machine.
+
+### Turn on daily backups
+
+Pick a folder inside your home that is not in `~/.devtwin`, such as a folder that a cloud drive or an external copy job saves. Preview, review, then apply after approval:
+
+```sh
+node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --backup-target "$HOME/devtwin-backups"
+node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --backup-target "$HOME/devtwin-backups" --apply --plan-fingerprint '<fingerprint>'
+node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --launch-agent "$HOME/Library/LaunchAgents/devtwin.backup-daily.plist"
+node "$KIT/bin/devtwin.mjs" schedule plan --pilot "$LIVE_CONFIG" --job backup-daily
+node "$KIT/bin/devtwin.mjs" schedule apply --pilot "$LIVE_CONFIG" --job backup-daily --plan-fingerprint '<fingerprint>'
+```
+
+The `--launch-agent` flag replaces the whole `launchAgents` list, so give every plist that you approved before as well. Then export the key once, in your own terminal and outside any agent session:
+
+```sh
+node "$KIT/bin/devtwin.mjs" backup key export --pilot "$LIVE_CONFIG"
+node "$KIT/bin/devtwin.mjs" backup key export --pilot "$LIVE_CONFIG" --apply --plan-fingerprint '<fingerprint>'
+```
+
+Store the key in a password manager, then clear the terminal. The export writes `store/state/backup/key-export.json` with the time only.
+
+### Restore a backup
+
+1. Run `backup status` to list the archives in each approved folder.
+2. Preview the restore into a new folder inside the backup folder:
+
+   ```sh
+   node "$KIT/bin/devtwin.mjs" backup restore --pilot "$LIVE_CONFIG" --from "$HOME/devtwin-backups/<archive>.dtb" --to "$HOME/devtwin-backups/restored"
+   ```
+
+3. Check the file count and the archive time in the preview.
+4. Run the same command with `--apply --plan-fingerprint '<fingerprint>'`.
+5. Read the result. It gives the number of files written and the number verified.
+
+The restored files are plain text. When the backup folder is copied off the machine, such as by a cloud drive, move the restored folder out of it or delete it after use.
+
+Restore refuses a folder that already exists, a folder outside the approved backup folders and the backup folder itself. It decrypts and checks the whole archive in memory before it writes. A changed archive or a wrong key fails with `INTEGRITY`, and nothing is written.
+
+The restored folder holds `config`, `data` and `state`, the same layout as `~/.devtwin/store`. devtwin does not point the live config at it, and no command does this step. To use it, stop every agent session and move the current store aside. Then move the restored folders into `~/.devtwin/store` by hand, and make an empty `inputs` folder at mode 0700. The restored `state/live/approved-config.json` must match `live.json`. If the live config changed after the backup, live commands fail with `GATE_REQUIRED`, `live.approval`.
+
+### Restore on another machine
+
+1. Add the exported key to the new machine's Keychain with `security add-generic-password -s devtwin-backup -a "$USER" -w`.
+2. Paste the key when `security` asks for the password. The key does not go into the shell history or a command line.
+3. Copy the archive into an approved backup folder on that machine.
+4. Follow [Restore a backup](#restore-a-backup).
+
+Onboarding copies some client repository text into the store. On the machine, that text is protected only by mode 0700 and the disk encryption. The archive protects only the copies that you keep away from the machine.
 
 ## Troubleshooting
 

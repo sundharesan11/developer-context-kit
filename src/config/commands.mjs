@@ -43,7 +43,7 @@ export const liveSetKitCommand = {
 };
 // Sets the approved write classes (KTD7). Each class flag replaces that class's paths; --clear removes a class; classes
 // not named stay as they are. The preview shows the classes before and after; --apply with its fingerprint approves.
-const CLASS_FLAGS = [["hub-root", "hubRoot"], ["instruction-target", "instructionTargets"], ["hook-target", "hookTargets"], ["launch-agent", "launchAgents"]];
+const CLASS_FLAGS = [["hub-root", "hubRoot"], ["instruction-target", "instructionTargets"], ["hook-target", "hookTargets"], ["launch-agent", "launchAgents"], ["backup-target", "backupTargets"]];
 export const liveWriteClassesCommand = {
   options: { ...liveOptions, ...Object.fromEntries(CLASS_FLAGS.map(([flag]) => [flag, { type: "string", multiple: true }])), clear: { type: "string", multiple: true } },
   async run(values, ctx) {

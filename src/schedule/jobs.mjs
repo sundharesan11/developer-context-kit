@@ -1,4 +1,5 @@
-// U20 (R10, R30, R31, R34; KTD15, KTD24): the radar, advisory and review jobs, and U37's weekly activity job. Each job is a user LaunchAgent with its
+// U20 (R10, R30, R31, R34; KTD15, KTD24): the radar, advisory and review jobs, U37's weekly activity job and U24's
+// daily backup job. Each job is a user LaunchAgent with its
 // own consent (schedule apply, after the owner dialog) and its own off switch (schedule off). A run checks, in order,
 // the live gate (the pilot load), the job's own flag and its last-run receipt, and only then makes a request. A
 // disabled job makes no request and writes nothing. Turning off the radar also turns off the advisory job.
@@ -20,14 +21,18 @@ export const JOBS = Object.freeze({
   "advisory-hourly": { interval: 3600, skipSeconds: 3000, requires: "radar-weekly", runs: "a security advisory check for your stack every hour, with a notification at once for an urgent fix (at most three a day)" },
   "review-monthly": { interval: 30 * DAY, skipSeconds: 27 * DAY, runs: "a monthly reminder that a setup review is available, with a count of suggestions" },
   // U37 (R3): the weekly activity digest, read from the audit log. It sends one notification and does nothing else.
-  "activity-weekly": { interval: 7 * DAY, skipSeconds: 6 * DAY, runs: "a weekly notification with counts of what devtwin learned, holds for sending and has waiting for you" }
+  "activity-weekly": { interval: 7 * DAY, skipSeconds: 6 * DAY, runs: "a weekly notification with counts of what devtwin learned, holds for sending and has waiting for you" },
+  // U24 (KTD33): one encrypted backup a day into the first approved backupTargets folder, keeping 14. No model call and
+  // no request. A held store lock skips the run with BUSY; the next run tries again.
+  "backup-daily": { interval: DAY, skipSeconds: 20 * 3600, runs: "an encrypted backup of your store once a day into your first approved backup folder, keeping the newest 14" }
 });
 export const JOB_IDS = Object.freeze(Object.keys(JOBS));
 export const OFF_SWITCH = {
   "radar-weekly": "Turning off the radar job stops the weekly fetch, digest and notification. It also turns off the security advisory job. Run stack digest by hand to get a digest.",
   "advisory-hourly": "Turning off the advisory job stops the hourly advisory check and its notifications. The weekly digest still lists advisories when you approved that group.",
   "review-monthly": "Turning off the review job stops the monthly reminder. You can still run the review by hand.",
-  "activity-weekly": "Turning off the activity job stops the weekly notification. devtwin still records what it does; run devtwin activity to see it."
+  "activity-weekly": "Turning off the activity job stops the weekly notification. devtwin still records what it does; run devtwin activity to see it.",
+  "backup-daily": "Turning off the backup job stops the daily backup. The archives already made stay. Run backup create to make one by hand."
 };
 export const jobLabel = (job) => "devtwin." + job;
 const jobsPath = (roots) => join(roots.stateRoot, "schedule", "jobs.json");
@@ -66,6 +71,10 @@ export function jobArguments(ctx, pilotPath, job) {
 // Install needs what the job reads: a stack approval for the radar and advisory jobs (with the advisories group for
 // the advisory job), the stackWatch exception in live mode, and the radar job on before the advisory job.
 async function requirements(roots, job, state) {
+  if (job === "backup-daily") {
+    if (!(roots.pilot.writeClasses?.backupTargets ?? []).length) throw new DevtwinError("GATE_REQUIRED", "No backup folder approved", { field: "writeClasses.backupTargets", remedy: "live write-classes --backup-target <folder>" });
+    return;
+  }
   if (job === "review-monthly" || job === "activity-weekly") return;
   const { readStackApproval } = await import("../stack/plan.mjs");
   const approval = await readStackApproval(roots);
@@ -182,7 +191,19 @@ async function activityWeekly(roots, ctx, deps, now) {
   const shown = notify(ctx, { title: "devtwin activity", message: weeklyMessage(counts) });
   return { counts: { learned: counts.learned, held: counts.held, waiting: counts.waiting }, notification: shown };
 }
-const WORK = { "radar-weekly": radarWeekly, "advisory-hourly": advisoryHourly, "review-monthly": reviewMonthly, "activity-weekly": activityWeekly };
+// A held store lock skips the backup; the receipt keeps the last good run, so the next run tries again.
+async function backupDaily(roots, ctx, deps, now) {
+  const { writeBackup } = await import("../backup/archive.mjs");
+  const { keychainOf } = await import("../backup/keychain.mjs");
+  try {
+    const done = await writeBackup(roots, { now, keychain: keychainOf(ctx) });
+    return { archive: done.archive, files: done.files, removed: done.removed.length, keyCreated: done.keyCreated };
+  } catch (error) {
+    if (error.code !== "DEVTWIN_BUSY") throw error;
+    return { skipped: "busy", code: error.code, lock: error.details?.lock ?? null };
+  }
+}
+const WORK = { "radar-weekly": radarWeekly, "advisory-hourly": advisoryHourly, "review-monthly": reviewMonthly, "activity-weekly": activityWeekly, "backup-daily": backupDaily };
 
 // The scheduled run. A run within the job's skip window of the last good run is skipped, so missed runs collapse into
 // one run, and two runs inside one period write one digest. lastRunAt moves only on success: a failed or interrupted
@@ -206,6 +227,10 @@ export async function runJob(roots, job, { now = () => new Date(), ctx = {}, dep
     await writeReceipt(roots, job, { lastRunAt: previous, lastAttemptAt: at, result: "running" });
     try {
       const result = await WORK[job](roots, ctx, { ...deps, cache: new Map(), now }, now);
+      if (result?.skipped) {
+        await writeReceipt(roots, job, { lastRunAt: previous, lastAttemptAt: at, result: "skipped", code: result.code });
+        return { job, attemptedAt: at, ...result };
+      }
       await writeReceipt(roots, job, { lastRunAt: at, lastAttemptAt: at, result: "ok" });
       return { job, ranAt: at, ...result };
     } catch (error) {

@@ -42,19 +42,29 @@ Live mode ([Live activation](LIVE.md)) relaxes the fence for exactly the paths a
 - The approved config digest in the store catches accidental edits to `live.json`. It does not stop deliberate same-user tampering: the same user can rewrite the live config and the digest together.
 - The rollback check compares a skill folder with the inventory taken before an install run. It fails on `devtwin-*` differences and lists foreign changes for the owner. It restores nothing.
 - Cursor also reads `~/.agents/skills` and sees the installed skills. The skills keep every confirmation for any caller.
-- There is no backup. Onboarding copies some client repository text into the store, protected by mode 0700 and disk encryption only.
+- Onboarding copies some client repository text into the store, protected by mode 0700 and disk encryption only. Backups are encrypted, but see [Backups](#backups) for what that protects.
 
 ## Live-mode exceptions
 
 The approved write classes in a live config ([Live-mode exceptions](LIVE.md#live-mode-exceptions)) are the only writes outside the store and the named skill folders. They widen the fence by exact paths only.
 
-- The four classes are `hubRoot`, `instructionTargets`, `hookTargets` and `launchAgents`. Each path has a fixed shape. A hub root is a folder inside the home. An instruction target is `CLAUDE.md`, `AGENTS.md` or a `devtwin*.md` file in the Claude or Codex folder. A hook target is `settings.json` or `hooks.json` in those folders. A launch agent is a `devtwin.<name>.plist` file in `~/Library/LaunchAgents`. Every other path stays refused.
+- The five classes are `hubRoot`, `instructionTargets`, `hookTargets`, `launchAgents` and `backupTargets`. Each path has a fixed shape. A hub root or a backup folder is a folder inside the home. An instruction target is `CLAUDE.md`, `AGENTS.md` or a `devtwin*.md` file in the Claude or Codex folder. A hook target is `settings.json` or `hooks.json` in those folders. A launch agent is a `devtwin.<name>.plist` file in `~/Library/LaunchAgents`. Every other path stays refused.
 - The classes are covered by the approved config digest, so an accidental change is refused with `GATE_REQUIRED`. As for the rest of the live config, this does not stop deliberate same-user tampering.
 - Only `live write-classes` changes the classes, through a preview and an apply with its fingerprint. The new config passes every fence check before its digest is approved. The devtwin hook denies its `--apply` from an agent shell, as for the other owner actions.
 - The fence accepts a class path only when the caller names that class. A record, draft or onboarding write cannot reach a class path.
 - A disposable pilot can list classes too. Its file targets must have the same shapes inside a listed fake agent home, and its hub folders must be inside `pilotRoot`.
 - Hub commands write only inside an approved `hubRoot` folder, and `hub schedule` writes only its own `devtwin.hub-sync.<scope>.plist` in `launchAgents`. `hub leave` deletes only the scope's clone folder and that plist.
 - Only `agents install --hooks`, `agents uninstall --hooks` and `hub schedule` edit a class file. The hook commands edit only the `hookTargets` files, and `hub schedule` only its plist. The shared edit step limits edits to developer-owned files to the devtwin marker block or devtwin's own JSON entries. The prior bytes are backed up byte for byte in the run folder first. The file is read without following links and checked again immediately before the replace, but the same-user residual race between that check and the rename remains.
+
+## Backups
+
+The backup ([Storage](STORAGE.md#backups)) protects copies of the store that you keep away from the machine. It does not protect data on the machine.
+
+- The key is in your login Keychain as a generic password. Any process that runs as your user can read that item, as it can read the store itself. An agent session can read it too.
+- The key never goes into a file or a command line. devtwin sends it to `/usr/bin/security -i` on standard input and reads it from the standard output of `security find-generic-password -w`.
+- `backup create` is automatic. `backup restore` is an owner action: the hook denies its apply from agent shells, and the apply shows the owner dialog. Restore writes only a new folder inside an approved `backupTargets` folder and never the live store. It checks the whole archive in memory before it writes. The restored files are plain text, so a backup folder that a cloud drive copies also copies them.
+- `backup key export` is always ask. The devtwin hook denies its `--apply` from an agent shell, and the apply shows the owner dialog. Run it in your own terminal, outside any agent session, because the key goes to that terminal. Store the key in a password manager.
+- Anyone with the key and one archive can read the whole store. Keep the exported key apart from the archives.
 
 ## Organization hubs
 

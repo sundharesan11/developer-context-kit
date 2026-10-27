@@ -83,8 +83,8 @@ test("docs state the candidate's limits in pinned phrases", async () => {
   const want = {
     "README.md": ["local package candidate", "NOT currently installed", "no automatic private-to-public synchronization", "not a sandbox"],
     "docs/SECURITY-MODEL.md": ["residual race", "same-user"],
-    "docs/LIMITATIONS.md": ["Linux support is not claimed", "Windows is unsupported", "migration is not implemented", "no backup or sync", "lost laptop", "multi-record onboarding", "no backup of the live store", "client repository text"],
-    "docs/LIVE.md": ["mkdir -m 700 ~/.devtwin", "--setting-sources user", "--sandbox read-only", "rollback-check", "live set-kit", "agents recover", "legacy", "Cursor", "same-user tampering", "If the store is lost", "No backup"],
+    "docs/LIMITATIONS.md": ["Linux support is not claimed", "Windows is unsupported", "migration is not implemented", "There is no sync", "lost laptop", "multi-record onboarding", "Without a backup, losing", "client repository text"],
+    "docs/LIVE.md": ["mkdir -m 700 ~/.devtwin", "--setting-sources user", "--sandbox read-only", "rollback-check", "live set-kit", "agents recover", "legacy", "Cursor", "same-user tampering", "If the store is lost", "There is no sync"],
   };
   for (const [file, phrases] of Object.entries(want)) {
     const text = await read(file);

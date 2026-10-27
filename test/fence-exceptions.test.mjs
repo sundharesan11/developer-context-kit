@@ -201,6 +201,17 @@ test("hubRoot allows writes inside and refuses siblings", async (t) => {
   }
   await assert.rejects(loadPilot(await f.write({ hubRoot: [f.paths.hub, join(f.paths.hub, "nested")] }), gate), refused(undefined));
 });
+test("backupTargets allows writes inside and refuses siblings, the store and other classes", async (t) => {
+  const f = await liveFixture(t), backups = join(f.home, "devtwin-backups"), roots = await f.roots({ backupTargets: [backups], hubRoot: [f.paths.hub] });
+  assert.doesNotThrow(() => assertWritable(roots, [backups, join(backups, "devtwin-backup-x.dtb"), join(backups, "restored/state/a.json")], { writeClass: "backupTargets" }));
+  for (const path of [join(f.home, "devtwin-backups-other"), f.home, join(f.paths.hub, "x")]) await assert.rejects(writable(roots, [path], { writeClass: "backupTargets" }), refused("destination"), path);
+  await assert.rejects(writable(roots, [join(backups, "x")], { writeClass: "hubRoot" }), refused("destination"));
+  const gate = { ...f.context, liveGate: { approval: false } };
+  for (const folder of [join(f.home, ".claude/backups"), f.home, f.obj.pilotRoot, join(f.obj.stateRoot, "backups"), f.obj.repos[0], join(f.obj.live.kitRoot, "backups"), join(f.sb, "outside-home/backups"), f.devtwin, f.paths.hub]) {
+    await assert.rejects(loadPilot(await f.write({ hubRoot: [f.paths.hub], backupTargets: [folder] }), gate), refused(undefined), folder);
+  }
+  await assert.rejects(loadPilot(await f.write({ backupTargets: [backups, join(backups, "nested")] }), gate), refused(undefined));
+});
 test("write classes refuse unknown classes, duplicates and targets outside the agent folders", async (t) => {
   const f = await liveFixture(t), gate = { ...f.context, liveGate: { approval: false } };
   for (const writeClasses of [{ other: [] }, { hookTargets: f.paths.settings }, { hookTargets: [7] }, [], { hookTargets: [f.paths.settings, f.paths.settings] }, { instructionTargets: [join(f.home, ".claude/notes.md")] }, { instructionTargets: [join(f.home, ".claude/skills/devtwin.md")] }, { instructionTargets: [join(f.home, "CLAUDE.md")] }, { instructionTargets: [join(f.sb, "other/.claude/CLAUDE.md")] }, { instructionTargets: [f.home + "/.claude/../.claude/CLAUDE.md"] }, { instructionTargets: [f.paths.settings] }, { hookTargets: [join(f.home, ".claude/settings.local.json")] }, { hookTargets: [join(f.home, ".codex/config.toml")] }, { hookTargets: [f.paths.claudeMd] }]) {

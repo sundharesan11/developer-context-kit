@@ -8,8 +8,9 @@ import { readAudit, landed, undoneMap } from "./log.mjs";
 const WEEK_MS = 7 * 86400000;
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2}))?$/;
 // kind -> async (roots, { sinceMs, full }) => items. held: items waiting in the held queue (full: true adds their text).
-// waiting: items that wait for the owner's weekly activity review.
-const SOURCES = { held: [], waiting: [] };
+// waiting: items that wait for the owner's weekly activity review. warnings: { code, message } items added to the
+// digest's warnings, such as U24's backup warnings.
+const SOURCES = { held: [], waiting: [], warnings: [] };
 export function registerActivitySource(kind, read) {
   if (!Object.hasOwn(SOURCES, kind) || typeof read !== "function") throw new DevtwinError("INVALID_INPUT", "Invalid activity source", { kind });
   SOURCES[kind].push(read);
@@ -34,6 +35,7 @@ export async function activity(roots, { since, held = false } = {}, { now = () =
     recordIds: e.recordIds, actor: e.actor, session: e.session, landed: landed(roots, e), undoneBy: done.get(e.id)?.id ?? null }));
   const undos = recent.filter((e) => e.kind === "undo").map((e) => ({ id: e.id, at: e.at, undoes: e.undoes, tier: e.tier, recordIds: e.recordIds, actor: e.actor, session: e.session, landed: landed(roots, e) }));
   const heldItems = await collect(roots, "held", { sinceMs: from, full: held }), waiting = await collect(roots, "waiting", { sinceMs: from, full: false });
+  warnings.push(...await collect(roots, "warnings", { sinceMs: from, full: false }));
   const counts = { learned: learned.length, neverLanded: learned.filter((e) => !e.landed).length, undone: learned.filter((e) => e.undoneBy).length, held: heldItems.length, waiting: waiting.length };
   const window = new Date(from).toISOString();
   if (held) return { since: window, counts, held: heldItems, warnings };
@@ -41,3 +43,6 @@ export async function activity(roots, { since, held = false } = {}, { now = () =
 }
 // The weekly notification text: counts only.
 export const weeklyMessage = (counts) => "This week devtwin learned " + counts.learned + (counts.learned === 1 ? " item" : " items") + ", holds " + counts.held + " for sending and has " + counts.waiting + " waiting for you. Run devtwin activity to see them.";
+// U24 (KTD33): no approved backup folder, and a key not yet exported, each add a warning. Loaded on use, so the digest
+// does not load the backup code until it runs.
+registerActivitySource("warnings", async (roots) => (await import("../backup/commands.mjs")).backupWarnings(roots));

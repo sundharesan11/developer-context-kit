@@ -156,7 +156,19 @@ A live config keeps its private state under `~/.devtwin`, at mode 0700. The live
 - Activation evidence stays in `state/evidence/`, created by the owner.
 - A store copied by `live migrate` holds `state/live/migration.json`: the config ID, the legacy and new live config paths and digests, the new kit and the digest of the copied tree. Installed entries from the former devctx name keep their `.devctx-owned.json` receipt and stay owned until `agents install` or `agents uninstall` removes them. See [Migrating from devctx](MIGRATING.md).
 
-There is no backup. A lost store leaves installed entries unowned; [Live activation](LIVE.md) gives the manual removal steps.
+A lost store leaves installed entries unowned; [Live activation](LIVE.md) gives the manual removal steps. A backup can bring the store back (see [Backups](#backups)).
+
+## Backups
+
+`backup create` and the `backup-daily` job write one encrypted archive of the store into an approved `backupTargets` folder ([Live activation](LIVE.md#backup-and-restore)). Backups are not audited: an archive and its rotation are derived data.
+
+- **Contents.** Every regular file of `configRoot`, `dataRoot` and `stateRoot`, with its path, mode, size and SHA-256. `inputsRoot` is not in the archive.
+- **Left out.** The caches that a rebuild or a new session makes again: `state/lessons/` (the lesson index), `state/summaries/`, `state/hooks/sessions/` and `state/hooks/budget.jsonl*`. Also left out are `state/locks/` and anything inside a hub clone folder. A link, or anything that is not a regular file, is not archived; the manifest lists it as skipped.
+- **Locks.** Create holds, in this order, the registry lock, each scope lock in sorted order, and the `pref_proposals`, `lesson_proposals`, `hub-sync`, `audit`, `consents` and `personal_records` locks while it reads. When one of them is held, create stops with `BUSY` before it writes, and the job tries again on its next run.
+- **Format.** The archive starts with the 8 bytes `DTBACKUP`, a version byte and a 12-byte IV. The AES-256-GCM ciphertext and the 16-byte tag follow. The first 9 bytes are authenticated with the rest. The plaintext is a 4-byte manifest length, the JSON manifest and the bytes of each file in manifest order.
+- **Name.** `devtwin-backup-<yyyymmddThhmmssZ>-<8 hex>.dtb`, mode 0600, written by atomic replace. A folder that devtwin makes has mode 0700. Each folder keeps the newest 14 archives; a new archive removes the oldest ones over that count.
+- **Key.** 32 random bytes in the macOS Keychain, service `devtwin-backup`, account the user name. The key is never in a file or a command line. `backup key export` writes `state/backup/key-export.json` (0600) with `schemaVersion` and `exportedAt` only.
+- **Restore.** The archive is decrypted and checked in memory first: the tag, then every path, size and hash. A path that is absolute, has `.` or `..` segments or leaves its folder fails with `INTEGRITY`, even in an archive with a good tag. Files then go into a staging folder next to the target, 0700 folders and each file with its archived mode. Each file is read back and checked, and then the staging folder becomes the target. A failure leaves the staging folder for review and no target.
 
 ## Portable handoff files
 

@@ -655,5 +655,19 @@
   "a corrupt month line or file is skipped with a warning and other months still read",
   "the audit log never holds body text",
   "activity lists learned items with held and waiting lists",
-  "the weekly activity job sends one notification with learned, held and waiting counts and does nothing else"
+  "the weekly activity job sends one notification with learned, held and waiting counts and does nothing else",
+  "create then restore into a new folder gives the same bytes and modes for every archived file (AE8)",
+  "the fifteenth archive removes the oldest",
+  "a held scope lock or the audit lock makes create skip with BUSY and write nothing",
+  "restore refuses an existing folder, a non-empty folder and a folder outside the backup folder before it writes (AE8)",
+  "a flipped byte fails authentication and restore writes nothing",
+  "restore refuses a manifest path that leaves its folder, even in an authenticated archive",
+  "backup key export --apply from a hooked agent shell is denied; its preview stays open",
+  "key export: a denied dialog prints nothing and writes no receipt; an approved one prints the key once with a time-only receipt",
+  "the activity digest warns until the key export receipt exists, and while no backup folder is approved",
+  "the default Keychain implementation never puts the key in argv",
+  "the daily backup job needs a backup folder, writes one archive a day and skips with BUSY while a store lock is held",
+  "backupTargets allows writes inside and refuses siblings, the store and other classes",
+  "live write-classes approves a backup folder with --backup-target",
+  "restore is an owner action: a denied dialog writes nothing"
 ]

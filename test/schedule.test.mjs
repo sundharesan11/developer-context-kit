@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile, chmod } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile, chmod, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { main } from "../src/cli.mjs";
 import { makePilot, sandbox, makeRepo, fixtureGit, now } from "./helpers.mjs";
@@ -45,12 +45,12 @@ function fakeLaunchctl() {
   };
   return { run, loaded, calls };
 }
-const JOB_LABELS = ["devtwin.radar-weekly", "devtwin.advisory-hourly", "devtwin.review-monthly", "devtwin.activity-weekly"];
+const JOB_LABELS = ["devtwin.radar-weekly", "devtwin.advisory-hourly", "devtwin.review-monthly", "devtwin.activity-weekly", "devtwin.backup-daily"];
 // A disposable pilot whose fake agent home has the three job plists approved, with a stack approval for acme-sdk.
-async function setup(t, { labels = JOB_LABELS, groups = ["advisories"] } = {}) {
+async function setup(t, { labels = JOB_LABELS, groups = ["advisories"], classes = () => ({}), keychain } = {}) {
   const p = await makePilot(t), home = p.agentHomes[0], agents = join(home, "Library", "LaunchAgents");
   await mkdir(agents, { recursive: true });
-  const path = await p.with({ writeClasses: { launchAgents: labels.map((l) => join(agents, l + ".plist")) } });
+  const path = await p.with({ writeClasses: { launchAgents: labels.map((l) => join(agents, l + ".plist")), ...classes(p) } });
   const roots = async () => rootsFromPilot(await loadPilot(path, { home: p.fakeHome, env: {} }));
   await applyInit(await roots(), { actorRefs: ["email:owner@example.com"], preferences: {}, now });
   await applyScopeAdd(await roots(), { scope: "alpha", hubs: [], policies: [], now });
@@ -62,7 +62,7 @@ async function setup(t, { labels = JOB_LABELS, groups = ["advisories"] } = {}) {
   const cli = async (args) => {
     const chunks = [];
     const code = await main([...args.slice(0, 2), "--pilot", path, ...args.slice(2)], { stdout: { write: (v) => { chunks.push(v); return true; } }, now: () => clock, home: p.fakeHome, env: {},
-      stackCatalog: CATALOG, request: net.request, lookup: net.lookup, launchctl: launchctl.run, notifier: (a) => { notes.push(a); return { status: 0 }; }, ownerDialog: async (c) => { dialogs.push(c); return "approved"; } });
+      stackCatalog: CATALOG, request: net.request, lookup: net.lookup, launchctl: launchctl.run, keychain, notifier: (a) => { notes.push(a); return { status: 0 }; }, ownerDialog: async (c) => { dialogs.push(c); return "approved"; } });
     return { code, json: JSON.parse(chunks.join("")) };
   };
   const ok = async (args) => { const out = await cli(args); assert.equal(out.json.ok, true, args.join(" ") + ": " + JSON.stringify(out.json.error)); return out.json.result; };
@@ -167,7 +167,8 @@ test("status reports installed, loaded and last run for each job", async (t) => 
     ["radar-weekly", true, true, true, null, null],
     ["advisory-hourly", false, false, false, null, null],
     ["review-monthly", true, true, true, now().toISOString(), "ok"],
-    ["activity-weekly", false, false, false, null, null]
+    ["activity-weekly", false, false, false, null, null],
+    ["backup-daily", false, false, false, null, null]
   ]);
   assert.equal(s.net.log.length, 0, "the review job and status make no request");
 });
@@ -191,6 +192,36 @@ test("the weekly activity job sends one notification with learned, held and wait
   assert.deepEqual(await s.digests(), []);
   s.advance(8 * DAY);
   assert.deepEqual((await s.ok(["schedule", "run", "--job", "activity-weekly"])).counts, { learned: 0, held: 0, waiting: 0 });
+});
+
+test("the daily backup job needs a backup folder, writes one archive a day and skips with BUSY while a store lock is held", async (t) => {
+  assert.equal((await (await setup(t)).cli(["schedule", "plan", "--job", "backup-daily"])).json.error.code, "DEVTWIN_GATE_REQUIRED");
+  let stored = null;
+  const keychain = { read: async () => stored, write: async (key) => { stored = Buffer.from(key); } };
+  const s = await setup(t, { keychain, classes: (p) => ({ backupTargets: [join(p.pilot.pilotRoot, "backups")] }) });
+  const archives = async () => { try { return await readdir(join(s.p.pilot.pilotRoot, "backups")); } catch { return []; } };
+  const plan = await s.ok(["schedule", "plan", "--job", "backup-daily"]);
+  assert.match(plan.runs, /encrypted backup/);
+  assert.equal(plan.actions[0].interval, 86400);
+  await s.on("backup-daily");
+  // A held scope lock skips the run: nothing is archived, no key is made and the last good run stays empty.
+  const lock = join(s.p.stateRoot, "locks", "alpha.lock");
+  await writeFile(lock, "{}", { mode: 0o600 });
+  const busy = await s.ok(["schedule", "run", "--job", "backup-daily"]);
+  assert.deepEqual([busy.skipped, busy.code, busy.lock], ["busy", "DEVTWIN_BUSY", "alpha"]);
+  assert.deepEqual([await archives(), stored], [[], null]);
+  const receipt = async () => JSON.parse(await readFile(receiptPath(await s.roots(), "backup-daily"), "utf8"));
+  assert.deepEqual([(await receipt()).result, (await receipt()).code, (await receipt()).lastRunAt], ["skipped", "DEVTWIN_BUSY", null]);
+  await rm(lock);
+  // The next run tries again and writes one archive; a second run that day is skipped.
+  assert.ok((await s.ok(["schedule", "run", "--job", "backup-daily"])).files > 0);
+  assert.equal((await archives()).length, 1);
+  assert.equal((await s.ok(["schedule", "run", "--job", "backup-daily"])).skipped, "ran-recently");
+  s.advance(DAY);
+  await s.ok(["schedule", "run", "--job", "backup-daily"]);
+  assert.equal((await archives()).length, 2);
+  assert.equal((await receipt()).result, "ok");
+  assert.equal(s.net.log.length, 0, "the backup job makes no request");
 });
 
 test("a job with a failing live gate records a failed receipt and makes no request", async (t) => {

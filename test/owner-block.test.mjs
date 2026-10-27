@@ -41,7 +41,9 @@ const OWNER_COMMANDS = [
   `${KIT} agents uninstall --pilot '/x/live.json' --agent claude --hooks --apply`,
   `${KIT} live set-kit --pilot '/x/live.json' --commit abc --apply`,
   `${KIT} live add-repo --pilot '/x/live.json' --repo /r --apply`,
-  `${KIT} live init --pilot '/x/live.json' --agent claude --apply`
+  `${KIT} live init --pilot '/x/live.json' --agent claude --apply`,
+  `${KIT} backup key export --pilot '/x/live.json' --apply --plan-fingerprint 'sha256:00'`,
+  `${KIT} backup restore --pilot '/x/live.json' --from /b/a.dtb --to /b/r --apply --plan-fingerprint 'sha256:00'`
 ];
 const WRAPPED = [
   "script -q /dev/null devtwin lesson copy --id rec_1 --apply",
@@ -99,7 +101,7 @@ test("owner block denies devtwin owner-only actions run directly from an agent s
     assert.match(out.permissionDecisionReason, /Ask your developer to run it themselves/);
     assert.doesNotMatch(result.out, /additionalContext/);
   }
-  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "consent grant", "consent revoke", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson copy", "lesson notices", "live add-repo", "live init", "live migrate", "live set-kit", "live stack-watch", "live write-classes", "note consent", "note revoke", "pref accept", "pref retire", "published delete", "record publish", "schedule apply", "schedule off", "undo --since"]);
+  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "backup key export", "backup restore", "consent grant", "consent revoke", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson copy", "lesson notices", "live add-repo", "live init", "live migrate", "live set-kit", "live stack-watch", "live write-classes", "note consent", "note revoke", "pref accept", "pref retire", "published delete", "record publish", "schedule apply", "schedule off", "undo --since"]);
 });
 
 test("owner block denies owner-only actions through terminal wrappers", async (t) => {
