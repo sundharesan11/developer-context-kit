@@ -26,8 +26,9 @@ const claudeBash = (cwd, command, session = "s-owner") => ({ session_id: session
 const isDeny = (result) => result.json?.hookSpecificOutput?.permissionDecision === "deny";
 const KIT = 'node "$DEVTWIN_KIT/bin/devtwin.mjs"';
 const OWNER_COMMANDS = [
-  "devtwin lesson accept --pilot /x/live.json --id rec_1 --apply",
-  `${KIT} lesson accept --pilot '/x/live.json' --target hub --apply --plan-fingerprint 'sha256:00'`,
+  "devtwin lesson copy --pilot /x/live.json --id rec_1 --apply",
+  `${KIT} consent grant --pilot '/x/live.json' --kind hub-publish --scope example --apply --plan-fingerprint 'sha256:00'`,
+  `${KIT} consent revoke --pilot '/x/live.json' --kind repo-push --repo /r --apply`,
   `${KIT} lesson copy --pilot '/x/live.json' --id rec_1 --apply`,
   `${KIT} published delete --pilot '/x/live.json' --apply`,
   `${KIT} hub join --pilot '/x/live.json' --apply`,
@@ -42,30 +43,34 @@ const OWNER_COMMANDS = [
   `${KIT} live init --pilot '/x/live.json' --agent claude --apply`
 ];
 const WRAPPED = [
-  "script -q /dev/null devtwin lesson accept --id rec_1 --apply",
-  "script -q /dev/null node \"$DEVTWIN_KIT/bin/devtwin.mjs\" lesson accept --id rec_1 --apply",
-  "bash -c \"devtwin lesson accept --id rec_1 --apply\"",
-  "sh -c 'node ~/.devtwin/kit/bin/devtwin.mjs lesson   accept --apply'",
-  "zsh -c 'cd /tmp && devtwin \"lesson\" \"accept\" \"--apply\"'",
-  "env X=1 node $DEVTWIN_KIT/bin/devtwin.mjs lesson accept --pilot /x/live.json --apply",
-  "expect -c 'spawn devtwin lesson accept --apply; expect eof'",
+  "script -q /dev/null devtwin lesson copy --id rec_1 --apply",
+  "script -q /dev/null node \"$DEVTWIN_KIT/bin/devtwin.mjs\" lesson copy --id rec_1 --apply",
+  "bash -c \"devtwin lesson copy --id rec_1 --apply\"",
+  "sh -c 'node ~/.devtwin/kit/bin/devtwin.mjs lesson   copy --apply'",
+  "zsh -c 'cd /tmp && devtwin \"lesson\" \"copy\" \"--apply\"'",
+  "env X=1 node $DEVTWIN_KIT/bin/devtwin.mjs lesson copy --pilot /x/live.json --apply",
+  "expect -c 'spawn devtwin lesson copy --apply; expect eof'",
   "unbuffer devtwin hub join --pilot /x --apply",
-  "npx devtwin lesson accept --apply",
+  "npx devtwin lesson copy --apply",
   "npx --yes ./bin/devtwin.mjs pref accept --apply",
   "nohup devtwin published delete --apply &",
   "time sudo devtwin instructions apply",
-  "echo accept | xargs devtwin lesson --apply",
-  "A=accept; devtwin lesson $A --apply",
-  "devtwin\\\n lesson accept --apply",
-  "DEVTWIN LESSON ACCEPT --APPLY"
+  "echo copy | xargs devtwin lesson --apply",
+  "A=copy; devtwin lesson $A --apply",
+  "devtwin\\\n lesson copy --apply",
+  "DEVTWIN LESSON COPY --APPLY"
 ];
 const ALLOWED = [
   `${KIT} lesson match --pilot '/x/live.json' --scope example --path db/a.sql`,
   `${KIT} lesson show --pilot '/x/live.json' --scope example --id rec_1`,
   `${KIT} live migrate --pilot '/x/live.json' --legacy '/x/old'`,
   `${KIT} agents install --pilot '/x/live.json' --agent claude`,
-  // Previews of the four lesson and hub owner actions stay open to agents; only the apply is owner-only.
+  // U36: lesson accept left the owner-only list; the route refuses the targets its tier does not allow.
   `${KIT} lesson accept --pilot '/x/live.json' --id prop_1 --target hub`,
+  `${KIT} lesson accept --pilot '/x/live.json' --id prop_1 --target project --apply --plan-fingerprint 'sha256:00'`,
+  // Previews of the lesson, hub and consent owner actions stay open to agents; only the apply is owner-only.
+  `${KIT} consent grant --pilot '/x/live.json' --kind hub-publish --scope example`,
+  `${KIT} consent list --pilot '/x/live.json'`,
   `${KIT} lesson copy --pilot '/x/live.json' --id rec_1 --to-scope example`,
   `${KIT} published delete --pilot '/x/live.json' --scope example --id lsn_1`,
   `${KIT} hub join --pilot '/x/live.json' --scope example --remote ssh://git.example.com/hub.git`,
@@ -90,7 +95,7 @@ test("owner block denies devtwin owner-only actions run directly from an agent s
     assert.match(out.permissionDecisionReason, /Ask your developer to run it themselves/);
     assert.doesNotMatch(result.out, /additionalContext/);
   }
-  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson accept", "lesson copy", "lesson notices", "live add-repo", "live init", "live migrate", "live set-kit", "live stack-watch", "live write-classes", "note consent", "note revoke", "pref accept", "pref retire", "published delete", "record publish", "schedule apply", "schedule off"]);
+  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "consent grant", "consent revoke", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson copy", "lesson notices", "live add-repo", "live init", "live migrate", "live set-kit", "live stack-watch", "live write-classes", "note consent", "note revoke", "pref accept", "pref retire", "published delete", "record publish", "schedule apply", "schedule off"]);
 });
 
 test("owner block denies owner-only actions through terminal wrappers", async (t) => {
@@ -126,7 +131,7 @@ test("owner block denies a Codex shell payload and keeps lesson delivery decisio
   await rebuildIndex(s.roots, "example");
   await writeKitReceipt(s.roots, { pilotPath: s.path, now: now() });
   const bash = await payload("codex-post-tool-bash", s.repo, { hook_event_name: "PreToolUse" });
-  for (const command of [`${KIT} lesson accept --pilot '${s.path}' --apply`, "bash -lc 'devtwin hub join --apply'"]) {
+  for (const command of [`${KIT} lesson copy --pilot '${s.path}' --apply`, "bash -lc 'devtwin hub join --apply'"]) {
     for (const tool of [{ tool_name: "Bash", tool_input: { command } }, { tool_name: "shell", tool_input: { command: ["bash", "-lc", command] } }]) {
       const result = await hook(s.path, "codex", { ...bash, ...tool });
       assert.ok(isDeny(result), command + " " + tool.tool_name);
@@ -138,7 +143,7 @@ test("owner block denies a Codex shell payload and keeps lesson delivery decisio
   assert.match(read.json.hookSpecificOutput.additionalContext, /Migrations before seeds/);
   assert.doesNotMatch(read.out, /permissionDecision|"decision"/);
   // An owner command that also names a matching file gets only the deny, never lesson lines.
-  const both = await hook(s.path, "claude", claudeBash(s.repo, `${KIT} lesson accept db/migrations/001_init.sql --apply`, "s-both"));
+  const both = await hook(s.path, "claude", claudeBash(s.repo, `${KIT} lesson copy db/migrations/001_init.sql --apply`, "s-both"));
   assert.ok(isDeny(both));
   assert.doesNotMatch(both.out, /additionalContext|Migrations before seeds/);
   // A Claude edit of a matching file gets lesson lines and no decision.

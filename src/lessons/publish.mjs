@@ -1,12 +1,15 @@
 // U11 (R13, R18, KTD3, KTD9): lesson accept and lesson copy. Both preview, then apply with the plan fingerprint.
-// Every accept and every copy shows the owner dialog with the exact lesson text before the first write; a dismissed or
-// denied dialog writes nothing. A target that leaves the machine (hub, hub+general) says so in the dialog. The hub copy is the organization's copy of
-// a lesson: accept writes no second copy to the org home under dataRoot/scopes/<scope>/org.
+// Every copy shows the owner dialog with the exact lesson text before the first write; a dismissed or denied dialog
+// writes nothing. The hub copy is the organization's copy of a lesson: accept writes no second copy to the org home
+// under dataRoot/scopes/<scope>/org.
 //
-// Targets:   hub          one file in the scope's hub (publishToHub; a rejected push goes to the outbox)
-//            hub+general  the hub file and a personal-store record, after the all-scope isolation check
-//            project      a project lesson record in the proposal's project; local
-//            general      a personal-store record only; local, the all-scope isolation check still runs
+// U36 (KTD38): lesson accept asks the tier table (src/policy/tiers.mjs) and shows no dialog.
+// Targets:   hub          consented: one file in the scope's hub, only while a hub-publish consent for the scope is
+//                         valid (publishToHub; a rejected push goes to the outbox)
+//            hub+general  refused: the general half waits for the weekly activity review
+//            project      automatic: a project lesson record in the proposal's project; local
+//            general      refused: a personal-store record reaches every organization, so it waits for activity review
+// recordedBy names the caller (src/policy/actor.mjs).
 //
 // U12: a replacement proposal (lesson supersede-propose) accepts to the hub target only. Its hub file names the
 // predecessor as supersedes: [{ id, hash }]. The predecessor is checked against the local clone at preview and on the
@@ -21,6 +24,9 @@ import { assertScopeId, assertProjectId, personalRecordIdFor, recordIdFor, RECOR
 import { digest } from "../storage/canonical.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { requireOwnerApproval, dialogText, DIALOG_LIMITS } from "../owner/dialog.mjs";
+import { tierRule } from "../policy/tiers.mjs";
+import { cliRecorder } from "../policy/actor.mjs";
+import { requireConsent } from "../consent/store.mjs";
 import { isolationTerms, assertOutboundClean } from "../records/isolation.mjs";
 import { addPersonalRecord, readPersonalSnapshot } from "../records/personal.mjs";
 import { addRecord, requireCommittedProject } from "../records/store.mjs";
@@ -33,7 +39,6 @@ import { checkLocalSupersession } from "./supersede.mjs";
 export const TARGETS = Object.freeze(["hub", "hub+general", "project", "general"]);
 export const leavesMachine = (target) => target === "hub" || target === "hub+general";
 const general = (target) => target === "hub+general" || target === "general";
-const recordedBy = { actor: "human", runId: "run_cli00001" };
 const hex = (text) => createHash("sha256").update(text).digest("hex").slice(0, 24);
 // KTD3: lsn_ plus a hash of hub ID, author handle, request ID and creation time.
 export const hubLessonId = ({ hubId, handle, requestId, createdAt }) => "lsn_" + hex([hubId, handle, requestId, createdAt].join("\0"));
@@ -60,20 +65,6 @@ function lessonDialog(title, header, lesson) {
   if (shown.endsWith("\u2026") && [...shown].length >= DIALOG_LIMITS.bodyChars) throw new DevtwinError("LIMIT", "Lesson too long to show in the owner dialog; shorten it with lesson edit", { maxChars: DIALOG_LIMITS.bodyChars });
   return content;
 }
-const replacesLines = (replaces) => replaces ? ["Replaces lesson: " + replaces.title + " [" + replaces.id + "], claimed by " + replaces.author,
-  "The replaced lesson stops reaching agents once this one is on the hub, and its author is told."] : [];
-// A local target writes only on this machine, but the owner still approves it: the agent hook reads command text and
-// cannot always tell a preview from an apply, so the dialog is the second gate for every accept.
-const localDialog = (plan) => lessonDialog("Save a lesson on this machine", [
-  "Scope: " + plan.scope,
-  plan.target === "project" ? "Saves it as a lesson of project " + plan.project + "." : "Saves it to your personal store, which every organization's sessions read.",
-  "Nothing leaves this machine."
-], plan.lesson);
-const acceptDialog = (plan) => !leavesMachine(plan.target) ? localDialog(plan) : lessonDialog(plan.replaces ? "Publish a replacement lesson to an organization hub" : "Publish a lesson to an organization hub", [
-  "Scope: " + plan.scope, "Hub: " + plan.hub.hubId, "Author: " + plan.hub.author, ...replacesLines(plan.replaces),
-  plan.target === "hub+general" ? "Also saves it to your personal store, which every organization's sessions read." : "Hub only. Your personal store does not get a copy.",
-  "Everyone with access to this hub can read it. Git history keeps the text."
-], plan.lesson);
 const copyDialog = (plan) => lessonDialog("Copy a personal lesson to another organization's hub", [
   "Personal lesson: " + plan.recordId, "To scope: " + plan.scope, "Hub: " + plan.hub.hubId, "Author: " + plan.hub.author,
   "Everyone with access to this hub can read it. Git history keeps the text."
@@ -87,9 +78,11 @@ export async function planAccept(roots, { id, target, scope, project }) {
   if (scope !== undefined && assertScopeId(scope) !== proposal.scope) throw new DevtwinError("CONFLICT", "Proposal belongs to another scope", { scope: proposal.scope });
   const lesson = await checkLesson(roots, proposal.scope, proposal.lesson);
   if (proposal.supersedes && target !== "hub") throw new DevtwinError("INVALID_INPUT", "A replacement lesson goes to the hub only", { field: "target", allowed: ["hub"] });
+  const rule = tierRule({ route: "lesson accept", target });
+  if (rule.via) throw new DevtwinError("GATE_REQUIRED", "A lesson for every organization waits for the weekly " + rule.via + "; accept it to a project or the hub now", { target, tier: rule.tier, via: rule.via });
   if (general(target)) assertOutboundClean(lessonText(lesson), await isolationTerms(roots));
   const requestId = requestIdFor("lsn", { proposalId: id, revision: proposal.revision, target });
-  const plan = { kind: "lesson-accept", proposalId: id, proposalHash: proposalHash(proposal), revision: proposal.revision, scope: proposal.scope, target, requestId, lesson, dialog: true };
+  const plan = { kind: "lesson-accept", proposalId: id, proposalHash: proposalHash(proposal), revision: proposal.revision, scope: proposal.scope, target, tier: rule.tier, ...(rule.consent ? { consent: rule.consent } : {}), requestId, lesson };
   if (leavesMachine(target)) {
     const binding = await writableBinding(roots, proposal.scope);
     let supersedes = null;
@@ -112,9 +105,7 @@ export async function planAccept(roots, { id, target, scope, project }) {
     plan.project = name;
     plan.projectRecordId = recordIdFor({ scope: proposal.scope, project: name, requestId });
   }
-  const final = finalizePlan(plan);
-  if (final.dialog) acceptDialog(final);
-  return final;
+  return finalizePlan(plan);
 }
 // Publishes one lesson file. The precondition runs before the commit and after each rebase: the file must not be there,
 // and for a replacement the predecessor must be there unchanged with no other replacement (U12).
@@ -144,11 +135,13 @@ async function rebuild(roots, scopes) {
 export async function applyAccept(roots, input, { fingerprint, now = () => new Date(), ctx = {} } = {}) {
   const plan = await planAccept(roots, input);
   assertFingerprint(plan, fingerprint);
-  if (plan.dialog) await requireOwnerApproval(ctx, acceptDialog(plan));
+  // A consented target needs its standing consent; no owner dialog runs for any accept target.
+  if (plan.consent) await requireConsent(roots, plan.consent, plan.scope);
+  const recordedBy = cliRecorder(ctx.env ?? process.env);
   const outcome = await withProposalLock(roots, "lesson-accept", async () => {
     const proposal = await requirePending(roots, plan.proposalId);
     if (proposalHash(proposal) !== plan.proposalHash) throw new DevtwinError("STALE_VERSION", "Lesson proposal changed", { id: plan.proposalId });
-    const result = { target: plan.target, acceptedAt: now().toISOString() };
+    const result = { target: plan.target, tier: plan.tier, recordedBy: recordedBy.actor, acceptedAt: now().toISOString() };
     const binding = plan.hub ? await writableBinding(roots, plan.scope) : null;
     if (binding && (binding.hubId !== plan.hub.hubId || binding.actorRef !== plan.hub.author)) throw new DevtwinError("STALE_VERSION", "Hub binding changed");
     // Local writes come first. They are idempotent by request ID, so if the publish then fails, the same accept can run

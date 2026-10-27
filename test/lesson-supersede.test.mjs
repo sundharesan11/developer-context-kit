@@ -63,7 +63,12 @@ async function machine(t, { handle }) {
   const ok = async (args, extra) => { const out = await cli(args, extra); assert.equal(out.json.ok, true, args.join(" ") + ": " + JSON.stringify(out.json.error)); return out.json.result; };
   const fail = async (args, code, extra) => { const out = await cli(args, extra); assert.equal(out.json.ok, false, args.join(" ")); assert.equal(out.json.error.code, code, args.join(" ") + ": " + JSON.stringify(out.json.error)); return out.json.error; };
   const applied = async (args, extra) => { const plan = await ok(args, extra); return ok([...args, "--apply", "--plan-fingerprint", plan.fingerprint], extra); };
-  const join_ = (hub) => applied(["hub", "join", "--scope", SCOPE, "--remote", hub.remote, "--handle", handle, "--email", handle + "@example.com", "--ssh-command", hub.ssh]);
+  // U36: the owner joins and grants the hub-publish consent, so lesson accept --target hub runs with no dialog.
+  const join_ = async (hub, { consent = true } = {}) => {
+    const joined = await applied(["hub", "join", "--scope", SCOPE, "--remote", hub.remote, "--handle", handle, "--email", handle + "@example.com", "--ssh-command", hub.ssh]);
+    if (consent) await applied(["consent", "grant", "--kind", "hub-publish", "--scope", SCOPE]);
+    return joined;
+  };
   const binding = async () => readHubBinding(await roots(), SCOPE);
   return { p, path, roots, cli, ok, fail, applied, join: join_, binding, dialogs, setDialog: (value) => { decision = value; }, handle };
 }
@@ -114,10 +119,12 @@ test("lesson supersede accepted and published appears in the author's next brief
   for (const target of ["general", "project", "hub+general"]) await b.fail(accept(created.proposalId, target), "DEVTWIN_INVALID_INPUT");
   const plan = await b.ok(accept(created.proposalId));
   assert.deepEqual(plan.supersedes, [{ id: original, hash: preview.supersedes.hash }]);
+  // The preview names the lesson it replaces; under the hub-publish consent the apply shows no dialog.
+  assert.deepEqual(plan.replaces, { id: original, title: ORIGINAL.title, author: "handle:alice" });
+  const dialogs = b.dialogs.length;
   const result = await b.ok([...accept(created.proposalId), "--apply", "--plan-fingerprint", plan.fingerprint], { clock: at(0.2) });
   assert.equal(result.hub.pushed, true);
-  const shown = b.dialogs.at(-1).body;
-  for (const text of [REPLACEMENT.title, REPLACEMENT.summary, "Replaces lesson: " + ORIGINAL.title, original, "claimed by handle:alice"]) assert.ok(shown.includes(text), "dialog shows " + text);
+  assert.equal(b.dialogs.length, dialogs);
   const meta = parseHubLesson(await hub.show("lessons/" + result.hub.lessonId + ".md")).meta;
   assert.deepEqual(meta.supersedes, [{ id: original, hash: preview.supersedes.hash }]);
   assert.equal(meta.author, "handle:bob");
@@ -250,18 +257,17 @@ test("lesson supersede-propose refuses an unknown or tombstoned predecessor and 
   await b.fail(["lesson", "propose", "--session", "ses_cap", "--scope", SCOPE, ...fields({ title: "Fourth", summary: "Do four." })], "DEVTWIN_LIMIT");
 });
 
-test("lesson supersede accept with the dialog denied publishes nothing", async (t) => {
+test("lesson supersede accept without the hub-publish consent publishes nothing", async (t) => {
   const hub = await hubFixture(t), a = await machine(t, { handle: "alice" }), b = await machine(t, { handle: "bob" });
   await a.join(hub);
-  await b.join(hub);
+  await b.join(hub, { consent: false });
   const original = await published(a);
   await sync(b);
   const id = (await b.ok([...supersedeArgs(original), "--apply"])).proposalId;
   const head = await hub.head();
   const plan = await b.ok(accept(id));
-  b.setDialog("denied");
-  await b.fail([...accept(id), "--apply", "--plan-fingerprint", plan.fingerprint], "DEVTWIN_OWNER_DENIED");
-  assert.match(b.dialogs.at(-1).body, /Replaces lesson: Retry the billing client/);
+  assert.equal(plan.replaces.title, "Retry the billing client");
+  assert.equal((await b.fail([...accept(id), "--apply", "--plan-fingerprint", plan.fingerprint], "DEVTWIN_APPROVAL_REQUIRED")).details.consent, "hub-publish");
   assert.equal(await hub.head(), head, "no commit reaches the hub");
   const state = await cloneState(b, hub);
   assert.equal(state.head, head);

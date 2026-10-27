@@ -256,6 +256,30 @@ const jobReview = jobStep("job-review-reminder", "review-monthly", "Scheduled jo
   "Installs devtwin.review-monthly.plist, which shows a monthly reminder with a count of waiting preference and lesson proposals. It makes no request. Runs schedule apply.",
   "Reminds you to review what devtwin keeps and does.", () => null);
 
+// U36 (KTD39): the standing consents, through consent grant (owner steps: the apply shows the owner dialog and the hook
+// denies it from agent shells). --push-repo names the repository; --hold-hours sets the hold time (default 24).
+const consentCmd = () => import("../consent/commands.mjs");
+const consentValues = (ctx, target) => ({ ...target, ...pick(ctx.values, ["hold-hours"]) });
+const consentDone = async (ctx, kind, target) => {
+  try { return (await (await import("../consent/store.mjs")).readConsent(ctx.roots, kind, target))?.valid === true; } catch { return false; }
+};
+const consentStep = (id, kind, title, what, why, target, skip, doneTarget) => ({
+  id, title, available: true, owner: true, what, why, skip,
+  undo: "consent revoke --kind " + kind + ", through preview and apply, ends the consent. Agents then stop at \"needs consent\" for that target.",
+  plan: async (ctx) => (await consentCmd()).consentGrantCommand.run(consentValues(ctx, target(ctx)), ctx),
+  apply: async (ctx, fingerprint) => (await consentCmd()).consentGrantCommand.run({ ...consentValues(ctx, target(ctx)), apply: true, "plan-fingerprint": fingerprint }, ctx),
+  done: async (ctx) => consentDone(ctx, kind, doneTarget(ctx))
+});
+const pushRepo = (ctx) => { try { return realpathSync(ctx.values["push-repo"]); } catch { return ctx.values["push-repo"]; } };
+const consentRepo = consentStep("consent-repo", "repo-push", "Consent: push learning branches to a repository",
+  "Records a standing consent for the bound repository at --push-repo: agents and jobs may push learning branches to its remote without asking each time. Runs consent grant --kind repo-push.",
+  "Lets lessons reach a repository's docs without a prompt for each branch. No command pushes a learning branch yet; the consent waits for that step.",
+  (ctx) => ({ kind: "repo-push", repo: ctx.values["push-repo"] }), (ctx) => ctx.values["push-repo"] ? null : "no --push-repo given", pushRepo);
+const consentHub = consentStep("consent-hub", "hub-publish", "Consent: publish lessons to the organization hub",
+  "Records a standing consent for the hub that --scope joined: lesson accept --target hub then publishes with no owner dialog. Runs consent grant --kind hub-publish.",
+  "Lets accepted lessons reach colleagues' agents without a prompt for each lesson.",
+  (ctx) => ({ kind: "hub-publish", scope: ctx.values.scope }), (ctx) => hubBindingSync(ctx) ? null : "no hub joined for this scope", (ctx) => ctx.values.scope);
+
 const sandbox = {
   id: "sandbox", title: "Sandbox recommendations", available: true,
   what: "Reads the project scan of --repo and recommends agent sandbox settings, and a container setup when the scan finds services. It writes no agent setting. Apply stores the recommendations you accept (--recommendation <id>; with none, all) as personal preference records.",
@@ -279,6 +303,8 @@ export const STEPS = Object.freeze([
   firstProject,
   hubJoin,
   jobHubSync,
+  consentHub,
+  consentRepo,
   jobRadar,
   jobAdvisories,
   jobReview,

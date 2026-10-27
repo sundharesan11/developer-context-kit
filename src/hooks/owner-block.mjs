@@ -7,9 +7,10 @@ const SHELL_TOOLS = new Set(["Bash", "shell", "local_shell", "exec_command"]);
 const MAX_COMMAND_BYTES = 65536;
 // words: the two route words. apply: the action is owner-only only with --apply (its preview stays allowed).
 export const OWNER_ACTIONS = Object.freeze([
-  // The owner decided on 2026-10-26 that agents may preview these four; the apply stays owner-only, and each apply
-  // shows the owner dialog as a second gate.
-  { words: ["lesson", "accept"], apply: true }, { words: ["lesson", "copy"], apply: true },
+  // The owner decided on 2026-10-26 that agents may preview these three; the apply stays owner-only, and each apply
+  // shows the owner dialog as a second gate. U36 (KTD38): lesson accept left this list; it refuses the targets its tier
+  // does not allow (src/policy/tiers.mjs).
+  { words: ["lesson", "copy"], apply: true },
   { words: ["published", "delete"], apply: true }, { words: ["hub", "join"], apply: true },
   // U15 and U16: the preview of pref accept stays open, as above. instructions apply is itself the apply; its preview is
   // instructions plan.
@@ -23,12 +24,14 @@ export const OWNER_ACTIONS = Object.freeze([
   // U12: acknowledging a replacement notice; an agent may list the notices but not hide them from its developer.
   { words: ["lesson", "notices"], apply: true },
   // U13: stopping or granting the standing note consent.
-  { words: ["note", "revoke"], apply: true }, { words: ["note", "consent"], apply: true }
+  { words: ["note", "revoke"], apply: true }, { words: ["note", "consent"], apply: true },
+  // U36: granting or revoking a standing consent (KTD39).
+  { words: ["consent", "grant"], apply: true }, { words: ["consent", "revoke"], apply: true }
 ].map((action) => Object.freeze({ ...action, words: Object.freeze(action.words) })));
 // U9: setup steps whose apply runs an owner action above (src/setup/steps.mjs marks them owner: true). "setup apply"
 // naming one of them is denied, and so is the "setup" terminal loop, which can apply them. setup status, setup plan
 // and setup apply for any other step stay allowed.
-export const OWNER_SETUP_STEPS = Object.freeze(["skills-claude", "skills-codex", "write-classes-hooks", "hooks-claude", "hooks-codex", "hub-join", "job-hub-sync", "job-radar", "job-advisories", "job-review-reminder"]);
+export const OWNER_SETUP_STEPS = Object.freeze(["skills-claude", "skills-codex", "write-classes-hooks", "hooks-claude", "hooks-codex", "hub-join", "job-hub-sync", "job-radar", "job-advisories", "job-review-reminder", "consent-repo", "consent-hub"]);
 const SETUP_READS = ["status", "plan", "apply"];
 function setupAction(words) {
   if (!words.includes("setup")) return null;

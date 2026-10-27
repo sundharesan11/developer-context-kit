@@ -13,7 +13,8 @@ export const setupOptions = {
   doc: { type: "string", multiple: true }, "expect-remote": { type: "string", multiple: true }, environment: { type: "string", multiple: true },
   actor: { type: "string", multiple: true }, accept: { type: "string" }, "request-id": { type: "string" }, "keep-previous": { type: "boolean" },
   recommendation: { type: "string", multiple: true },
-  "hub-remote": { type: "string" }, "hub-handle": { type: "string" }, "hub-email": { type: "string" }, "ssh-command": { type: "string" }, "hub-root": { type: "string" }
+  "hub-remote": { type: "string" }, "hub-handle": { type: "string" }, "hub-email": { type: "string" }, "ssh-command": { type: "string" }, "hub-root": { type: "string" },
+  "push-repo": { type: "string" }, "hold-hours": { type: "string" }
 };
 export const stepContext = (values, ctx) => ({ ...ctx, values });
 // A step's header: the consent text and its state. done and skip never write; a failed check reads as not done.
