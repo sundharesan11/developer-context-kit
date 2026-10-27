@@ -105,10 +105,19 @@ Personal and org records have their own homes. They need no registry entry or pr
 `lesson index --scope <scope>` builds one index file per scope at `stateRoot/lessons/<scope>.json`. The folder is 0700 and the file is 0600. The file is written by atomic replace under `stateRoot/locks/lessons_<scope>.lock`.
 
 - **Sources.** The index reads the scope's project records, its org records, the personal store and the hub clone of a joined scope. It keeps only lessons and preferences that have a `match` block and an effective status of `observed` or `confirmed`. Superseded, proposed and disputed records are left out.
-- **Entries.** Each entry holds the record ID, reach, scope, project, title, a one-line summary, the claimed author, the revisit date, the `match` block and the record hash.
+- **Entries.** Each entry holds the record ID, reach, scope, project, title, a one-line summary, the claimed author, the revisit date, the `match` block and the record hash. It also holds the effective status and the recording actor, which the session summary uses for its labels.
 - **Path map.** The index also maps each bound root to its scope and project, with the root's Git common directory. A linked worktree resolves to its parent project through that directory.
 - **Fingerprint.** The `fingerprint` is the digest of the rest of the file. A rebuild writes only when the fingerprint changes, so the same records always give the same bytes.
 - **Cache write.** The file is a cache of record data that a rebuild can replace at any time. For this reason, `lesson index` writes it with no preview and no plan fingerprint. It writes nothing outside `stateRoot`.
+
+### Session summary
+
+Each bound project has a session summary at `stateRoot/summaries/<scope>/<project>.json`. The folder is 0700 and the file is 0600. The hook adds it to the session-start output.
+
+- **Writers.** A record add or supersede rebuilds its project's summary. A lesson index rebuild rebuilds the summary of every project in the scope. Lesson accept, handoffs and `undo` write records and rebuild the index, so they rebuild it too.
+- **Lock.** The file is written by atomic replace under the scope lock, after the write that asked for it has released that lock.
+- **Cache write.** The summary is a cache, like the index. It is not audited. A failed rebuild never fails the write; the hook then shows the file it finds.
+- **Fingerprint.** The `fingerprint` is the digest of the rest of the file. The hook ignores a file that does not match it.
 
 Globs match one path segment per `/`. `*` matches any run of characters in a segment and `?` matches one character. A `**` segment matches zero or more segments. A wildcard does not match a leading dot, so a dotfile matches only a pattern that starts with a literal dot. A path with `..` never matches.
 

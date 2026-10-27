@@ -31,7 +31,7 @@ See the [security model](/docs/security/security-model/).
 
 ## Agents and sessions
 
-- **Hooks deliver lessons, not the brief.** The [agent hook](/docs/guides/lessons-and-hooks/) delivers matching lesson lines and blocks owner-only commands. Nothing injects the brief when a session starts or records a handoff when it ends. You or a skill pull the brief explicitly.
+- **Hooks deliver lessons and a short summary, not the brief.** The [agent hook](/docs/guides/lessons-and-hooks/) delivers matching lesson lines, a [session summary](/docs/guides/lessons-and-hooks/#the-session-summary) of at most 1,200 characters at session start, and blocks owner-only commands. Nothing injects the full brief when a session starts or records a handoff when it ends. You or a skill pull the brief explicitly.
 - **Fresh-session discovery is proven narrowly.** The first live activation, on one machine with one repository, showed fresh non-interactive Claude Code and Codex sessions finding the skills and resolving the project. Interactive sessions have not been checked yet, and one machine is not broad compatibility. Installing skill files alone does not prove a session uses them.
 - Cursor reads `~/.agents/skills` and will see the skills, but is untested.
 - `devtwin-setup` is not yet installed by `agents install`.

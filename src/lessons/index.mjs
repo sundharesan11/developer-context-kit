@@ -101,7 +101,7 @@ async function gather(roots, scope, { sources = SOURCES } = {}) {
     const live = read.records.filter(isLive);
     counts[source.name] = live.length;
     for (const r of live) {
-      entries.push({ id: r.id, kind: r.kind, reach: r.reach, source: source.name, scope: r.scope, project: r.project, title: r.title, summary: summaryOf(r), claimedBy: ACTOR_REF.test(r.recordedBy?.actorRef ?? "") ? r.recordedBy.actorRef : handle, revisitAfter: r.revisitAfter ?? null, createdAt: r.createdAt, recordHash: r.recordHash, match: r.match, ...(r.contested ? { contested: true } : {}) });
+      entries.push({ id: r.id, kind: r.kind, reach: r.reach, source: source.name, scope: r.scope, project: r.project, title: r.title, summary: summaryOf(r), claimedBy: ACTOR_REF.test(r.recordedBy?.actorRef ?? "") ? r.recordedBy.actorRef : handle, status: r.effective, actor: r.recordedBy?.actor ?? null, revisitAfter: r.revisitAfter ?? null, createdAt: r.createdAt, recordHash: r.recordHash, match: r.match, ...(r.contested ? { contested: true } : {}) });
       bodies.set(r.id, r.body);
     }
   }
@@ -121,7 +121,7 @@ export async function buildIndex(roots, scope, options = {}) { return (await gat
 export async function rebuildIndex(roots, scope, options = {}) {
   const path = indexPath(roots, scope);
   assertWritable(roots, [path, indexLockPath(roots, scope)]);
-  return withPilotLock(roots, indexLockPath(roots, scope), { kind: "lesson-index" }, async () => {
+  const result = await withPilotLock(roots, indexLockPath(roots, scope), { kind: "lesson-index" }, async () => {
     const { index } = await gather(roots, scope, options);
     let current = null;
     try { current = await readIndex(roots, scope); } catch { /* A damaged index is replaced. */ }
@@ -133,6 +133,11 @@ export async function rebuildIndex(roots, scope, options = {}) {
     }
     return { scope, path, written, fingerprint: index.fingerprint, counts: index.counts };
   }, { destinations: [path] });
+  // U31 (KTD30): the session summaries read the index, so they follow it, after the index lock is released. A failed
+  // summary never fails the rebuild.
+  const { refreshSummaries } = await import("../context/summary.mjs");
+  await refreshSummaries(roots, scope);
+  return result;
 }
 // The stored index, or null when none is built. A changed or damaged file fails with INTEGRITY.
 export async function readIndex(roots, scope) {
