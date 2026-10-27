@@ -141,8 +141,9 @@ export async function planStack(roots, input = {}, { catalog, resolvePublicRead 
   const approval = await readStackApproval(roots);
   const overrides = chooseOverrides(given, approval, input.clearOverrides === true, declared);
   const resolved = entries.map((entry) => resolveItem(entry, catalog, overrides, groups));
-  const radar = groups.includes("radar") ? (catalog.radar ?? []).map((r) => ({ id: r.id, kind: r.kind, label: r.terms[0], sources: { feeds: [...r.feeds], github: [...r.github] } })) : [];
-  const radarFetches = radar.flatMap((r) => [...r.sources.feeds.map((feed) => ({ host: new URL(feed).hostname, group: "radar", feed })), ...r.sources.github.map((id) => ({ host: GITHUB_HOST, group: "radar", identifier: id }))]);
+  const radar = groups.includes("radar") ? (catalog.radar ?? []).map((r) => ({ id: r.id, kind: r.kind, label: r.terms[0], sources: { feeds: [...r.feeds], github: [...r.github], ...(r.pages?.length ? { pages: [...r.pages] } : {}) } })) : [];
+  // A deprecation page URL (U34) is bound by the approval exactly like a feed URL.
+  const radarFetches = radar.flatMap((r) => [...[...r.sources.feeds, ...(r.sources.pages ?? [])].map((feed) => ({ host: new URL(feed).hostname, group: "radar", feed })), ...r.sources.github.map((id) => ({ host: GITHUB_HOST, group: "radar", identifier: id }))]);
   const hosts = hostsFrom([...resolved.flatMap((r) => r.fetches), ...radarFetches]);
   // Only whether the binding exists is asked; any other field the resolver returns is ignored and never stored.
   // A typed refusal from the resolver (for example TOKEN_TOO_BROAD) means GitHub requests stay unauthenticated.

@@ -62,7 +62,7 @@ In a bound project, the session-start output also holds a short summary of the p
 
 When a session stopped in this worktree without a handoff, one more line says when, on which branch and which files changed. The `Stop` and `PreCompact` hook entries record that; an agent answers it with `handoff write`, as the managed instruction block asks at each stopping point.
 
-The summary is fenced and marked as data, not instructions. A line that was not confirmed starts with its source, for example "unreviewed, from agent:". Each line passes the same text checks as automatic writes again, and a line that names another scope is left out. When the summary is too long, the last lines are dropped whole. The hook only reads a stored copy, so it stays fast and takes no lock. Record writes, index rebuilds and `undo` update that copy. A missing or damaged copy gives the one-line output.
+The summary is fenced and marked as data, not instructions. A line that was not confirmed starts with its source, for example "unreviewed, from agent:". A hub lesson always starts with "unreviewed, from" and its author, even when the hub marks it confirmed. Each line passes the same text checks as automatic writes again, and a line that names another scope is left out. When the summary is too long, the last lines are dropped whole. The hook only reads a stored copy, so it stays fast and takes no lock. Record writes, index rebuilds and `undo` update that copy. A missing or damaged copy gives the one-line output.
 
 After `paths confirm`, the session-start line says "Kit and config confirmed." while the kit and the config stay the same. The skills then skip the path question, and the hook keeps its 30-day receipt current, so a weekly `hook verify` is not needed. See [Confirm the kit and config paths](LIVE.md#confirm-the-kit-and-config-paths).
 
@@ -150,6 +150,10 @@ node bin/devtwin.mjs profile plan --pilot "$PILOT_FILE" --interest 'Rust:strong'
 ```
 
 Radar items are ranked locally. A match with a project in the digest's scope scores 100 and a match with your stack scores 60. A strong interest adds 30, an interest adds 15 and a weak interest adds 5. An item below 15 is counted, not listed, so an item that matches only a weak interest is left out. The digest lists at most 30 radar items, grouped by kind, with the highest score first.
+
+The radar also reports model retirements. Two catalog sources of kind `deprecations` name fixed vendor pages: the Anthropic model deprecations page and the OpenAI deprecations page. A fixed extractor reads only table rows under a header that names a model column and a retirement or shutdown column. From each row it keeps only a model ID and a date (ISO or "Month D, YYYY"). No other page text reaches the digest, so an instruction on the page cannot reach you or an agent. The digest lists the models that retire within 180 days under "Model retirements" in the radar section. The page URLs are part of the approval like feed URLs, and in live mode their hosts must be in the `stackWatch` exception.
+
+Each applied digest records how many rows each page had. If a page that had rows before has none now, the run reports a source failure (`UPSTREAM_INVALID`, reason `rows-missing`), not "no retirements". The page layout probably changed, so check the page yourself.
 
 Each listed item has a 12-character item ID. `radar guide` writes a short "how to try this" note for one item of the scope's latest applied digest:
 

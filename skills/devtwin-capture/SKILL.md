@@ -130,7 +130,7 @@ Some devtwin commands need the owner at the keyboard. These include `lesson copy
 - `lesson show`: the lesson's title, body and match rules, with its scope and project.
 - `lesson match`: `matches[]`, each with an `id` and the one-line `line`.
 - `lesson propose`: the `proposalId`. Without `--apply` the result has `preview: true` and nothing is saved.
-- `handoff write`: the `recordId` and the `audit` entry ID. `INVALID_INPUT` with a `field` means that a line is empty, too long, more than one line or not plain text. `GATE_REQUIRED` with `via: "activity review"` means that this session already made twenty automatic writes.
+- `handoff write`: the `recordId` and the `audit` entry ID. `INVALID_INPUT` with a `field` means that a line is empty, too long, more than one line or not plain text. `GATE_REQUIRED` with `via: "activity review"` means that this session already made twenty automatic writes, or this caller a hundred today (`details.bucket` says which).
 - `pref propose`: the `proposalId`. `CONFLICT` with the reason `declined` or `accepted` means that the user already answered this preference; do not propose it again. `INVALID_INPUT` with a `reason` means that the text is not one plain rule.
 - `LIMIT` from `lesson propose`: this session already has three proposals. Do not propose more, and do not change the session ID to get past the limit.
 - `ISOLATION` or `SENSITIVE_CONTENT` from `lesson propose`: the draft names another organization or holds a secret. Make it more general with the user, or drop it.

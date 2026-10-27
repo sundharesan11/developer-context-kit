@@ -13,7 +13,7 @@ const list = (value) => value === undefined ? [] : Array.isArray(value) ? value 
 // U37 (KTD38, KTD40, KTD42, KTD43): record add and record supersede. recordedBy names the caller. Every write passes the
 // plain-rule and scope-name checks, then appends an audit entry with the caller's --session before the record is
 // written. The tier comes from the record's status (src/policy/tiers.mjs): observed and proposed knowledge is
-// automatic; a confirmed or disputed record, or a write that replaces a confirmed record, shows the owner dialog
+// automatic; a confirmed or disputed record, or a write that replaces a confirmed or disputed record, shows the owner dialog
 // first, whoever the caller is, and its audit entry has tier always-ask. A retraction is refused (validateDraft).
 const options = { session: { type: "string" }, scope: { type: "string" }, project: { type: "string" }, kind: { type: "string" }, title: { type: "string" }, body: { type: "string" }, "body-file": { type: "string" }, status: { type: "string" }, source: { type: "string", multiple: true }, reviewer: { type: "string" }, "request-id": { type: "string" }, apply: { type: "boolean" }, target: { type: "string", multiple: true }, "expect-hash": { type: "string", multiple: true }, proposal: { type: "string" }, location: { type: "string", multiple: true } };
 // U29 (KTD36): --location <kind>:<name>:<where>, repeatable, on an environment record. The name holds no colon; the
@@ -36,9 +36,11 @@ async function inputFrom(values, ctx) {
   }
   return { scope: values.scope, project: values.project, requestId: values["request-id"], recordedBy: cliRecorder(ctx.env ?? process.env), draft: { kind: values.kind, status: values.status ?? "observed", title: values.title, body, sources: list(values.source).map((ref) => ({ ref })), applicability: { level: "project" }, review: values.reviewer ? { reviewer: values.reviewer } : null, ...(values.location !== undefined && { locations: list(values.location).map(parseLocation) }) } };
 }
-// The record's tier target: its status, or replaces-confirmed for a write that replaces a confirmed record.
-const recordTarget = (draft, replacesConfirmed) => replacesConfirmed ? "replaces-confirmed" : draft.status;
-const ownerDialog = (route, input, target, targets) => ({ title: target === "replaces-confirmed" ? "Replace a confirmed devtwin record" : "Record " + (input.draft.status === "confirmed" ? "a confirmed" : "a disputed") + " devtwin fact",
+// The record's tier target: its status, or replaces-confirmed (replaces-disputed) for a write that replaces a confirmed
+// (disputed) record. A disputed record is the owner's open question, so an agent cannot settle it by replacing it.
+const recordTarget = (draft, replaces) => replaces ? "replaces-" + replaces : draft.status;
+const REPLACED = { "replaces-confirmed": "Replace a confirmed devtwin record", "replaces-disputed": "Replace a disputed devtwin record" };
+const ownerDialog = (route, input, target, targets) => ({ title: REPLACED[target] ?? "Record " + (input.draft.status === "confirmed" ? "a confirmed" : "a disputed") + " devtwin fact",
   body: ["Route: " + route, "Project: " + input.project, "Kind: " + input.draft.kind + ", status " + input.draft.status, ...(input.draft.review?.reviewer ? ["Reviewer: " + input.draft.review.reviewer] : []),
     ...(targets.length ? ["Replaces: " + targets.join(", ")] : []), "", "Title: " + input.draft.title].join("\n") });
 // The checks that run before the audit entry, so a write refused here leaves no entry behind. An always-ask write
@@ -51,16 +53,17 @@ export async function auditedWrite(ctx, route, input, session, { targets = [], e
   validateDraft(input.draft, { recordedBy: input.recordedBy });
   assertProjectReach(input.draft);
   await requireCommittedProject(ctx.roots, input.scope, input.project);
-  let replacesConfirmed = false;
+  let replaces = null;
   if (targets.length) {
     const records = (await readSnapshot(ctx.roots, input.scope, input.project)).records;
     targets.forEach((id, i) => {
       const target = records.find((r) => r.id === id);
       if (!target || target.effective === "superseded" || target.recordHash !== expectHashes[i]) throw new DevtwinError("STALE_VERSION", "Target changed");
-      replacesConfirmed ||= target.status === "confirmed";
+      if (target.status === "confirmed") replaces = "confirmed";
+      else if (target.status === "disputed") replaces ??= "disputed";
     });
   }
-  const target = recordTarget(input.draft, replacesConfirmed), tier = tierOf({ route, target });
+  const target = recordTarget(input.draft, replaces), tier = tierOf({ route, target });
   const { checkAutomaticText } = await import("../audit/checks.mjs");
   checkAutomaticText({ lines: [input.draft.title, ...locationLines(input.draft.locations)], body: input.draft.body });
   assertOutboundClean([input.draft.title, input.draft.body, ...locationLines(input.draft.locations)].join("\n"), await isolationTerms(ctx.roots), { except: input.scope });

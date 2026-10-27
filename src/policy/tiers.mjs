@@ -17,8 +17,8 @@ const A = "automatic", C = "consented", ASK = "always-ask", R = READ;
 const REVIEW = { tier: ASK, via: "activity review" };
 const DIALOG = { tier: ASK, dialog: true };
 // Review fix: a record's target is its status. observed and proposed knowledge is automatic; a confirmed or disputed
-// record, or a write that replaces a confirmed record ("replaces-confirmed"), needs the owner dialog whoever calls,
-// because the caller's actor comes from environment variables any process can unset.
+// record, or a write that replaces a confirmed or disputed record ("replaces-confirmed", "replaces-disputed"), needs
+// the owner dialog whoever calls, because the caller's actor comes from environment variables any process can unset.
 const RECORD_WRITE = { observed: A, proposed: A, confirmed: DIALOG, disputed: DIALOG };
 // setup apply has the tier of the step it applies; the owner steps run an always-ask action.
 const SETUP_STEPS = { "live-folder": R, "skills-claude": ASK, "skills-codex": ASK, "write-classes-hooks": ASK, "hooks-claude": ASK, "hooks-codex": ASK,
@@ -34,7 +34,7 @@ const TABLE = {
   "live init": ASK, "live add-repo": ASK, "live set-kit": ASK, "live write-classes": ASK, "live stack-watch": ASK, "live migrate": ASK,
   // U26 (KTD34): letting a terminal answer the owner prompt weakens it, so the switch is always ask.
   "live approval": ASK,
-  "record add": RECORD_WRITE, "record supersede": { ...RECORD_WRITE, "replaces-confirmed": DIALOG }, "record propose": A, "record publish": ASK,
+  "record add": RECORD_WRITE, "record supersede": { ...RECORD_WRITE, "replaces-confirmed": DIALOG, "replaces-disputed": DIALOG }, "record propose": A, "record publish": ASK,
   "lesson match": R, "lesson show": R, "lesson index": R, "lesson propose": A, "lesson proposals": R, "lesson edit": A, "lesson reject": A,
   "lesson accept": { project: A, hub: { tier: C, consent: "hub-publish" }, "hub+general": REVIEW, general: REVIEW },
   "lesson copy": ASK, "lesson supersede-propose": A, "lesson notices": ASK,

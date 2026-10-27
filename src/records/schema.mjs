@@ -55,7 +55,8 @@ function match(value) {
 }
 // U29 (KTD36): an environment record may say where things live: a name, a kind and a place. The place is a
 // repo-relative path, a home-relative path (~/), a host name or a named service. It is never an absolute path or a
-// parent segment, and never a value: the sensitive and value-like scans refuse it (src/records/redact.mjs).
+// parent segment, and never a value: the sensitive and value-like scans refuse one in the place or the name
+// (src/records/redact.mjs).
 export const LOCATION_KINDS = ["file", "directory", "host", "service", "secret-store"];
 export const LOCATION_LIMIT = 20;
 const LOCATION_UNSAFE = /[\p{Cc}\p{Cf}\u2028\u2029]/u;
@@ -72,6 +73,7 @@ export function validateLocations(value) {
   for (const entry of value) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry) || Object.keys(entry).some((key) => !["name", "kind", "where"].includes(key))) invalid();
     locationText(entry.name, 80);
+    assertNoValueLike(entry.name);
     if (!LOCATION_KINDS.includes(entry.kind)) invalid();
     where(entry.where);
   }

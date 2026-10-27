@@ -33,19 +33,19 @@ test("tier table has one line for every CLI route and no other", () => {
   for (const route of ["handoff export", "project onboard"]) assert.equal(tierOf({ route }), "automatic", route);
   for (const route of ["pref accept", "consent grant", "consent revoke", "undo"]) assert.equal(tierOf({ route }), "always-ask", route);
   // A record's target is its status: observed and proposed are automatic; confirmed, disputed and replacing a
-  // confirmed record need the owner dialog, whoever calls.
+  // confirmed or disputed record need the owner dialog, whoever calls.
   for (const route of ["record add", "record supersede"]) {
-    assert.deepEqual(Object.keys(TIER_TABLE[route].targets).filter((k) => k !== "replaces-confirmed").sort(), [...STATUSES].sort(), route);
+    assert.deepEqual(Object.keys(TIER_TABLE[route].targets).filter((k) => !k.startsWith("replaces-")).sort(), [...STATUSES].sort(), route);
     for (const status of ["observed", "proposed"]) assert.equal(tierOf({ route, target: status }), "automatic", route + " " + status);
     for (const status of ["confirmed", "disputed"]) assert.deepEqual(tierRule({ route, target: status }), { tier: "always-ask", dialog: true }, route + " " + status);
   }
-  assert.deepEqual(tierRule({ route: "record supersede", target: "replaces-confirmed" }), { tier: "always-ask", dialog: true });
+  for (const target of ["replaces-confirmed", "replaces-disputed"]) assert.deepEqual(tierRule({ route: "record supersede", target }), { tier: "always-ask", dialog: true }, target);
   assert.equal(tierOf({ route: "activity" }), "read");
 });
 
 test("tierOf throws for an unknown route, target or source", () => {
   const bad = [{ route: "lesson delete" }, { route: "lesson accept" }, { route: "lesson accept", target: "everywhere" }, { route: "lesson accept", target: "project", source: "fetched" },
-    { route: "record add" }, { route: "record add", target: "hub" }, { route: "record add", target: "observed", source: "synced" }, { route: "record add", target: "replaces-confirmed" }, { route: "setup apply", target: "nope" }, { route: "toString" }, { route: "__proto__" }, {}, undefined];
+    { route: "record add" }, { route: "record add", target: "hub" }, { route: "record add", target: "observed", source: "synced" }, { route: "record add", target: "replaces-confirmed" }, { route: "record add", target: "replaces-disputed" }, { route: "setup apply", target: "nope" }, { route: "toString" }, { route: "__proto__" }, {}, undefined];
   for (const action of bad) assert.throws(() => tierOf(action), (e) => e.code === "DEVTWIN_INVALID_INPUT" && e.details.field === "tier", JSON.stringify(action));
   assert.ok(Object.isFrozen(TIER_TABLE));
   assert.throws(() => { TIER_TABLE["record add"].targets.observed.tier = "always-ask"; }, TypeError);
@@ -62,7 +62,7 @@ test("always-ask routes in the tier table are exactly the owner-block actions an
   // from an observed one by its words, so they are not owner-block actions.
   assert.deepEqual(dialogOnlyRoutes(), ["record add", "record supersede"]);
   assert.ok(!ask.includes("record add") && !ask.includes("record supersede"));
-  assert.deepEqual(targetsWithTier("record supersede", "always-ask"), ["confirmed", "disputed", "replaces-confirmed"]);
+  assert.deepEqual(targetsWithTier("record supersede", "always-ask"), ["confirmed", "disputed", "replaces-confirmed", "replaces-disputed"]);
   assert.ok(ask.includes("setup") && ask.includes("setup apply"));
   assert.ok(!ask.includes("lesson accept"), "lesson accept left the owner-only list");
   assert.deepEqual(targetsWithTier("setup apply", "always-ask"), [...OWNER_SETUP_STEPS].sort());

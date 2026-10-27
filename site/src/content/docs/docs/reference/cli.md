@@ -66,7 +66,7 @@ The skill builder and skill-source installers add separate recorded approvals; s
 
 Some commands need you at the keyboard: the **always ask** tier of the [tier table](/docs/security/security-model/#tiers). When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `consent grant`, `consent revoke`, `undo`, `backup restore`, `backup key export`, `paths confirm`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
 
-`lesson accept` is not an owner action. Agents run it for the `project` target, and for the `hub` target while you hold a `hub-publish` consent. `record add` and `record supersede` of `confirmed` or `disputed` knowledge, or of a write that replaces a `confirmed` record, are not denied by the hook but show the owner dialog whoever runs them.
+`lesson accept` is not an owner action. Agents run it for the `project` target, and for the `hub` target while you hold a `hub-publish` consent. `record add` and `record supersede` of `confirmed` or `disputed` knowledge, or of a write that replaces a `confirmed` or `disputed` record, are not denied by the hook but show the owner dialog whoever runs them.
 
 ### Identifiers
 
@@ -375,7 +375,7 @@ Returns `recordId` and `audit`.
 | `--session <id>` | Optional. The session ID from the hook's session-start line. It is kept in the audit entry, which `activity` shows, and counts toward the session cap. |
 | `--apply` | Write. Without it, the command previews and returns the `recordId`. |
 
-`record add` and `record supersede` of `observed` or `proposed` knowledge are automatic writes. A `confirmed` or `disputed` record, or a write that replaces a `confirmed` record, shows the owner dialog first. Every write adds an entry to the audit log. An agent session makes at most 20 automatic writes; writes with no `--session` share one count per caller and UTC day. `--kind retraction` is refused: only `undo` writes one. See [`activity`](#activity) and [`undo`](#undo).
+`record add` and `record supersede` of `observed` or `proposed` knowledge are automatic writes. A `confirmed` or `disputed` record, or a write that replaces a `confirmed` or `disputed` record, shows the owner dialog first. Every write adds an entry to the audit log. An agent session makes at most 20 automatic writes; writes with no `--session` share one count per caller and UTC day, and a caller makes at most 100 a day across all sessions. `--kind retraction` is refused: only `undo` writes one. See [`activity`](#activity) and [`undo`](#undo).
 
 ### `record add`
 

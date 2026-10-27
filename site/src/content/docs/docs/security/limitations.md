@@ -77,7 +77,8 @@ See the [security model](/docs/security/security-model/).
 - Installing a template-made skill into your real agent homes is not available yet.
 - In live mode the stack watch and the radar run only under the `stackWatch` exception.
 - Live requests are always unauthenticated, so GitHub allows roughly 60 of them an hour.
-- The bundled stack catalog covers eight items and five radar sources, and no vendor changelog feeds; add feeds with `--feed`.
+- The bundled stack catalog covers eight items and seven radar sources, and no vendor changelog feeds; add feeds with `--feed`. Two radar sources are vendor model deprecation pages, read only for model IDs and retirement dates.
+- The deprecation extractor reads table rows only. If a vendor page loads its table with a script, moves or redirects, that source fails and reports no retirements.
 - Radar ranking uses your stack and stated interests only. Package names that are in a project but not in your profile stack do not rank.
 - The radar jobs use macOS launchd and `osascript`. On other systems you cannot install the jobs, and devtwin shows no notifications.
 - The monthly review reminder counts waiting preference and lesson proposals only, until the setup review lands.
@@ -112,7 +113,7 @@ These are outside what devtwin does, even when it runs in the background:
 - **Commands that break when pasted.** devtwin does not check or repair shell commands for your shell.
 - **Polling long jobs.** devtwin does not watch a job and tell you when it ends.
 
-Automatic items are reviewed after they land: you read the weekly digest and reverse an item with `undo`. An agent that writes outside text again in its own words makes an agent write, which only that later review catches. The cap of 20 automatic writes counts each session on its own, and writes with no session in one bucket per caller and UTC day; the caller label comes from environment variables. Backups go only to folders inside your home folder, so a copy off the machine needs a folder that a sync service copies.
+Automatic items are reviewed after they land: you read the weekly digest and reverse an item with `undo`. An agent that writes outside text again in its own words makes an agent write, which only that later review catches. The cap of 20 automatic writes counts each session on its own, and writes with no session in one bucket per caller and UTC day. A caller that passes a new session for each write still stops at 100 automatic writes per UTC day. The caller label comes from environment variables. Backups go only to folders inside your home folder, so a copy off the machine needs a folder that a sync service copies.
 
 ## Development status
 

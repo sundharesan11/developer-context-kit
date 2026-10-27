@@ -71,7 +71,8 @@ const retractionDraft = (entry, heads) => ({ kind: "retraction", class: "lesson"
   body: "Undoes audit entry " + entry.id + ".\n", sources: heads.slice(0, 20).map((r) => ({ ref: "record:" + r.id })), applicability: { level: "project" } });
 // The earlier record's draft fields, as validateDraft takes them.
 const restoredDraft = (r) => ({ kind: r.kind, class: r.class, reach: r.reach, status: r.status, title: r.title, body: r.body, sources: r.sources, verification: r.verification ?? [],
-  applicability: r.applicability, review: r.review ? { reviewer: r.review.reviewer, note: r.review.note ?? "" } : null, revisitAfter: r.revisitAfter ?? null, match: r.match });
+  applicability: r.applicability, review: r.review ? { reviewer: r.review.reviewer, note: r.review.note ?? "" } : null, revisitAfter: r.revisitAfter ?? null, match: r.match,
+  ...(r.locations ? { locations: r.locations.map(({ name, kind, where }) => ({ name, kind, where })) } : {}) });
 
 // What undo of a record entry does now: the heads it retracts (none when a retraction from this undo already exists),
 // and the earlier records it restores (only those that exist and are not restored yet).

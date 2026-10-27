@@ -10,7 +10,7 @@ import { readSnapshot, addRecord } from "../src/records/store.mjs";
 import { planUndo, applyUndo } from "../src/audit/undo.mjs";
 import { buildIndex } from "../src/lessons/index.mjs";
 import { ownerAction } from "../src/hooks/owner-block.mjs";
-import { readAudit, appendEntry, auditDir, SESSION_CAP } from "../src/audit/log.mjs";
+import { readAudit, appendEntry, auditDir, SESSION_CAP, DAY_CAP } from "../src/audit/log.mjs";
 import { checkAutomaticText } from "../src/audit/checks.mjs";
 
 const SCOPE = "example", PROJECT = "example.atlas";
@@ -126,6 +126,18 @@ test("undo of a supersede entry retracts the successor and restores the earlier 
   assert.deepEqual(await m.matchIds(), [restored.id]);
 });
 
+test("undo of a supersede of an environment record restores its locations", async (t) => {
+  const m = await machine(t);
+  const places = ["file:DB URL:.env in the repo root", "service:Deploy logs:the staging log viewer"];
+  const added = await m.ok(["record", "add", "--scope", SCOPE, "--project", PROJECT, "--kind", "environment", "--title", "Where things live", "--body", "", ...places.flatMap((p) => ["--location", p]), "--request-id", "req_envundo1", "--session", "ses_one", "--apply"]);
+  const original = (await m.snapshot()).find((r) => r.id === added.recordId);
+  assert.equal(original.locations.length, 2);
+  await m.ok(["record", "supersede", "--scope", SCOPE, "--project", PROJECT, "--kind", "environment", "--title", "Where things live now", "--body", "", "--location", "file:DB URL:config/db.env", "--target", added.recordId, "--expect-hash", original.recordHash, "--request-id", "req_envundo2", "--session", "ses_one", "--apply"]);
+  const { result } = await m.applied(["undo", "--id", (await entries(m))[1].id, "--session", "ses_one"]);
+  const restored = (await m.snapshot()).find((r) => r.id === result.undone[0].restored[0]);
+  assert.deepEqual([restored.kind, restored.title, restored.locations], ["environment", original.title, original.locations]);
+});
+
 test("the owner's undo --since reverses three entries newest first after the owner dialog", async (t) => {
   const m = await machine(t);
   const since = new Date(m.tick(1000).getTime() - 1).toISOString();
@@ -229,6 +241,23 @@ test("writes with no --session share one cap per caller and UTC day", async (t) 
   await recordAdd(m, { requestId: "req_nosess020", session: null, title: "One more" });
 });
 
+test("fresh --session values do not lift the cap: 100 automatic writes per caller and UTC day, whichever limit comes first", async (t) => {
+  const { roots } = await initPilot(t);
+  const day = now().toISOString().slice(0, 10);
+  const write = (n, session, actor = "claude") => appendEntry(roots, { kind: "record", tier: "automatic", route: "record add", home: "project", scope: SCOPE, project: PROJECT, recordIds: [], actor, session, requestId: "req_daycap" + String(n).padStart(4, "0") }, { now });
+  assert.deepEqual([SESSION_CAP, DAY_CAP], [20, 100]);
+  for (let n = 0; n < SESSION_CAP; n++) await write(n, "ses_s0");
+  // The session limit comes first for one session.
+  await assert.rejects(write(9000, "ses_s0"), (e) => e.code === "DEVTWIN_GATE_REQUIRED" && e.details.bucket === "session:ses_s0" && e.details.max === SESSION_CAP);
+  for (let n = SESSION_CAP; n < DAY_CAP; n++) await write(n, "ses_s" + Math.floor(n / SESSION_CAP));
+  // The 101st write of the day refuses even from a session that has written nothing.
+  await assert.rejects(write(9001, "ses_fresh"), (e) => e.code === "DEVTWIN_GATE_REQUIRED" && e.details.bucket === "day:claude:" + day && e.details.max === DAY_CAP && e.details.session === "ses_fresh" && /weekly activity review/.test(e.message));
+  await assert.rejects(write(9002, null), (e) => e.details.bucket === "day:claude:" + day);
+  // Another caller has its own day bucket.
+  await write(9003, "ses_fresh", "codex");
+  assert.equal((await readAudit(roots)).entries.length, DAY_CAP + 1);
+});
+
 test("a confirmed or disputed record, or a write that replaces a confirmed record, needs the owner dialog whoever calls", async (t) => {
   const m = await machine(t);
   const args = (requestId, status, extra = []) => ["record", "add", "--scope", SCOPE, "--project", PROJECT, "--kind", "fact", "--title", "Use the staging queue", "--body", "The staging queue drains every hour.\n", "--status", status, "--request-id", requestId, ...extra, "--apply"];
@@ -267,6 +296,22 @@ test("a confirmed or disputed record, or a write that replaces a confirmed recor
   const entry = (await entries(m)).find((e) => e.id === replaced.audit);
   assert.deepEqual([entry.route, entry.target, entry.tier, entry.supersedes], ["record supersede", "replaces-confirmed", "always-ask", [confirmed.recordId]]);
   assert.ok(observed.audit);
+});
+
+test("replacing a disputed record needs the owner dialog whoever calls", async (t) => {
+  const m = await machine(t);
+  const disputed = await m.ok(["record", "add", "--scope", SCOPE, "--project", PROJECT, "--kind", "fact", "--title", "Use the staging queue", "--body", "x\n", "--status", "disputed", "--request-id", "req_dispute10", "--apply"]);
+  assert.equal(m.dialogs.length, 1);
+  const hash = (await m.snapshot()).find((r) => r.id === disputed.recordId).recordHash;
+  const replace = ["record", "supersede", "--scope", SCOPE, "--project", PROJECT, "--kind", "fact", "--title", "Use the main queue", "--body", "x\n", "--target", disputed.recordId, "--expect-hash", hash, "--request-id", "req_dispute11", "--session", "ses_one", "--apply"];
+  m.setDialog("denied");
+  await m.fail(replace, "DEVTWIN_OWNER_DENIED");
+  assert.match(m.dialogs[1].title, /Replace a disputed/);
+  assert.equal((await m.snapshot()).find((r) => r.id === disputed.recordId).effective, "disputed");
+  m.setDialog("approved");
+  const replaced = await m.ok(replace);
+  const entry = (await entries(m)).find((e) => e.id === replaced.audit);
+  assert.deepEqual([entry.target, entry.tier, entry.supersedes], ["replaces-disputed", "always-ask", [disputed.recordId]]);
 });
 
 test("record add and record supersede refuse a retraction; only undo writes one", async (t) => {

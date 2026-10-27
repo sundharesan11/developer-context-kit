@@ -6,8 +6,9 @@
 // Lines, in rank order: "ask before" lessons for the project (a lesson with a command match whose text says "ask" or
 // "confirm"), up to five constraint and location lines (confirmed first, then newest) and the last handoff's next step
 // with its time. Each line is checked again here with the KTD43 plain-rule checks, the sensitive scan and the
-// scope-name check; a line that fails is left out, never repaired. Each unconfirmed line starts with its source and
-// "unreviewed". The rendered block is at most SUMMARY_CHARS characters; over that, the lowest-ranked whole lines go.
+// scope-name check; a line that fails is left out, never repaired. Each unconfirmed line, and every hub lesson, starts
+// with its source and "unreviewed". The rendered block is at most SUMMARY_CHARS characters; over that, the
+// lowest-ranked whole lines go.
 // U33 (KTD32): the cache also lists handoffSessions, the session IDs (from the audit log) of the newest live handoff
 // records, so the hook can tell a stop stub that was answered by a handoff without reading records or taking a lock.
 import { join } from "node:path";
@@ -32,11 +33,12 @@ export const summaryPath = (roots, scope, project) => join(roots.stateRoot, "sum
 const chars = (text) => [...text].length;
 const capChars = (text, limit = LINE_CHARS) => chars(text) <= limit ? text : [...text].slice(0, limit - 1).join("").trimEnd() + "…";
 const minute = (iso) => typeof iso === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(iso) ? iso.slice(0, 10) + " " + iso.slice(11, 16) + " UTC" : "unknown time";
-// Who wrote an unconfirmed line: "agent", "you" (a human at the CLI) or a hub lesson's author handle.
+// Who wrote an unconfirmed line: "agent", "you" (a human at the CLI) or a hub lesson's author handle. A hub lesson is
+// always labeled, even when the hub marks it confirmed: that confirmation is the hub's, not this owner's review.
 function label({ status, actor, source, claimedBy }) {
+  if (source === "hub") return "unreviewed, from " + String(claimedBy ?? "hub") + ": ";
   if (status === "confirmed") return "";
-  const from = source === "hub" ? String(claimedBy ?? "hub") : actor === "human" ? "you" : "agent";
-  return "unreviewed, from " + from + ": ";
+  return "unreviewed, from " + (actor === "human" ? "you" : "agent") + ": ";
 }
 // The first body line without list or heading marks.
 const firstLine = (body) => String(body ?? "").split("\n").map((l) => l.replace(/^\s*(?:[#>*+-]+|\d+[.)])\s*/, "").replace(/\s+/g, " ").trim()).find(Boolean) ?? "";
