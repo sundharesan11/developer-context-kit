@@ -6,14 +6,20 @@
 //   read        it writes nothing that needs a tier: a read, a preview or a derived cache
 // A line is a tier, or a map from target to tier for a route whose tier depends on the target. A map key is the target,
 // with "@<source>" added for a source other than "local" (for example "@fetched" for an item devtwin fetched). A map
-// value can be { tier, consent } (the consent kind it needs) or { tier, via } (the route that does this action
-// instead; the route itself refuses it).
+// value can be { tier, consent } (the consent kind it needs), { tier, via } (the route that does this action
+// instead; the route itself refuses it) or { tier, dialog: true } (an always-ask action the route gates with the owner
+// dialog alone: the hook cannot tell it from the route's automatic targets by its words, so it is not in OWNER_ACTIONS).
 import { DevtwinError } from "../errors.mjs";
 
 export const TIERS = Object.freeze(["automatic", "consented", "always-ask"]);
 export const READ = "read";
 const A = "automatic", C = "consented", ASK = "always-ask", R = READ;
 const REVIEW = { tier: ASK, via: "activity review" };
+const DIALOG = { tier: ASK, dialog: true };
+// Review fix: a record's target is its status. observed and proposed knowledge is automatic; a confirmed or disputed
+// record, or a write that replaces a confirmed record ("replaces-confirmed"), needs the owner dialog whoever calls,
+// because the caller's actor comes from environment variables any process can unset.
+const RECORD_WRITE = { observed: A, proposed: A, confirmed: DIALOG, disputed: DIALOG };
 // setup apply has the tier of the step it applies; the owner steps run an always-ask action.
 const SETUP_STEPS = { "live-folder": R, "skills-claude": ASK, "skills-codex": ASK, "write-classes-hooks": ASK, "hooks-claude": ASK, "hooks-codex": ASK,
   "hook-verify": A, "paths-confirm": ASK, profile: A, "starter-preferences": A, "starter-templates": R, scope: A, "first-project": A, "hub-join": ASK, "job-hub-sync": ASK,
@@ -28,7 +34,7 @@ const TABLE = {
   "live init": ASK, "live add-repo": ASK, "live set-kit": ASK, "live write-classes": ASK, "live stack-watch": ASK, "live migrate": ASK,
   // U26 (KTD34): letting a terminal answer the owner prompt weakens it, so the switch is always ask.
   "live approval": ASK,
-  "record add": A, "record supersede": A, "record propose": A, "record publish": ASK,
+  "record add": RECORD_WRITE, "record supersede": { ...RECORD_WRITE, "replaces-confirmed": DIALOG }, "record propose": A, "record publish": ASK,
   "lesson match": R, "lesson show": R, "lesson index": R, "lesson propose": A, "lesson proposals": R, "lesson edit": A, "lesson reject": A,
   "lesson accept": { project: A, hub: { tier: C, consent: "hub-publish" }, "hub+general": REVIEW, general: REVIEW },
   "lesson copy": ASK, "lesson supersede-propose": A, "lesson notices": ASK,
@@ -47,10 +53,9 @@ const TABLE = {
   "template list": R, "template show": R, "template from": A,
   "note list": R, "note revoke": ASK, "note consent": ASK,
   "consent grant": ASK, "consent revoke": ASK, "consent list": R,
-  // U37 (KTD40): activity reads the audit log. undo --id of an entry from the calling session (--session matches the
-  // entry's) is automatic; undo --id of any other entry and undo --since need the owner. The hook denies undo --since
-  // --apply by its words (OWNER_ACTIONS); it cannot see sessions, so the "other" target is gated by the owner dialog.
-  activity: R, undo: { session: A, other: ASK, since: ASK },
+  // U37 (KTD40): activity reads the audit log. Review fix: every undo needs the owner, because a caller's --session
+  // cannot be proven. The hook denies undo --apply by its words (OWNER_ACTIONS) and the apply shows the owner dialog.
+  activity: R, undo: ASK,
   // U24 (KTD33): backups are automatic and not audited. restore is always ask: it writes decrypted files into a folder a
   // cloud drive may sync. Showing the key is always ask.
   "backup create": A, "backup restore": ASK, "backup status": R, "backup key export": ASK,
@@ -74,10 +79,11 @@ export function tierRule({ route, target = null, source = "local" } = {}) {
   return typeof target === "string" && Object.hasOwn(line.targets, key) ? line.targets[key] : unknown(route, target, source);
 }
 export const tierOf = (action) => tierRule(action).tier;
-// Routes with an always-ask action of their own (an action with via is done by another route).
-export const alwaysAskRoutes = () => Object.keys(TIER_TABLE).filter((route) => {
-  const line = TIER_TABLE[route];
-  return (line.targets ? Object.values(line.targets) : [line]).some((rule) => rule.tier === ASK && !rule.via);
-}).sort();
+const askRule = (line, test) => (line.targets ? Object.values(line.targets) : [line]).some((rule) => rule.tier === ASK && test(rule));
+// Routes with an always-ask action the hook denies by its words (an action with via is done by another route; an
+// action with dialog is gated by the owner dialog alone).
+export const alwaysAskRoutes = () => Object.keys(TIER_TABLE).filter((route) => askRule(TIER_TABLE[route], (rule) => !rule.via && !rule.dialog)).sort();
+// Routes with an always-ask target that only the owner dialog gates.
+export const dialogOnlyRoutes = () => Object.keys(TIER_TABLE).filter((route) => askRule(TIER_TABLE[route], (rule) => rule.dialog === true)).sort();
 // The targets of a route that have the given tier.
 export const targetsWithTier = (route, tier) => Object.entries(TIER_TABLE[route]?.targets ?? {}).filter(([, rule]) => rule.tier === tier).map(([key]) => key).sort();

@@ -64,9 +64,9 @@ The skill builder and skill-source installers add separate recorded approvals; s
 
 ### Owner actions
 
-Some commands need you at the keyboard: the **always ask** tier of the [tier table](/docs/security/security-model/#tiers). When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `consent grant`, `consent revoke`, `undo --since`, `backup restore`, `backup key export`, `paths confirm`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
+Some commands need you at the keyboard: the **always ask** tier of the [tier table](/docs/security/security-model/#tiers). When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `consent grant`, `consent revoke`, `undo`, `backup restore`, `backup key export`, `paths confirm`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
 
-`lesson accept` is not an owner action. Agents run it for the `project` target, and for the `hub` target while you hold a `hub-publish` consent. `undo --id` of an entry from the agent's own session is automatic too.
+`lesson accept` is not an owner action. Agents run it for the `project` target, and for the `hub` target while you hold a `hub-publish` consent. `record add` and `record supersede` of `confirmed` or `disputed` knowledge, or of a write that replaces a `confirmed` record, are not denied by the hook but show the owner dialog whoever runs them.
 
 ### Identifiers
 
@@ -355,10 +355,10 @@ Returns `records`, `packetHash`, `fileHash`, `bytes`, `output` and `"publication
 | `--source <ref>` | Repeatable, up to 20. `file:`, `commit:`, `record:`, `issue:`, `user:` or `url:`. |
 | `--location <kind>:<name>:<where>` | `environment` records only. Repeatable, up to 20. Says where something lives, never its value. See [Locations](#locations). |
 | `--request-id <id>` | Required with `--apply`. |
-| `--session <id>` | Optional. The session ID from the hook's session-start line. It lets that session undo its own writes, and counts toward the session cap. |
+| `--session <id>` | Optional. The session ID from the hook's session-start line. It is kept in the audit entry, which `activity` shows, and counts toward the session cap. |
 | `--apply` | Write. Without it, the command previews and returns the `recordId`. |
 
-`record add` and `record supersede` of `observed` or `proposed` knowledge are automatic writes: each one adds an entry to the audit log. An agent session makes at most 20 of them. See [`activity`](#activity) and [`undo`](#undo).
+`record add` and `record supersede` of `observed` or `proposed` knowledge are automatic writes. A `confirmed` or `disputed` record, or a write that replaces a `confirmed` record, shows the owner dialog first. Every write adds an entry to the audit log. An agent session makes at most 20 automatic writes; writes with no `--session` share one count per caller and UTC day. `--kind retraction` is refused: only `undo` writes one. See [`activity`](#activity) and [`undo`](#undo).
 
 ### `record add`
 
@@ -752,7 +752,7 @@ Accepts a proposal. It shows no owner dialog; the [tier](/docs/security/security
 | `--id <prop_id>` | Required. |
 | `--target <target>` | `hub` (default), `hub+general`, `project` or `general`. See [Review proposals](/docs/guides/lessons-and-hooks/#review-proposals). |
 | `--scope <id>`, `--project <id>` | The project for a `project` target when the proposal names none. |
-| `--session <id>` | Optional. The session ID from the hook, so that the session can undo the write. |
+| `--session <id>` | Optional. The session ID from the hook, kept in the audit entry. |
 | `--apply --plan-fingerprint <fp>` | Write. |
 
 A replacement accepts to `hub` only. `DEVTWIN_STALE_VERSION` means another replacement reached the hub first.
@@ -948,16 +948,16 @@ Reverses automatic writes from the audit log. A record gets a retraction, so the
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
-| `--id <entry>` | One entry. Automatic with `--session` when the calling session made the entry; any other entry shows the owner dialog. |
-| `--session <id>` | The calling session's ID. |
-| `--since <time>` | Every entry after this time, newest first. **Owner** with `--apply`. |
+| `--id <entry>` | One entry. |
+| `--session <id>` | The calling session's ID, shown in the plan only. |
+| `--since <time>` | Every entry after this time, newest first. |
 | `--apply --plan-fingerprint <fp>` | Write. |
 
 ```sh
 node "$KIT/bin/devtwin.mjs" undo --pilot "$LIVE_CONFIG" --id aud_0123456789abcdef01234567
 ```
 
-Each undo adds its own audit entry. An undo of an undo fails with `DEVTWIN_CONFLICT`.
+**Owner** with `--apply`: every undo shows the owner dialog. Each undo adds its own audit entry. An undo of an undo fails with `DEVTWIN_CONFLICT`. An undo that stopped between its retraction and its restores resumes on the next run. A lesson published to a hub fails with `DEVTWIN_GATE_REQUIRED` and points to `published delete`.
 
 ## Backups
 
@@ -965,7 +965,7 @@ See [Backup and restore](/docs/guides/live-mode/#backup-and-restore).
 
 ### `backup create`
 
-Writes one encrypted archive of the store into an approved `backupTargets` folder. Automatic: agents and the `backup-daily` job may run it. Each folder keeps the newest 14 archives. A held store lock stops it with `DEVTWIN_BUSY` before it writes.
+Writes one encrypted archive of the store into an approved `backupTargets` folder. Automatic: agents and the `backup-daily` job may run it. Each folder keeps the newest archive of each day, for the newest 14 days that have archives. A create removes only older archives of its own day and archives older than those days. A held store lock stops it with `DEVTWIN_BUSY` before it writes.
 
 | Flag | |
 | --- | --- |

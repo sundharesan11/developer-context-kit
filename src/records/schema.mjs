@@ -6,6 +6,8 @@ import { assertNoSensitive, assertNoValueLike, findForbiddenFields } from "./red
 export const KINDS = ["brief", "map", "command", "environment", "constraint", "fact", "decision", "experiment", "unknown", "handoff", "lesson", "preference", "retraction"];
 // U37 (KTD40): a retraction is the undo of a record. It supersedes the current head of that record's chain and is
 // never delivered: the brief, the lesson index, handoffs and the stack match all skip it.
+// Only undo writes one (the retraction option of the store writes, which no CLI argument reaches): a retraction from
+// any other caller would hide a record that undo cannot bring back.
 export const isDelivered = (record) => record.kind !== "retraction";
 export const STATUSES = ["proposed", "observed", "confirmed", "disputed"];
 export const CLASSES = ["fact", "lesson"];
@@ -88,8 +90,11 @@ function classAndReach(kind, cls, reach) {
 export function draftReach(draft) { return draft.reach ?? defaultReach(draft.kind); }
 // The project store holds project reach only. Personal and org records get their own homes.
 export function assertProjectReach(draft) { if (draftReach(draft) !== "project") throw new DevtwinError("INVALID_INPUT", "Project records need project reach"); }
-export function validateDraft(draft, { recordedBy, supersedes = [] } = {}) {
+// A confirmed record needs a reviewer. Who may write one is the route's tier (src/policy/tiers.mjs): the owner dialog,
+// never the caller's actor, which comes from environment variables.
+export function validateDraft(draft, { recordedBy, retraction = false } = {}) {
   if (!draft || !KINDS.includes(draft.kind) || !STATUSES.includes(draft.status)) invalid();
+  if (draft.kind === "retraction" && !retraction) throw new DevtwinError("INVALID_INPUT", "Only devtwin undo writes a retraction", { field: "kind" });
   if (Object.keys(draft).some((key) => !["kind", "status", "title", "body", "sources", "tags", "verification", "applicability", "review", "revisitAfter", "class", "reach", "match", "locations"].includes(key))) invalid();
   if (typeof draft.title !== "string" || draft.title.length < 1 || draft.title.length > 200 || /[\r\n]/.test(draft.title)) invalid();
   if (typeof draft.body !== "string" || Buffer.byteLength(draft.body) > 32768) invalid();
@@ -99,7 +104,7 @@ export function validateDraft(draft, { recordedBy, supersedes = [] } = {}) {
   if (draft.match !== undefined) match(draft.match);
   if (draft.locations !== undefined && (draft.kind !== "environment" || validateLocations(draft.locations).length === 0)) invalid();
   if (!recordedBy || !["human", "claude", "codex", "other"].includes(recordedBy.actor)) invalid();
-  if (draft.status === "confirmed" && (!draft.review?.reviewer || (recordedBy.actor !== "human" && supersedes.length === 0))) throw new DevtwinError("APPROVAL_REQUIRED", "Confirmation requires reviewer");
+  if (draft.status === "confirmed" && !draft.review?.reviewer) throw new DevtwinError("APPROVAL_REQUIRED", "Confirmation requires reviewer");
   if (draft.review?.reviewer) assertActorRef(draft.review.reviewer);
   assertNoSensitive([draft.title, draft.body, ...locationLines(draft.locations)].join("\n"));
   if (findForbiddenFields(draft).length) invalid();
@@ -109,9 +114,9 @@ export function validateDraft(draft, { recordedBy, supersedes = [] } = {}) {
 function recordFields({ requestId, requestHash, operationId = null, recordedBy, draft, supersedes = [] }, now) {
   return { kind: draft.kind, class: draft.class ?? defaultClass(draft.kind), reach: draftReach(draft), match: match(draft.match ?? {}), status: draft.status, title: draft.title, bodyHash: sha256(draft.body), bodyBytes: Buffer.byteLength(draft.body), sources: draft.sources ?? [], verification: draft.verification ?? [], recordedBy, applicability: { level: draft.applicability?.level ?? "project", branch: draft.applicability?.branch ?? null, commit: draft.applicability?.commit ?? null, worktree: draft.applicability?.worktree ?? null, task: draft.applicability?.task ?? null, environment: draft.applicability?.environment ?? null }, supersedes, review: draft.review ? { reviewer: draft.review.reviewer, receipt: "owner-cli-confirmation", note: draft.review.note ?? "" } : null, revisitAfter: draft.revisitAfter ?? null, requestId, requestHash, operationId, createdAt: now().toISOString(), ...(draft.locations !== undefined && { locations: validateLocations(draft.locations) }) };
 }
-export function buildRecord({ scope, project, requestId, requestHash, operationId = null, recordedBy, draft, supersedes = [] }, { now = () => new Date() } = {}) {
+export function buildRecord({ scope, project, requestId, requestHash, operationId = null, recordedBy, draft, supersedes = [] }, { now = () => new Date(), retraction = false } = {}) {
   assertScopeId(scope); assertProjectId(project, scope);
-  validateDraft(draft, { recordedBy, supersedes });
+  validateDraft(draft, { recordedBy, retraction });
   assertProjectReach(draft);
   return { schemaVersion: 2, id: recordIdFor({ scope, project, requestId }), scope, project, ...recordFields({ requestId, requestHash, operationId, recordedBy, draft, supersedes }, now) };
 }
@@ -120,8 +125,8 @@ export const HOME_KINDS = { personal: ["lesson", "preference", "retraction"], or
 export function assertHomeReach(reach, draft) {
   if (!HOME_KINDS[reach]?.includes(draft?.kind) || draftReach(draft) !== reach) throw new DevtwinError("INVALID_INPUT", "Record reach does not match its home");
 }
-export function buildHomeRecord({ reach, scope = null, requestId, requestHash, recordedBy, draft, supersedes = [] }, { now = () => new Date() } = {}) {
-  validateDraft(draft, { recordedBy, supersedes });
+export function buildHomeRecord({ reach, scope = null, requestId, requestHash, recordedBy, draft, supersedes = [] }, { now = () => new Date(), retraction = false } = {}) {
+  validateDraft(draft, { recordedBy, retraction });
   assertHomeReach(reach, draft);
   const id = reach === "org" ? orgRecordIdFor({ scope, requestId }) : personalRecordIdFor({ requestId });
   return { schemaVersion: 2, id, scope: reach === "org" ? scope : null, project: null, ...recordFields({ requestId, requestHash, recordedBy, draft, supersedes }, now) };

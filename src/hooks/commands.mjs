@@ -177,14 +177,21 @@ async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, 
   return out && { ...out, key };
 }
 // U27 (KTD35): the confirmed-paths part of the session-start line, after receiptProblem passed. While the confirmed
-// paths match, it renews the receipt and says so. Otherwise it warns when the receipt expires within three days.
+// paths match and the confirmation is less than CONFIRM_RENEW_DAYS old, it renews the receipt and says so. An older
+// confirmation renews nothing and asks for `devtwin paths confirm` again, which runs the full checks; its line leaves
+// out "Kit and config confirmed", so skills ask for the paths again. Otherwise it
+// warns when the receipt expires within three days.
 const WARN_MS = 3 * 24 * 3600 * 1000, DAY_MS = 24 * 3600 * 1000;
+export const CONFIRM_RENEW_DAYS = 90;
 async function pathsNote(stateRoot, { pilotPath, pilotBytes, kitRoot, now, log }) {
-  const { state } = await confirmationState(stateRoot, { pilotPath, pilotBytes, kitRoot });
-  const said = state === "confirmed" ? " Kit and config confirmed." : state === "mismatch" ? " Kit or config changed since `devtwin paths confirm`." : "";
-  if (state === "confirmed") {
+  const { state, confirmedAt } = await confirmationState(stateRoot, { pilotPath, pilotBytes, kitRoot });
+  const age = state === "confirmed" ? now.getTime() - Date.parse(confirmedAt) : NaN, fresh = age >= 0 && age < CONFIRM_RENEW_DAYS * DAY_MS;
+  const said = state === "confirmed" ? (fresh ? " Kit and config confirmed." : " The paths confirmation is over " + CONFIRM_RENEW_DAYS + " days old; run `devtwin paths confirm` again.")
+    : state === "mismatch" ? " Kit or config changed since `devtwin paths confirm`." : "";
+  if (state === "confirmed" && fresh) {
     try { await renewReceipt(stateRoot, now); return said; } catch { log("receipt-renew-failed"); }
-  } else if (state === "mismatch") log("paths-changed");
+  } else if (state === "confirmed") log("paths-confirm-old");
+  else if (state === "mismatch") log("paths-changed");
   const expiry = await receiptExpiry(stateRoot), left = expiry ? expiry.getTime() - now.getTime() : Infinity;
   if (left > WARN_MS) return said;
   return said + " The kit receipt expires in " + plural(Math.max(1, Math.ceil(left / DAY_MS)), "day") + "; run `devtwin hook verify`.";

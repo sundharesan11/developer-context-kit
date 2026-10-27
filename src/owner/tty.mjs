@@ -2,12 +2,19 @@
 // comes from the launchd session type (`launchctl managername` prints "Aqua" in a GUI login), never from SSH_*
 // variables. With no GUI session, the prompt and the answer use /dev/tty, so stdout keeps only the JSON result line.
 // The owner types a random six-letter code; anything else, end of input, a timeout or no terminal denies.
-// Seams: ctx.sessionType (a string, or a function that returns one) and ctx.tty ({ write, readLine, close? }, or a
-// function that opens one). Tests set both, so no test reads the real terminal or runs launchctl.
+// Review fix: the terminal answer is used only when the caller is not an agent (callerActor) and stdin is the SSH
+// login's own terminal: process.stdin is a TTY and its device equals the device SSH_TTY names. Otherwise it denies.
+// This stops an agent shell that merely sets SSH_TTY, but not a process of the same user that drives a terminal
+// (for example through a pseudo-terminal it opens), so this mode is a convenience for an owner over SSH, not a barrier
+// against agents. The dialog mode stays the barrier.
+// Seams: ctx.sessionType (a string, or a function that returns one), ctx.tty ({ write, readLine, close? }, or a
+// function that opens one) and ctx.sshTerminal (a boolean, or a function of env that returns one). Tests set them, so
+// no test reads the real terminal or runs launchctl.
 import { spawnSync } from "node:child_process";
-import { closeSync, openSync, writeSync } from "node:fs";
+import { closeSync, fstatSync, openSync, statSync, writeSync } from "node:fs";
 import { randomInt } from "node:crypto";
 import { ReadStream } from "node:tty";
+import { callerActor } from "../policy/actor.mjs";
 
 const LAUNCHCTL = "/bin/launchctl";
 // No I or O, which read like 1 and 0.
@@ -27,6 +34,19 @@ export function launchdSessionType({ spawn = spawnSync } = {}) {
 export function hasGuiSession(ctx) {
   const type = typeof ctx?.sessionType === "function" ? ctx.sessionType() : ctx?.sessionType !== undefined ? ctx.sessionType : launchdSessionType();
   return type === null || type === "Aqua";
+}
+// Whether stdin is the terminal of the SSH login: a TTY whose device is the one SSH_TTY names.
+export function onSshTerminal(env, { stdin = process.stdin, fstat = fstatSync, stat = statSync } = {}) {
+  const path = env?.SSH_TTY;
+  if (!stdin?.isTTY || typeof path !== "string" || !path.startsWith("/dev/")) return false;
+  try { const own = fstat(0), named = stat(path); return own.isCharacterDevice() && named.isCharacterDevice() && own.rdev === named.rdev; } catch { return false; }
+}
+// Why the terminal answer may not be used, or null when it may.
+export function ttyProblem(ctx) {
+  const env = ctx?.env ?? process.env;
+  if (callerActor(env) !== "human") return "agent-caller";
+  const ssh = typeof ctx?.sshTerminal === "function" ? ctx.sshTerminal(env) : ctx?.sshTerminal !== undefined ? ctx.sshTerminal : onSshTerminal(env);
+  return ssh === true ? null : "not-ssh-terminal";
 }
 // The production terminal: one write descriptor and one read stream on /dev/tty. Opening fails with no controlling terminal.
 export function openTty() {
@@ -53,6 +73,8 @@ export function openTty() {
 }
 // shown is the cleaned dialog text (dialogText), so no control character reaches the terminal.
 export async function ttyApproval(shown, ctx, { timeoutMs = TTY_TIMEOUT_SECONDS * 1000 } = {}) {
+  const problem = ttyProblem(ctx);
+  if (problem) return { decision: "denied", reason: problem };
   let io;
   try { io = typeof ctx?.tty === "function" ? ctx.tty() : ctx?.tty ?? openTty(); }
   catch { return { decision: "denied", reason: "no-tty" }; }

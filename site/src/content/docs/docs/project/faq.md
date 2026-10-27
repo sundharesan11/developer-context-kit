@@ -71,7 +71,7 @@ Only under a consent you gave. An agent can propose up to three lessons per sess
 
 ## Is my data backed up?
 
-Once you turn it on. In live mode, approve a backup folder and the `backup-daily` job writes an encrypted archive of the store there each day, and keeps the newest 14. The key stays in your macOS Keychain; export it once with `backup key export` so that you can restore on another machine. There is no sync. See [Backup and restore](/docs/guides/live-mode/#backup-and-restore).
+Once you turn it on. In live mode, approve a backup folder and the `backup-daily` job writes an encrypted archive of the store there each day, and keeps one archive for each of the newest 14 days. The key stays in your macOS Keychain; export it once with `backup key export` so that you can restore on another machine. There is no sync. See [Backup and restore](/docs/guides/live-mode/#backup-and-restore).
 
 ## Can I store credentials in it?
 

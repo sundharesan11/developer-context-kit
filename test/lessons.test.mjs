@@ -11,6 +11,7 @@ import { applyScopeAdd, readHubBinding } from "../src/config/store.mjs";
 import { planOnboard, applyOnboard } from "../src/onboarding/onboard.mjs";
 import { addPersonalRecord, readPersonalSnapshot } from "../src/records/personal.mjs";
 import { readSnapshot } from "../src/records/store.mjs";
+import { readAudit } from "../src/audit/log.mjs";
 import { listOutbox } from "../src/hubs/git-write.mjs";
 import { parseHubLesson } from "../src/hubs/read.mjs";
 import { ownerAction } from "../src/hooks/owner-block.mjs";
@@ -124,6 +125,30 @@ test("lesson propose then accept to the hub under the hub-publish consent reache
   assert.match(match.matches[0].line, /Do wrap billing calls/);
   // A second accept of the same proposal is refused.
   await a.fail(accept(id, "hub"), "DEVTWIN_CONFLICT");
+});
+
+test("a hub publish under the consent is audited, and undo points to published delete", async (t) => {
+  const hub = await hubFixture(t), a = await machine(t);
+  await a.join(hub);
+  const id = await propose(a);
+  const since = new Date(now().getTime() - 1000).toISOString();
+  const plan = await a.ok(accept(id, "hub", ["--session", "ses_one"]));
+  const result = await a.ok([...accept(id, "hub", ["--session", "ses_one"]), "--apply", "--plan-fingerprint", plan.fingerprint]);
+  assert.equal(result.hub.pushed, true);
+  const entries = (await readAudit(await a.roots())).entries.filter((e) => e.kind === "hub-lesson");
+  assert.equal(entries.length, 1);
+  const [entry] = entries;
+  assert.deepEqual([entry.route, entry.target, entry.tier, entry.scope, entry.itemIds, entry.recordIds, entry.session], ["lesson accept", "hub", "consented", SCOPE, [plan.hub.lessonId], [], "ses_one"]);
+  assert.equal(result.audit, entry.id);
+  const learned = (await a.ok(["activity"])).learned.find((x) => x.id === entry.id);
+  assert.deepEqual([learned.kind, learned.landed], ["hub-lesson", true]);
+  // undo cannot take a lesson back out of the hub's Git history; the owner removes it with published delete.
+  const error = await a.fail(["undo", "--id", entry.id], "DEVTWIN_GATE_REQUIRED");
+  assert.deepEqual([error.details.reason, error.details.via], ["published-delete", "published delete"]);
+  assert.match(error.message, /published delete/);
+  const sincePlan = await a.ok(["undo", "--since", since]);
+  assert.deepEqual(sincePlan.skipped, [{ id: entry.id, reason: "published-delete" }]);
+  assert.deepEqual(sincePlan.entries, []);
 });
 
 test("lesson accept to the hub without a valid consent publishes nothing and keeps the proposal pending", async (t) => {

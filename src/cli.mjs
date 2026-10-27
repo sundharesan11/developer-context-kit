@@ -152,8 +152,8 @@ export async function main(argv, options = {}) {
   // notifier is the seam for desktop notifications (src/schedule/notify.mjs).
   // keychain is the seam for the backup key (src/backup/keychain.mjs).
   // ownerDialog and launchctl are seams for the owner dialog (src/owner/dialog.mjs) and launchd (src/schedule/launchd.mjs).
-  // sessionType and tty are seams for the owner's terminal answer (src/owner/tty.mjs).
-  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot, ownerDialog, launchctl, notifier, keychain, sessionType, tty } = options;
+  // sessionType, tty and sshTerminal are seams for the owner's terminal answer (src/owner/tty.mjs).
+  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot, ownerDialog, launchctl, notifier, keychain, sessionType, tty, sshTerminal } = options;
   let command = argv.slice(0, 2).join(" ");
   try {
     const routed = routeFor(argv);
@@ -196,7 +196,7 @@ export async function main(argv, options = {}) {
         if (values[flag] && values[flag] !== roots[key]) throw new DevtwinError("GATE_REQUIRED", "Root does not match pilot");
       }
     }
-    const context = { roots, pilot, now, home, env, kitRoot, templateRoot, ownerDialog, launchctl, sessionType, tty };
+    const context = { roots, pilot, now, home, env, kitRoot, templateRoot, ownerDialog, launchctl, sessionType, tty, sshTerminal };
     if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
     // --body-file - reads the lesson body from stdin.
     if (command === "lesson propose" || command === "lesson edit" || command === "lesson supersede-propose") context.stdin = stdin;

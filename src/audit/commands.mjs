@@ -1,6 +1,5 @@
-// U37: activity (read-only) and undo. undo previews, then applies with --apply and the plan fingerprint. undo --since
-// --apply is an owner action the hook denies from agent shells; undo --id of another session's entry shows the owner
-// dialog.
+// U37: activity (read-only) and undo. undo previews, then applies with --apply and the plan fingerprint. undo --apply
+// is an owner action: the hook denies it from agent shells and the apply shows the owner dialog.
 import { DevtwinError } from "../errors.mjs";
 
 export const activityCommand = { options: { since: { type: "string" }, held: { type: "boolean" } }, async run(values, ctx) {

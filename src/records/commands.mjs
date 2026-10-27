@@ -10,10 +10,11 @@ import { addRecord, supersedeRecord, previewRecord, proposeRecord, publishPropos
 import { validateDraft, assertProjectReach, locationLines } from "./schema.mjs";
 import { isolationTerms, assertOutboundClean } from "./isolation.mjs";
 const list = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
-// U37 (KTD38, KTD40, KTD42, KTD43): record add and record supersede are automatic. recordedBy names the caller. A write of
-// observed or proposed knowledge passes the plain-rule and scope-name checks, then appends an audit entry with the
-// caller's --session before the record is written. confirmed still needs a human reviewer (validateDraft), and an
-// agent may not supersede a confirmed record: that changes only through the owner.
+// U37 (KTD38, KTD40, KTD42, KTD43): record add and record supersede. recordedBy names the caller. Every write passes the
+// plain-rule and scope-name checks, then appends an audit entry with the caller's --session before the record is
+// written. The tier comes from the record's status (src/policy/tiers.mjs): observed and proposed knowledge is
+// automatic; a confirmed or disputed record, or a write that replaces a confirmed record, shows the owner dialog
+// first, whoever the caller is, and its audit entry has tier always-ask. A retraction is refused (validateDraft).
 const options = { session: { type: "string" }, scope: { type: "string" }, project: { type: "string" }, kind: { type: "string" }, title: { type: "string" }, body: { type: "string" }, "body-file": { type: "string" }, status: { type: "string" }, source: { type: "string", multiple: true }, reviewer: { type: "string" }, "request-id": { type: "string" }, apply: { type: "boolean" }, target: { type: "string", multiple: true }, "expect-hash": { type: "string", multiple: true }, proposal: { type: "string" }, location: { type: "string", multiple: true } };
 // U29 (KTD36): --location <kind>:<name>:<where>, repeatable, on an environment record. The name holds no colon; the
 // place is everything after the second one. The error never echoes the text, which may be a value.
@@ -35,37 +36,44 @@ async function inputFrom(values, ctx) {
   }
   return { scope: values.scope, project: values.project, requestId: values["request-id"], recordedBy: cliRecorder(ctx.env ?? process.env), draft: { kind: values.kind, status: values.status ?? "observed", title: values.title, body, sources: list(values.source).map((ref) => ({ ref })), applicability: { level: "project" }, review: values.reviewer ? { reviewer: values.reviewer } : null, ...(values.location !== undefined && { locations: list(values.location).map(parseLocation) }) } };
 }
-const AUDITED = ["observed", "proposed"];
-// The checks that run before the audit entry, so a write refused here leaves no entry behind.
-async function automaticWrite(ctx, route, input, session, { targets = [], expectHashes = [] } = {}) {
+// The record's tier target: its status, or replaces-confirmed for a write that replaces a confirmed record.
+const recordTarget = (draft, replacesConfirmed) => replacesConfirmed ? "replaces-confirmed" : draft.status;
+const ownerDialog = (route, input, target, targets) => ({ title: target === "replaces-confirmed" ? "Replace a confirmed devtwin record" : "Record " + (input.draft.status === "confirmed" ? "a confirmed" : "a disputed") + " devtwin fact",
+  body: ["Route: " + route, "Project: " + input.project, "Kind: " + input.draft.kind + ", status " + input.draft.status, ...(input.draft.review?.reviewer ? ["Reviewer: " + input.draft.review.reviewer] : []),
+    ...(targets.length ? ["Replaces: " + targets.join(", ")] : []), "", "Title: " + input.draft.title].join("\n") });
+// The checks that run before the audit entry, so a write refused here leaves no entry behind. An always-ask write
+// shows the owner dialog after the checks and before the entry.
+async function auditedWrite(ctx, route, input, session, { targets = [], expectHashes = [] } = {}) {
   const { SESSION_ID } = await import("../lessons/propose.mjs");
   if (session !== undefined && !SESSION_ID.test(session)) throw new DevtwinError("INVALID_INPUT", "Invalid session ID", { field: "session" });
   if (!REQUEST_ID.test(input.requestId)) throw new DevtwinError("INVALID_ID", "Invalid request ID");
   const recordId = recordIdFor(input);
-  validateDraft(input.draft, { recordedBy: input.recordedBy, supersedes: targets });
+  validateDraft(input.draft, { recordedBy: input.recordedBy });
   assertProjectReach(input.draft);
   await requireCommittedProject(ctx.roots, input.scope, input.project);
+  let replacesConfirmed = false;
   if (targets.length) {
     const records = (await readSnapshot(ctx.roots, input.scope, input.project)).records;
     targets.forEach((id, i) => {
       const target = records.find((r) => r.id === id);
       if (!target || target.effective === "superseded" || target.recordHash !== expectHashes[i]) throw new DevtwinError("STALE_VERSION", "Target changed");
-      if (target.status === "confirmed" && input.recordedBy.actor !== "human") throw new DevtwinError("APPROVAL_REQUIRED", "A confirmed record changes only through the owner", { id });
+      replacesConfirmed ||= target.status === "confirmed";
     });
   }
-  if (!AUDITED.includes(input.draft.status)) return null;
+  const target = recordTarget(input.draft, replacesConfirmed), tier = tierOf({ route, target });
   const { checkAutomaticText } = await import("../audit/checks.mjs");
   checkAutomaticText({ lines: [input.draft.title, ...locationLines(input.draft.locations)], body: input.draft.body });
   assertOutboundClean([input.draft.title, input.draft.body, ...locationLines(input.draft.locations)].join("\n"), await isolationTerms(ctx.roots), { except: input.scope });
+  if (tier === "always-ask") await (await import("../owner/dialog.mjs")).requireOwnerApproval(ctx, ownerDialog(route, input, target, targets));
   const { appendEntry } = await import("../audit/log.mjs");
-  return appendEntry(ctx.roots, { kind: "record", tier: tierOf({ route }), route, home: "project", scope: input.scope, project: input.project, recordIds: [recordId], supersedes: targets, actor: input.recordedBy.actor, session: session ?? null, requestId: input.requestId }, { now: ctx.now });
+  return appendEntry(ctx.roots, { kind: "record", tier, route, target, home: "project", scope: input.scope, project: input.project, recordIds: [recordId], supersedes: targets, actor: input.recordedBy.actor, session: session ?? null, requestId: input.requestId }, { now: ctx.now });
 }
-const withAudit = (result, entry) => entry ? { ...result, audit: entry.id } : result;
+const withAudit = (result, entry) => ({ ...result, audit: entry.id });
 export const recordAddCommand = { options, async run(values, ctx) {
   const input = await inputFrom(values, ctx);
   if (!values.apply) return previewRecord(ctx.roots, input);
   if (!input.requestId) throw new DevtwinError("PLAN_REQUIRED", "Request ID required");
-  const entry = await automaticWrite(ctx, "record add", input, values.session);
+  const entry = await auditedWrite(ctx, "record add", input, values.session);
   return withAudit(await addRecord(ctx.roots, input, { now: ctx.now }), entry);
 } };
 export const recordSupersedeCommand = { options, async run(values, ctx) {
@@ -74,7 +82,7 @@ export const recordSupersedeCommand = { options, async run(values, ctx) {
   if (!input.requestId) throw new DevtwinError("PLAN_REQUIRED", "Request ID required");
   if (input.targets.length === 0 || input.targets.length !== input.expectHashes.length) throw new DevtwinError("INVALID_INPUT", "Targets and hashes required");
   const { scope, project, requestId, recordedBy, draft } = input;
-  const entry = await automaticWrite(ctx, "record supersede", { scope, project, requestId, recordedBy, draft }, values.session, input);
+  const entry = await auditedWrite(ctx, "record supersede", { scope, project, requestId, recordedBy, draft }, values.session, input);
   return withAudit(await supersedeRecord(ctx.roots, input, { now: ctx.now }), entry);
 } };
 export const recordProposeCommand = { options, async run(values, ctx) { const input = await inputFrom(values, ctx); if (!values.apply) return previewRecord(ctx.roots, input); if (!input.requestId) throw new DevtwinError("PLAN_REQUIRED", "Request ID required"); return proposeRecord(ctx.roots, input, { now: ctx.now }); } };

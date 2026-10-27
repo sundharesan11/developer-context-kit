@@ -479,7 +479,7 @@ Without the store, installed `devtwin-*` entries have no matching journal and be
 
 devtwin can keep encrypted backups of the store in a folder that you approve. There is no sync. The archive format and the files it leaves out are in [Storage](STORAGE.md#backups).
 
-- `backup create` writes one archive into an approved `backupTargets` folder. Agents and the `backup-daily` job may run it. Each folder keeps the newest 14 archives.
+- `backup create` writes one archive into an approved `backupTargets` folder. Agents and the `backup-daily` job may run it. Each folder keeps the newest archive of each day, for the newest 14 days that have archives. A create removes only older archives of its own day and archives older than those days.
 - The key is 32 random bytes in your macOS Keychain, made on the first `backup create`. Without the key, an archive cannot be read.
 - `backup restore` writes only to a new folder inside an approved `backupTargets` folder. It never writes the live store.
 - `backup key export` prints the key once. Only you can run it, after the owner dialog. Until it has run once, the activity digest warns that backups cannot be restored on another machine.

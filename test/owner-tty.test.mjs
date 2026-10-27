@@ -5,11 +5,12 @@ import { mkdir, chmod, readFile } from "node:fs/promises";
 import { sandbox, makeRepo, fixtureGit, now } from "./helpers.mjs";
 import { main } from "../src/cli.mjs";
 import { requireOwnerApproval } from "../src/owner/dialog.mjs";
-import { CODE_ALPHABET, approvalCode, hasGuiSession, launchdSessionType } from "../src/owner/tty.mjs";
+import { CODE_ALPHABET, approvalCode, hasGuiSession, launchdSessionType, onSshTerminal, ttyProblem } from "../src/owner/tty.mjs";
 import { ownerAction } from "../src/hooks/owner-block.mjs";
 
 const CONTENT = { title: "Example action", body: "Writes one example file." };
-const TTY_MODE = { pilot: { approval: "dialog-or-tty" } };
+// The owner at the SSH login's own terminal: a human caller, and the sshTerminal seam in place of the device check.
+const TTY_MODE = { pilot: { approval: "dialog-or-tty" }, env: {}, sshTerminal: true };
 // A fake terminal. answer(code) gives the line the owner types; null is end of input.
 function fakeTty(answer = (code) => code) {
   const written = [];
@@ -68,6 +69,28 @@ test("owner tty denies a wrong code, no answer, no terminal and the default mode
   }
 });
 
+test("owner tty refuses an agent caller and a stdin that is not the SSH login's terminal", async () => {
+  const base = { ...TTY_MODE, sessionType: "Background" };
+  for (const [ctx, reason] of [[{ env: { CLAUDECODE: "1" } }, "agent-caller"], [{ env: { CODEX_SANDBOX: "seatbelt" } }, "agent-caller"], [{ sshTerminal: false }, "not-ssh-terminal"], [{ sshTerminal: () => false }, "not-ssh-terminal"]]) {
+    const tty = fakeTty();
+    await assert.rejects(requireOwnerApproval({ ...base, ...ctx, tty }, CONTENT), denied(reason), reason);
+    assert.equal(tty.written.length, 0, "the terminal is never asked");
+  }
+  assert.equal(ttyProblem({ env: {}, sshTerminal: (env) => env.SSH_TTY === "/dev/ttys001" }), "not-ssh-terminal");
+  assert.equal(ttyProblem({ env: { SSH_TTY: "/dev/ttys001" }, sshTerminal: (env) => env.SSH_TTY === "/dev/ttys001" }), null);
+  // The device check: stdin must be a TTY whose device is the one SSH_TTY names.
+  const dev = (rdev, character = true) => ({ rdev, isCharacterDevice: () => character });
+  const seams = (own, named, isTTY = true) => ({ stdin: { isTTY }, fstat: () => own, stat: () => named });
+  const env = { SSH_TTY: "/dev/ttys001" };
+  assert.equal(onSshTerminal(env, seams(dev(16), dev(16))), true);
+  assert.equal(onSshTerminal(env, seams(dev(16), dev(17))), false, "another terminal");
+  assert.equal(onSshTerminal(env, seams(dev(16), dev(16), false)), false, "stdin is not a TTY");
+  assert.equal(onSshTerminal(env, seams(dev(16), dev(16, false))), false, "SSH_TTY is not a device");
+  assert.equal(onSshTerminal({}, seams(dev(16), dev(16))), false, "no SSH_TTY");
+  assert.equal(onSshTerminal({ SSH_TTY: "ttys001" }, seams(dev(16), dev(16))), false);
+  assert.equal(onSshTerminal(env, { stdin: { isTTY: true }, fstat: () => { throw new Error("EBADF"); }, stat: () => dev(16) }), false);
+});
+
 // A live config in a fixture home, made through the CLI as the owner makes it.
 async function liveHome(t) {
   const sb = await sandbox(t), home = join(sb, "home"), devtwin = join(home, ".devtwin");
@@ -109,7 +132,7 @@ test("owner tty mode is set by live approval after the owner dialog and keeps st
   const back = ["live", "approval", "--pilot", h.liveConfig, "--mode", "dialog"];
   const plan = await h.ok(back);
   const tty = fakeTty();
-  const applied = await h.run([...back, "--apply", "--plan-fingerprint", plan.fingerprint], { sessionType: "Background", tty, ownerDialog: () => { throw new Error("the dialog must not show"); } });
+  const applied = await h.run([...back, "--apply", "--plan-fingerprint", plan.fingerprint], { sessionType: "Background", tty, sshTerminal: true, ownerDialog: () => { throw new Error("the dialog must not show"); } });
   assert.equal(applied.json.ok, true, JSON.stringify(applied.json.error));
   assert.equal(applied.out.split("\n").filter(Boolean).length, 1);
   assert.doesNotMatch(applied.out, /type this code|Anything else denies/);
