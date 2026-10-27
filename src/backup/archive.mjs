@@ -6,8 +6,11 @@
 //   manifest  { schemaVersion: 1, createdAt, files: [{ root, path, mode, size, sha256 }], skipped: [{ root, path, type }] }
 // root is config, data or state; path is relative to that root, with "/" between segments. The key is 32 random bytes in
 // the Keychain (src/backup/keychain.mjs), made on the first create. Create reads the store while it holds, in a fixed
-// order, the registry lock, each scope lock and the shared knowledge locks; a held lock stops it with BUSY before it
-// writes. Restore decrypts in memory, checks the tag, every path, size and hash, and only then writes, into a new
+// order, the registry lock, each scope lock, the shared knowledge locks and the backup-key lock; a held lock stops it
+// with BUSY before it writes. The key is read or made under those locks, so two first creates cannot make two keys,
+// and read again from the Keychain just before sealing. Retention keeps the newest archive of each UTC day for the
+// newest KEEP days that have archives; a create removes only older archives of its own day and archives older than
+// those days. Restore decrypts in memory, checks the tag, every path, size and hash, and only then writes, into a new
 // 0700 folder inside an approved backupTargets folder. It never writes the live store.
 import { constants, closeSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, renameSync, unlinkSync, writeSync } from "node:fs";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
@@ -30,8 +33,9 @@ export const ROOTS = Object.freeze([["config", "configRoot"], ["data", "dataRoot
 const EXCLUDED_DIRS = ["locks", "lessons", "summaries", "hooks/sessions"];
 const EXCLUDED_FILE = /^hooks\/budget\.jsonl(?:\.\d+)?$/;
 export const EXCLUDED = Object.freeze(["state/locks", "state/lessons", "state/summaries", "state/hooks/sessions", "state/hooks/budget.jsonl*", "hub clones"]);
-// The shared locks a knowledge write takes, after the registry lock and the scope locks.
-const SHARED_LOCKS = ["pref_proposals", "lesson_proposals", "hub-sync", "audit", "consents", "personal_records"];
+// The shared locks a knowledge write takes, after the registry lock and the scope locks, then the lock under which a
+// create reads or makes the backup key (taken last: nothing else takes it).
+const SHARED_LOCKS = ["pref_proposals", "lesson_proposals", "hub-sync", "audit", "consents", "personal_records", "backup-key"];
 export const exportReceiptPath = (roots) => join(roots.stateRoot, "backup", "key-export.json");
 const invalid = (message, details = {}) => { throw new DevtwinError("INTEGRITY", message, details); };
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -177,6 +181,14 @@ export function listArchives(folder) {
 }
 export const archiveTime = (name) => { const m = ARCHIVE_NAME.exec(name)?.[1]; return m ? m.slice(0, 4) + "-" + m.slice(4, 6) + "-" + m.slice(6, 11) + ":" + m.slice(11, 13) + ":" + m.slice(13) : null; };
 
+// The archives retention removes after a create wrote `made`: every archive of a UTC day outside the newest KEEP days
+// that have archives, and the archives of made's own day that sort before it. made itself always stays. An earlier day
+// inside those days is left as it is.
+export function expiredArchives(names, made) {
+  const day = (name) => ARCHIVE_NAME.exec(name)[1].slice(0, 8);
+  const days = [...new Set(names.map(day))].sort().reverse().slice(0, KEEP), today = day(made);
+  return names.filter((name) => name !== made && (!days.includes(day(name)) || (day(name) === today && name < made)));
+}
 export function planBackupCreate(roots, { to } = {}) {
   const target = backupFolder(roots, to);
   assertWritable(roots, [target], { writeClass: "backupTargets" });
@@ -186,10 +198,12 @@ export function planBackupCreate(roots, { to } = {}) {
 export async function writeBackup(roots, { to, now = () => new Date(), keychain }) {
   const target = backupFolder(roots, to);
   assertWritable(roots, [target], { writeClass: "backupTargets" });
-  const { files, skipped } = await withPilotLocks(roots, await backupLocks(roots), { kind: "backup-create" }, async () => collect(roots));
-  const { key, created } = await backupKey(keychain);
+  const { files, skipped, key, created } = await withPilotLocks(roots, await backupLocks(roots), { kind: "backup-create" }, async () => ({ ...collect(roots), ...await backupKey(keychain) }));
   const at = now().toISOString();
   const manifest = { schemaVersion: 1, createdAt: at, files: files.map(({ bytes, ...entry }) => entry), skipped };
+  // The key in the Keychain must still be the one this create holds, or the archive could not be opened later.
+  const current = await keychain.read();
+  if (!Buffer.isBuffer(current) || !current.equals(key)) throw new DevtwinError("CONFLICT", "The Keychain backup key changed during the backup; run backup create again", { field: "keychain" });
   const archive = seal(key, manifest, files.map((file) => file.bytes));
   const name = "devtwin-backup-" + at.replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z") + "-" + randomBytes(4).toString("hex") + ".dtb", path = join(target, name);
   assertWritable(roots, [target, path], { writeClass: "backupTargets" });
@@ -198,7 +212,7 @@ export async function writeBackup(roots, { to, now = () => new Date(), keychain 
   if (!folder.isDirectory() || folder.isSymbolicLink() || folder.uid !== process.getuid()) throw new DevtwinError("PATH_UNSAFE", "Backup folder is not a folder you own", { field: "to" });
   await atomicReplace(path, archive);
   const removed = [];
-  for (const old of listArchives(target).slice(0, -KEEP)) {
+  for (const old of expiredArchives(listArchives(target), name)) {
     assertWritable(roots, [join(target, old)], { writeClass: "backupTargets" });
     unlinkSync(join(target, old));
     removed.push(old);

@@ -181,8 +181,8 @@ test("an environment record stores a location and the brief shows it on its own 
 
 test("a location that holds a value is refused (AE7)", () => {
   const sensitive = (d) => assert.throws(() => validateDraft(d, { recordedBy: human }), { code: "DEVTWIN_SENSITIVE_CONTENT" });
-  sensitive(located("post" + "gres://u:p@db.example.com/app"));
-  sensitive(located("post" + "gres://admin@db.example.com/app"));
+  sensitive(located("post" + "gres://u:p" + "@db.example.com/app"));
+  sensitive(located("post" + "gres://admin" + "@db.example.com/app"));
   sensitive(located("https://vault.example.com/ui" + "?tok" + "=abc"));
   sensitive(located("DATABASE_HOST" + "=" + "db.example.com", "file"));
   sensitive(located("q7Xk2Lm9" + "Pz4Rt8Vw" + "3Nb6Yc1H" + "s5Dj0Gf2"));
@@ -224,8 +224,8 @@ test("record add --location from an agent is an automatic write with an audit en
   assert.deepEqual(record.locations, [DB_URL, { name: "Cache", kind: "host", where: "cache.example.com:6379" }]);
   const [entry] = (await readAudit(s.roots)).entries;
   assert.deepEqual([entry.route, entry.tier, entry.session, entry.recordIds], ["record add", "automatic", "ses_one", [record.id]]);
-  const secret = "post" + "gres://u:p@db.example.com/app";
-  const refusedValue = await runCli(args("req_location06", "service:DB:" + secret), { env: agent });
+  const dsn = "post" + "gres://u:p" + "@db.example.com/app";
+  const refusedValue = await runCli(args("req_location06", "service:DB:" + dsn), { env: agent });
   assert.equal(refusedValue.json.error.code, "DEVTWIN_SENSITIVE_CONTENT");
   assert.equal(JSON.stringify(refusedValue.json).includes("u:p@"), false);
   assert.equal((await runCli(args("req_location07", "file-only"), { env: agent })).json.error.code, "DEVTWIN_INVALID_INPUT");

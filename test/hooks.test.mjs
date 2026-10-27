@@ -382,8 +382,8 @@ async function confirmedStore(t, { receiptAt = new Date(now().getTime() - 10 * 8
   await writeFile(join(kit, ".git/refs/heads/main"), "a".repeat(40) + "\n");
   const kitRoot = await realpath(kit);
   await writeKitReceipt(s.roots, { pilotPath: s.path, kitRoot, now: receiptAt });
-  const confirm = async () => {
-    const run = async (args) => { const chunks = []; await main([...args, "--pilot", s.path], { stdout: { write(v) { chunks.push(v); return true; } }, now, env: {}, kitRoot, ownerDialog: () => "approved" }); return JSON.parse(chunks.join("")); };
+  const confirm = async (at = now()) => {
+    const run = async (args) => { const chunks = []; await main([...args, "--pilot", s.path], { stdout: { write(v) { chunks.push(v); return true; } }, now: () => at, env: {}, kitRoot, ownerDialog: () => "approved" }); return JSON.parse(chunks.join("")); };
     const preview = await run(["paths", "confirm"]);
     assert.equal(preview.ok, true, JSON.stringify(preview.error));
     assert.equal((await run(["paths", "confirm", "--apply", "--plan-fingerprint", preview.result.fingerprint])).ok, true);
@@ -414,6 +414,23 @@ test("hook session start says kit and config confirmed and renews the receipt", 
   const later = new Date(now().getTime() + 29 * 86400000);
   assert.match(await s.start(later), /Kit and config confirmed\.$/);
   assert.equal(await s.verifiedAt(), later.toISOString());
+});
+
+test("hook stops renewing the receipt 90 days after paths confirm and asks for it again", async (t) => {
+  const s = await confirmedStore(t);
+  await s.confirm();
+  const day = (n) => new Date(now().getTime() + n * 86400000);
+  // Renewals every 29 days keep the receipt current while the confirmation is under 90 days old.
+  for (const n of [0, 29, 58, 87]) { assert.match(await s.start(day(n)), /Kit and config confirmed\.$/, "day " + n); assert.equal(await s.verifiedAt(), day(n).toISOString()); }
+  const old = await s.start(day(91));
+  assert.match(old, /The paths confirmation is over 90 days old; run `devtwin paths confirm` again\./);
+  assert.doesNotMatch(old, /Kit and config confirmed/, "skills ask for the paths again");
+  assert.equal(await s.verifiedAt(), day(87).toISOString(), "no renewal after 90 days");
+  assert.ok((await hookLog(s)).some((entry) => entry.code === "paths-confirm-old"));
+  // A new confirmation (the full checks) renews again.
+  await s.confirm(day(92));
+  assert.match(await s.start(day(92)), /Kit and config confirmed\.$/);
+  assert.equal(await s.verifiedAt(), day(92).toISOString());
 });
 
 test("hook drops the confirmation and does not renew after a config edit or a new kit HEAD", async (t) => {

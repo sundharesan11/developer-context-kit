@@ -55,7 +55,7 @@ function assertPublicInput(input) {
   if (!input || Object.keys(input).some((key) => !INPUT_KEYS.includes(key))) throw new DevtwinError("INVALID_INPUT", "Unexpected record field");
 }
 function assertBundleOptions(options) {
-  if (Object.keys(options).some((key) => !["now", "faults"].includes(key))) throw new DevtwinError("INVALID_INPUT", "Unexpected bundle option");
+  if (Object.keys(options).some((key) => !["now", "faults", "retraction"].includes(key))) throw new DevtwinError("INVALID_INPUT", "Unexpected bundle option");
 }
 export async function commitBundle(roots, input, options = {}) {
   assertPublicInput(input); assertBundleOptions(options);
@@ -69,7 +69,8 @@ export async function commitOnboardingBundle(roots, input, options = {}) {
   assertBundleOptions(rest);
   return commitBundleInternal(roots, input, { ...rest, supersedes });
 }
-async function commitBundleInternal(roots, input, { now = () => new Date(), faults = {}, supersedes = [] } = {}) {
+// retraction: true lets the draft be a retraction; only undo passes it (src/audit/undo.mjs).
+async function commitBundleInternal(roots, input, { now = () => new Date(), faults = {}, supersedes = [], retraction = false } = {}) {
   const { scope, project, requestId, recordedBy, draft, operationId = null } = input;
   if (!REQUEST_ID.test(requestId)) throw new DevtwinError("INVALID_ID", "Invalid request ID");
   const id = recordIdFor({ scope, project, requestId });
@@ -83,7 +84,7 @@ async function commitBundleInternal(roots, input, { now = () => new Date(), faul
     return { recordId: id, recordHash: recordHash(record), created: false };
   }
   if (existsSync(stage)) throw new DevtwinError("RECOVERY_REQUIRED", "Orphan staging retained", { staging: [id] });
-  const record = buildRecord({ scope, project, requestId, requestHash, operationId, recordedBy, draft, supersedes }, { now });
+  const record = buildRecord({ scope, project, requestId, requestHash, operationId, recordedBy, draft, supersedes }, { now, retraction });
   assertWritable(roots, [stage, dest]);
   ensurePrivatePath(roots.dataRoot, ["scopes", scope, "projects", project, "staging"]);
   ensurePrivatePath(roots.dataRoot, ["scopes", scope, "projects", project, "records"]);

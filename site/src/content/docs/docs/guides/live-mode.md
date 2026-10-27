@@ -158,7 +158,7 @@ The session should list `devtwin-capture`, `devtwin-onboard`, `devtwin-record` a
 
 devtwin can keep encrypted backups of the store in a folder that you approve. There is no sync.
 
-- `backup create` writes one archive into an approved `backupTargets` folder. Agents and the `backup-daily` job may run it. Each folder keeps the newest 14 archives.
+- `backup create` writes one archive into an approved `backupTargets` folder. Agents and the `backup-daily` job may run it. Each folder keeps the newest archive of each day, for the newest 14 days that have archives. A create removes only older archives of its own day and archives older than those days.
 - The archive holds the config, data and state roots, without caches such as the lesson index and hook session files. It is encrypted with AES-256-GCM.
 - The key is 32 random bytes in your macOS Keychain, made on the first `backup create`. Without the key, an archive cannot be read.
 - `backup restore` writes only to a new folder inside an approved backup folder. It never writes the live store.

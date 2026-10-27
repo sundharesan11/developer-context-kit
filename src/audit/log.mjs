@@ -11,7 +11,8 @@
 // the records live (project, personal or org); supersedes lists the records the write replaced.
 //
 // KTD43: an agent session (by --session) makes at most SESSION_CAP automatic knowledge writes; later ones wait for the
-// weekly activity review. Undo entries do not count.
+// weekly activity review. Writes with no --session count in one bucket per caller and UTC day (actor:<actor>:<date>)
+// with the same cap, so leaving out --session does not lift it. Undo entries do not count.
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { openSync, closeSync, fstatSync, writeSync, fsyncSync, constants } from "node:fs";
@@ -93,6 +94,8 @@ function appendLine(path, value) {
   const fd = openSync(path, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
   try { checkNode(fstatSync(fd), path); writeSync(fd, JSON.stringify(value) + "\n"); fsyncSync(fd); } finally { closeSync(fd); }
 }
+// The cap bucket of an entry: its session, or its caller and UTC day when it has none.
+const capBucket = (entry, at) => entry.session ? "session:" + entry.session : "actor:" + entry.actor + ":" + at.slice(0, 10);
 // Appends the intent entry for one write and returns it. A second call for the same route and request ID returns the
 // first entry and appends nothing. cap: false skips the session cap (undo entries).
 export async function appendEntry(roots, fields, { now = () => new Date(), cap = true } = {}) {
@@ -102,9 +105,10 @@ export async function appendEntry(roots, fields, { now = () => new Date(), cap =
     const { entries } = await readAudit(roots);
     const same = entries.find((e) => e.route === clean.route && e.requestId === clean.requestId);
     if (same) return same;
-    if (cap && clean.session && clean.tier === "automatic" && clean.kind !== "undo") {
-      const used = new Set(entries.filter((e) => e.session === clean.session && e.kind !== "undo").map((e) => e.requestId)).size;
-      if (used >= SESSION_CAP) throw new DevtwinError("GATE_REQUIRED", "This session already made " + SESSION_CAP + " automatic writes; later ones wait for the weekly activity review", { session: clean.session, max: SESSION_CAP, via: "activity review" });
+    if (cap && clean.tier === "automatic" && clean.kind !== "undo") {
+      const bucket = capBucket(clean, at);
+      const used = new Set(entries.filter((e) => e.kind !== "undo" && capBucket(e, e.at) === bucket).map((e) => e.requestId)).size;
+      if (used >= SESSION_CAP) throw new DevtwinError("GATE_REQUIRED", "This session already made " + SESSION_CAP + " automatic writes; later ones wait for the weekly activity review", { session: clean.session, bucket, max: SESSION_CAP, via: "activity review" });
     }
     const entry = { schemaVersion: 1, id: "aud_" + randomBytes(12).toString("hex"), at, ...clean, state: "intent" };
     ensurePrivatePath(roots.stateRoot, ["audit"]);

@@ -12,7 +12,9 @@
 // recordedBy names the caller (src/policy/actor.mjs).
 //
 // U37 (KTD40, KTD43): the project target is an automatic knowledge write. The lesson text passes the plain-rule checks
-// (checkLesson), and an audit entry with the caller's --session goes into the log before the record is written.
+// (checkLesson), and an audit entry with the caller's --session goes into the log before the record is written. The
+// hub target appends a hub-lesson entry (tier consented, itemIds the hub lesson ID) before it publishes; undo refuses
+// that kind and points to `published delete` (src/audit/undo.mjs).
 //
 // U12: a replacement proposal (lesson supersede-propose) accepts to the hub target only. Its hub file names the
 // predecessor as supersedes: [{ id, hash }]. The predecessor is checked against the local clone at preview and on the
@@ -99,6 +101,7 @@ export async function planAccept(roots, { id, target, scope, project, session = 
     }
     plan.hub = hubFile(binding, { requestId, createdAt: proposal.createdAt, lesson, localRecordHash: digest(lessonDraft(lesson)), supersedes });
     plan.createdAt = proposal.createdAt;
+    plan.session = session;
   }
   if (general(target)) plan.personalRecordId = personalRecordIdFor({ requestId });
   if (target === "project") {
@@ -165,6 +168,8 @@ export async function applyAccept(roots, input, { fingerprint, now = () => new D
       result.project = { project: plan.project, recordId: added.recordId, recordHash: added.recordHash };
     }
     if (binding) {
+      const entry = await appendEntry(roots, { kind: "hub-lesson", tier: plan.tier, route: "lesson accept", target: plan.target, scope: plan.scope, itemIds: [plan.hub.lessonId], actor: recordedBy.actor, session: plan.session ?? null, requestId: plan.requestId }, { now });
+      result.audit = entry.id;
       try { result.hub = await publishLesson(roots, binding, plan.hub, { now, createdAt: plan.createdAt }); }
       catch (error) {
         if (error.code === "DEVTWIN_STALE_VERSION" && plan.supersedes) await markAttempt(roots, proposal, plan.proposalHash, { code: error.code, reason: error.details?.reason ?? null, ...(error.details?.successorId ? { successorId: error.details.successorId } : {}) }, { now });

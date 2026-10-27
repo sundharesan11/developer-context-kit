@@ -112,7 +112,7 @@ These are outside what devtwin does, even when it runs in the background:
 - **Commands that break when pasted.** devtwin does not check or repair shell commands for your shell.
 - **Polling long jobs.** devtwin does not watch a job and tell you when it ends.
 
-Automatic items are reviewed after they land: you read the weekly digest and reverse an item with `undo`. An agent that writes outside text again in its own words makes an agent write, which only that later review catches. The cap of 20 automatic writes per session counts only writes that name a session. Backups go only to folders inside your home folder, so a copy off the machine needs a folder that a sync service copies.
+Automatic items are reviewed after they land: you read the weekly digest and reverse an item with `undo`. An agent that writes outside text again in its own words makes an agent write, which only that later review catches. The cap of 20 automatic writes counts each session on its own, and writes with no session in one bucket per caller and UTC day; the caller label comes from environment variables. Backups go only to folders inside your home folder, so a copy off the machine needs a folder that a sync service copies.
 
 ## Development status
 

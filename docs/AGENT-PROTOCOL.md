@@ -67,11 +67,12 @@ A worker proposes. A controller publishes. These are separate steps.
 
 ### Audit and undo
 
-`record add`, `record supersede` and `lesson accept --target project` are automatic writes. Each one adds an entry to the audit log. Pass `--session <id>` with the session ID from the hook's session-start line, so that the session can undo its own writes.
+`record add`, `record supersede` and `lesson accept --target project` are automatic writes. Each one adds an entry to the audit log. Pass `--session <id>` with the session ID from the hook's session-start line, so that the activity digest shows which session made each write and the session cap counts it.
 
-- `undo --id <entry> --session <id>` reverses an entry from your own session with no prompt. Preview it first, then apply it with the plan fingerprint.
-- Do not run `undo --since`. The hook denies its apply. `undo --id` of another session's entry shows the owner dialog, so ask your developer instead.
-- A session makes at most 20 automatic writes. After that, a write fails with `GATE_REQUIRED` and waits for the weekly activity review.
+- Do not apply `undo`. Every undo is an owner action: the hook denies `undo --apply` and the apply shows the owner dialog. You may preview `undo --id <entry>` and give your developer the entry ID.
+- A `confirmed` or `disputed` record, or a write that replaces a `confirmed` record, shows the owner dialog. Write `observed` knowledge and let your developer confirm it.
+- Do not write `--kind retraction`. Only undo writes one.
+- A session makes at most 20 automatic writes. Writes with no `--session` share one count per caller and UTC day. After that, a write fails with `GATE_REQUIRED` and waits for the weekly activity review.
 - Automatic text must read as plain notes. A title or summary with Markdown structure, an `@` import, a devtwin marker or text that tells the reader to ignore other instructions is refused.
 
 ## 6. Hub proposals

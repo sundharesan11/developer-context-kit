@@ -51,14 +51,14 @@ async function readHomeSnapshot(roots, home) {
   return resolveSupersession(candidates, corrupt);
 }
 // Checks that run before any lock or write: input shape, draft, home reach, the sensitive check and the all-scope isolation check.
-async function checkInput(roots, home, input, keys, supersedes = []) {
+async function checkInput(roots, home, input, keys, { retraction = false } = {}) {
   if (!input || Object.keys(input).some((key) => !keys.includes(key))) throw new DevtwinError("INVALID_INPUT", "Unexpected record field");
   if (!REQUEST_ID.test(input.requestId ?? "")) throw new DevtwinError("INVALID_ID", "Invalid request ID");
-  validateDraft(input.draft, { recordedBy: input.recordedBy, supersedes });
+  validateDraft(input.draft, { recordedBy: input.recordedBy, retraction });
   assertHomeReach(home.reach, input.draft);
   assertOutboundClean(input.draft.title + "\n" + input.draft.body, await isolationTerms(roots), { except: home.scope ?? undefined });
 }
-async function commitHome(roots, home, { requestId, recordedBy, draft }, { now = () => new Date(), supersedes = [] } = {}) {
+async function commitHome(roots, home, { requestId, recordedBy, draft }, { now = () => new Date(), supersedes = [], retraction = false } = {}) {
   const id = home.idFor(requestId), base = baseDir(roots, home);
   const stage = join(base, "staging", id), dest = recDir(roots, home, id);
   assertWritable(roots, [stage, dest]);
@@ -69,7 +69,7 @@ async function commitHome(roots, home, { requestId, recordedBy, draft }, { now =
     return { recordId: id, recordHash: recordHash(record), created: false };
   }
   if (existsSync(stage)) throw new DevtwinError("RECOVERY_REQUIRED", "Orphan staging retained", { staging: [id] });
-  const record = buildHomeRecord({ reach: home.reach, scope: home.scope, requestId, requestHash, recordedBy, draft, supersedes }, { now });
+  const record = buildHomeRecord({ reach: home.reach, scope: home.scope, requestId, requestHash, recordedBy, draft, supersedes }, { now, retraction });
   ensurePrivatePath(roots.dataRoot, [...home.segments, "staging"]);
   ensurePrivatePath(roots.dataRoot, [...home.segments, "records"]);
   await mkdir(stage, { mode: 0o700 });
@@ -82,7 +82,7 @@ async function commitHome(roots, home, { requestId, recordedBy, draft }, { now =
   return { recordId: id, recordHash: recordHash(record), created: true, bodyHash: record.bodyHash };
 }
 async function addHome(roots, home, input, keys, options) {
-  await checkInput(roots, home, input, keys);
+  await checkInput(roots, home, input, keys, options);
   const path = recDir(roots, home, home.idFor(input.requestId));
   return withPilotLock(roots, home.lock, { kind: home.reach + "-record-add" }, () => commitHome(roots, home, input, options), { destinations: [path] });
 }
@@ -90,7 +90,7 @@ async function addHome(roots, home, input, keys, options) {
 async function supersedeHome(roots, home, input, keys, options) {
   const targets = input?.targets;
   if (!Array.isArray(targets) || targets.length === 0 || targets.length !== input.expectHashes?.length || new Set(targets).size !== targets.length) throw new DevtwinError("INVALID_INPUT", "Targets and hashes required");
-  await checkInput(roots, home, input, [...keys, "targets", "expectHashes"], targets);
+  await checkInput(roots, home, input, [...keys, "targets", "expectHashes"], options);
   const path = recDir(roots, home, home.idFor(input.requestId));
   return withPilotLock(roots, home.lock, { kind: home.reach + "-record-supersede" }, async () => {
     const snap = await readHomeSnapshot(roots, home);

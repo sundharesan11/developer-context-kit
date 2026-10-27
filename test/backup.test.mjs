@@ -80,7 +80,8 @@ test("create then restore into a new folder gives the same bytes and modes for e
   assert.equal(existsSync(m.folder), false, "the preview writes nothing");
   const made = await m.ok(["backup", "create", "--apply", "--plan-fingerprint", preview.fingerprint]);
   assert.equal(made.keyCreated, true);
-  assert.deepEqual(m.keychain.calls, ["read", "write", "read"]);
+  // Read, make, read back, then read again just before sealing.
+  assert.deepEqual(m.keychain.calls, ["read", "write", "read", "read"]);
   assert.match(made.archive, /devtwin-backup-20261007T000000Z-[0-9a-f]{8}\.dtb$/);
   assert.equal((await stat(made.archive)).mode & 0o777, 0o600);
   assert.equal((await stat(m.folder)).mode & 0o777, 0o700);
@@ -116,6 +117,42 @@ test("the fifteenth archive removes the oldest", async (t) => {
   assert.equal(existsSync(made[0]), false, "the oldest is gone");
   assert.deepEqual(left, made.slice(1).map((path) => relative(m.folder, path)).sort());
   assert.equal(m.keychain.calls.filter((c) => c === "write").length, 1, "one key for every archive");
+});
+
+test("retention keeps the newest archive of each of the newest fourteen days; twenty creates on one day keep the earlier days", async (t) => {
+  const m = await machine(t);
+  const daily = [];
+  for (let i = 0; i < 3; i++) { daily.push(relative(m.folder, (await m.create()).archive)); m.advance(DAY); }
+  const today = [];
+  for (let i = 0; i < 20; i++) { const made = await m.create(); today.push(relative(m.folder, made.archive)); m.advance(60000); }
+  assert.deepEqual((await readdir(m.folder)).sort(), [...daily, today.at(-1)].sort(), "each earlier day keeps its archive; today keeps its newest");
+  // Twelve more days make sixteen days with archives: the oldest two days go.
+  for (let i = 0; i < 12; i++) { m.advance(DAY); await m.create(); }
+  const left = (await readdir(m.folder)).sort();
+  assert.equal(left.length, KEEP);
+  assert.deepEqual(daily.map((name) => left.includes(name)), [false, false, true], "the oldest days go first");
+  assert.ok(left.includes(today.at(-1)));
+});
+
+test("the backup key is made under the backup-key lock and read again before sealing", async (t) => {
+  const m = await machine(t);
+  const plan = await m.ok(["backup", "create"]);
+  const lock = join(m.p.stateRoot, "locks", "backup-key.lock");
+  await mkdir(join(m.p.stateRoot, "locks"), { recursive: true, mode: 0o700 });
+  await writeFile(lock, JSON.stringify({ pid: process.pid, host: "example.invalid", owner: { kind: "test" } }), { mode: 0o600 });
+  const busy = await m.fail(["backup", "create", "--apply", "--plan-fingerprint", plan.fingerprint], "DEVTWIN_BUSY");
+  assert.equal(busy.details.lock, "backup-key");
+  assert.deepEqual(m.keychain.calls, [], "no key is read or made while another create holds the lock");
+  await rm(lock);
+  // Another key replaced this one after it was made: create stops before it writes an archive no key opens.
+  const read = m.keychain.read;
+  let reads = 0;
+  m.keychain.read = async () => { reads += 1; return reads === 3 ? Buffer.alloc(32, 7) : read(); };
+  const error = await m.fail(["backup", "create", "--apply", "--plan-fingerprint", plan.fingerprint], "DEVTWIN_CONFLICT");
+  assert.equal(error.details.field, "keychain");
+  assert.equal(existsSync(m.folder) ? (await readdir(m.folder)).length : 0, 0);
+  m.keychain.read = read;
+  assert.equal((await m.create()).keyCreated, false);
 });
 
 test("a held scope lock or the audit lock makes create skip with BUSY and write nothing", async (t) => {

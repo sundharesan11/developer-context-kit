@@ -47,21 +47,21 @@ Two controls protect these owner actions:
 
 ## Tiers
 
-One table in the kit (`src/policy/tiers.mjs`) gives each CLI route a tier. A test checks that every route has a line, and that the always-ask routes match the routes that the hook denies.
+One table in the kit (`src/policy/tiers.mjs`) gives each CLI route a tier. A test checks that every route has a line, and that the always-ask routes match the routes that the hook denies. A `confirmed` or `disputed` record write is the exception: the hook cannot tell it from an `observed` write by its words, so only the owner dialog gates it.
 
 | Tier | Who runs it | Examples |
 | --- | --- | --- |
-| Automatic | Agents and jobs, with no prompt | `record add`, `record supersede`, `lesson accept --target project`, `handoff export`, `project onboard`, `backup create`, `undo --id` of an entry from the calling session |
+| Automatic | Agents and jobs, with no prompt | `record add` and `record supersede` of `observed` or `proposed` knowledge, `lesson accept --target project`, `handoff export`, `project onboard`, `backup create` |
 | Consented | Agents and jobs, while a standing consent for the target is valid | `lesson accept --target hub` |
-| Always ask | You only, after the owner dialog | `consent grant`, `consent revoke`, `pref accept`, `lesson copy`, `hub join`, `instructions apply`, `undo --since`, `undo --id` of another session's entry, and the other owner actions |
+| Always ask | You only, after the owner dialog | `consent grant`, `consent revoke`, `pref accept`, `lesson copy`, `hub join`, `instructions apply`, every `undo`, a `confirmed` or `disputed` record or one that replaces a `confirmed` record, and the other owner actions |
 
-- **Review after the write.** Automatic writes land with no prompt. Each knowledge write adds an entry to the [audit log](/docs/concepts/where-data-lives/#activity-consents-and-backups). `activity` lists them, and `undo` reverses one.
+- **Review after the write.** Automatic writes land with no prompt. Each knowledge write adds an entry to the [audit log](/docs/concepts/where-data-lives/#activity-consents-and-backups). `activity` lists them, and `undo` reverses one after you approve the owner dialog. A `--session` that a caller passes cannot be proven, so it grants nothing. A lesson published to a hub is removed with `published delete`, not `undo`.
 - **Consents.** `consent grant --kind hub-publish --scope <scope>` lets agents publish lessons to that scope's hub. `--kind repo-push --repo <path>` names a bound repository; no command uses it yet. A consent stores its target, a hold time of 1 to 168 hours (24 by default), the grant time and the digest of its rules. A change to the rules voids it. Without a valid consent, a consented action fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent".
 - **Lessons for every organization.** `lesson accept --target general` and `--target hub+general` fail with `DEVTWIN_GATE_REQUIRED`. A lesson in your personal store reaches every organization, so it waits for the weekly review, which arrives in a later phase.
-- **Session cap.** An agent session makes at most 20 automatic knowledge writes. The 21st fails with `DEVTWIN_GATE_REQUIRED`. The cap counts only writes that name a session with `--session`.
+- **Session cap.** An agent session makes at most 20 automatic knowledge writes. The 21st fails with `DEVTWIN_GATE_REQUIRED`. Writes with no `--session` count in one bucket per caller and UTC day, with the same cap.
 - **Plain text only.** Automatic lesson and record text passes the checks that preferences use, plus the credential and scope-name checks. A title or summary with Markdown structure, an `@` import, a devtwin marker or text that tells the reader to ignore other instructions is refused.
-- **Caller label.** A record that a CLI write makes names its caller in `recordedBy`: `claude` when `CLAUDECODE` is set, `codex` when a `CODEX_` variable is set, and `human` otherwise. This is a label for the audit trail, not a gate. A `confirmed` record still needs a human reviewer.
-- **Confirmed paths.** `paths confirm` is always ask, because a confirmation makes skills stop asking for the kit and config paths. A changed kit HEAD, kit path, config path or config file ends the confirmation.
+- **Caller label.** A record that a CLI write makes names its caller in `recordedBy`: `claude` when `CLAUDECODE` is set, `codex` when a `CODEX_` variable is set, and `human` otherwise. This is a label for the audit trail, not a gate: any process can unset those variables. A `confirmed` record needs a reviewer, and a `confirmed` or `disputed` write shows the owner dialog whoever runs it. Only `undo` writes a retraction.
+- **Confirmed paths.** `paths confirm` is always ask, because a confirmation makes skills stop asking for the kit and config paths. A changed kit HEAD, kit path, config path or config file ends the confirmation. 90 days after a confirmation the hook stops renewing the kit receipt and asks you to run `paths confirm` again.
 
 ## Owner answers over SSH
 
@@ -69,7 +69,8 @@ The live config key `approval` is `dialog` by default. `live approval --mode dia
 
 - devtwin reads the launchd session type (`launchctl managername`), never `SSH_*` variables. In a GUI session, or when the type cannot be read, the dialog is still required.
 - With no GUI session, devtwin opens `/dev/tty` and shows the dialog text and a random six-letter code. Only the exact code approves. A wrong answer, end of input, 300 seconds with no answer or no terminal denies.
-- This is one control plus a terminal check, not a second factor. A process that can read and write your terminal can answer the prompt.
+- The terminal answer is used only when the caller is not an agent and stdin is the SSH login's own terminal: a TTY whose device is the one `SSH_TTY` names. Otherwise the prompt denies.
+- This is one control plus a terminal check, not a second factor. A process that can read and write your terminal can answer the prompt. It does not stop a process of your user that drives a terminal, so this mode is a convenience for you over SSH, not a barrier against agents. The `dialog` mode is the barrier.
 - The hook still denies always-ask commands from agent shells. `live approval --apply` is itself always ask.
 
 ## Backups

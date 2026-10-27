@@ -5,7 +5,7 @@
 // the deny, and a call that is not denied goes on to the lesson path, which never returns a decision.
 const SHELL_TOOLS = new Set(["Bash", "shell", "local_shell", "exec_command"]);
 const MAX_COMMAND_BYTES = 65536;
-// words: the route words (two, or three for backup key export). apply: the action is owner-only only with --apply (its preview stays allowed).
+// words: the route words (one for undo, two, or three for backup key export). apply: the action is owner-only only with --apply (its preview stays allowed).
 export const OWNER_ACTIONS = Object.freeze([
   // The owner decided on 2026-10-26 that agents may preview these three; the apply stays owner-only, and each apply
   // shows the owner dialog as a second gate. U36 (KTD38): lesson accept left this list; it refuses the targets its tier
@@ -27,9 +27,9 @@ export const OWNER_ACTIONS = Object.freeze([
   { words: ["note", "revoke"], apply: true }, { words: ["note", "consent"], apply: true },
   // U36: granting or revoking a standing consent (KTD39).
   { words: ["consent", "grant"], apply: true }, { words: ["consent", "revoke"], apply: true },
-  // U37: undoing every entry after a time. The second word is the flag, so undo --id stays open to agents; undo --id of
-  // another session's entry shows the owner dialog instead (src/audit/undo.mjs).
-  { words: ["undo", "--since"], apply: true },
+  // U37: undo. Review fix: every undo apply is owner-only, since a caller's --session cannot be proven; its preview
+  // stays open. The one word "undo" with --apply is enough, so a harmless command naming both is denied too.
+  { words: ["undo"], apply: true },
   // U24 (KTD33): printing the backup key. Its preview stays open.
   { words: ["backup", "key", "export"], apply: true }, { words: ["backup", "restore"], apply: true },
   // U27 (KTD35): recording the confirmed kit and config paths. U26 (KTD34): the owner-answer mode.

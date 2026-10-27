@@ -81,7 +81,7 @@ devtwin lesson reject --pilot "$PILOT" --id prop_0123456789abcdef01234567
 | `general` | Nothing yet: refused with `DEVTWIN_GATE_REQUIRED` | Waits for the weekly review |
 | `hub+general` | Nothing yet: refused with `DEVTWIN_GATE_REQUIRED` | Waits for the weekly review |
 
-- **Project lessons are automatic.** The bundled skill accepts its own proposals for the current project. The record names the agent in `recordedBy`, and the write adds an entry to the audit log. You see it in `activity` and the weekly notification, and you reverse it with `undo --id`.
+- **Project lessons are automatic.** The bundled skill accepts its own proposals for the current project. The record names the agent in `recordedBy`, and the write adds an entry to the audit log. You see it in `activity` and the weekly notification, and you reverse it with `undo --id` after the owner dialog.
 - **Hub lessons need a consent.** Without a valid `hub-publish` consent, the accept fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". You grant it once with `consent grant`; see [Organization hub](/docs/guides/organization-hub/#publish-a-lesson).
 - **General lessons wait.** Your personal store follows you to every organization, so a lesson for it waits for the weekly review, which arrives in a later phase.
 - **Plain text only.** A title or summary with Markdown structure, an `@` import, a devtwin marker or text that tells the reader to ignore other instructions is refused.
@@ -98,9 +98,10 @@ devtwin undo --pilot "$PILOT" --id aud_0123456789abcdef01234567
 ```
 
 - `activity` lists what devtwin learned in the last seven days, or since `--since <time>`. It is read-only.
-- `undo --id` reverses one entry. A record gets a retraction, so the next session no longer sees it. The agent can undo an entry from its own session with `--session`, with no prompt. Any other entry shows the owner dialog.
-- `undo --since <time>` reverses every entry after a time. It is an owner action.
-- An agent session makes at most 20 automatic writes. After that, a write fails with `DEVTWIN_GATE_REQUIRED`.
+- `undo --id` reverses one entry. A record gets a retraction, so the next session no longer sees it.
+- `undo --since <time>` reverses every entry after a time.
+- Every undo is an owner action: the hook denies `undo --apply` from an agent shell, and the apply shows the owner dialog. A lesson published to a hub is removed with `published delete` instead.
+- An agent session makes at most 20 automatic writes, and writes with no `--session` share one count per caller and UTC day. After that, a write fails with `DEVTWIN_GATE_REQUIRED`.
 - The `activity-weekly` job sends one notification each week with the counts. Turn it on with `schedule plan` and `schedule apply --job activity-weekly`.
 
 ## The agent hook
