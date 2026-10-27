@@ -7,6 +7,7 @@ import { isWithin } from "../storage/fsx.mjs";
 import { readApprovedSource } from "../storage/source-read.mjs";
 import { sha256 } from "../storage/canonical.mjs";
 import { readSnapshot } from "../records/store.mjs";
+import { isDelivered } from "../records/schema.mjs";
 import { resolveContext } from "../context/resolve.mjs";
 import { portableRecord, assertPortableText, canonicalTime, HASH, unsafe, handoffError } from "./privacy.mjs";
 
@@ -63,12 +64,13 @@ export async function buildPortableHandoff(roots, pilot, input) {
     const selected = new Set(recordIds), records = [];
     for (const id of [...recordIds].sort()) {
       const record = snapshot.records.find((item) => item.id === id);
-      if (!record || record.effective === "superseded" || record.status === "proposed") throw new DevtwinError("RECORD_NOT_EXPORTABLE", "Selected record unavailable or ineffective");
+      // U37: a retraction is never delivered, so it is never exported either.
+      if (!record || record.effective === "superseded" || record.status === "proposed" || !isDelivered(record)) throw new DevtwinError("RECORD_NOT_EXPORTABLE", "Selected record unavailable or ineffective");
       const projected = portableRecord(record);
       records.push({ ...projected, ...await observe(record, projected, resolved, asOf) });
     }
     const excluded = snapshot.records.filter((record) => !selected.has(record.id));
-    const effective = excluded.filter((record) => record.effective !== "superseded" && record.status !== "proposed");
+    const effective = excluded.filter((record) => record.effective !== "superseded" && record.status !== "proposed" && isDelivered(record));
     const model = {
       schemaVersion: 1, scope, project: resolved.project, asOf,
       exportingWorktree: { revision: resolved.worktree.head, branch: resolved.worktree.branch, dirty: resolved.worktree.dirty }, records,

@@ -7,6 +7,7 @@ import { loadScope, validatePreferences } from "../config/store.mjs";
 import { readApprovedSource, checkSourceFreshness } from "../storage/source-read.mjs";
 import { scanSensitive } from "../records/redact.mjs";
 import { readSnapshot } from "../records/store.mjs";
+import { isDelivered } from "../records/schema.mjs";
 import { readProfile } from "../profile/store.mjs";
 import { validateProfile } from "../profile/validate.mjs";
 import { resolveContext } from "./resolve.mjs";
@@ -76,7 +77,8 @@ export async function buildBrief(roots, pilot, { scope, cwd, now = new Date() })
   for (const entry of required) { policies.push(entry); policyReceipt.selected.push({ id: entry.id, sha256: entry.sha256 }); bytes += Buffer.byteLength(entry.text); }
   bytes += profileBytes; // charged after required policies and before records; never counted as an item
   const snapshot = await readSnapshot(roots, scope, resolved.project);
-  const ordered = snapshot.records.filter((r) => r.effective !== "superseded").sort((a, b) =>
+  // U37: a retraction is never delivered.
+  const ordered = snapshot.records.filter((r) => r.effective !== "superseded" && isDelivered(r)).sort((a, b) =>
     KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) ||
     STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) ||
     b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));

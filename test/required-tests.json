@@ -643,5 +643,17 @@
   "consent grant for repo-push after the owner dialog records the target and rule digest",
   "a consent whose rule digest changed reads as void and the action needs consent",
   "consent grant and revoke apply from a hooked agent shell are denied",
-  "setup consent-repo step grants the repo-push consent after the owner dialog"
+  "setup consent-repo step grants the repo-push consent after the owner dialog",
+  "an automatic lesson write adds one audit entry and undo --id from the same session retracts it (AE2)",
+  "undo of a lesson entry after the lesson was sharpened retracts the current head",
+  "undo of a supersede entry retracts the successor and restores the earlier version",
+  "the owner's undo --since reverses three entries newest first after the owner dialog",
+  "undo --since from an agent shell and undo --id of another session's entry are denied (AE9)",
+  "an entry whose write never landed is reported and undo does nothing",
+  "automatic text with a devtwin marker or an override is refused at write time",
+  "the 21st automatic write in one session waits for the activity review",
+  "a corrupt month line or file is skipped with a warning and other months still read",
+  "the audit log never holds body text",
+  "activity lists learned items with held and waiting lists",
+  "the weekly activity job sends one notification with learned, held and waiting counts and does nothing else"
 ]

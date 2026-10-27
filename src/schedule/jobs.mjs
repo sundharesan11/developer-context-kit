@@ -1,4 +1,4 @@
-// U20 (R10, R30, R31, R34; KTD15, KTD24): the radar, advisory and review jobs. Each job is a user LaunchAgent with its
+// U20 (R10, R30, R31, R34; KTD15, KTD24): the radar, advisory and review jobs, and U37's weekly activity job. Each job is a user LaunchAgent with its
 // own consent (schedule apply, after the owner dialog) and its own off switch (schedule off). A run checks, in order,
 // the live gate (the pilot load), the job's own flag and its last-run receipt, and only then makes a request. A
 // disabled job makes no request and writes nothing. Turning off the radar also turns off the advisory job.
@@ -18,13 +18,16 @@ const DAY = 86400;
 export const JOBS = Object.freeze({
   "radar-weekly": { interval: 7 * DAY, skipSeconds: 6 * DAY, runs: "the weekly radar: fetch your approved sources, write one digest for each scope and show a short notification" },
   "advisory-hourly": { interval: 3600, skipSeconds: 3000, requires: "radar-weekly", runs: "a security advisory check for your stack every hour, with a notification at once for an urgent fix (at most three a day)" },
-  "review-monthly": { interval: 30 * DAY, skipSeconds: 27 * DAY, runs: "a monthly reminder that a setup review is available, with a count of suggestions" }
+  "review-monthly": { interval: 30 * DAY, skipSeconds: 27 * DAY, runs: "a monthly reminder that a setup review is available, with a count of suggestions" },
+  // U37 (R3): the weekly activity digest, read from the audit log. It sends one notification and does nothing else.
+  "activity-weekly": { interval: 7 * DAY, skipSeconds: 6 * DAY, runs: "a weekly notification with counts of what devtwin learned, holds for sending and has waiting for you" }
 });
 export const JOB_IDS = Object.freeze(Object.keys(JOBS));
 export const OFF_SWITCH = {
   "radar-weekly": "Turning off the radar job stops the weekly fetch, digest and notification. It also turns off the security advisory job. Run stack digest by hand to get a digest.",
   "advisory-hourly": "Turning off the advisory job stops the hourly advisory check and its notifications. The weekly digest still lists advisories when you approved that group.",
-  "review-monthly": "Turning off the review job stops the monthly reminder. You can still run the review by hand."
+  "review-monthly": "Turning off the review job stops the monthly reminder. You can still run the review by hand.",
+  "activity-weekly": "Turning off the activity job stops the weekly notification. devtwin still records what it does; run devtwin activity to see it."
 };
 export const jobLabel = (job) => "devtwin." + job;
 const jobsPath = (roots) => join(roots.stateRoot, "schedule", "jobs.json");
@@ -63,7 +66,7 @@ export function jobArguments(ctx, pilotPath, job) {
 // Install needs what the job reads: a stack approval for the radar and advisory jobs (with the advisories group for
 // the advisory job), the stackWatch exception in live mode, and the radar job on before the advisory job.
 async function requirements(roots, job, state) {
-  if (job === "review-monthly") return;
+  if (job === "review-monthly" || job === "activity-weekly") return;
   const { readStackApproval } = await import("../stack/plan.mjs");
   const approval = await readStackApproval(roots);
   if (!approval) throw new DevtwinError("APPROVAL_REQUIRED", "Approve the stack sources first", { remedy: "stack plan, then stack approve" });
@@ -173,7 +176,13 @@ async function reviewMonthly(roots, ctx) {
   const shown = notify(ctx, { title: "devtwin review", message: "Your monthly setup review is available with " + count + (count === 1 ? " suggestion." : " suggestions.") + " Run devtwin pref proposals and devtwin lesson proposals to see them." });
   return { suggestions: { preferences, lessons }, notification: shown };
 }
-const WORK = { "radar-weekly": radarWeekly, "advisory-hourly": advisoryHourly, "review-monthly": reviewMonthly };
+async function activityWeekly(roots, ctx, deps, now) {
+  const { activity, weeklyMessage } = await import("../audit/digest.mjs");
+  const { counts } = await activity(roots, {}, { now });
+  const shown = notify(ctx, { title: "devtwin activity", message: weeklyMessage(counts) });
+  return { counts: { learned: counts.learned, held: counts.held, waiting: counts.waiting }, notification: shown };
+}
+const WORK = { "radar-weekly": radarWeekly, "advisory-hourly": advisoryHourly, "review-monthly": reviewMonthly, "activity-weekly": activityWeekly };
 
 // The scheduled run. A run within the job's skip window of the last good run is skipped, so missed runs collapse into
 // one run, and two runs inside one period write one digest. lastRunAt moves only on success: a failed or interrupted

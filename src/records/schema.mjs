@@ -3,7 +3,10 @@ import { sha256, digest, canonicalJson } from "../storage/canonical.mjs";
 import { assertActorRef, assertProjectId, assertScopeId, recordIdFor, personalRecordIdFor, orgRecordIdFor } from "../identity/ids.mjs";
 import { assertSourceRel, isDeniedRel } from "../storage/source-read.mjs";
 import { assertNoSensitive, findForbiddenFields } from "./redact.mjs";
-export const KINDS = ["brief", "map", "command", "environment", "constraint", "fact", "decision", "experiment", "unknown", "handoff", "lesson", "preference"];
+export const KINDS = ["brief", "map", "command", "environment", "constraint", "fact", "decision", "experiment", "unknown", "handoff", "lesson", "preference", "retraction"];
+// U37 (KTD40): a retraction is the undo of a record. It supersedes the current head of that record's chain and is
+// never delivered: the brief, the lesson index, handoffs and the stack match all skip it.
+export const isDelivered = (record) => record.kind !== "retraction";
 export const STATUSES = ["proposed", "observed", "confirmed", "disputed"];
 export const CLASSES = ["fact", "lesson"];
 export const REACHES = ["personal", "project", "org"];
@@ -81,7 +84,7 @@ export function buildRecord({ scope, project, requestId, requestHash, operationI
   return { schemaVersion: 2, id: recordIdFor({ scope, project, requestId }), scope, project, ...recordFields({ requestId, requestHash, operationId, recordedBy, draft, supersedes }, now) };
 }
 // Personal and org homes. Each home takes one reach and a fixed set of kinds, and never an operation ID.
-export const HOME_KINDS = { personal: ["lesson", "preference"], org: ["lesson"] };
+export const HOME_KINDS = { personal: ["lesson", "preference", "retraction"], org: ["lesson", "retraction"] };
 export function assertHomeReach(reach, draft) {
   if (!HOME_KINDS[reach]?.includes(draft?.kind) || draftReach(draft) !== reach) throw new DevtwinError("INVALID_INPUT", "Record reach does not match its home");
 }

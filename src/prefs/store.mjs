@@ -16,6 +16,7 @@ import { isolationTerms, assertOutboundClean } from "../records/isolation.mjs";
 import { addPersonalRecord, readPersonalSnapshot } from "../records/personal.mjs";
 import { requireOwnerApproval } from "../owner/dialog.mjs";
 import { SESSION_ID } from "../lessons/propose.mjs";
+import { plainRuleProblem } from "../audit/checks.mjs";
 
 export const PREFS_PER_SESSION = 3;
 export const PREF_ID = /^pref_[a-f0-9]{24}$/;
@@ -23,14 +24,8 @@ const TITLE_CHARS = 80, TEXT_CHARS = 300, PROPOSAL_BYTES = 16384, MAX_PROPOSALS 
 const TOPIC = /^[a-z0-9][a-z0-9-]{0,47}$/;
 const UNSAFE = /[\p{Cc}\p{Cf}\u2028\u2029]/u;
 // Preference text goes into agent instruction files. It must read as one plain rule: no Markdown structure, no
-// devtwin markers, no Claude Code import line (@path) and no text that tries to override other instructions.
-const INJECTION = [
-  ["markdown-structure", /^\s*(?:#|>|```|~~~|-{3,}|\*{3,})/m],
-  ["marker", /<!--|-->|devtwin:(?:begin|end)/i],
-  ["import", /(?:^|\s)@[~./A-Za-z0-9_-]/],
-  ["override", /\b(?:ignore|disregard|forget|override)\s+(?:all\s+|any\s+)?(?:the\s+|your\s+)?(?:previous|prior|above|earlier|other|system|developer)\b/i],
-  ["system-prompt", /\bsystem\s+prompt\b/i]
-];
+// devtwin markers, no Claude Code import line (@path) and no text that tries to override other instructions. U37: the
+// checks live in src/audit/checks.mjs, shared with automatic lesson and record text.
 const dir = (roots) => join(roots.dataRoot, "pref-proposals");
 const pathOf = (roots, id) => join(dir(roots), id + ".json");
 const lockPath = (roots) => join(roots.stateRoot, "locks", "pref_proposals.lock");
@@ -40,7 +35,8 @@ export const prefKey = (text) => digest({ text: text.toLowerCase().replace(/\s+/
 const requestIdFor = (value) => "req_prf" + digest(value).slice(7, 31);
 
 export function checkInjection(text) {
-  for (const [reason, pattern] of INJECTION) if (pattern.test(text)) throw new DevtwinError("INVALID_INPUT", "Preference text is not one plain rule", { field: "text", reason });
+  const reason = plainRuleProblem(text);
+  if (reason) throw new DevtwinError("INVALID_INPUT", "Preference text is not one plain rule", { field: "text", reason });
 }
 // Shape, injection, draft and isolation checks. A preference reaches every organization, so it is checked against the
 // names of every scope.

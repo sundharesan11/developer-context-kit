@@ -105,9 +105,10 @@ export const lessonEditCommand = { options: { ...lessonOptions, ...planOptions }
   needPlan(values);
   return propose.applyEdit(ctx.roots, input, { fingerprint: values["plan-fingerprint"], now: ctx.now });
 } };
-export const lessonAcceptCommand = { options: { ...planOptions, target: { type: "string" }, scope: { type: "string" }, project: { type: "string" } }, async run(values, ctx) {
+// U37: --session names the agent session for the audit entry, so that session may undo the write itself.
+export const lessonAcceptCommand = { options: { ...planOptions, target: { type: "string" }, scope: { type: "string" }, project: { type: "string" }, session: { type: "string" } }, async run(values, ctx) {
   const publish = await import("./publish.mjs");
-  const input = { id: values.id, target: values.target, scope: values.scope, project: values.project };
+  const input = { id: values.id, target: values.target, scope: values.scope, project: values.project, session: values.session ?? null };
   if (!values.apply) return publish.planAccept(ctx.roots, input);
   needPlan(values);
   return publish.applyAccept(ctx.roots, input, { fingerprint: values["plan-fingerprint"], now: ctx.now, ctx });

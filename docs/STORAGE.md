@@ -64,8 +64,8 @@ New records use schema 2. Readers accept schema 1 and 2, and a schema 1 record i
 
 Personal and org records have their own homes. They need no registry entry or project binding. These homes are library functions in `src/records/personal.mjs`. `lesson accept` with a general target and `lesson copy` read or write the personal home. No CLI command writes to the org home: the hub copy of a lesson is the organization's copy.
 
-- **Personal.** `dataRoot/personal/records/<record-id>/` holds records with `personal` reach and the kinds `lesson` and `preference`. Writes use `stateRoot/locks/personal_records.lock`.
-- **Org.** `dataRoot/scopes/<scope>/org/records/<record-id>/` holds `lesson` records with `org` reach for a scope that exists. Writes use the scope lock.
+- **Personal.** `dataRoot/personal/records/<record-id>/` holds records with `personal` reach and the kinds `lesson`, `preference` and `retraction`. Writes use `stateRoot/locks/personal_records.lock`.
+- **Org.** `dataRoot/scopes/<scope>/org/records/<record-id>/` holds `lesson` and `retraction` records with `org` reach for a scope that exists. Writes use the scope lock.
 - **Integrity.** Each home uses the project store's bundle rules. The reader recomputes the record ID from the home and request ID, and checks the reach, kind, body hash and body size. A record that fails is reported as corrupt. Writes are staged, fsynced and renamed into place. Supersession names each target with its expected record hash.
 - **Wrong reach.** Each home refuses a draft whose reach or kind does not belong there. The project store refuses any reach other than `project`.
 
@@ -121,6 +121,17 @@ The hook keeps its state in `stateRoot/hooks/`. The folders are 0700 and the fil
 - **Budget log.** `hooks/budget.jsonl` gets one line per injection: the time, agent, session key, event, bytes, index lines and overflow lines. It holds no prompt text, path or lesson text. A log over 4 MiB moves to `budget.jsonl.1`.
 - **Hook log.** `hooks/hook.log` gets one line per failure, with the error code only.
 - **Cache writes.** The receipt, session files and logs are devtwin's own state, like the lesson index. They have no preview and no plan fingerprint. The hook writes only when the `hooks` folder already exists, so a hook with no receipt writes nothing.
+
+### Audit log
+
+Every automatic knowledge write appends one entry to `stateRoot/audit/<yyyy-mm>.jsonl`. The folder is 0700 and each month file is 0600. Writers append under `stateRoot/locks/audit.lock`.
+
+- **When.** The entry goes in before the write itself. A crash between the two leaves an entry whose records do not exist, and `activity` reports it as never landed. There is no second line: an entry has landed when every record it names exists.
+- **Key.** The entry is keyed by the route and the write's request ID. A retry of the same write reuses its entry and appends nothing.
+- **Fields.** An entry has `schemaVersion` 1, `id` (`aud_` and 24 hex characters), `at`, `kind` (`record` or `undo`), `tier`, `route` and `target`. Then come `home` (`project`, `personal` or `org`), `scope`, `project`, `recordIds`, `supersedes` and `itemIds`. Last come `sourceHash`, `actor`, `session`, `requestId`, `undoes` and `state` (`intent`). An entry never holds a title or body text.
+- **Writers.** `record add` and `record supersede` of `observed` or `proposed` knowledge, `lesson accept --target project`, and `undo`.
+- **Reading.** A line that does not parse, or a month file that is not a private file, is skipped with a warning in the result. The other months still read. Nothing repairs the log.
+- **Retractions.** `undo` writes a record of kind `retraction` that supersedes the current head of the undone record's chain. The brief, the lesson index, handoff exports and the stack match never deliver a retraction.
 
 ## File identity and interrupted writes
 

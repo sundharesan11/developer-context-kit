@@ -11,6 +11,9 @@
 //            general      refused: a personal-store record reaches every organization, so it waits for activity review
 // recordedBy names the caller (src/policy/actor.mjs).
 //
+// U37 (KTD40, KTD43): the project target is an automatic knowledge write. The lesson text passes the plain-rule checks
+// (checkLesson), and an audit entry with the caller's --session goes into the log before the record is written.
+//
 // U12: a replacement proposal (lesson supersede-propose) accepts to the hub target only. Its hub file names the
 // predecessor as supersedes: [{ id, hash }]. The predecessor is checked against the local clone at preview and on the
 // fetched remote branch before the commit and after every rebase. STALE_VERSION drops the local commit, queues
@@ -26,6 +29,7 @@ import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { requireOwnerApproval, dialogText, DIALOG_LIMITS } from "../owner/dialog.mjs";
 import { tierRule } from "../policy/tiers.mjs";
 import { cliRecorder } from "../policy/actor.mjs";
+import { appendEntry } from "../audit/log.mjs";
 import { requireConsent } from "../consent/store.mjs";
 import { isolationTerms, assertOutboundClean } from "../records/isolation.mjs";
 import { addPersonalRecord, readPersonalSnapshot } from "../records/personal.mjs";
@@ -33,7 +37,7 @@ import { addRecord, requireCommittedProject } from "../records/store.mjs";
 import { renderHubLesson } from "../hubs/read.mjs";
 import { publishToHub, hubGit, checkRemoteSupersession } from "../hubs/git-write.mjs";
 import { rebuildIndex } from "./index.mjs";
-import { checkLesson, lessonBody, lessonDraft, lessonText, requirePending, proposalHash, markAccepted, markAttempt, withProposalLock } from "./propose.mjs";
+import { checkLesson, lessonBody, lessonDraft, lessonText, requirePending, proposalHash, markAccepted, markAttempt, withProposalLock, SESSION_ID } from "./propose.mjs";
 import { checkLocalSupersession } from "./supersede.mjs";
 
 export const TARGETS = Object.freeze(["hub", "hub+general", "project", "general"]);
@@ -72,8 +76,9 @@ const copyDialog = (plan) => lessonDialog("Copy a personal lesson to another org
 
 // lesson accept preview. It re-runs the draft and isolation checks; general targets are also checked against the
 // lesson's own scope, because the personal store reaches every organization.
-export async function planAccept(roots, { id, target, scope, project }) {
+export async function planAccept(roots, { id, target, scope, project, session = null }) {
   if (!TARGETS.includes(target)) throw new DevtwinError("INVALID_INPUT", "Invalid lesson target", { field: "target", allowed: TARGETS });
+  if (session !== null && (typeof session !== "string" || !SESSION_ID.test(session))) throw new DevtwinError("INVALID_INPUT", "Invalid session ID", { field: "session" });
   const proposal = await requirePending(roots, id);
   if (scope !== undefined && assertScopeId(scope) !== proposal.scope) throw new DevtwinError("CONFLICT", "Proposal belongs to another scope", { scope: proposal.scope });
   const lesson = await checkLesson(roots, proposal.scope, proposal.lesson);
@@ -103,6 +108,7 @@ export async function planAccept(roots, { id, target, scope, project }) {
     assertProjectId(name, proposal.scope);
     await requireCommittedProject(roots, proposal.scope, name);
     plan.project = name;
+    plan.session = session;
     plan.projectRecordId = recordIdFor({ scope: proposal.scope, project: name, requestId });
   }
   return finalizePlan(plan);
@@ -123,7 +129,9 @@ async function configuredScopes(roots) {
   catch (error) { if (error.code === "ENOENT") return []; throw error; }
 }
 // KTD22: lesson commands rebuild the index. A personal record is in every scope's index, so all of them rebuild.
-async function rebuild(roots, scopes) {
+// U37: undo rebuilds the same way (src/audit/undo.mjs).
+export const indexScopesFor = async (roots, home, scope) => home === "personal" ? configuredScopes(roots) : [scope];
+export async function rebuildIndexes(roots, scopes) {
   const out = [];
   for (const scope of scopes) {
     try { const index = await rebuildIndex(roots, scope); out.push({ scope, written: index.written, counts: index.counts }); }
@@ -151,6 +159,8 @@ export async function applyAccept(roots, input, { fingerprint, now = () => new D
       result.personal = { recordId: added.recordId, recordHash: added.recordHash };
     }
     if (plan.projectRecordId) {
+      const entry = await appendEntry(roots, { kind: "record", tier: plan.tier, route: "lesson accept", target: "project", home: "project", scope: plan.scope, project: plan.project, recordIds: [plan.projectRecordId], actor: recordedBy.actor, session: plan.session, requestId: plan.requestId }, { now });
+      result.audit = entry.id;
       const added = await addRecord(roots, { scope: plan.scope, project: plan.project, requestId: plan.requestId, recordedBy, draft: { ...lessonDraft(plan.lesson, { reach: "project", status: "observed" }), applicability: { level: "project" } } }, { now });
       result.project = { project: plan.project, recordId: added.recordId, recordHash: added.recordHash };
     }
@@ -164,7 +174,7 @@ export async function applyAccept(roots, input, { fingerprint, now = () => new D
     await markAccepted(roots, proposal, plan.proposalHash, result, { now });
     return result;
   });
-  const index = await rebuild(roots, plan.personalRecordId ? await configuredScopes(roots) : [plan.scope]);
+  const index = await rebuildIndexes(roots, plan.personalRecordId ? await configuredScopes(roots) : [plan.scope]);
   return { accepted: true, proposalId: plan.proposalId, ...outcome, index };
 }
 
@@ -191,6 +201,6 @@ export async function applyCopy(roots, input, { fingerprint, now = () => new Dat
   const binding = await writableBinding(roots, plan.scope);
   if (binding.hubId !== plan.hub.hubId || binding.actorRef !== plan.hub.author) throw new DevtwinError("STALE_VERSION", "Hub binding changed");
   const hub = await publishLesson(roots, binding, plan.hub, { now, createdAt: plan.createdAt });
-  const index = await rebuild(roots, [plan.scope]);
+  const index = await rebuildIndexes(roots, [plan.scope]);
   return { copied: true, recordId: plan.recordId, scope: plan.scope, hub, index };
 }

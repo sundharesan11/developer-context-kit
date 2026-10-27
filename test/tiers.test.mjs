@@ -31,6 +31,7 @@ test("tier table has one line for every CLI route and no other", () => {
   assert.deepEqual(tierRule({ route: "lesson accept", target: "general" }), { tier: "always-ask", via: "activity review" });
   for (const route of ["record add", "record supersede", "handoff export", "project onboard"]) assert.equal(tierOf({ route }), "automatic", route);
   for (const route of ["pref accept", "consent grant", "consent revoke"]) assert.equal(tierOf({ route }), "always-ask", route);
+  assert.equal(tierOf({ route: "activity" }), "read");
 });
 
 test("tierOf throws for an unknown route, target or source", () => {
@@ -45,7 +46,11 @@ test("tierOf throws for an unknown route, target or source", () => {
 test("always-ask routes in the tier table are exactly the owner-block actions and owner setup steps", () => {
   // The setup routes are blocked through the setup step list and the terminal loop rule, not through OWNER_ACTIONS.
   const ask = alwaysAskRoutes();
-  assert.deepEqual(ask.filter((route) => route !== "setup" && route !== "setup apply"), OWNER_ACTIONS.map((a) => a.words.join(" ")).sort());
+  // An owner action whose second word is a flag (undo --since) blocks one target of a one-word route.
+  const routeOf = (words) => words[1].startsWith("--") ? words[0] : words.join(" ");
+  assert.deepEqual(ask.filter((route) => route !== "setup" && route !== "setup apply"), OWNER_ACTIONS.map((a) => routeOf(a.words)).sort());
+  assert.deepEqual(targetsWithTier("undo", "always-ask"), ["other", "since"]);
+  assert.deepEqual(targetsWithTier("undo", "automatic"), ["session"]);
   assert.ok(ask.includes("setup") && ask.includes("setup apply"));
   assert.ok(!ask.includes("lesson accept"), "lesson accept left the owner-only list");
   assert.deepEqual(targetsWithTier("setup apply", "always-ask"), [...OWNER_SETUP_STEPS].sort());

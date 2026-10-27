@@ -12,6 +12,7 @@ import { canonicalJson, digest } from "../storage/canonical.mjs";
 import { assertScopeId, ACTOR_REF } from "../identity/ids.mjs";
 import { readSnapshot } from "../records/store.mjs";
 import { readOrgSnapshot, readPersonalSnapshot } from "../records/personal.mjs";
+import { isDelivered } from "../records/schema.mjs";
 // U6: one match index per scope at stateRoot/lessons/<scope>.json. It is a derived cache: every field comes from the
 // scope's project records, its org records, the personal store and the registry bindings, so a rebuild can replace it
 // at any time. The hook reads it and never rebuilds it (KTD22).
@@ -60,7 +61,8 @@ export const SOURCES = [
   } }
 ];
 const hasMatch = (match) => ["paths", "packages", "topics"].some((key) => match?.[key]?.length);
-const isLive = (r) => r.schemaVersion === 2 && ["lesson", "preference"].includes(r.kind) && LIVE.includes(r.effective) && hasMatch(r.match);
+// U37: a retraction is never delivered (it is not a lesson kind either).
+const isLive = (r) => r.schemaVersion === 2 && isDelivered(r) && ["lesson", "preference"].includes(r.kind) && LIVE.includes(r.effective) && hasMatch(r.match);
 function capBytes(text, limit) {
   if (Buffer.byteLength(text) <= limit) return text;
   let out = "", bytes = 0;

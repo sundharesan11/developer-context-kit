@@ -2,9 +2,19 @@ import { dirname, relative } from "node:path";
 import { DevtwinError } from "../errors.mjs";
 import { assertInPilot } from "../config/pilot.mjs";
 import { readApprovedSource } from "../storage/source-read.mjs";
-import { addRecord, supersedeRecord, previewRecord, proposeRecord, publishProposal } from "./store.mjs";
+import { REQUEST_ID } from "../storage/plan.mjs";
+import { recordIdFor } from "../identity/ids.mjs";
+import { cliRecorder } from "../policy/actor.mjs";
+import { tierOf } from "../policy/tiers.mjs";
+import { addRecord, supersedeRecord, previewRecord, proposeRecord, publishProposal, requireCommittedProject, readSnapshot } from "./store.mjs";
+import { validateDraft, assertProjectReach } from "./schema.mjs";
+import { isolationTerms, assertOutboundClean } from "./isolation.mjs";
 const list = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
-const options = { scope: { type: "string" }, project: { type: "string" }, kind: { type: "string" }, title: { type: "string" }, body: { type: "string" }, "body-file": { type: "string" }, status: { type: "string" }, source: { type: "string", multiple: true }, reviewer: { type: "string" }, "request-id": { type: "string" }, apply: { type: "boolean" }, target: { type: "string", multiple: true }, "expect-hash": { type: "string", multiple: true }, proposal: { type: "string" } };
+// U37 (KTD38, KTD40, KTD42, KTD43): record add and record supersede are automatic. recordedBy names the caller. A write of
+// observed or proposed knowledge passes the plain-rule and scope-name checks, then appends an audit entry with the
+// caller's --session before the record is written. confirmed still needs a human reviewer (validateDraft), and an
+// agent may not supersede a confirmed record: that changes only through the owner.
+const options = { session: { type: "string" }, scope: { type: "string" }, project: { type: "string" }, kind: { type: "string" }, title: { type: "string" }, body: { type: "string" }, "body-file": { type: "string" }, status: { type: "string" }, source: { type: "string", multiple: true }, reviewer: { type: "string" }, "request-id": { type: "string" }, apply: { type: "boolean" }, target: { type: "string", multiple: true }, "expect-hash": { type: "string", multiple: true }, proposal: { type: "string" } };
 async function inputFrom(values, ctx) {
   if (values.body !== undefined && values["body-file"] !== undefined) throw new DevtwinError("USAGE", "Choose one body input");
   let body = values.body ?? "";
@@ -16,9 +26,49 @@ async function inputFrom(values, ctx) {
     if (read.skipped || Buffer.byteLength(read.text) > 32768) throw new DevtwinError("INVALID_INPUT", "Body file unavailable");
     body = read.text;
   }
-  return { scope: values.scope, project: values.project, requestId: values["request-id"], recordedBy: { actor: "human", runId: "run_cli00001" }, draft: { kind: values.kind, status: values.status ?? "observed", title: values.title, body, sources: list(values.source).map((ref) => ({ ref })), applicability: { level: "project" }, review: values.reviewer ? { reviewer: values.reviewer } : null } };
+  return { scope: values.scope, project: values.project, requestId: values["request-id"], recordedBy: cliRecorder(ctx.env ?? process.env), draft: { kind: values.kind, status: values.status ?? "observed", title: values.title, body, sources: list(values.source).map((ref) => ({ ref })), applicability: { level: "project" }, review: values.reviewer ? { reviewer: values.reviewer } : null } };
 }
-export const recordAddCommand = { options, async run(values, ctx) { const input = await inputFrom(values, ctx); if (!values.apply) return previewRecord(ctx.roots, input); if (!input.requestId) throw new DevtwinError("PLAN_REQUIRED", "Request ID required"); return addRecord(ctx.roots, input, { now: ctx.now }); } };
-export const recordSupersedeCommand = { options, async run(values, ctx) { const input = { ...await inputFrom(values, ctx), targets: list(values.target), expectHashes: list(values["expect-hash"]) }; if (!values.apply) return previewRecord(ctx.roots, input); if (!input.requestId) throw new DevtwinError("PLAN_REQUIRED", "Request ID required"); return supersedeRecord(ctx.roots, input, { now: ctx.now }); } };
+const AUDITED = ["observed", "proposed"];
+// The checks that run before the audit entry, so a write refused here leaves no entry behind.
+async function automaticWrite(ctx, route, input, session, { targets = [], expectHashes = [] } = {}) {
+  const { SESSION_ID } = await import("../lessons/propose.mjs");
+  if (session !== undefined && !SESSION_ID.test(session)) throw new DevtwinError("INVALID_INPUT", "Invalid session ID", { field: "session" });
+  if (!REQUEST_ID.test(input.requestId)) throw new DevtwinError("INVALID_ID", "Invalid request ID");
+  const recordId = recordIdFor(input);
+  validateDraft(input.draft, { recordedBy: input.recordedBy, supersedes: targets });
+  assertProjectReach(input.draft);
+  await requireCommittedProject(ctx.roots, input.scope, input.project);
+  if (targets.length) {
+    const records = (await readSnapshot(ctx.roots, input.scope, input.project)).records;
+    targets.forEach((id, i) => {
+      const target = records.find((r) => r.id === id);
+      if (!target || target.effective === "superseded" || target.recordHash !== expectHashes[i]) throw new DevtwinError("STALE_VERSION", "Target changed");
+      if (target.status === "confirmed" && input.recordedBy.actor !== "human") throw new DevtwinError("APPROVAL_REQUIRED", "A confirmed record changes only through the owner", { id });
+    });
+  }
+  if (!AUDITED.includes(input.draft.status)) return null;
+  const { checkAutomaticText } = await import("../audit/checks.mjs");
+  checkAutomaticText({ lines: [input.draft.title], body: input.draft.body });
+  assertOutboundClean(input.draft.title + "\n" + input.draft.body, await isolationTerms(ctx.roots), { except: input.scope });
+  const { appendEntry } = await import("../audit/log.mjs");
+  return appendEntry(ctx.roots, { kind: "record", tier: tierOf({ route }), route, home: "project", scope: input.scope, project: input.project, recordIds: [recordId], supersedes: targets, actor: input.recordedBy.actor, session: session ?? null, requestId: input.requestId }, { now: ctx.now });
+}
+const withAudit = (result, entry) => entry ? { ...result, audit: entry.id } : result;
+export const recordAddCommand = { options, async run(values, ctx) {
+  const input = await inputFrom(values, ctx);
+  if (!values.apply) return previewRecord(ctx.roots, input);
+  if (!input.requestId) throw new DevtwinError("PLAN_REQUIRED", "Request ID required");
+  const entry = await automaticWrite(ctx, "record add", input, values.session);
+  return withAudit(await addRecord(ctx.roots, input, { now: ctx.now }), entry);
+} };
+export const recordSupersedeCommand = { options, async run(values, ctx) {
+  const input = { ...await inputFrom(values, ctx), targets: list(values.target), expectHashes: list(values["expect-hash"]) };
+  if (!values.apply) return previewRecord(ctx.roots, input);
+  if (!input.requestId) throw new DevtwinError("PLAN_REQUIRED", "Request ID required");
+  if (input.targets.length === 0 || input.targets.length !== input.expectHashes.length) throw new DevtwinError("INVALID_INPUT", "Targets and hashes required");
+  const { scope, project, requestId, recordedBy, draft } = input;
+  const entry = await automaticWrite(ctx, "record supersede", { scope, project, requestId, recordedBy, draft }, values.session, input);
+  return withAudit(await supersedeRecord(ctx.roots, input, { now: ctx.now }), entry);
+} };
 export const recordProposeCommand = { options, async run(values, ctx) { const input = await inputFrom(values, ctx); if (!values.apply) return previewRecord(ctx.roots, input); if (!input.requestId) throw new DevtwinError("PLAN_REQUIRED", "Request ID required"); return proposeRecord(ctx.roots, input, { now: ctx.now }); } };
 export const recordPublishCommand = { options, async run(values, ctx) { if (!values.apply) return { preview: true, proposalId: values.proposal }; return publishProposal(ctx.roots, { scope: values.scope, project: values.project, proposalId: values.proposal, review: values.reviewer ? { reviewer: values.reviewer } : null }, { controller: true, now: ctx.now }); } };

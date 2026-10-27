@@ -14,6 +14,7 @@ import { canonicalJson, digest } from "../storage/canonical.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { validateDraft } from "../records/schema.mjs";
 import { isolationTerms, assertOutboundClean } from "../records/isolation.mjs";
+import { checkAutomaticText } from "../audit/checks.mjs";
 
 export const PROPOSALS_PER_SESSION = 3;
 export const PROPOSAL_ID = /^prop_[a-f0-9]{24}$/;
@@ -48,6 +49,8 @@ export async function checkLesson(roots, scope, lesson) {
   if (typeof text !== "string" || (!text.trim() && !summary) || TEXT_UNSAFE.test(text)) invalid("body");
   const clean = { title, summary, text, match: { paths: match?.paths ?? [], packages: match?.packages ?? [], topics: match?.topics ?? [] } };
   if (!["paths", "packages", "topics"].some((key) => clean.match[key].length)) invalid("match");
+  // U37 (KTD43): the plain-rule checks; the body may use Markdown structure (src/audit/checks.mjs).
+  checkAutomaticText({ lines: [title, ...(summary ? [summary] : [])], body: text });
   validateDraft(lessonDraft(clean), { recordedBy: { actor: "other" } });
   assertOutboundClean(lessonText(clean), await isolationTerms(roots), { except: scope });
   return clean;

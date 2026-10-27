@@ -43,6 +43,10 @@ const TABLE = {
   "template list": R, "template show": R, "template from": A,
   "note list": R, "note revoke": ASK, "note consent": ASK,
   "consent grant": ASK, "consent revoke": ASK, "consent list": R,
+  // U37 (KTD40): activity reads the audit log. undo --id of an entry from the calling session (--session matches the
+  // entry's) is automatic; undo --id of any other entry and undo --since need the owner. The hook denies undo --since
+  // --apply by its words (OWNER_ACTIONS); it cannot see sessions, so the "other" target is gated by the owner dialog.
+  activity: R, undo: { session: A, other: ASK, since: ASK },
   "hub propose": A, "hub join": ASK, "hub sync": A, "hub leave": ASK, "hub status": R, "hub schedule": ASK,
   "schedule plan": R, "schedule apply": ASK, "schedule off": ASK, "schedule status": R, "schedule run": A,
   "published list": R, "published delete": ASK,
