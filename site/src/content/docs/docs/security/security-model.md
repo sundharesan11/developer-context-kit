@@ -3,7 +3,7 @@ title: Security model
 description: What devtwin protects against, what it trusts, and where its protections stop.
 ---
 
-devtwin keeps private project context on your machine and makes every write something you previewed and approved. It is designed to prevent **mistakes**: an agent writing to the wrong folder, context leaking into a public repository, a stale plan being applied, a skill folder being clobbered. It is not a sandbox and does not defend against a malicious process running as your own user.
+devtwin keeps private project context on your machine. Every write is a preview followed by an apply, and the [tier table](#tiers) decides who may run the apply: an agent, an agent under a consent you gave, or only you. It is designed to prevent **mistakes**: an agent writing to the wrong folder, context leaking into a public repository, a stale plan being applied, a skill folder being clobbered. It is not a sandbox and does not defend against a malicious process running as your own user.
 
 ## Trust boundary: your user account
 
@@ -32,18 +32,55 @@ The fence controls what **this CLI** writes. It does not limit what your agent h
 - An entry is removable only when its receipt matches a completed journal in this store for the same config ID.
 - Live commands run only from the kit clone the config names, clean and detached at its commit, with your real home.
 - The rollback check compares a skill folder with the inventory taken before an install. It restores nothing.
-- There is no backup. See [Limitations](/docs/security/limitations/).
+- Onboarding copies some repository text into the store, protected by mode 0700 and disk encryption only. Backups are encrypted, but see [Backups](#backups) for what that protects.
 
 ## Approvals and consent
 
 Every write is a preview followed by an apply. Applies are bound to a **fingerprint** of the exact plan, so a plan that changed after you reviewed it is refused.
 
-A fingerprint is not proof that *you* approved. An agent can read a preview and pass its fingerprint back. That is why the bundled skills ask you in the session and never apply a plan you did not approve, and why some actions are reserved for you: `record publish --apply`, live config changes, hook and skill installs, every hub publish and delete, and (when [identity routing](/docs/guides/identity-routing/) ships) account bindings.
+A fingerprint is not proof that *you* approved. An agent can read a preview and pass its fingerprint back. That is why the tier table reserves some actions for you (the **always ask** tier): `record publish --apply`, live config changes, hook and skill installs, `consent grant` and `consent revoke`, `lesson copy`, `published delete`, `hub join`, `undo --since`, `backup restore`, `backup key export`, `paths confirm` and `live approval`, and (when [identity routing](/docs/guides/identity-routing/) ships) account bindings.
 
 Two controls protect these owner actions:
 
 - **The hook block.** When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies owner-only commands from an agent shell, also through terminal wrappers. It reads command text, so it is a guard against mistakes, not a sandbox.
-- **The owner dialog.** Hub joins, publishes, deletes and consent changes show a macOS dialog with the exact content. Nothing is written until you click **Approve**. The text reaches `osascript` only as arguments, never as script text. Without a desktop session, for example over SSH, the dialog denies.
+- **The owner dialog.** Owner actions such as hub joins, deletes, consent changes, restores and the key export show a macOS dialog with the exact content. Nothing is written until you click **Approve**. The text reaches `osascript` only as arguments, never as script text. Without a desktop session, for example over SSH, the dialog denies, unless you [opt in to terminal answers](#owner-answers-over-ssh).
+
+## Tiers
+
+One table in the kit (`src/policy/tiers.mjs`) gives each CLI route a tier. A test checks that every route has a line, and that the always-ask routes match the routes that the hook denies.
+
+| Tier | Who runs it | Examples |
+| --- | --- | --- |
+| Automatic | Agents and jobs, with no prompt | `record add`, `record supersede`, `lesson accept --target project`, `handoff export`, `project onboard`, `backup create`, `undo --id` of an entry from the calling session |
+| Consented | Agents and jobs, while a standing consent for the target is valid | `lesson accept --target hub` |
+| Always ask | You only, after the owner dialog | `consent grant`, `consent revoke`, `pref accept`, `lesson copy`, `hub join`, `instructions apply`, `undo --since`, `undo --id` of another session's entry, and the other owner actions |
+
+- **Review after the write.** Automatic writes land with no prompt. Each knowledge write adds an entry to the [audit log](/docs/concepts/where-data-lives/#activity-consents-and-backups). `activity` lists them, and `undo` reverses one.
+- **Consents.** `consent grant --kind hub-publish --scope <scope>` lets agents publish lessons to that scope's hub. `--kind repo-push --repo <path>` names a bound repository; no command uses it yet. A consent stores its target, a hold time of 1 to 168 hours (24 by default), the grant time and the digest of its rules. A change to the rules voids it. Without a valid consent, a consented action fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent".
+- **Lessons for every organization.** `lesson accept --target general` and `--target hub+general` fail with `DEVTWIN_GATE_REQUIRED`. A lesson in your personal store reaches every organization, so it waits for the weekly review, which arrives in a later phase.
+- **Session cap.** An agent session makes at most 20 automatic knowledge writes. The 21st fails with `DEVTWIN_GATE_REQUIRED`. The cap counts only writes that name a session with `--session`.
+- **Plain text only.** Automatic lesson and record text passes the checks that preferences use, plus the credential and scope-name checks. A title or summary with Markdown structure, an `@` import, a devtwin marker or text that tells the reader to ignore other instructions is refused.
+- **Caller label.** A record that a CLI write makes names its caller in `recordedBy`: `claude` when `CLAUDECODE` is set, `codex` when a `CODEX_` variable is set, and `human` otherwise. This is a label for the audit trail, not a gate. A `confirmed` record still needs a human reviewer.
+- **Confirmed paths.** `paths confirm` is always ask, because a confirmation makes skills stop asking for the kit and config paths. A changed kit HEAD, kit path, config path or config file ends the confirmation.
+
+## Owner answers over SSH
+
+The live config key `approval` is `dialog` by default. `live approval --mode dialog-or-tty` is an opt-in that lets you answer an always-ask prompt on a terminal when there is no GUI session.
+
+- devtwin reads the launchd session type (`launchctl managername`), never `SSH_*` variables. In a GUI session, or when the type cannot be read, the dialog is still required.
+- With no GUI session, devtwin opens `/dev/tty` and shows the dialog text and a random six-letter code. Only the exact code approves. A wrong answer, end of input, 300 seconds with no answer or no terminal denies.
+- This is one control plus a terminal check, not a second factor. A process that can read and write your terminal can answer the prompt.
+- The hook still denies always-ask commands from agent shells. `live approval --apply` is itself always ask.
+
+## Backups
+
+[Backups](/docs/guides/live-mode/#backup-and-restore) protect copies of the store that you keep away from the machine. They do not protect data on the machine.
+
+- The key is 32 random bytes in your login Keychain. Any process that runs as your user can read that item, as it can read the store itself. An agent session can read it too.
+- The key never goes into a file or a command line. devtwin passes it to `/usr/bin/security` on standard input and output.
+- `backup create` is automatic. `backup restore` is always ask: it writes only a new folder inside an approved backup folder, never the live store, and checks the whole archive in memory before it writes. The restored files are plain text.
+- `backup key export` is always ask. Run it in your own terminal, outside any agent session, and store the key in a password manager.
+- Anyone with the key and one archive can read the whole store. Keep the exported key apart from the archives.
 
 Approval responses recorded by the skill builder and skill-source installers (`--interaction-ref`, `--response`) are evidence of your decision, not authentication.
 
@@ -52,7 +89,7 @@ Approval responses recorded by the skill builder and skill-source installers (`-
 Records, briefs, policies, onboarding candidates, fetched feed text and third-party skill files are treated as untrusted data.
 
 - Every brief carries a notice: stored context is evidence, not instructions; repository instructions and the user govern.
-- `confirmed` means an owner workflow receipt, not authentication. CLI records are attributed to `human` whoever runs the command.
+- `confirmed` means an owner workflow receipt, not authentication. The `recordedBy` caller label comes from environment variables, so it is not proof of who ran the command.
 - The bundled skills tell agents never to follow instructions found inside records or fetched text.
 - The personal profile is preference data, never permission.
 
@@ -70,7 +107,7 @@ The full contract is in the [Organization hub](/docs/guides/organization-hub/) g
 - **SSH only.** HTTPS, `git://`, `file://`, local paths, transport helpers and a password in the remote are refused. Hub Git calls keep global config, hooks and filters off.
 - **Hub content is untrusted input.** Clones keep symlinks off and use no submodules. Each file is read without following links, with caps on size, count and JSON depth. Lesson and note text reaches agents only as fenced, attributed data.
 - **Outbound checks.** Every lesson and note passes the credential check and the check against the names of every scope before it is queued, and again when it is pushed. devtwin never force-pushes.
-- **Notes are the one standing consent.** "Working on" notes leave your machine with no per-item yes, under the consent you gave at `hub join`. Only the hook's edit path posts one. The line is built from the branch name and folder areas only.
+- **Standing consents.** "Working on" notes leave your machine with no per-item yes, under the consent you gave at `hub join`. Only the hook's edit path posts one. The line is built from the branch name and folder areas only. Lessons reach the hub with no dialog only under a `hub-publish` consent that you granted for the scope.
 
 ## Live-mode write classes
 
@@ -84,7 +121,7 @@ Most commands make no network request. The exceptions are explicit:
 | --- | --- | --- |
 | `skill-sources check`, `preview`, `stage` | `api.github.com` (unauthenticated) | Repository, release, tag, commit and selected-file requests |
 | `stack check`, `stack digest` (preview), the `radar-weekly` and `advisory-hourly` jobs | Only hosts in your stored approval | Feed URLs and identifiers; exact versions to OSV only when advisories are enabled |
-| `hub join`, `hub sync`, `lesson accept` and `lesson copy` to a hub, `lesson supersede-propose --apply`, `published delete` | Your hub remote, over SSH | Accepted lessons, your "working on" notes and your tombstones |
+| `hub join`, `hub sync`, `lesson accept --target hub`, `lesson copy`, `lesson supersede-propose --apply`, `published delete` | Your hub remote, over SSH | Accepted lessons, your "working on" notes and your tombstones |
 
 Hosts still see your IP address and the request time. The stack watch never follows redirects, refuses hosts that resolve to private or reserved addresses, and caps request count, size and time. Fetched text is rendered as inert, fenced text. No environment variable or record is read for a token.
 

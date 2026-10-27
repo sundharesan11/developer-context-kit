@@ -107,6 +107,7 @@ Lessons, the agent hook and the organization hub add these:
 | `config/hubs/<scope>.json` | The hub binding: hub ID, handle, commit email and note consent. |
 | `state/lessons/<scope>.json` | The lesson index for a scope. A cache that `lesson index` and `hub sync` rebuild. |
 | `state/hooks/` | The kit receipt, per-session files, the budget log and the hook log. They hold no prompt text. |
+| `state/confirmed-paths.json` | The kit and config paths, the kit's Git HEAD and the config hash that `paths confirm` recorded. |
 | `state/hubs/<hubId>/` | The outbox, the colleagues' notes cache, replacement notices and tombstone memory. |
 | `<hub root>/<scope>/` | The local clone of the hub, inside a hub root folder you approved. Not in the store. |
 
@@ -117,6 +118,20 @@ The [radar and its schedules](/docs/guides/stack-watch/#the-radar) add these:
 | `data/guides/radar/` or `data/scopes/<scope>/guides/radar/` | Radar guides: one "how to try this" note for each item you chose. |
 | `state/radar/` | The items of the latest digest (ID, catalog name, kind, date and links, no feed text) and the advisory alert memory. |
 | `state/schedule/` | Each job's flag in `jobs.json` and its last-run receipt in `receipts/<job>.json`. |
+
+## Activity, consents and backups
+
+The [tier table](/docs/security/security-model/#tiers) and backups add these:
+
+| Path | Holds |
+| --- | --- |
+| `state/audit/<yyyy-mm>.jsonl` | The audit log: one entry for each automatic knowledge write and each undo. An entry holds IDs, the route, the target, the caller and the session, never a title or body. `activity` reads it. |
+| `state/consents/<kind>/` | One file for each standing consent: the target, the hold time, the grant time and the digest of its rules. |
+| `state/backup/key-export.json` | The time of the last `backup key export`. It never holds the key. |
+| Retraction records | `undo` writes a record of kind `retraction` next to the record it reverses. Briefs, the lesson index and handoff exports never deliver a retraction. |
+| `<backup folder>/devtwin-backup-<time>-<id>.dtb` | Encrypted backup archives, mode 0600, inside a backup folder you approved. Not in the store. |
+
+The backup key is in your macOS Keychain under the service `devtwin-backup`, not in a file.
 
 ## Live mode layout
 
@@ -135,13 +150,13 @@ In live mode, everything private lives under one folder in your home directory:
 
 </FileTree>
 
-Outside this folder, live mode writes only `devtwin-*` skill folders inside `~/.claude/skills` and `~/.agents/skills`, and the exact paths you approved as [write classes](/docs/reference/configuration/#write-classes): hub clone folders, devtwin's own entries in the agent hook settings files, and its `devtwin.*.plist` files in `~/Library/LaunchAgents`. The hub sync and radar jobs use those plist files. See [Live mode](/docs/guides/live-mode/).
+Outside this folder, live mode writes only `devtwin-*` skill folders inside `~/.claude/skills` and `~/.agents/skills`, and the exact paths you approved as [write classes](/docs/reference/configuration/#write-classes): hub clone folders, devtwin's own entries in the agent hook settings files, its `devtwin.*.plist` files in `~/Library/LaunchAgents`, and backup archives in the backup folders. The hub sync, radar, activity and backup jobs use those plist files. See [Live mode](/docs/guides/live-mode/).
 
 ## Protection and its limits
 
 - **Private file modes.** New files are created with mode `0600` and folders with `0700`, so other users on the machine can't read them.
-- **Not encrypted.** `devtwin` does not encrypt the store. Use full-disk encryption, such as FileVault on macOS.
-- **No backup and no sync.** The store exists only on your disk. A hub shares only the lessons you accept and your "working on" notes, never the store. If you lose it, you lose its records. Back up `~/.devtwin` with your usual backup tool if the context matters to you.
+- **Not encrypted on disk.** `devtwin` does not encrypt the store itself. Use full-disk encryption, such as FileVault on macOS. Only the backup archives are encrypted.
+- **Backups, no sync.** In live mode, `backup create` and the daily backup job write encrypted archives to a folder you approved. Until you approve one, the store exists only on your disk, and if you lose it, you lose its records. A hub shares only the lessons you accept and your "working on" notes, never the store. See [Backup and restore](/docs/guides/live-mode/#backup-and-restore).
 - **The fence is not a sandbox.** `devtwin` refuses to write outside the pilot's folders and always refuses your real agent homes (`~/.claude`, `~/.codex`, `~/.agents`, `~/.gemini`, `~/.cursor`, `~/.commandcode`, plus `$CLAUDE_CONFIG_DIR` and `$CODEX_HOME` when set) and the kit checkout. That limits the CLI, not other programs: any process running as you, including your agent, can still read the store.
 
 Read the [Security model](/docs/security/security-model/) for the full set of assumptions.

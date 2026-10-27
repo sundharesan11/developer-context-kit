@@ -1,6 +1,6 @@
 ---
 title: Organization hub
-description: Share accepted lessons and short "working on" notes with colleagues through a Git repository that your organization owns, with every publish approved by you.
+description: Share accepted lessons and short "working on" notes with colleagues through a Git repository that your organization owns, under consents that you grant and can revoke.
 sidebar:
   label: Organization hub
 ---
@@ -78,16 +78,29 @@ The job is a user LaunchAgent that runs `hub sync --job` every 10 minutes. It ha
 
 ## Publish a lesson
 
-A lesson reaches the hub only when you accept a proposal, or copy a personal lesson, in your own terminal. Agents only propose; see [Lessons and hooks](/docs/guides/lessons-and-hooks/#let-agents-propose-lessons).
+A lesson reaches the hub only when a proposal is accepted under your `hub-publish` consent, or when you copy a personal lesson in your own terminal. Agents write proposals with `lesson propose`; see [Lessons and hooks](/docs/guides/lessons-and-hooks/#let-agents-propose-lessons).
+
+Grant the consent once for the scope, in your own terminal:
+
+```sh
+node "$KIT/bin/devtwin.mjs" consent grant --pilot "$LIVE_CONFIG" --kind hub-publish --scope example
+node "$KIT/bin/devtwin.mjs" consent grant --pilot "$LIVE_CONFIG" --kind hub-publish --scope example --apply --plan-fingerprint '<fingerprint>'
+```
+
+The grant shows the owner dialog with the scope, the hub and the rules. The setup step `consent-hub` runs the same command. `consent list` shows each consent, and `consent revoke` ends one.
+
+After that, an agent or you can publish a proposal:
 
 ```sh
 node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id prop_0123456789abcdef01234567 --target hub
 node "$KIT/bin/devtwin.mjs" lesson copy --pilot "$LIVE_CONFIG" --id rec_0123456789abcdef01234567 --to-scope example
 ```
 
-- The apply shows a macOS dialog with the exact lesson text: the title, the do or don't line, the body and the match rules. A denied dialog writes nothing, and the proposal stays pending.
+- `lesson accept --target hub` shows no dialog. While the consent is valid, the apply publishes the lesson. Without a valid consent, it fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent", and writes nothing: no commit, no outbox item, and the proposal stays pending.
+- A kit update that changes the consent rules makes the consent void. Grant it again to review the new rules.
+- The text passes the credential check and the check against every scope name before it is queued, and again when it is pushed.
 - The hub file names you by your claimed handle. Your full local record is never published.
-- `lesson copy` publishes a lesson from your personal store to the hub of another scope. It first checks the text against the names of every other scope and fails with `DEVTWIN_ISOLATION` before the dialog.
+- `lesson copy` is an owner action. It publishes a lesson from your personal store to the hub of another scope, after the owner dialog. It first checks the text against the names of every other scope and fails with `DEVTWIN_ISOLATION` before the dialog.
 
 ## Replace a lesson
 
@@ -101,7 +114,7 @@ node "$KIT/bin/devtwin.mjs" lesson supersede-propose --pilot "$LIVE_CONFIG" --sc
 node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id prop_0123456789abcdef01234567 --target hub
 ```
 
-- A replacement accepts to the `hub` target only. The dialog names the lesson it replaces.
+- A replacement accepts to the `hub` target only, under the same `hub-publish` consent. The preview names the lesson it replaces.
 - After the next `hub sync`, the old lesson stops matching on every machine and the replacement is delivered in its place.
 - When another replacement reached the hub first, the accept fails with `DEVTWIN_STALE_VERSION`. Nothing is published and the proposal stays pending.
 - **Contested.** Two replacements pushed before either client saw the other both land. Both are delivered with a `contested: ` prefix, and the old lesson stops matching. devtwin does not choose a winner. The contest ends when one author deletes their replacement.
@@ -130,7 +143,7 @@ sample-dev on feat/retry touching src/billing, src/payments
 - **Content.** The line is built from the branch name and the areas only, never from a prompt or agent text. An area is the first two folder levels of a path. A note holds at most 10 areas.
 - **Checks.** The line passes the credential check and the check against every scope name before it is queued, and again when it is pushed.
 - **Expiry.** A note expires after 72 hours. Each `hub sync` deletes your own expired notes.
-- **Consent.** Notes are the only items that leave your machine without a per-item yes. They post under the consent you gave at `hub join`.
+- **Consent.** Notes leave your machine without a per-item yes, under the note consent you gave at `hub join`. Lessons do so only under a `hub-publish` consent.
 
 When an agent's tool call touches the area of a colleague's active note, the hook adds one fenced block that names the colleague and the note. A session gets each note once and at most two note reports. Your own notes are never reported to you.
 
@@ -160,11 +173,11 @@ A tombstone removes a lesson on other machines only when its handle matches the 
 
 These commands need you at the keyboard. The devtwin hook denies them from an agent shell, and each one except `lesson notices` shows the owner dialog:
 
-- `hub join`, `lesson accept`, `lesson copy`, `published delete`, `hub leave`, `hub schedule`, `lesson notices --ack`, `note revoke` and `note consent`, with `--apply`.
+- `hub join`, `lesson copy`, `published delete`, `hub leave`, `hub schedule`, `lesson notices --ack`, `note revoke`, `note consent`, `consent grant` and `consent revoke`, with `--apply`.
 
-An agent can run the previews and show you what an action would do.
+An agent can run the previews and show you what an action would do. `lesson accept --target hub` is not an owner action: it publishes with no dialog while your `hub-publish` consent for the scope is valid.
 
-Without a desktop session, the dialog denies. `hub status`, `hub sync`, `note list`, `published list` and every preview stay open to agents.
+Without a desktop session, the dialog denies, unless you opted in to [terminal answers](/docs/security/security-model/#owner-answers-over-ssh). `hub status`, `hub sync`, `note list`, `published list` and every preview stay open to agents.
 
 ## Trust model
 

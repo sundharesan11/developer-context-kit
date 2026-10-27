@@ -86,6 +86,17 @@ The live config is a pilot file with a `live` block. `live init` writes it; you 
 
 Live mode relaxes the fence for exactly these named skill folders (only `devtwin-*` entries inside them) and the listed repositories (read-only). The approved digest is stored at `store/state/live/approved-config.json`; a `live.json` that differs from it is refused.
 
+### Approval mode
+
+The optional `live.approval` key sets how you answer an always-ask prompt:
+
+| Value | Meaning |
+| --- | --- |
+| `dialog` | The default. Every always-ask action needs the macOS owner dialog. With no GUI session, such as over SSH, it denies. |
+| `dialog-or-tty` | In a GUI session the dialog is still required. With no GUI session, devtwin shows the prompt and a six-letter code on the terminal, and only that code approves. |
+
+Set it only with [`live approval`](/docs/reference/cli/#live-approval), an owner action. The key is part of the approved config digest. See [Owner answers over SSH](/docs/security/security-model/#owner-answers-over-ssh).
+
 ### Write classes
 
 A live config can hold an optional top-level `writeClasses` block. It names the only other paths outside the store that devtwin may write. Each class is a list of exact absolute paths, at most 16 per class.
@@ -94,19 +105,21 @@ A live config can hold an optional top-level `writeClasses` block. It names the 
 "writeClasses": {
   "hubRoot": ["/Users/<you>/.devtwin/hubs"],
   "hookTargets": ["/Users/<you>/.claude/settings.json", "/Users/<you>/.codex/hooks.json"],
-  "launchAgents": ["/Users/<you>/Library/LaunchAgents/devtwin.hub-sync.example.plist"]
+  "launchAgents": ["/Users/<you>/Library/LaunchAgents/devtwin.hub-sync.example.plist"],
+  "backupTargets": ["/Users/<you>/devtwin-backups"]
 }
 ```
 
 | Class | Allowed paths | Written by |
 | --- | --- | --- |
 | `hubRoot` | Folders inside your home for hub clones. Writes are allowed in the folder and below it. | `hub join`, `hub sync`, `hub leave` |
-| `instructionTargets` | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`), `~/.codex/AGENTS.md`, and a `devtwin*.md` file directly in one of those folders. | No command yet |
+| `instructionTargets` | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`), `~/.codex/AGENTS.md`, and a `devtwin*.md` file directly in one of those folders. | `instructions apply` |
 | `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) and `~/.codex/hooks.json`. | `agents install --hooks`, `agents uninstall --hooks` |
 | `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. | `hub schedule`, `schedule apply`, `schedule off` |
+| `backupTargets` | Folders inside your home for backup archives and restores. Writes are allowed in the folder and below it, never in a sibling or a parent. | `backup create`, `backup restore`, the `backup-daily` job |
 
 - Set the classes only with [`live write-classes`](/docs/reference/cli/#live-write-classes). The classes are part of the approved config digest, so a hand edit is refused with `DEVTWIN_GATE_REQUIRED`.
-- Every path must be canonical and inside your home. A link, or a path whose folder is a link, is refused. A hub root must not overlap the store, the kit, a listed repository, a skill folder or another hub root.
+- Every path must be canonical and inside your home. A link, or a path whose folder is a link, is refused. A hub root or backup folder must not overlap the store, the kit, a listed repository, a skill folder, a protected agent home or another approved folder.
 - In a settings or instruction file, devtwin changes only its own JSON entries or the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. It backs up the exact prior bytes to `store/state/runs/<run_id>/backups/` first, and the file keeps its own mode.
 - A disposable pilot can list classes too. Its file targets must have the same shapes inside a listed `agentHomes` folder, and its hub roots must be inside `pilotRoot`.
 

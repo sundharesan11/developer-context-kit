@@ -38,12 +38,15 @@ node "$KIT/bin/devtwin.mjs" setup apply --pilot "$LIVE_CONFIG" --step hook-verif
 | `write-classes-hooks` | Approves `~/.claude/settings.json` and `~/.codex/hooks.json` as hook targets (`live write-classes --hook-target`). | Yes |
 | `hooks-claude`, `hooks-codex` | Adds devtwin's hook entries for that agent (`agents install --hooks`). | Yes |
 | `hook-verify` | Writes the kit receipt that the hook trusts (`hook verify`). | |
+| `paths-confirm` | Records the kit and config paths, so the skills stop asking for them and the hook renews its receipt (`paths confirm`). | Yes |
 | `profile` | Writes your personal profile (`profile plan` and `profile apply`). | |
 | `starter-preferences` | Stores the starter preferences you select as personal preference records. | |
 | `scope` | Adds the scope you name with `--scope` (`scope add`). | |
 | `first-project` | Onboards one repository into the scope (`project onboard`). The live config must list it first. | |
 | `hub-join` | Joins an [organization hub](/docs/guides/organization-hub/) (`hub join`). Skipped without `--hub-remote`. | Yes |
 | `job-hub-sync` | Installs the hub sync job (`hub schedule`). Skipped when the scope has no hub. | Yes |
+| `consent-hub` | Grants the `hub-publish` consent for the scope, so `lesson accept --target hub` publishes with no dialog (`consent grant`). Skipped when the scope has no hub. | Yes |
+| `consent-repo` | Grants the `repo-push` consent for the bound repository at `--push-repo` (`consent grant`). No command uses this consent yet. Skipped without `--push-repo`. | Yes |
 | `sandbox` | Recommends agent sandbox settings, and a container setup when the scan finds services. Writes no agent setting. | |
 
 The starter output templates step is listed as "not available yet" and writes nothing. The scheduled radar, advisory and review reminder steps run `schedule apply` after the owner dialog. Each one is skipped, with the command to run, until its plist path is approved with `live write-classes --launch-agent`. The radar step also needs a stack approval, and the advisory step needs the radar job on.
@@ -68,9 +71,11 @@ The starter output templates step is listed as "not available yet" and writes no
 | `--project`, `--repo`, `--doc`, `--expect-remote`, `--environment`, `--actor`, `--accept`, `--request-id`, `--keep-previous` | `first-project`. Same values as [`project onboard`](/docs/reference/cli/#project-onboard). `--repo` is also used by `sandbox`. |
 | `--recommendation <id>` | `sandbox`. Repeatable. |
 | `--hub-remote`, `--hub-handle`, `--hub-email`, `--ssh-command`, `--hub-root` | `hub-join`. |
+| `--push-repo <path>` | `consent-repo`. |
+| `--hold-hours <n>` | `consent-hub` and `consent-repo`. The hold time, from 1 to 168. Default 24. |
 
 ## Owner steps
 
-The steps marked **Owner** run an owner action. The devtwin hook denies `setup apply` for these steps from an agent shell, and denies the `devtwin setup` terminal loop. An agent that uses the `devtwin-setup` skill shows you the plan and gives you the exact `setup apply` command to run in your own terminal.
+The steps marked **Owner** run an owner action. The scheduled radar, advisory and review reminder steps are owner steps too. The devtwin hook denies `setup apply` for these steps from an agent shell, and denies the `devtwin setup` terminal loop. An agent that uses the `devtwin-setup` skill shows you the plan and gives you the exact `setup apply` command to run in your own terminal.
 
 A terminal prompt protects against accidents. It is not proof that you are at the keyboard.

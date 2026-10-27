@@ -56,7 +56,7 @@ Commands that write follow one of three patterns:
 | Pattern | Commands |
 | --- | --- |
 | Preview, then `--apply` | `init`, `scope add`, `record add`, `record supersede`, `record propose`, `record publish`, `hub propose`, `lesson propose`, `lesson supersede-propose` |
-| Preview, then `--apply --plan-fingerprint <fp>` | `project onboard`, `live *`, `agents install/uninstall/recover`, `locks release`, `draft save`, `stack digest`, `radar guide`, `schedule off`, `lesson edit/reject/accept/copy`, `lesson notices --ack`, `hub join/leave/schedule`, `note revoke/consent`, `published delete` |
+| Preview, then `--apply --plan-fingerprint <fp>` | `project onboard`, `live *`, `agents install/uninstall/recover`, `locks release`, `draft save`, `stack digest`, `radar guide`, `schedule off`, `lesson edit/reject/accept/copy`, `lesson notices --ack`, `hub join/leave/schedule`, `note revoke/consent`, `published delete`, `consent grant/revoke`, `undo`, `backup create/restore`, `backup key export`, `paths confirm` |
 | Preview command, then a separate apply command with `--plan-fingerprint` | `profile plan` → `profile apply`, `stack plan` → `stack approve`, `setup plan` → `setup apply`, `schedule plan` → `schedule apply` |
 | No preview | `lesson index` and `hook verify` write only devtwin's own state. `hub sync` fetches and pushes items you already approved. |
 
@@ -64,7 +64,9 @@ The skill builder and skill-source installers add separate recorded approvals; s
 
 ### Owner actions
 
-Some commands need you at the keyboard. When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson accept`, `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most hub and lesson owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
+Some commands need you at the keyboard: the **always ask** tier of the [tier table](/docs/security/security-model/#tiers). When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `consent grant`, `consent revoke`, `undo --since`, `backup restore`, `backup key export`, `paths confirm`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
+
+`lesson accept` is not an owner action. Agents run it for the `project` target, and for the `hub` target while you hold a `hub-publish` consent. `undo --id` of an entry from the agent's own session is automatic too.
 
 ### Identifiers
 
@@ -219,7 +221,8 @@ node "$HOME/.devtwin/kit/bin/devtwin.mjs" live migrate --pilot "$HOME/.devtwin/l
 | `--instruction-target <file>` | `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` or a `devtwin*.md` file in one of those folders. Repeatable. |
 | `--hook-target <file>` | `~/.claude/settings.json` or `~/.codex/hooks.json`. Repeatable. |
 | `--launch-agent <file>` | A `devtwin.<name>.plist` file in `~/Library/LaunchAgents`. Repeatable. |
-| `--clear <class>` | Remove a class: `hubRoot`, `instructionTargets`, `hookTargets` or `launchAgents`. Repeatable. |
+| `--backup-target <folder>` | A folder inside your home for backup archives and restores. Repeatable. |
+| `--clear <class>` | Remove a class: `hubRoot`, `instructionTargets`, `hookTargets`, `launchAgents` or `backupTargets`. Repeatable. |
 | `--apply --plan-fingerprint <fp>` | Write. |
 
 ```sh
@@ -246,6 +249,22 @@ node "$KIT/bin/devtwin.mjs" live stack-watch --pilot "$LIVE_CONFIG" --host api.g
 ```
 
 Take the hosts from the `hosts` list of `stack plan`. After a change, run `stack plan` and `stack approve` again.
+
+### `live approval`
+
+**Owner** with `--apply`. Sets how you answer an always-ask prompt: the live config key `approval`. See [Owner answers over SSH](/docs/security/security-model/#owner-answers-over-ssh).
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. The live config. |
+| `--mode <mode>` | Required. `dialog` (the default) or `dialog-or-tty`. |
+| `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |
+
+```sh
+node "$KIT/bin/devtwin.mjs" live approval --pilot "$LIVE_CONFIG" --mode dialog-or-tty
+```
+
+With `dialog-or-tty` and no GUI session, such as over SSH, the prompt and a six-letter code go to the terminal. Type the code to approve. In a GUI session the dialog is still required. The key is part of the approved config digest, so a change ends the [path confirmation](#paths-confirm).
 
 ## Projects and context
 
@@ -335,7 +354,10 @@ Returns `records`, `packetHash`, `fileHash`, `bytes`, `output` and `"publication
 | `--reviewer <actor>` | Required for `confirmed`. |
 | `--source <ref>` | Repeatable, up to 20. `file:`, `commit:`, `record:`, `issue:`, `user:` or `url:`. |
 | `--request-id <id>` | Required with `--apply`. |
+| `--session <id>` | Optional. The session ID from the hook's session-start line. It lets that session undo its own writes, and counts toward the session cap. |
 | `--apply` | Write. Without it, the command previews and returns the `recordId`. |
+
+`record add` and `record supersede` of `observed` or `proposed` knowledge are automatic writes: each one adds an entry to the audit log. An agent session makes at most 20 of them. See [`activity`](#activity) and [`undo`](#undo).
 
 ### `record add`
 
@@ -494,7 +516,7 @@ devtwin radar guide --pilot "$PILOT" --scope acme --item 0123456789ab
 
 ## Schedules
 
-Three jobs run the radar: `radar-weekly`, `advisory-hourly` and `review-monthly`. Each is a user LaunchAgent. See [Schedules](/docs/guides/stack-watch/#schedules).
+Five jobs run in the background: `radar-weekly`, `advisory-hourly` and `review-monthly` for the radar, `activity-weekly` for the weekly activity notification, and `backup-daily` for the [daily backup](/docs/guides/live-mode/#backup-and-restore). Each is a user LaunchAgent. See [Schedules](/docs/guides/stack-watch/#schedules).
 
 ### `schedule plan`
 
@@ -503,11 +525,11 @@ Shows the LaunchAgent path, the command it runs and the off switch for one job. 
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
-| `--job <job>` | Required. `radar-weekly`, `advisory-hourly` or `review-monthly`. |
+| `--job <job>` | Required. `radar-weekly`, `advisory-hourly`, `review-monthly`, `activity-weekly` or `backup-daily`. |
 
 ### `schedule apply`
 
-**Owner**. Shows the owner dialog, writes the plist and loads it. The radar and advisory jobs need a stack approval. The advisory job also needs the radar job on and the `advisories` group.
+**Owner**. Shows the owner dialog, writes the plist and loads it. The radar and advisory jobs need a stack approval. The advisory job also needs the radar job on and the `advisories` group. The backup job needs an approved `backupTargets` folder.
 
 | Flag | |
 | --- | --- |
@@ -613,14 +635,14 @@ Lists every step with `id`, `title`, `available`, `owner`, `what`, `why`, `undo`
 
 ### `setup plan` / `setup apply`
 
-`setup plan --step <id>` shows the preview of one step and its fingerprint. `setup apply --step <id> --plan-fingerprint <fp>` applies it. `setup apply` is **Owner** for the steps `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex`, `hub-join` and `job-hub-sync`.
+`setup plan --step <id>` shows the preview of one step and its fingerprint. `setup apply --step <id> --plan-fingerprint <fp>` applies it. `setup apply` is **Owner** for the steps `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex`, `paths-confirm`, `hub-join`, `job-hub-sync`, `consent-hub`, `consent-repo`, `job-radar`, `job-advisories` and `job-review-reminder`.
 
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
 | `--step <id>` | Required. A step ID from `setup status`. |
 | `--plan-fingerprint <fp>` | `setup apply` only. Required. |
-| Step flags | `--home`, `--run-id`, `--work`, `--preference`, `--stack-current`, `--stack-known`, `--writing`, `--seed-from-init`, `--proposed-by`, `--starter`, `--scope`, `--display-name`, `--project`, `--repo`, `--doc`, `--expect-remote`, `--environment`, `--actor`, `--accept`, `--request-id`, `--keep-previous`, `--recommendation`, `--hub-remote`, `--hub-handle`, `--hub-email`, `--ssh-command`, `--hub-root`. Each step reads only its own. See [Setup flags](/docs/guides/setup-wizard/#setup-flags). |
+| Step flags | `--home`, `--run-id`, `--work`, `--preference`, `--stack-current`, `--stack-known`, `--writing`, `--seed-from-init`, `--proposed-by`, `--starter`, `--scope`, `--display-name`, `--project`, `--repo`, `--doc`, `--expect-remote`, `--environment`, `--actor`, `--accept`, `--request-id`, `--keep-previous`, `--recommendation`, `--hub-remote`, `--hub-handle`, `--hub-email`, `--ssh-command`, `--hub-root`, `--push-repo`, `--hold-hours`. Each step reads only its own. See [Setup flags](/docs/guides/setup-wizard/#setup-flags). |
 
 ## Lessons
 
@@ -697,7 +719,13 @@ Drops a pending proposal. Takes `--id <prop_id>`; apply with `--apply --plan-fin
 
 ### `lesson accept`
 
-**Owner** with `--apply`. Accepts a proposal. Every target shows the owner dialog.
+Accepts a proposal. It shows no owner dialog; the [tier](/docs/security/security-model/#tiers) of the target decides who may run the apply.
+
+| Target | Tier |
+| --- | --- |
+| `project` | Automatic. Agents run it. Writes an `observed` lesson record and an audit entry. |
+| `hub` (default) | Consented. Runs only while a `hub-publish` consent for the scope is valid; otherwise fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". |
+| `general`, `hub+general` | Refused with `DEVTWIN_GATE_REQUIRED`. These lessons wait for the weekly review, which arrives in a later phase. |
 
 | Flag | |
 | --- | --- |
@@ -705,7 +733,8 @@ Drops a pending proposal. Takes `--id <prop_id>`; apply with `--apply --plan-fin
 | `--id <prop_id>` | Required. |
 | `--target <target>` | `hub` (default), `hub+general`, `project` or `general`. See [Review proposals](/docs/guides/lessons-and-hooks/#review-proposals). |
 | `--scope <id>`, `--project <id>` | The project for a `project` target when the proposal names none. |
-| `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |
+| `--session <id>` | Optional. The session ID from the hook, so that the session can undo the write. |
+| `--apply --plan-fingerprint <fp>` | Write. |
 
 A replacement accepts to `hub` only. `DEVTWIN_STALE_VERSION` means another replacement reached the hub first.
 
@@ -758,7 +787,17 @@ You don't run it yourself; `agents install --hooks` writes the entries.
 
 ### `hook verify`
 
-Loads and checks the full pilot, then writes the kit receipt that the hook trusts, at `stateRoot/hooks/kit-receipt.json`. The receipt is valid for seven days. Takes only `--pilot`.
+Loads and checks the full pilot, then writes the kit receipt that the hook trusts, at `stateRoot/hooks/kit-receipt.json`. The receipt is valid for 30 days. While the [confirmed paths](#paths-confirm) match, each session start renews it. Takes only `--pilot`.
+
+### `paths confirm`
+
+**Owner** with `--apply`. Records the real paths of the kit and the live config, the kit's Git HEAD and the SHA-256 of the config in `stateRoot/confirmed-paths.json`. While they still match, the session-start line ends with "Kit and config confirmed.", the bundled skills stop asking you for the paths, and the hook renews the kit receipt. Takes `--pilot` and `--apply --plan-fingerprint <fp>`. The apply shows the owner dialog with both paths.
+
+A kit upgrade or a config change ends the confirmation. Run `paths confirm` again after you check the new paths.
+
+### `paths check`
+
+Reports `match` or `mismatch` for each confirmed value. Read-only. Takes only `--pilot`.
 
 ### `budget report`
 
@@ -841,6 +880,102 @@ Lists what devtwin published in your name: your hub lessons with their status, y
 | `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |
 
 Git history and colleagues' existing clones keep the text. Another author's item fails with `DEVTWIN_HUB_PATH_REFUSED`.
+
+## Consents, activity and undo
+
+See the [tier table](/docs/security/security-model/#tiers).
+
+### `consent grant`
+
+**Owner** with `--apply`. Records a standing consent, after the owner dialog.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--kind <kind>` | Required. `hub-publish` or `repo-push`. |
+| `--scope <id>` | For `hub-publish`. A scope that joined a hub. |
+| `--repo <path>` | For `repo-push`. A bound repository. No command uses this consent yet. |
+| `--hold-hours <n>` | The hold time, from 1 to 168. Default 24. |
+| `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |
+
+```sh
+node "$KIT/bin/devtwin.mjs" consent grant --pilot "$LIVE_CONFIG" --kind hub-publish --scope example
+```
+
+A change to the consent rules in a later kit makes the stored consent void. Grant it again to review the new rules.
+
+### `consent revoke`
+
+**Owner** with `--apply`. Ends a consent. Takes `--pilot`, `--kind`, `--scope` or `--repo`, and `--apply --plan-fingerprint <fp>`. Agents then stop at "Needs consent" for that target.
+
+### `consent list`
+
+Lists each consent with its target, hold time, grant time and whether it is valid. It also shows the note consent of each hub, which `note consent` and `note revoke` manage. Read-only. Takes only `--pilot`.
+
+### `activity`
+
+Lists what devtwin learned in the last seven days: each automatic write with its entry ID, time, route, target, record IDs, caller and whether it landed. It also lists warnings, such as no approved backup folder. Read-only.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--since <time>` | An ISO time, such as `2026-10-01T00:00:00Z`. |
+| `--held` | Only the held items, with their full text. |
+
+### `undo`
+
+Reverses automatic writes from the audit log. A record gets a retraction, so the next session no longer sees it. When the undone entry replaced an earlier record, that record comes back as a new one.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--id <entry>` | One entry. Automatic with `--session` when the calling session made the entry; any other entry shows the owner dialog. |
+| `--session <id>` | The calling session's ID. |
+| `--since <time>` | Every entry after this time, newest first. **Owner** with `--apply`. |
+| `--apply --plan-fingerprint <fp>` | Write. |
+
+```sh
+node "$KIT/bin/devtwin.mjs" undo --pilot "$LIVE_CONFIG" --id aud_0123456789abcdef01234567
+```
+
+Each undo adds its own audit entry. An undo of an undo fails with `DEVTWIN_CONFLICT`.
+
+## Backups
+
+See [Backup and restore](/docs/guides/live-mode/#backup-and-restore).
+
+### `backup create`
+
+Writes one encrypted archive of the store into an approved `backupTargets` folder. Automatic: agents and the `backup-daily` job may run it. Each folder keeps the newest 14 archives. A held store lock stops it with `DEVTWIN_BUSY` before it writes.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--to <folder>` | One of the approved backup folders. Default: the first one. |
+| `--apply --plan-fingerprint <fp>` | Write. |
+
+Without an approved folder it fails with `DEVTWIN_GATE_REQUIRED`. The key is made in your macOS Keychain on the first run.
+
+### `backup restore`
+
+**Owner** with `--apply`. Decrypts an archive into a new folder inside an approved backup folder, after the owner dialog. It never writes the live store.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--from <archive>` | Required. A `.dtb` archive. |
+| `--to <folder>` | Required. A new folder inside an approved backup folder. |
+| `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |
+
+A changed archive or a wrong key fails with `DEVTWIN_INTEGRITY`, and an existing folder with `DEVTWIN_CONFLICT`. Nothing is written in either case.
+
+### `backup status`
+
+Lists the archives in each approved folder and whether the key was exported. Read-only. Takes only `--pilot`.
+
+### `backup key export`
+
+**Owner** with `--apply`. Prints the backup key once, after the owner dialog. Run it in your own terminal, outside any agent session. Takes `--pilot` and `--apply --plan-fingerprint <fp>`.
 
 ## Preferences
 

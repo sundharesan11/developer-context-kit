@@ -39,7 +39,7 @@ macOS is the reference platform. The test suite also runs on Linux, but Linux is
 
 ## Does it remember things automatically?
 
-No record is written unless you, or an agent through a bundled skill, run a record or lesson command, and agent writes are proposals until you publish or accept them. A brief reaches a session only when you or a skill fetch it. With the [agent hook](/docs/guides/lessons-and-hooks/) installed, matching lesson lines arrive on their own while the agent works.
+Partly. No record is written unless you, or an agent through a bundled skill, run a record or lesson command. An agent can save a lesson for the current project on its own, with no prompt. You review those writes afterwards with `activity` and the weekly notification, and reverse one with `undo`. A brief reaches a session only when you or a skill fetch it. With the [agent hook](/docs/guides/lessons-and-hooks/) installed, matching lesson lines arrive on their own while the agent works.
 
 ## Why does every command need `--pilot`?
 
@@ -59,7 +59,7 @@ Not through a shared store: devtwin keeps one private store per machine, with no
 
 ## Do my lessons leave my machine?
 
-Only when you say so. Agent proposals stay on your machine. A lesson goes to a hub only when you run `lesson accept --target hub` or `lesson copy` in your own terminal and click **Approve** in the dialog that shows the exact text. A `general` or `project` lesson never leaves your machine. The one exception to per-item approval is "working on" notes, which post under the consent you give at `hub join`, and which you can stop with `note revoke`.
+Only under a consent you gave. Proposals and `project` lessons stay on your machine. A lesson goes to a hub in two ways. First, `lesson accept --target hub` publishes it with no dialog, but only while you hold a `hub-publish` consent for that scope. You grant that consent once with `consent grant` and end it with `consent revoke`. Second, `lesson copy` in your own terminal shows the dialog with the exact text. "Working on" notes post under the consent you give at `hub join`, and you can stop them with `note revoke`.
 
 ## What do my colleagues see?
 
@@ -67,11 +67,11 @@ Your accepted hub lessons, labelled as claimed by your handle, and your "working
 
 ## Can an agent publish for me?
 
-No. An agent can propose up to three lessons per session, but `lesson accept`, `lesson copy`, `published delete` and `hub join` are owner actions. The devtwin hook denies them from an agent shell, and each one shows a macOS dialog that only you can approve.
+Only under a consent you gave. An agent can propose up to three lessons per session and accept them for the current project. It can publish one to the hub only while your `hub-publish` consent for that scope is valid; without it, the accept fails with "Needs consent". `consent grant`, `lesson copy`, `published delete` and `hub join` are owner actions. The devtwin hook denies them from an agent shell, and each one shows a macOS dialog that only you can approve. See [Tiers](/docs/security/security-model/#tiers).
 
 ## Is my data backed up?
 
-No. The store lives only on your disk. Back up `~/.devtwin` with your usual backup tool if the context matters to you. Backup and restore is the top item on the [roadmap](/docs/project/roadmap/).
+Once you turn it on. In live mode, approve a backup folder and the `backup-daily` job writes an encrypted archive of the store there each day, and keeps the newest 14. The key stays in your macOS Keychain; export it once with `backup key export` so that you can restore on another machine. There is no sync. See [Backup and restore](/docs/guides/live-mode/#backup-and-restore).
 
 ## Can I store credentials in it?
 

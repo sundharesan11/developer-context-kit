@@ -14,9 +14,11 @@ devtwin is an early, local-first tool. This page lists its honest limits in one 
 
 ## Your data
 
-- **No backup, restore or sync.** Losing `~/.devtwin` (or a pilot's roots) loses every record, decision, journal and piece of evidence, and leaves installed skills unowned. Back up the folder yourself until backup and restore ships.
+- **Backups need a folder you approve.** In live mode, `backup create` and the daily job write encrypted archives only to an approved backup folder inside your home. Until you approve one, there is no backup: losing `~/.devtwin` loses every record, decision, journal and piece of evidence, and leaves installed skills unowned. A disposable pilot has no backup. See [Backup and restore](/docs/guides/live-mode/#backup-and-restore).
+- **Backups stay on the machine unless you move them.** A copy off the machine needs a backup folder that a sync service or an external copy job saves. The backup key lives in the macOS Keychain; without `backup key export`, an archive cannot be restored on another machine.
+- **Restore is a manual swap.** `backup restore` writes a new folder and never the live store. You move the restored folders into `~/.devtwin/store` by hand, with every agent session stopped.
 - Onboarding copies some repository text (README summary, declared commands, environment names) into the store. It is protected only by mode 0700 and your disk encryption. A lost laptop can expose it.
-- No multi-device synchronization, and no import from other personal setups yet. `live migrate` only moves a live setup made under devtwin's former name; see [Migrate from devctx](/docs/guides/migrate-from-devctx/).
+- No sync and no multi-device synchronization, and no import from other personal setups yet. `live migrate` only moves a live setup made under devtwin's former name; see [Migrate from devctx](/docs/guides/migrate-from-devctx/).
 
 ## Security boundary
 
@@ -34,7 +36,7 @@ See the [security model](/docs/security/security-model/).
 - Cursor reads `~/.agents/skills` and will see the skills, but is untested.
 - `devtwin-setup` is not yet installed by `agents install`.
 - **Preferences arrive after `instructions apply`.** An accepted or retired preference changes nothing in the agent files until you apply the instruction block again. The Claude Code block depends on Claude Code reading the `@<path>` import in `~/.claude/CLAUDE.md`. The injection check refuses common shapes, not every phrasing, so the owner dialog is the real review.
-- CLI records are attributed to `actor: "human"` with a fixed run ID, whoever runs the command. `record publish --apply` always acts as the controller; the CLI does not check who is running it.
+- CLI records name their caller in `recordedBy` from environment variables: `claude`, `codex` or `human`. This is a label, not proof of who ran the command. `record publish --apply` always acts as the controller; the CLI does not check who is running it.
 - The bundled skills are checked for valid command routes, not for every flag they pass.
 
 ## Lessons, hooks and hubs
@@ -43,7 +45,7 @@ See the [security model](/docs/security/security-model/).
 - **Codex coverage.** The hook sees Codex edits through `apply_patch`, but not files that Codex reads through the shell. On Codex, a `post-tool` lesson arrives after the edit ran. Shell paths are a best-effort guess.
 - **No lock on session caps.** Two hook calls in one session at the same time can both send a lesson, and both can post a note past the six-note cap.
 - **Exact roots.** A root reached through another symlink or a moved checkout does not match. A folder bound in two scopes gets no lessons.
-- **The owner-action block is text-based.** It reads command text, not a parsed shell command. A command built in a way the text does not show can pass, and a harmless command that names an owner action can be denied. Previews stay open to agents, so every lesson and hub owner action also shows the owner dialog as a second gate. It does not protect a session that runs without the hook, or an agent that edits its settings files.
+- **The owner-action block is text-based.** It reads command text, not a parsed shell command. A command built in a way the text does not show can pass, and a harmless command that names an owner action can be denied. Previews stay open to agents, so every hub owner action also shows the owner dialog as a second gate. It does not protect a session that runs without the hook, or an agent that edits its settings files.
 - **The hub trusts push access.** Anyone who can push can add lessons and notes under any handle. devtwin does not verify the handle or the commit email.
 - **Deleted text stays in Git.** `published delete` removes the file and adds a tombstone, but Git history and colleagues' clones keep the text. A history rewrite is a manual step for the hub admin.
 - **Tombstones.** A machine that never synced while a lesson file was there cannot tie a later tombstone to its author. It never delivered that lesson, but it does not remember the tombstone.
@@ -52,8 +54,8 @@ See the [security model](/docs/security/security-model/).
 - **Notes are slow.** A note moves only when `hub sync` runs on both machines: up to about 20 minutes with the hub sync job. A note that waits in the outbox for more than half its 72-hour expiry is dropped.
 - **Note cleanup.** Each developer's devtwin deletes only that developer's expired notes. A hub with more than 5000 note files fails to sync with `DEVTWIN_LIMIT` until the admin prunes it.
 - **One lost item.** A publish that stops between its commit and its outbox write can lose that one item.
-- **macOS only for owner actions and the job.** The owner dialog needs a macOS desktop session, so owner actions deny over SSH. The hub sync job is a macOS LaunchAgent.
-- **Isolation checks match whole names.** A bare project short name without its scope prefix is not matched. Review "general" lessons before you accept them.
+- **macOS only for owner actions and the jobs.** The owner dialog needs a macOS desktop session, so owner actions deny over SSH unless you opt in with `live approval --mode dialog-or-tty`. The hub sync, activity and backup jobs are macOS LaunchAgents.
+- **Isolation checks match whole names.** A bare project short name without its scope prefix is not matched. Lessons for every organization (`general` and `hub+general`) wait for the weekly review, which arrives in a later phase, so `lesson accept` refuses those targets today.
 
 ## Onboarding and briefs
 
