@@ -54,6 +54,14 @@ node bin/devtwin.mjs profile apply --pilot "$PILOT_FILE" --work 'Backend service
 
 The hook entries are separate from the skills. `agents install --hooks` previews and, after approval, writes them to the approved agent settings files. `agents status` reports them. The hook also denies owner-only devtwin commands from agent shells. See [Live activation](LIVE.md#install-the-hooks).
 
+In a bound project, the session-start output also holds a short summary of the project, at most 1,200 characters. It lists, in this order:
+
+- lessons with a command match that say to ask or confirm first,
+- up to five constraints and locations, confirmed ones first, then the newest,
+- the next step of the last handoff, with its time.
+
+The summary is fenced and marked as data, not instructions. A line that was not confirmed starts with its source, for example "unreviewed, from agent:". Each line passes the same text checks as automatic writes again, and a line that names another scope is left out. When the summary is too long, the last lines are dropped whole. The hook only reads a stored copy, so it stays fast and takes no lock. Record writes, index rebuilds and `undo` update that copy. A missing or damaged copy gives the one-line output.
+
 After `paths confirm`, the session-start line says "Kit and config confirmed." while the kit and the config stay the same. The skills then skip the path question, and the hook keeps its 30-day receipt current, so a weekly `hook verify` is not needed. See [Confirm the kit and config paths](LIVE.md#confirm-the-kit-and-config-paths).
 
 ## Skill templates

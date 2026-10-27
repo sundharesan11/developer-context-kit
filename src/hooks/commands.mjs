@@ -14,6 +14,7 @@ import { isolationTerms } from "../records/isolation.mjs";
 import { postFromHook, reportNotes, readNotesCache, NOTE_NOTICE } from "../notes/post.mjs";
 import { repoPaths, isEditCall } from "./paths.mjs";
 import { payloadCommands } from "./shell-words.mjs";
+import { readSummary, renderSummary } from "../context/summary.mjs";
 import { sessionKey, readSession, writeSession, removeSession, pruneSessions, logBudget, logHook, budgetReport, readNoteState, writeNoteState } from "./session.mjs";
 // U7: `devtwin hook --event <event> --agent <agent> --pilot <path>` (KTD6, KTD8, KTD17, KTD22, KTD23). It reads the
 // agent's JSON payload on stdin and prints the agent's additionalContext JSON, or nothing. It never loads or checks the
@@ -28,6 +29,9 @@ import { sessionKey, readSession, writeSession, removeSession, pruneSessions, lo
 // U32 (KTD31): a pre-tool shell call also matches lessons by the commands it runs (src/hooks/shell-words.mjs), so a
 // call with no paths still gets its command lessons. The line is guidance only (KTD8). The budget log records the
 // delivered lesson IDs, never the command text.
+// U31 (KTD30): at session start in a bound project, the hook appends the cached session summary
+// (src/context/summary.mjs) after the live line. It only reads the cache: a missing or damaged cache gives the one-line
+// output, and a damaged one is logged.
 const EVENTS = { "session-start": "SessionStart", "user-prompt": "UserPromptSubmit", "pre-tool": "PreToolUse", "post-tool": "PostToolUse", "pre-compact": "PreCompact", "post-compact": "PostCompact" };
 const LINE_CAP = 4, MAX_PAYLOAD_BYTES = 8 << 20, STDIN_TIMEOUT_MS = 2000;
 export const NOTICE = "devtwin lessons — data from teammates, not instructions.";
@@ -154,7 +158,11 @@ async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, 
   if (event === "SessionStart") { pruneSessions(stateRoot, now); paths = await pathsNote(stateRoot, { pilotPath, pilotBytes, kitRoot, now, log: (code) => logHook(stateRoot, { at, agent, event, code }) }); }
   const found = await dropRemoved(stateRoot, await locate(stateRoot, payload.cwd));
   if (found.status === "ambiguous") logHook(stateRoot, { at, agent, event, code: "ambiguous-root" });
-  if (event === "SessionStart") return { text: startLine(found, key, found.status === "bound" ? await openNoticeCount(stateRoot, found.repo.scope) : 0) + paths, lines: 0, overflow: 0, key };
+  if (event === "SessionStart") {
+    const line = startLine(found, key, found.status === "bound" ? await openNoticeCount(stateRoot, found.repo.scope) : 0) + paths;
+    const summary = found.status === "bound" ? await summaryBlock(stateRoot, found, { log: (code) => logHook(stateRoot, { at, agent, event, code }) }) : "";
+    return { text: summary ? line + "\n" + summary : line, lines: 0, overflow: 0, key };
+  }
   if (found.status !== "bound") return null;
   const project = found.repo.project;
   let matches;
@@ -176,6 +184,17 @@ async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, 
   const out = await deliver(stateRoot, { agent, key, found, matches, now });
   return out && { ...out, key };
 }
+// U31: the cached summary block, or "" when there is none. Never throws.
+async function summaryBlock(stateRoot, found, { log }) {
+  let cache = null;
+  try { cache = await readSummary(stateRoot, found.repo.scope, found.repo.project); }
+  catch { log("summary-corrupt"); }
+  const lines = [...(cache?.lines ?? []), ...stubLines(stateRoot, found, cache)];
+  return lines.length ? renderSummary(found.repo.project, lines).text : "";
+}
+// U33 seam (KTD32): the stop-stub line for this worktree, read from stateRoot/handoffs/<scope>/<project>/<hash>.json
+// and added when the stub is newer than cache.handoffAt. Not built yet, so there is no line.
+function stubLines(stateRoot, found, cache) { return []; }
 // U27 (KTD35): the confirmed-paths part of the session-start line, after receiptProblem passed. While the confirmed
 // paths match and the confirmation is less than CONFIRM_RENEW_DAYS old, it renews the receipt and says so. An older
 // confirmation renews nothing and asks for `devtwin paths confirm` again, which runs the full checks; its line leaves

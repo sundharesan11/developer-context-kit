@@ -175,6 +175,7 @@
   "src/context/brief.mjs",
   "src/context/commands.mjs",
   "src/context/resolve.mjs",
+  "src/context/summary.mjs",
   "src/drafts/commands.mjs",
   "src/drafts/save.mjs",
   "src/errors.mjs",
@@ -387,6 +388,7 @@
   "test/stack-fetch.test.mjs",
   "test/stack-live.test.mjs",
   "test/stack-plan.test.mjs",
+  "test/summary.test.mjs",
   "test/tiers.test.mjs",
   "test/writing.test.mjs"
 ]

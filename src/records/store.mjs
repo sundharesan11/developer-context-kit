@@ -161,20 +161,27 @@ export function resolveSupersession(candidates, corrupt = []) {
   }
   return { records, corrupt };
 }
+// U31 (KTD30): after a record write, the project's session summary is rebuilt under the scope lock, once this write
+// has released it. The summary is a cache, so its failure never fails the write (src/context/summary.mjs).
+async function afterWrite(roots, input, options, result) {
+  const { refreshSummaries } = await import("../context/summary.mjs");
+  await refreshSummaries(roots, input.scope, input.project, options.now ? { now: options.now } : {});
+  return result;
+}
 export async function addRecord(roots, input, options = {}) {
   assertPublicInput(input);
   const path = recDir(roots, input.scope, input.project, recordIdFor(input));
   assertWritable(roots, [path, scopeLockPath(roots, input.scope)]);
-  return withPilotLock(roots, scopeLockPath(roots, input.scope), { kind: "record-add" }, async () => {
+  return afterWrite(roots, input, options, await withPilotLock(roots, scopeLockPath(roots, input.scope), { kind: "record-add" }, async () => {
     await requireCommittedProject(roots, input.scope, input.project);
     return commitBundle(roots, input, options);
-  }, { destinations: [path] });
+  }, { destinations: [path] }));
 }
 export async function supersedeRecord(roots, input, options = {}) {
   if (!input || Object.keys(input).some((key) => !["scope", "project", "requestId", "recordedBy", "draft", "targets", "expectHashes"].includes(key))) throw new DevtwinError("INVALID_INPUT", "Unexpected supersession field");
   const path = recDir(roots, input.scope, input.project, recordIdFor(input));
   assertWritable(roots, [path, scopeLockPath(roots, input.scope)]);
-  return withPilotLock(roots, scopeLockPath(roots, input.scope), { kind: "record-supersede" }, async () => {
+  return afterWrite(roots, input, options, await withPilotLock(roots, scopeLockPath(roots, input.scope), { kind: "record-supersede" }, async () => {
     const snap = await readSnapshot(roots, input.scope, input.project);
     if (!Array.isArray(input.targets) || input.targets.length === 0 || input.targets.length !== input.expectHashes?.length) throw new DevtwinError("INVALID_INPUT", "Targets and hashes required");
     for (let i = 0; i < input.targets.length; i++) {
@@ -182,7 +189,7 @@ export async function supersedeRecord(roots, input, options = {}) {
       if (!target || target.effective === "superseded" || target.recordHash !== input.expectHashes[i]) throw new DevtwinError("STALE_VERSION", "Target changed");
     }
     return commitBundleInternal(roots, input, { ...options, supersedes: input.targets });
-  }, { destinations: [path] });
+  }, { destinations: [path] }));
 }
 export async function previewRecord(roots, input) {
   await requireCommittedProject(roots, input.scope, input.project);
