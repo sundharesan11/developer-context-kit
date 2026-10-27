@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { open, lstat, unlink } from "node:fs/promises";
 import { hostname } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
@@ -72,6 +72,21 @@ export async function withPilotLock(roots, lockPath, owner, action, { destinatio
   if (rel !== "locks") throw new DevtwinError("PATH_UNSAFE", "Lock path outside lock directory");
   ensurePrivatePath(roots.stateRoot, ["locks"]);
   return withLock(lockPath, owner, async () => { assertWritable(roots, [lockPath, ...destinations], { targetHome }); return action(); }, { waitMs });
+}
+// U24 (KTD33): holds every lock in paths, in the order given, around action. Each lock is tried once with no wait by
+// default, so a held lock fails at once with BUSY, naming that lock, and action never runs.
+export async function withPilotLocks(roots, paths, owner, action, { waitMs = 0 } = {}) {
+  const list = [...new Set(paths)];
+  const step = async (i) => {
+    if (i === list.length) return action();
+    let entered = false;
+    try { return await withPilotLock(roots, list[i], owner, () => { entered = true; return step(i + 1); }, { destinations: [list[i]], waitMs }); }
+    catch (error) {
+      if (!entered && error.code === "DEVTWIN_BUSY") error.details.lock = basename(list[i], ".lock");
+      throw error;
+    }
+  };
+  return step(0);
 }
 // Locks an owner may release by hand after a crash. Each lives at stateRoot/locks/<name>.lock.
 export const RELEASABLE_LOCKS = ["install", "live", "hub-sync"];

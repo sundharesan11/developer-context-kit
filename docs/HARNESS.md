@@ -209,7 +209,7 @@ Personal state lives under the pilot's private roots, outside the clone:
 
 ## Schedules
 
-Four jobs run in the background for you. Each job is disabled by default. Each one is a user LaunchAgent with its own consent and its own off switch:
+Five jobs run in the background for you. Each job is disabled by default. Each one is a user LaunchAgent with its own consent and its own off switch:
 
 | Job | Runs | What it does |
 | --- | --- | --- |
@@ -217,6 +217,7 @@ Four jobs run in the background for you. Each job is disabled by default. Each o
 | `advisory-hourly` | Once an hour | Checks security advisories for your stack. An urgent (critical or high) advisory shows a notification at once: one for each advisory, at most three a day |
 | `review-monthly` | Once a month | Reminds you that a setup review is available, with a count of waiting preference and lesson proposals |
 | `activity-weekly` | Once a week | Shows one notification with counts of what devtwin learned, holds for sending and has waiting for you. It does nothing else and makes no request |
+| `backup-daily` | Once a day | Writes one encrypted backup of the store into the first approved `backupTargets` folder and keeps the newest 14. It makes no request and no model call |
 
 ```sh
 node bin/devtwin.mjs schedule plan --pilot "$PILOT_FILE" --job radar-weekly
@@ -250,6 +251,19 @@ node bin/devtwin.mjs undo --pilot "$PILOT_FILE" --since 2026-10-20T00:00:00Z
 - `undo --since` reverses every entry after a time, newest first. It always shows the owner dialog.
 - Each undo adds its own entry to the log and rebuilds the lesson indexes. An undo of an undo is refused. An entry whose write never landed is reported, and undo leaves it alone.
 - The `activity-weekly` job sends the weekly counts as one notification.
+- The digest warns while no backup folder is approved, and until `backup key export` has run once.
+
+## Backups
+
+```sh
+node bin/devtwin.mjs backup create --pilot "$PILOT_FILE"
+node bin/devtwin.mjs backup create --pilot "$PILOT_FILE" --apply --plan-fingerprint "$FINGERPRINT"
+node bin/devtwin.mjs backup status --pilot "$PILOT_FILE"
+node bin/devtwin.mjs backup restore --pilot "$PILOT_FILE" --from "$ARCHIVE" --to "$BACKUPS/restored"
+```
+
+- The `backup-daily` job needs an approved `backupTargets` folder and its own `launchAgents` plist. A held store lock skips the run with `BUSY`; the receipt keeps the last good run, so the next run tries again.
+- `backup restore` writes only a new folder inside an approved backup folder. See [Backup and restore](LIVE.md#backup-and-restore) for the key, the restore steps and a restore on another machine.
 
 ## Optional companions
 

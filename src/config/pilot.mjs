@@ -15,9 +15,10 @@ const keys = ["schemaVersion", "pilotRoot", ...members, "agentHomes", "repos", "
 const liveKeys = ["configId", "home", "skillDirs", "kitRoot", "kitCommit"];
 // Skill folders sit inside these protected homes; only the exact named folder is carved out, never the home.
 const SKILL_PARENTS = ["real-claude-home", "real-agents-home", "CLAUDE_CONFIG_DIR"];
-// Write classes are the reviewed fence exceptions outside the store. Each lists exact paths; hubRoot lists folders.
-export const WRITE_CLASSES = ["hubRoot", "instructionTargets", "hookTargets", "launchAgents"];
-const FILE_CLASSES = WRITE_CLASSES.slice(1);
+// Write classes are the reviewed fence exceptions outside the store. Each lists exact paths; the folder classes
+// (hubRoot, and U24's backupTargets for backup archives and restores) list folders.
+export const WRITE_CLASSES = ["hubRoot", "instructionTargets", "hookTargets", "launchAgents", "backupTargets"];
+export const FOLDER_CLASSES = Object.freeze(["hubRoot", "backupTargets"]);
 const MAX_CLASS_PATHS = 16;
 // U18 (KTD16): live-mode exceptions that are not file paths. stackWatch lets the stack watch and the radar fetch from
 // the listed hosts only, unauthenticated, with at most maxRequests requests in one run. GitHub allows 60
@@ -82,10 +83,11 @@ function validateClasses(pilot, context) {
     const paths = classes[writeClass] ?? [], field = "writeClasses." + writeClass;
     if (!Array.isArray(paths) || paths.length > MAX_CLASS_PATHS || paths.some((path) => typeof path !== "string")) fail(field);
     for (const path of paths) {
-      validateRoot(path, field, writeClass !== "hubRoot");
+      const folder = FOLDER_CLASSES.includes(writeClass);
+      validateRoot(path, field, !folder);
       if (seen.has(comparable(path))) fail(field);
       seen.add(comparable(path));
-      if (writeClass === "hubRoot") {
+      if (folder) {
         if (pilot.live && (!isWithin(path, pilot.live.home) || path === pilot.live.home)) fail(field);
         continue;
       }
@@ -132,7 +134,7 @@ function validateLive(pilot, context) {
   return skills.map(([field, path]) => [field, path]);
 }
 const carved = (field, path, entry) => field.startsWith("live.skillDirs.") && SKILL_PARENTS.includes(entry.label) && comparable(path) !== comparable(entry.path) && isWithin(comparable(path), comparable(entry.path));
-const outsideStore = (pilot, field) => pilot.live !== undefined && (field === "repos" || field.startsWith("live.skillDirs.") || field === "writeClasses.hubRoot");
+const outsideStore = (pilot, field) => pilot.live !== undefined && (field === "repos" || field.startsWith("live.skillDirs.") || FOLDER_CLASSES.some((name) => field === "writeClasses." + name));
 function validate(pilot, context, allowInternal = false) {
   if (!isObject(pilot)) fail("pilot");
   for (const key of Object.keys(pilot)) if (!keys.includes(key) && !(allowInternal && ["path", "digest", "_context", "warnings"].includes(key))) fail(key);
@@ -141,7 +143,7 @@ function validate(pilot, context, allowInternal = false) {
   for (const key of ["agentHomes", "repos", "forbidden"]) if (!Array.isArray(pilot[key]) || pilot[key].some((item) => typeof item !== "string")) fail(key);
   const skills = Object.hasOwn(pilot, "live") ? validateLive(pilot, context) : [];
   validateExceptions(pilot);
-  const files = validateClasses(pilot, context), hubs = (pilot.writeClasses?.hubRoot ?? []).map((path) => ["writeClasses.hubRoot", path]);
+  const files = validateClasses(pilot, context), hubs = FOLDER_CLASSES.flatMap((name) => (pilot.writeClasses?.[name] ?? []).map((path) => ["writeClasses." + name, path]));
   const ps = protectedPaths(context);
   validateRoot(pilot.pilotRoot, "pilotRoot");
   for (const entry of ps) if (touches(pilot.pilotRoot, entry.path)) fail("pilotRoot", entry.label);
@@ -250,7 +252,10 @@ function inTarget(pilot, target, path) {
   return !pilot.live || top.startsWith("devtwin-") || top.startsWith(LEGACY_SKILL_PREFIX);
 }
 // A write class destination needs the caller to name its one class, as an installer names its one target home.
-const inClass = (pilot, writeClass, path) => writeClass !== undefined && (pilot.writeClasses?.[writeClass] ?? []).some((approved) => writeClass === "hubRoot" ? isWithin(comparable(path), comparable(approved)) : comparable(path) === comparable(approved));
+export const inClass = (pilot, writeClass, path) => writeClass !== undefined && (pilot.writeClasses?.[writeClass] ?? []).some((approved) => FOLDER_CLASSES.includes(writeClass) ? isWithin(comparable(path), comparable(approved)) : comparable(path) === comparable(approved));
+// U24: the approved folder of a folder class that holds path, or null; samePath compares two paths as the fence does.
+export const approvedFolder = (pilot, writeClass, path) => FOLDER_CLASSES.includes(writeClass) ? (pilot?.writeClasses?.[writeClass] ?? []).find((approved) => isWithin(comparable(path), comparable(approved))) ?? null : null;
+export const samePath = (a, b) => comparable(a) === comparable(b);
 export function assertWritable(roots, destinations, { targetHome, writeClass } = {}) {
   const pilot = roots?.pilot;
   if (!pilot || pilotDigest(pilot) !== pilot.digest || roots.configRoot !== pilot.configRoot || roots.dataRoot !== pilot.dataRoot || roots.stateRoot !== pilot.stateRoot) fail("pilot");

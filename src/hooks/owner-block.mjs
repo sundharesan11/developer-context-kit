@@ -5,7 +5,7 @@
 // the deny, and a call that is not denied goes on to the lesson path, which never returns a decision.
 const SHELL_TOOLS = new Set(["Bash", "shell", "local_shell", "exec_command"]);
 const MAX_COMMAND_BYTES = 65536;
-// words: the two route words. apply: the action is owner-only only with --apply (its preview stays allowed).
+// words: the route words (two, or three for backup key export). apply: the action is owner-only only with --apply (its preview stays allowed).
 export const OWNER_ACTIONS = Object.freeze([
   // The owner decided on 2026-10-26 that agents may preview these three; the apply stays owner-only, and each apply
   // shows the owner dialog as a second gate. U36 (KTD38): lesson accept left this list; it refuses the targets its tier
@@ -29,7 +29,9 @@ export const OWNER_ACTIONS = Object.freeze([
   { words: ["consent", "grant"], apply: true }, { words: ["consent", "revoke"], apply: true },
   // U37: undoing every entry after a time. The second word is the flag, so undo --id stays open to agents; undo --id of
   // another session's entry shows the owner dialog instead (src/audit/undo.mjs).
-  { words: ["undo", "--since"], apply: true }
+  { words: ["undo", "--since"], apply: true },
+  // U24 (KTD33): printing the backup key. Its preview stays open.
+  { words: ["backup", "key", "export"], apply: true }, { words: ["backup", "restore"], apply: true }
 ].map((action) => Object.freeze({ ...action, words: Object.freeze(action.words) })));
 // U9: setup steps whose apply runs an owner action above (src/setup/steps.mjs marks them owner: true). "setup apply"
 // naming one of them is denied, and so is the "setup" terminal loop, which can apply them. setup status, setup plan
@@ -61,9 +63,8 @@ export function ownerAction(agent, payload) {
   const text = commandText(payload.tool_input);
   if (!/devtwin/i.test(text)) return null;
   const words = wordsOf(text), apply = words.includes("--apply");
-  const adjacent = (a, b) => words.some((word, i) => word === a && words[i + 1] === b);
-  // An adjacent route pair, or both words anywhere: a wrapper such as xargs or a variable can split the pair.
-  const found = OWNER_ACTIONS.find(({ words: [a, b], apply: needsApply }) => (!needsApply || apply) && (adjacent(a, b) || (words.includes(a) && words.includes(b))));
+  // Every route word anywhere, adjacent or not: a wrapper such as xargs or a variable can split the route.
+  const found = OWNER_ACTIONS.find(({ words: route, apply: needsApply }) => (!needsApply || apply) && route.every((word) => words.includes(word)));
   return found ? found.words.join(" ") + (found.apply ? " --apply" : "") : setupAction(words);
 }
 // Both agents read the same PreToolUse deny shape.

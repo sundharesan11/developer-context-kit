@@ -47,6 +47,9 @@ const TABLE = {
   // entry's) is automatic; undo --id of any other entry and undo --since need the owner. The hook denies undo --since
   // --apply by its words (OWNER_ACTIONS); it cannot see sessions, so the "other" target is gated by the owner dialog.
   activity: R, undo: { session: A, other: ASK, since: ASK },
+  // U24 (KTD33): backups are automatic and not audited. restore is always ask: it writes decrypted files into a folder a
+  // cloud drive may sync. Showing the key is always ask.
+  "backup create": A, "backup restore": ASK, "backup status": R, "backup key export": ASK,
   "hub propose": A, "hub join": ASK, "hub sync": A, "hub leave": ASK, "hub status": R, "hub schedule": ASK,
   "schedule plan": R, "schedule apply": ASK, "schedule off": ASK, "schedule status": R, "schedule run": A,
   "published list": R, "published delete": ASK,

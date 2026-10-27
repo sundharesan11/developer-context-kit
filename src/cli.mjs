@@ -93,6 +93,11 @@ export const COMMANDS = {
   "consent list": { load: async () => (await import("./consent/commands.mjs")).consentListCommand },
   activity: { load: async () => (await import("./audit/commands.mjs")).activityCommand },
   undo: { load: async () => (await import("./audit/commands.mjs")).undoCommand },
+  // U24 (KTD33): the encrypted backup. backup key export is the one three-word route.
+  "backup create": { load: async () => (await import("./backup/commands.mjs")).backupCreateCommand },
+  "backup restore": { load: async () => (await import("./backup/commands.mjs")).backupRestoreCommand },
+  "backup status": { load: async () => (await import("./backup/commands.mjs")).backupStatusCommand },
+  "backup key export": { load: async () => (await import("./backup/commands.mjs")).backupKeyExportCommand },
   "hub propose": { load: async () => (await import("./hubs/commands.mjs")).hubProposeCommand },
   "hub join": { load: async () => (await import("./hubs/commands.mjs")).hubJoinCommand },
   "hub sync": { load: async () => (await import("./hubs/commands.mjs")).hubSyncCommand },
@@ -128,7 +133,8 @@ export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;
 function routeFor(argv) {
   if (argv.length === 0 || argv[0].startsWith("-")) throw new DevtwinError("USAGE", "A command is required");
-  const two = argv.slice(0, 2).join(" ");
+  const three = argv.slice(0, 3).join(" "), two = argv.slice(0, 2).join(" ");
+  if (argv.length >= 3 && COMMANDS[three]) return { route: three, args: argv.slice(3) };
   if (COMMANDS[two]) return { route: two, args: argv.slice(2) };
   if (COMMANDS[argv[0]]) return { route: argv[0], args: argv.slice(1) };
   throw new DevtwinError("USAGE", "Unknown command");
@@ -139,8 +145,9 @@ export async function main(argv, options = {}) {
   // resolver. Without request and lookup, stack check uses node:https pinned to the checked address (src/stack/fetch.mjs).
   // stdin carries the agent payload for the hook route: a stream in production, a string in tests.
   // notifier is the seam for desktop notifications (src/schedule/notify.mjs).
+  // keychain is the seam for the backup key (src/backup/keychain.mjs).
   // ownerDialog and launchctl are seams for the owner dialog (src/owner/dialog.mjs) and launchd (src/schedule/launchd.mjs).
-  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot, ownerDialog, launchctl, notifier } = options;
+  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot, ownerDialog, launchctl, notifier, keychain } = options;
   let command = argv.slice(0, 2).join(" ");
   try {
     const routed = routeFor(argv);
@@ -187,6 +194,7 @@ export async function main(argv, options = {}) {
     if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
     // --body-file - reads the lesson body from stdin.
     if (command === "lesson propose" || command === "lesson edit" || command === "lesson supersede-propose") context.stdin = stdin;
+    if (command.startsWith("backup ") || command.startsWith("schedule ")) context.keychain = keychain;
     if (command.startsWith("schedule ")) Object.assign(context, { notifier, stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (command.startsWith("stack ")) Object.assign(context, { stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (COMMANDS[command].interactive === true) return await impl.run(values, { ...context, stdin, stdout });

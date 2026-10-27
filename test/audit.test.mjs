@@ -228,7 +228,8 @@ test("a corrupt month line or file is skipped with a warning and other months st
   assert.deepEqual(read.warnings.map((w) => [w.file, w.line ?? null]).sort(), [["2026-08.jsonl", null], [month, 2]].sort());
   const activity = await m.ok(["activity", "--since", "2026-09-01T00:00:00.000Z"]);
   assert.equal(activity.counts.learned, 2);
-  assert.equal(activity.warnings.length, 2);
+  // U24 adds the backup warnings (no backup folder, key not exported); the log warnings name their file.
+  assert.equal(activity.warnings.filter((w) => w.file).length, 2);
 });
 
 test("the audit log never holds body text", async (t) => {
