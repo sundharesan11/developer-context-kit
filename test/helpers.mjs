@@ -60,10 +60,10 @@ export async function sandbox(t) {
   t.after(() => rm(dir, { recursive: true, force: true }));
   return dir;
 }
-export async function runCli(args, { env = {}, home = tmpdir(), kitRoot, templateRoot } = {}) {
+export async function runCli(args, { env = {}, home = tmpdir(), kitRoot, templateRoot, ownerDialog } = {}) {
   const chunks = [];
   const stdout = { write(value) { chunks.push(value); return true; } };
-  const code = await main(args, { stdout, now, home, env, kitRoot, templateRoot });
+  const code = await main(args, { stdout, now, home, env, kitRoot, templateRoot, ownerDialog });
   return { code, json: JSON.parse(chunks.join("")) };
 }
 export async function makePilot(t, { env = {} } = {}) {

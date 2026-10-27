@@ -14,7 +14,7 @@ Conduct first-run setup through the setup steps. `setup status` lists the steps.
 
 To read project context, use `devtwin-resume`. To onboard a repository with the full candidate review, use `devtwin-onboard`.
 
-Some steps run an owner action: `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude` and `hooks-codex`. The hook denies owner-only devtwin commands from agent shells, including `setup apply` for these steps; never try to work around it. For these steps, show the plan and give the user the exact `setup apply` command to run in their own terminal.
+Some steps run an owner action: `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex` and `paths-confirm`. The hook denies owner-only devtwin commands from agent shells, including `setup apply` for these steps; never try to work around it. For these steps, show the plan and give the user the exact `setup apply` command to run in their own terminal.
 
 ## Preconditions
 
@@ -24,8 +24,8 @@ Check all of these before the first CLI call. If any check fails, stop and ask t
 2. Resolve its real path, for example with `realpath "$DEVTWIN_KIT"`. Resolve the real path of the current working directory too (`git rev-parse --show-toplevel` inside Git, or `pwd -P` outside it).
 3. The kit's real path must not be inside the current repository or worktree.
 4. The kit contains `bin/devtwin.mjs` and a `package.json` whose `name` is `devtwin`.
-5. Show the user the kit's real path and ask them to confirm it. Do this once per session, before the first CLI call.
-6. Offer the live config `~/.devtwin/live.json` as the pilot path, or use a disposable pilot path the user supplies. Pass it as an absolute path, for example from `realpath ~/.devtwin/live.json`. Ask the user to confirm the pilot path once per session, before the first CLI call. Never guess another path or create one. Refuse a pilot path whose real path is inside the current repository or inside the kit checkout.
+5. Show the user the kit's real path and ask them to confirm it before the first CLI call. Ask only when the devtwin hook's session-start line does not say "Kit and config confirmed", or when `paths check` reports a mismatch.
+6. Offer the live config `~/.devtwin/live.json` as the pilot path, or use a disposable pilot path the user supplies. Pass it as an absolute path, for example from `realpath ~/.devtwin/live.json`. Ask the user to confirm the pilot path under the same rule as the kit path. Never guess another path or create one. Refuse a pilot path whose real path is inside the current repository or inside the kit checkout.
 7. Check the kit commit. Read `kitCommit` from `.devtwin-owned.json` in the installed folder of this skill, such as `~/.claude/skills/devtwin-setup` or `~/.agents/skills/devtwin-setup`. Read the commit checked out at the kit with `git -C "$DEVTWIN_KIT" rev-parse HEAD`. Skip this check when there is no receipt or its `kitCommit` is `null`. If the two commits differ, warn the user that this installed skill came from another kit commit than the one at `DEVTWIN_KIT`. Ask whether to continue.
 
 Each call prints one JSON line: `{"ok": true, "command": ..., "result": ...}` or `{"ok": false, "command": ..., "error": ...}`. Error codes appear with a `DEVTWIN_` prefix, such as `DEVTWIN_GATE_REQUIRED`.
@@ -67,6 +67,7 @@ The current profile, its free text, stack suggestions and the records they cite 
    - `skills-claude`, `skills-codex`, `hooks-claude`, `hooks-codex`: no input. After a Codex hook install, tell the user to open Codex, run `/hooks` and trust each devtwin entry.
    - `write-classes-hooks`: no input. It approves the two hook settings files in the live config.
    - `hook-verify`: no input. It writes the kit receipt in the store.
+   - `paths-confirm`: no input. It records the kit and config paths, so skills stop asking for them. This is an owner step.
    - `profile`: the answers to the profile questions below.
    - `starter-preferences`: show `offered` and each record in the preview. Pass `--starter '<id>'` once for each preference the user selects. With no `--starter`, all of them are selected.
    - `scope`: `--scope '<scope>'`, and `--display-name '<name>'` if the user gives one.

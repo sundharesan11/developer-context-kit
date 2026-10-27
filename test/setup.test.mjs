@@ -32,7 +32,8 @@ async function setupHome(t) {
   await fixtureGit(kit, ["checkout", "-q", "--detach"]);
   const repo = await makeRepo(join(sb, "work/atlas"), REPO_FILES);
   const liveConfig = join(devtwin, "live.json");
-  const cli = async (args) => runCli(args, { home, env: {}, kitRoot: kit });
+  // The owner steps that show the owner dialog (paths-confirm) get an approving fake; no test shows a real dialog.
+  const cli = async (args) => runCli(args, { home, env: {}, kitRoot: kit, ownerDialog: () => "approved" });
   const ok = async (args) => {
     const out = await cli(args);
     assert.equal(out.json.ok, true, args.slice(0, 2).join(" ") + ": " + JSON.stringify(out.json.error));
@@ -72,7 +73,7 @@ async function drive(h, answers = {}, { tty = true, args = h.inputs } = {}) {
   } });
   input.isTTY = tty;
   output.isTTY = tty;
-  const code = await main(["setup", "--pilot", h.liveConfig, ...args], { stdin: input, stdout: output, now, home: h.home, env: {}, kitRoot: h.kit });
+  const code = await main(["setup", "--pilot", h.liveConfig, ...args], { stdin: input, stdout: output, now, home: h.home, env: {}, kitRoot: h.kit, ownerDialog: () => "approved" });
   input.end();
   return { code, text, asked };
 }

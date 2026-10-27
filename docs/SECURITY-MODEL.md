@@ -93,9 +93,19 @@ The full guide is [HUB.md](HUB.md).
 - There are two consent kinds. `repo-push` names the real path of a bound repository root. `hub-publish` names a scope that joined a hub. Consents live at `stateRoot/consents/<kind>/<sha256 of the target>.json`, in folders at mode 0700 and files at mode 0600, written by atomic replace under a lock.
 - `consent list` is read-only. It also shows the note consent of each hub, which `note consent` and `note revoke` manage.
 - `undo --id <entry> --session <id>` is automatic when the session is the one that made the entry. `undo --id` of any other entry, or of a `confirmed` record, shows the owner dialog. `undo --since <time>` is always ask: the hook denies `undo --since --apply` from agent shells, and the apply shows the owner dialog. An undo is never undone.
+- `paths confirm` is always ask. A confirmation makes skills stop asking for the kit and config paths, so an agent must not be able to write one. The hook denies `paths confirm --apply` from agent shells, and the apply shows the owner dialog with both paths. While the confirmed values match, the hook renews the kit receipt at session start. A changed kit HEAD, kit path, config path or config file ends the confirmation, and the receipt then is not renewed.
 - An agent session makes at most 20 automatic knowledge writes. The 21st fails with `GATE_REQUIRED` and waits for the weekly activity review.
 - Automatic lesson and record text passes the plain-rule checks that preferences use, plus the sensitive and scope-name checks. Titles and summaries get every check. Bodies get the marker and override checks only, because a body can use Markdown structure and package names such as `@types/node`.
 - A record that a CLI write makes names its caller in `recordedBy`: `claude` when `CLAUDECODE` is set, `codex` when a `CODEX_` variable is set, and `human` otherwise. This is a label for the audit trail, not a gate. A `confirmed` record still needs a human reviewer.
+
+## Owner answers over SSH
+
+The live config key `approval` is `dialog` by default. `dialog-or-tty` is an opt-in that lets the owner answer an always-ask prompt on a terminal when there is no GUI session.
+
+- The mode is one control plus a terminal check. It is not a second factor. A process that can read and write the owner's terminal can answer the prompt.
+- GUI presence comes from the launchd session type (`launchctl managername`), never from `SSH_*` variables. In a GUI session (`Aqua`), or when the type cannot be read, the dialog is required.
+- With no GUI session, devtwin opens `/dev/tty`, shows the cleaned dialog text and a random six-letter code, and reads one line. Only the exact code approves. A wrong answer, end of input, a 300-second timeout or no terminal denies. The prompt never reaches stdout, so the JSON result line stays the same.
+- The hook still denies always-ask commands from agent shells. `live approval --apply` is itself always ask and shows the owner dialog.
 
 ## Preferences and the instruction block
 
@@ -108,7 +118,7 @@ The full guide is [HUB.md](HUB.md).
 
 `setup status`, `setup plan --step <id>` and `setup apply --step <id>` (and the `devtwin setup` terminal loop) add no write location. Each step wraps an existing command and its preview, and its apply needs the fingerprint of that preview.
 
-- The steps that run an owner action are `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude` and `hooks-codex`. The devtwin hook denies `setup apply` for these steps from an agent shell, and denies the `devtwin setup` terminal loop.
+- The steps that run an owner action are `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex` and `paths-confirm`. The devtwin hook denies `setup apply` for these steps from an agent shell, and denies the `devtwin setup` terminal loop.
 - The terminal loop refuses to run without a terminal. A terminal prompt protects against accidents. It is not proof that the owner is present.
 - The `sandbox` step reads the project scan and writes no agent setting. Env example files are read only when the source reader allows them, and only their key names are kept. Accepted recommendations become personal preference records in the store.
 

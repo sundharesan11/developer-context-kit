@@ -28,6 +28,8 @@ export const COMMANDS = {
   "live set-kit": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveSetKitCommand },
   "live write-classes": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveWriteClassesCommand },
   "live stack-watch": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveStackWatchCommand },
+  // U26 (KTD34): how the owner dialog may be answered.
+  "live approval": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveApprovalCommand },
   "live migrate": { rootOptions: false, liveConfig: true, load: async () => (await import("./config/commands.mjs")).liveMigrateCommand },
   "record add": { load: async () => (await import("./records/commands.mjs")).recordAddCommand },
   "record supersede": { load: async () => (await import("./records/commands.mjs")).recordSupersedeCommand },
@@ -47,6 +49,9 @@ export const COMMANDS = {
   // The agent hook route prints the agent's own JSON, not the CLI envelope, and skips the full pilot load (KTD6).
   hook: { hook: true, load: async () => import("./hooks/commands.mjs") },
   "hook verify": { load: async () => (await import("./hooks/commands.mjs")).hookVerifyCommand },
+  // U27 (KTD35): the confirmed kit and config paths.
+  "paths confirm": { load: async () => (await import("./paths/confirm.mjs")).pathsConfirmCommand },
+  "paths check": { load: async () => (await import("./paths/confirm.mjs")).pathsCheckCommand },
   "budget report": { load: async () => (await import("./hooks/commands.mjs")).budgetReportCommand },
   // The terminal loop writes its own text to a terminal instead of the JSON envelope; without one it refuses.
   setup: { interactive: true, load: async () => (await import("./setup/tty.mjs")).setupLoopCommand },
@@ -147,7 +152,8 @@ export async function main(argv, options = {}) {
   // notifier is the seam for desktop notifications (src/schedule/notify.mjs).
   // keychain is the seam for the backup key (src/backup/keychain.mjs).
   // ownerDialog and launchctl are seams for the owner dialog (src/owner/dialog.mjs) and launchd (src/schedule/launchd.mjs).
-  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot, ownerDialog, launchctl, notifier, keychain } = options;
+  // sessionType and tty are seams for the owner's terminal answer (src/owner/tty.mjs).
+  const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot, ownerDialog, launchctl, notifier, keychain, sessionType, tty } = options;
   let command = argv.slice(0, 2).join(" ");
   try {
     const routed = routeFor(argv);
@@ -190,7 +196,7 @@ export async function main(argv, options = {}) {
         if (values[flag] && values[flag] !== roots[key]) throw new DevtwinError("GATE_REQUIRED", "Root does not match pilot");
       }
     }
-    const context = { roots, pilot, now, home, env, kitRoot, templateRoot, ownerDialog, launchctl };
+    const context = { roots, pilot, now, home, env, kitRoot, templateRoot, ownerDialog, launchctl, sessionType, tty };
     if (["skill-sources check", "skill-sources preview", "skill-sources stage"].includes(command)) context.request = options.request;
     // --body-file - reads the lesson body from stdin.
     if (command === "lesson propose" || command === "lesson edit" || command === "lesson supersede-propose") context.stdin = stdin;

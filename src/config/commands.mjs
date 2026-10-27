@@ -60,6 +60,14 @@ export const liveStackWatchCommand = {
     return values.apply ? (await live()).applyLiveStackWatch(input, ctx) : (await live()).planLiveStackWatch(input, ctx);
   }
 };
+// U26 (KTD34): the owner-answer mode. Preview, then --apply with the plan fingerprint after the owner dialog.
+export const liveApprovalCommand = {
+  options: { ...liveOptions, mode: { type: "string" } },
+  async run(values, ctx) {
+    const input = liveInput(values, { mode: values.mode });
+    return values.apply ? (await live()).applyLiveApproval(input, ctx) : (await live()).planLiveApproval(input, ctx);
+  }
+};
 // Copies a live setup made under the former devctx name to a new live config folder. --pilot names the new live config,
 // --from the legacy one. It runs from the new kit; see docs/MIGRATING.md.
 export const liveMigrateCommand = {

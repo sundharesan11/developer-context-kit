@@ -2,9 +2,11 @@
 // the title and body reach the script only as arguments of its run handler (KTD24), never as script text, so quotes
 // or AppleScript in them stay inert. With no GUI session, no osascript or any failure, the answer is "denied".
 // Tests and other callers pass ctx.ownerDialog(content) => "approved" | "denied" | { decision, reason }.
+// U26 (KTD34): the opt-in terminal answer for a session with no GUI; see src/owner/tty.mjs.
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { DevtwinError } from "../errors.mjs";
+import { hasGuiSession, ttyApproval } from "./tty.mjs";
 
 export const DIALOG_LIMITS = Object.freeze({ titleChars: 80, bodyChars: 2000, timeoutSeconds: 300 });
 const OSASCRIPT = "/usr/bin/osascript";
@@ -52,11 +54,15 @@ export function osascriptDialog(content, { platform = process.platform, env = pr
   if (result?.error || result?.status !== 0) return { decision: "denied", reason: "dialog-failed" };
   return String(result.stdout ?? "").trim() === "approved" ? { decision: "approved" } : { decision: "denied", reason: "denied" };
 }
+// U26 (KTD34): the approval mode of the loaded live config; "dialog" when the key is absent.
+const approvalMode = (ctx) => (ctx?.pilot ?? ctx?.roots?.pilot)?.approval === "dialog-or-tty" ? "dialog-or-tty" : "dialog";
 // Shows the dialog and throws OWNER_DENIED unless the owner clicked Approve. Call it before the first write.
+// In mode dialog-or-tty with no GUI session, the owner answers on the terminal instead (src/owner/tty.mjs).
 export async function requireOwnerApproval(ctx, content) {
   const shown = dialogText(content);
+  const tty = approvalMode(ctx) === "dialog-or-tty" && !hasGuiSession(ctx);
   // An injected dialog gets the cleaned text; osascriptDialog cleans the raw content itself.
-  const show = typeof ctx?.ownerDialog === "function" ? () => ctx.ownerDialog(shown) : () => osascriptDialog(content, { env: ctx?.env ?? process.env });
+  const show = tty ? () => ttyApproval(shown, ctx) : typeof ctx?.ownerDialog === "function" ? () => ctx.ownerDialog(shown) : () => osascriptDialog(content, { env: ctx?.env ?? process.env });
   let result;
   try { result = await show(); } catch { result = { decision: "denied", reason: "dialog-failed" }; }
   const decision = typeof result === "string" ? result : result?.decision;

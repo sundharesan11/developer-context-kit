@@ -98,13 +98,26 @@ const hookVerify = {
   id: "hook-verify", title: "Hook verify", available: true,
   what: "Writes the kit receipt that the hook trusts, in the store at state/hooks/kit-receipt.json. Runs hook verify.",
   why: "The hook runs only for a kit and a live config whose receipt is current. A hook install writes it too. Run this step again after a kit upgrade or when the receipt expires.",
-  undo: "Nothing to undo outside the store. The receipt expires by itself after seven days.",
+  undo: "Nothing to undo outside the store. The receipt expires by itself after 30 days, unless the paths-confirm step keeps it current.",
   plan: async (ctx) => ({ ...receiptPlan(ctx), current: await receiptState(ctx) }),
   apply: async (ctx, fingerprint) => {
     assertFingerprint(receiptPlan(ctx), fingerprint);
     return (await import("../hooks/commands.mjs")).hookVerifyCommand.run({ pilot: ctx.values.pilot }, ctx);
   },
   done: async (ctx) => await receiptState(ctx) === "ok"
+};
+
+// U27 (KTD35): the confirmed kit and config paths. An owner step: the hook denies its apply from agent shells, and the
+// apply shows the owner dialog with both paths.
+const pathsCmd = () => import("../paths/confirm.mjs");
+const pathsConfirm = {
+  id: "paths-confirm", title: "Confirm the kit and config paths", available: true, owner: true,
+  what: "Records the real paths of the kit and the live config, the kit's Git HEAD and the SHA-256 of the config in the store at state/confirmed-paths.json. Runs paths confirm.",
+  why: "While the kit and the config stay the same, the hook says so at session start, skills stop asking you to confirm the paths, and the hook keeps the kit receipt current.",
+  undo: "Nothing to undo outside the store. A kit upgrade or a config change ends the confirmation; run this step again to confirm the new paths.",
+  plan: async (ctx) => (await pathsCmd()).pathsConfirmCommand.run({}, ctx),
+  apply: async (ctx, fingerprint) => (await pathsCmd()).pathsConfirmCommand.run({ apply: true, "plan-fingerprint": fingerprint }, ctx),
+  done: async (ctx) => (await (await pathsCmd()).pathsCheckCommand.run({}, ctx)).state === "confirmed"
 };
 
 const PROFILE_FLAGS = ["work", "stack-current", "stack-known", "preference", "writing", "seed-from-init", "proposed-by"];
@@ -296,6 +309,7 @@ export const STEPS = Object.freeze([
   writeClassesHooks,
   ...AGENTS.map(hooksStep),
   hookVerify,
+  pathsConfirm,
   profile,
   starterPreferences,
   later("starter-templates", "Starter templates", "P4", "Will install starter output templates (U17).", "Templates give agents a shared shape for briefs, reviews and reports."),
