@@ -43,7 +43,7 @@ const ownerDialog = (route, input, target, targets) => ({ title: target === "rep
     ...(targets.length ? ["Replaces: " + targets.join(", ")] : []), "", "Title: " + input.draft.title].join("\n") });
 // The checks that run before the audit entry, so a write refused here leaves no entry behind. An always-ask write
 // shows the owner dialog after the checks and before the entry.
-async function auditedWrite(ctx, route, input, session, { targets = [], expectHashes = [] } = {}) {
+export async function auditedWrite(ctx, route, input, session, { targets = [], expectHashes = [] } = {}) {
   const { SESSION_ID } = await import("../lessons/propose.mjs");
   if (session !== undefined && !SESSION_ID.test(session)) throw new DevtwinError("INVALID_INPUT", "Invalid session ID", { field: "session" });
   if (!REQUEST_ID.test(input.requestId)) throw new DevtwinError("INVALID_ID", "Invalid request ID");

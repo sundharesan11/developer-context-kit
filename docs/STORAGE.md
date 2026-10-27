@@ -118,6 +118,11 @@ Each bound project has a session summary at `stateRoot/summaries/<scope>/<projec
 - **Lock.** The file is written by atomic replace under the scope lock, after the write that asked for it has released that lock.
 - **Cache write.** The summary is a cache, like the index. It is not audited. A failed rebuild never fails the write; the hook then shows the file it finds.
 - **Fingerprint.** The `fingerprint` is the digest of the rest of the file. The hook ignores a file that does not match it.
+- **Handoff sessions.** `handoffSessions` lists the session IDs of the newest live handoff records, from the audit log. A stop stub from one of these sessions is answered, so the hook shows no line for it.
+
+### Stop stubs
+
+The hook writes one stop stub per worktree at `stateRoot/handoffs/<scope>/<project>/<worktree-hash>.json` on `stop` and `pre-compact`. The hash is the first 16 hex characters of the SHA-256 of the worktree's real path. The folders are 0700 and the file is 0600, written by atomic replace with no lock. A stub holds `schemaVersion`, `at`, `scope`, `project`, `worktree`, `branch` (null when detached), `head` (the short commit), `changed` (the full count), `paths` (at most ten) and `session` (the hook's session key). It is derived, so it is not audited.
 
 Globs match one path segment per `/`. `*` matches any run of characters in a segment and `?` matches one character. A `**` segment matches zero or more segments. A wildcard does not match a leading dot, so a dotfile matches only a pattern that starts with a literal dot. A path with `..` never matches.
 

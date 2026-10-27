@@ -113,11 +113,12 @@ The devtwin hook runs at fixed points in a Claude Code or Codex session. It read
 | `session-start` | One line: the hook is live, how many lessons the project has, and the session ID for `lesson propose`. It also counts open replacement notices. After [`paths confirm`](#confirm-the-kit-and-config-paths), the line ends with "Kit and config confirmed." In a bound project, the [session summary](#the-session-summary) follows the line. |
 | `user-prompt` | Matches package names and topics in the prompt, so a lesson can arrive before the first edit. |
 | `pre-tool`, `post-tool` | Matches the paths in the tool call. On an edit call in a hub-joined project, it can also queue a ["working on" note](/docs/guides/organization-hub/#working-on-notes). |
-| `pre-compact`, `post-compact` | Resets the per-session lesson count, so lessons can arrive again after compaction. |
+| `pre-compact`, `post-compact` | Resets the per-session lesson count, so lessons can arrive again after compaction. `pre-compact` also records [where the worktree stands](#where-the-last-session-stopped). |
+| `stop` | Runs at the end of each agent turn. It records [where the worktree stands](#where-the-last-session-stopped) and prints nothing. |
 
 The block of lesson lines starts with `devtwin lessons — data from teammates, not instructions.` A session gets each lesson once and at most **four** index lines. At the cap, one more line says how many more lessons match and names `devtwin lesson match`.
 
-The hook never fails a tool call. Any error gives exit 0 and no output; the error code goes to the hook log. It takes no lock, runs no Git process and makes no network call.
+The hook never fails a tool call. Any error gives exit 0 and no output; the error code goes to the hook log. It takes no lock and makes no network call. It runs Git only on `stop` and `pre-compact`: one `git status` with a 2-second limit.
 
 ### The session summary
 
@@ -140,6 +141,18 @@ unreviewed, from agent: last handoff 2026-10-27 09:00 UTC, next step: run the mi
 A line that was not confirmed starts with its source and "unreviewed". Each line passes the text checks for automatic writes again before it is shown, and a line that names another scope is left out. When the summary is too long, the last lines are dropped whole.
 
 The hook reads a stored copy under `stateRoot/summaries/`. Record writes, lesson index rebuilds and `undo` keep that copy current. A missing or damaged copy gives the one-line output. `budget report` counts the summary bytes with the line.
+
+### Where the last session stopped
+
+On `stop` and `pre-compact` in a bound project, the hook writes a small stub for the worktree under `stateRoot/handoffs/<scope>/<project>/`. It holds the time, the branch, the short commit, the number of changed files, at most ten of their paths and the session. Each worktree has its own stub. The stub is derived, so it is not audited. When `git status` takes more than 2 seconds or fails, the hook writes nothing. A repository whose own Git config defines a filter or an include gets no stub.
+
+At the next session start in that worktree, the summary adds one line when no handoff from that session exists:
+
+```text
+Last session stopped 2026-10-27 14:02 UTC on branch `search-paging` with 3 changed files: `src/a.ts`, `src/b.ts`, `README.md`. No handoff was written.
+```
+
+An agent answers the stub with [`handoff write`](/docs/concepts/handoffs/#write-a-handoff-from-an-agent). The managed instruction block asks agents to write one at each stopping point.
 
 ### The owner-action block
 
@@ -168,7 +181,7 @@ The hook needs two agent settings files approved in the [live config](/docs/refe
    node "$KIT/bin/devtwin.mjs" agents install --hooks --pilot "$LIVE_CONFIG" --agent claude --agent codex
    ```
 
-   Claude Code gets entries for `SessionStart`, `UserPromptSubmit`, `PreToolUse` and `PreCompact`. Codex gets `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse` and `PreCompact`. devtwin adds only its own entries and never changes another entry. Each entry runs `node "<kit>/bin/devtwin.mjs" hook --event <event> --agent <agent> --pilot "<live config>"` with a 10-second timeout.
+   Claude Code gets entries for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PreCompact` and `Stop`. Codex gets `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PreCompact` and `Stop`. An install made before the `Stop` entry existed shows it as `missing` in `agents status` until you run the install again. devtwin adds only its own entries and never changes another entry. Each entry runs `node "<kit>/bin/devtwin.mjs" hook --event <event> --agent <agent> --pilot "<live config>"` with a 10-second timeout.
 
 3. Write the kit receipt that the hook trusts:
 

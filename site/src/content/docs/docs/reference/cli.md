@@ -339,6 +339,23 @@ devtwin handoff export --pilot "$PILOT" --scope example --cwd "$REPO" \
 
 Returns `records`, `packetHash`, `fileHash`, `bytes`, `output` and `"publication":"not-approved"`.
 
+### `handoff write`
+
+Stores a handoff record: where the session stopped, the next step and where the artifacts are. **Automatic**: it needs no approval, and it is audited like `record add`. See [Handoffs](/docs/concepts/handoffs/#write-a-handoff-from-an-agent).
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--scope <id>`, `--project <id>` | Required. |
+| `--stopped <text>` | Required. One plain line, at most 300 characters. |
+| `--next <text>` | Required. One plain line, at most 300 characters. |
+| `--artifact <text>` | Repeatable, up to 10. One plain line each, at most 200 characters. |
+| `--session <id>` | The session ID from the hook's session-start line. A handoff from that session hides the stop line at the next start. |
+| `--request-id <id>` | Required with `--apply`. |
+| `--apply` | Writes the record. Without it, the command shows the body and writes nothing. |
+
+Returns `recordId` and `audit`.
+
 ## Records
 
 `record add`, `record supersede` and `record propose` share these flags:
@@ -794,7 +811,7 @@ The command that agent hook entries run. It reads the agent's JSON payload on st
 
 | Flag | |
 | --- | --- |
-| `--event <event>` | Required. `session-start`, `user-prompt`, `pre-tool`, `post-tool`, `pre-compact` or `post-compact`. |
+| `--event <event>` | Required. `session-start`, `user-prompt`, `pre-tool`, `post-tool`, `pre-compact`, `post-compact` or `stop`. |
 | `--agent <claude\|codex>` | Required. |
 | `--pilot <file>` | Required. |
 

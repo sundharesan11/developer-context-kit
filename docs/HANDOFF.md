@@ -1,5 +1,7 @@
 # Private portable handoff
 
+This page covers `handoff export`. To leave a handoff record for the next session, an agent runs `handoff write`; see [Agent protocol](AGENT-PROTOCOL.md#agent-hook).
+
 `handoff export` produces a readable Markdown packet from explicitly selected records in one committed pilot project. A recipient needs no toolkit installation. This is a private preview, not approved for publication; human confidentiality and rights review is required before distribution. Commands in the packet are documented, not executed. Export does not verify application tests, credentials, runtime access or deployment.
 
 Use an existing disposable pilot and the exact selected worktree. Set the variables to your own pilot paths and selected record IDs:

@@ -54,6 +54,7 @@ Pass every placeholder in single quotes, as the examples below do, and write any
 
 4. Summarise for the user. Lead with stale records, disputed records and unknowns. Then give decisions, constraints and commands. Quote record IDs.
 5. Ask the user which parts the current task needs. Use only those.
+6. The devtwin summary at session start can say `Last session stopped ... No handoff was written.` If it does, tell the user which files changed in that worktree. At the end of this session, write a handoff with `handoff write` (see `devtwin-capture`).
 
 ## Output
 

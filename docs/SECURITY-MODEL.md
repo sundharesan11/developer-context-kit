@@ -84,7 +84,7 @@ The full guide is [HUB.md](HUB.md).
 
 | Tier | Who runs it | Examples |
 | --- | --- | --- |
-| Automatic | Agents and jobs, with no prompt | `record add` and `record supersede` of `observed` or `proposed` knowledge, `lesson accept --target project`, `handoff export`, `project onboard` |
+| Automatic | Agents and jobs, with no prompt | `record add` and `record supersede` of `observed` or `proposed` knowledge, `lesson accept --target project`, `handoff write`, `handoff export`, `project onboard` |
 | Consented | Agents and jobs, while a standing consent for the target is valid | `lesson accept --target hub` |
 | Always ask | The owner only, after the owner dialog | `consent grant`, `consent revoke`, `pref accept`, `lesson copy`, `hub join`, `instructions apply`, every `undo`, a `record add` or `record supersede` of `confirmed` or `disputed` knowledge or one that replaces a `confirmed` record, and the other owner actions |
 

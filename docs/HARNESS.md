@@ -60,6 +60,8 @@ In a bound project, the session-start output also holds a short summary of the p
 - up to five constraints and locations, confirmed ones first, then the newest,
 - the next step of the last handoff, with its time.
 
+When a session stopped in this worktree without a handoff, one more line says when, on which branch and which files changed. The `Stop` and `PreCompact` hook entries record that; an agent answers it with `handoff write`, as the managed instruction block asks at each stopping point.
+
 The summary is fenced and marked as data, not instructions. A line that was not confirmed starts with its source, for example "unreviewed, from agent:". Each line passes the same text checks as automatic writes again, and a line that names another scope is left out. When the summary is too long, the last lines are dropped whole. The hook only reads a stored copy, so it stays fast and takes no lock. Record writes, index rebuilds and `undo` update that copy. A missing or damaged copy gives the one-line output.
 
 After `paths confirm`, the session-start line says "Kit and config confirmed." while the kit and the config stay the same. The skills then skip the path question, and the hook keeps its 30-day receipt current, so a weekly `hook verify` is not needed. See [Confirm the kit and config paths](LIVE.md#confirm-the-kit-and-config-paths).

@@ -44,8 +44,8 @@ test("hook install on a fixture home adds only devtwin hook entries and uninstal
   const context = hookContext(h.pilot, KIT), claude = expectedEntries("claude", context), codex = expectedEntries("codex", context);
   assert.equal(claude.PreToolUse[0].hooks[0].command, 'node "' + KIT + '/bin/devtwin.mjs" hook --event pre-tool --agent claude --pilot "' + realpathSync(h.path) + '"');
   assert.equal(claude.PreToolUse[0].matcher, "Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep|Bash");
-  assert.deepEqual(Object.keys(claude), ["SessionStart", "UserPromptSubmit", "PreToolUse", "PreCompact"]);
-  assert.deepEqual(Object.keys(codex), ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact"]);
+  assert.deepEqual(Object.keys(claude), ["SessionStart", "UserPromptSubmit", "PreToolUse", "PreCompact", "Stop"]);
+  assert.deepEqual(Object.keys(codex), ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact", "Stop"]);
   assert.deepEqual([codex.PreToolUse[0].matcher, codex.PostToolUse[0].matcher], ["^(apply_patch|Bash)$", "^Bash$"]);
   // Without --hooks the installer previews skills exactly as before.
   assert.equal((await cli(h, ["agents", "install", "--agent", "claude"])).kind, "skill-install");
@@ -61,7 +61,7 @@ test("hook install on a fixture home adds only devtwin hook entries and uninstal
   const applied = await cli(h, [...args, "--apply", "--plan-fingerprint", preview.fingerprint]);
   assert.equal(applied.applied, true);
   const settings = JSON.parse(await readFile(h.paths.settings, "utf8"));
-  assert.deepEqual(settings, { model: "example", hooks: { PreToolUse: [lint, ...claude.PreToolUse], SessionStart: [lookalike, ...claude.SessionStart], UserPromptSubmit: claude.UserPromptSubmit, PreCompact: claude.PreCompact } });
+  assert.deepEqual(settings, { model: "example", hooks: { PreToolUse: [lint, ...claude.PreToolUse], SessionStart: [lookalike, ...claude.SessionStart], UserPromptSubmit: claude.UserPromptSubmit, PreCompact: claude.PreCompact, Stop: claude.Stop } });
   assert.equal((await lstat(h.paths.settings)).mode & 0o777, 0o644);
   assert.deepEqual(JSON.parse(await readFile(h.paths.codex, "utf8")), { hooks: codex });
   assert.equal((await lstat(h.paths.codex)).mode & 0o777, 0o600);
@@ -180,6 +180,37 @@ test("agents status reports a removed hook as missing and an edited one as modif
   const { result } = await hooks(h, ["claude"], "uninstall", "run_status002");
   assert.equal(result.applied, true);
   assert.deepEqual(JSON.parse(await readFile(h.paths.settings, "utf8")), { model: "example", hooks: { PreToolUse: [settings.hooks.PreToolUse[0]] } });
+});
+
+// U33 (KTD32): the Stop entry is new; every earlier entry keeps its bytes, so an install made before it only adds Stop.
+test("hook install shows the new Stop entry and keeps the PreCompact entry byte-identical", async (t) => {
+  const h = await hookPilot(t, { settings: json({ model: "example" }) });
+  const context = hookContext(h.pilot, KIT), pilotPath = realpathSync(h.path);
+  const line = (event, agent) => 'node "' + KIT + '/bin/devtwin.mjs" hook --event ' + event + " --agent " + agent + ' --pilot "' + pilotPath + '"';
+  for (const agent of ["claude", "codex"]) {
+    const expected = expectedEntries(agent, context);
+    assert.equal(JSON.stringify(expected.PreCompact), JSON.stringify([{ hooks: [{ type: "command", command: line("pre-compact", agent), timeout: 10 }] }]), agent);
+    assert.equal(JSON.stringify(expected.Stop), JSON.stringify([{ hooks: [{ type: "command", command: line("stop", agent), timeout: 10 }] }]), agent);
+  }
+  await hooks(h, ["claude", "codex"], "install", "run_stop0001");
+  const claude = expectedEntries("claude", context);
+  const settings = JSON.parse(await readFile(h.paths.settings, "utf8"));
+  assert.deepEqual(settings.hooks.Stop, claude.Stop);
+  assert.equal(JSON.stringify(settings.hooks.PreCompact), JSON.stringify(claude.PreCompact));
+  assert.deepEqual(JSON.parse(await readFile(h.paths.codex, "utf8")).hooks.Stop, expectedEntries("codex", context).Stop);
+  // An install without Stop (as one made before U33) reports it missing until the hooks are installed again.
+  delete settings.hooks.Stop;
+  await writeFile(h.paths.settings, json(settings));
+  const before = await readFile(h.paths.settings, "utf8");
+  const status = (await cli(h, ["agents", "status"])).hooks.agents.find((a) => a.agent === "claude");
+  assert.equal(status.status, "partial");
+  assert.deepEqual(status.events.filter((e) => e.status !== "installed").map((e) => [e.event, e.status]), [["Stop", "missing"]]);
+  const { plan } = await hooks(h, ["claude"], "install", "run_stop0002");
+  assert.deepEqual(plan.actions[0].changes, [{ event: "Stop", op: "add", entry: claude.Stop[0] }]);
+  const after = await readFile(h.paths.settings, "utf8");
+  // Every byte up to the end of the PreCompact list is unchanged; Stop follows it.
+  assert.ok(after.startsWith(before.slice(0, before.lastIndexOf("]") + 1) + ",\n    \"Stop\": ["), "earlier entries keep their bytes");
+  assert.deepEqual(JSON.parse(after).hooks.Stop, claude.Stop);
 });
 
 test("hook install journal, recovery and rollback-check stay consistent", async (t) => {

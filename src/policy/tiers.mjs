@@ -46,6 +46,8 @@ const TABLE = {
   "profile show": R, "profile plan": R, "profile apply": A, "profile export": R, "profile suggest-stack": R,
   "stack plan": R, "stack approve": A, "stack check": A, "stack digest": A, "radar guide": R,
   "draft save": A, "context resolve": R, "context brief": R, "handoff export": A,
+  // U33 (KTD32): a handoff is an observed project record, so it is automatic like record add.
+  "handoff write": { observed: A },
   "agents install": ASK, "agents uninstall": ASK, "agents status": R, "agents recover": A, "agents rollback-check": R,
   "locks release": A,
   "pref propose": A, "pref proposals": R, "pref list": R, "pref accept": ASK, "pref decline": A, "pref retire": ASK,
