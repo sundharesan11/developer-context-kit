@@ -1,4 +1,5 @@
 import { exportHandoff } from "./export.mjs";
+export { handoffWriteCommand } from "./write.mjs";
 
 export const handoffExportCommand = {
   options: {

@@ -29,6 +29,19 @@ Blockers: none.
 
 The next brief includes it like any other record. When the work moves on, supersede the old handoff with a new one, so the brief only ever shows the latest. See [Records](/docs/concepts/records/#records-are-immutable).
 
+## Write a handoff from an agent
+
+An agent writes a handoff at a stopping point with `handoff write`. It is an automatic action, so it needs no approval. You see it in the weekly digest and can reverse it with `undo`.
+
+```sh
+devtwin handoff write --pilot "$PILOT" --scope example --project example.atlas \
+  --session ses_0123456789abcdef01234567 \
+  --stopped "after the server-side filter" --next "add paging at 50 items" \
+  --artifact "src/search/filter.ts" --request-id req_atlas_handoff_02 --apply
+```
+
+The next session start in the project shows the next step in its [summary](/docs/guides/lessons-and-hooks/#the-session-summary). When a session stops without a handoff, the hook records where the worktree stood, and the next start in that worktree says so. See [Where the last session stopped](/docs/guides/lessons-and-hooks/#where-the-last-session-stopped).
+
 With the bundled skills installed, you can ask your agent to leave the handoff for you. It drafts a proposal and you publish it; see [Capture decisions](/docs/guides/capture-decisions/).
 
 ## Export a handoff packet

@@ -25,9 +25,11 @@ const KIT = fileURLToPath(new URL("../..", import.meta.url));
 const AGENTS = ["claude", "codex"], WRITES = ["create", "update", "remove"], TIMEOUT_SECONDS = 10;
 const FILES = { claude: "settings.json", codex: "hooks.json" };
 // [agent event, devtwin hook event, matcher]. Claude matches tool names exactly; Codex matchers are regexes.
+// U33 (KTD32): Stop writes the stop stub and prints nothing. It is added last, so every earlier entry keeps its bytes;
+// an install made before it reports Stop as missing (status partial) until the owner installs the hooks again.
 export const HOOK_EVENTS = Object.freeze({
-  claude: [["SessionStart", "session-start", null], ["UserPromptSubmit", "user-prompt", null], ["PreToolUse", "pre-tool", "Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep|Bash"], ["PreCompact", "pre-compact", null]],
-  codex: [["SessionStart", "session-start", null], ["UserPromptSubmit", "user-prompt", null], ["PreToolUse", "pre-tool", "^(apply_patch|Bash)$"], ["PostToolUse", "post-tool", "^Bash$"], ["PreCompact", "pre-compact", null]]
+  claude: [["SessionStart", "session-start", null], ["UserPromptSubmit", "user-prompt", null], ["PreToolUse", "pre-tool", "Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep|Bash"], ["PreCompact", "pre-compact", null], ["Stop", "stop", null]],
+  codex: [["SessionStart", "session-start", null], ["UserPromptSubmit", "user-prompt", null], ["PreToolUse", "pre-tool", "^(apply_patch|Bash)$"], ["PostToolUse", "post-tool", "^Bash$"], ["PreCompact", "pre-compact", null], ["Stop", "stop", null]]
 });
 export const CODEX_TRUST_NOTE = { code: "CODEX_HOOK_TRUST", message: "Codex runs a new or changed hook only after you review it. Open Codex, run /hooks, and trust each devtwin entry." };
 const UNSAFE_IN_COMMAND = /["$`\\\n\r]/;

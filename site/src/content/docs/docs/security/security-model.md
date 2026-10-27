@@ -51,7 +51,7 @@ One table in the kit (`src/policy/tiers.mjs`) gives each CLI route a tier. A tes
 
 | Tier | Who runs it | Examples |
 | --- | --- | --- |
-| Automatic | Agents and jobs, with no prompt | `record add` and `record supersede` of `observed` or `proposed` knowledge, `lesson accept --target project`, `handoff export`, `project onboard`, `backup create` |
+| Automatic | Agents and jobs, with no prompt | `record add` and `record supersede` of `observed` or `proposed` knowledge, `lesson accept --target project`, `handoff write`, `handoff export`, `project onboard`, `backup create` |
 | Consented | Agents and jobs, while a standing consent for the target is valid | `lesson accept --target hub` |
 | Always ask | You only, after the owner dialog | `consent grant`, `consent revoke`, `pref accept`, `lesson copy`, `hub join`, `instructions apply`, every `undo`, a `confirmed` or `disputed` record or one that replaces a `confirmed` record, and the other owner actions |
 

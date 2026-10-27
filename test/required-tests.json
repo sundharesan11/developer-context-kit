@@ -710,5 +710,12 @@
   "a location that holds a value is refused (AE7)",
   "locations hold at most twenty entries and only on environment records",
   "record add --location from an agent is an automatic write with an audit entry",
-  "value-like scan finds URLs with user info or a query, assignments and random runs"
+  "value-like scan finds URLs with user info or a query, assignments and random runs",
+  "stop stub: a stop with three changed files and no handoff makes the next start in that worktree report it",
+  "stop stub: a handoff from the same session hides the line, and its next step reaches the summary",
+  "stop stub: handoff write refuses text that is not one plain line and writes no audit entry",
+  "stop stub: two worktrees of one project keep separate stubs",
+  "stop stub: a Git status timeout writes no stub and exits quietly",
+  "stop stub: more than ten changed files stores ten paths and the full count",
+  "hook install shows the new Stop entry and keeps the PreCompact entry byte-identical"
 ]

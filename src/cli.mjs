@@ -73,6 +73,7 @@ export const COMMANDS = {
   "context resolve": { load: async () => (await import("./context/commands.mjs")).contextResolveCommand },
   "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand },
   "handoff export": { rootOptions: false, load: async () => (await import("./handoff/commands.mjs")).handoffExportCommand },
+  "handoff write": { load: async () => (await import("./handoff/commands.mjs")).handoffWriteCommand },
   "agents install": { load: async () => (await import("./agents/commands.mjs")).agentsInstallCommand },
   "agents uninstall": { load: async () => (await import("./agents/commands.mjs")).agentsUninstallCommand },
   "agents status": { load: async () => (await import("./agents/commands.mjs")).agentsStatusCommand },
@@ -153,13 +154,14 @@ export async function main(argv, options = {}) {
   // keychain is the seam for the backup key (src/backup/keychain.mjs).
   // ownerDialog and launchctl are seams for the owner dialog (src/owner/dialog.mjs) and launchd (src/schedule/launchd.mjs).
   // sessionType, tty and sshTerminal are seams for the owner's terminal answer (src/owner/tty.mjs).
+  // hookGit is the seam for the stop stub's Git call on the hook route (src/hooks/stub.mjs).
   const { stdout = process.stdout, stdin = process.stdin, now = () => new Date(), home = homedir(), env = process.env, kitRoot, templateRoot, ownerDialog, launchctl, notifier, keychain, sessionType, tty, sshTerminal } = options;
   let command = argv.slice(0, 2).join(" ");
   try {
     const routed = routeFor(argv);
     command = routed.route;
     if (!isRootFree(command) && !routed.args.some((arg) => arg === "--pilot" || arg.startsWith("--pilot="))) throw new DevtwinError("GATE_REQUIRED", "v0 runs only inside a pilot fence");
-    if (COMMANDS[command].hook === true) return (await COMMANDS[command].load()).runHook(routed.args, { stdin, stdout, now, kitRoot });
+    if (COMMANDS[command].hook === true) return (await COMMANDS[command].load()).runHook(routed.args, { stdin, stdout, now, kitRoot, runGit: options.hookGit });
     const impl = await COMMANDS[command].load();
     let values;
     try {
