@@ -302,21 +302,23 @@ node bin/devtwin.mjs review apply --pilot "$PILOT_FILE" --accept "$LINE" --rejec
 | `preference-overridden` | A saved preference got a later correction on the same topic | `pref retire` |
 | `preference-declined` | You declined two or more proposals on a topic that has no saved preference | None. Write the rule yourself, or leave it |
 | `sandbox-setting` | The latest project scan recommends other sandbox settings than the ones you saved | `setup apply --step sandbox` for a new setting. A changed or dropped setting is for you to check |
-| `radar-interest` | You wrote a try-it guide for a radar item that is not one of your radar interests | `profile apply` adding it |
+| `radar-interest` | You wrote a try-it guide for a radar item that is not one of your radar interests. There are never more lines than the 30-interest limit leaves room for | `profile apply` adding it |
 | `promoted-source-changed` | The source of an imported record changed since the import | None. The next import updates an unreviewed record. A reviewed one is yours to compare |
-| `promoted-source-removed` | The source of an imported record is gone | `undo` of the import entry, when that entry replaced nothing |
-| `lesson-unused` | No session got a lesson in 30 days, from the hook budget log | `undo` of the entry that wrote it, when there is one |
+| `promoted-source-removed` | The source file of an imported record is gone | `undo` of the import entry, when that entry replaced nothing |
+| `promoted-source-skipped` | The source of an imported record is still there, but the import skips it now, for example because it cannot read it. The line gives the reason | None. Fix the file, or retract the record yourself |
+| `lesson-unused` | No session got a lesson in 30 days, from the hook budget log. A lesson shown as an "ask before" line of the session summary counts as delivered | `undo` of the entry that wrote it, when there is one |
 | `memory-delivered-twice` | An imported Claude memory file still exists, so sessions read it twice | None. devtwin never edits memory. The line names the file, and you decide whether to delete it |
 | `consent-unused` | Nothing ran under a consent in the 30 days or more since you granted it | `consent revoke` |
 | `learning-branch-stale` | A learning branch stayed local for more than 14 days | None. Delete the branch yourself, or send it with `learning send` |
 
-The review does not suggest unused skills or templates. The hook log keeps error codes only, not which skill or template ran.
+The review does not suggest unused skills or templates. The hook log keeps error codes only, not which skill or template ran. It checks for unused lessons only when the budget log goes back at least 30 days. Until then, `notCollected` in the plan lists `lesson-unused` with the reason.
 
-- `review apply` takes one decision for each open line: `--accept <id>` or `--reject <id>`. It refuses when no decision is given, when a line has none or when a line has both.
-- Without `--apply` it previews the decisions. `--apply` with the plan fingerprint shows the owner dialog with every accepted line.
+- `review apply` takes a decision for each line you want to decide: `--accept <id>` or `--reject <id>`. It refuses when no decision is given or when a line has both. A line with no decision stays open, and nothing changes for it.
+- Without `--apply` it previews the decisions. `--apply` with the plan fingerprint shows the owner dialog. The dialog lists each accepted line with the command it runs, and gives the rejected lines as a count. When the accepted lines do not fit one dialog, it refuses: accept fewer at once.
+- When you only reject lines, there is no dialog. A reject changes nothing but the list of decided lines.
 - Each accepted change runs through its own command, as you would run it: plan first, then apply. That command keeps its own checks and its own owner dialog, so `consent revoke` and `undo` ask you again.
 - Accepting a line with no proposed change records your decision only.
-- Each decision gets an audit entry. A decided line stays hidden until its evidence changes. A change that fails is reported, and its line comes back in the next review.
+- Each decision gets an audit entry. Each decision is saved as soon as its change is done. A decided line stays hidden until its evidence changes. A change that fails is reported, and its line comes back in the next review. `undo --since` skips these audit entries; the change a decision ran has its own entry.
 - The hook denies `review apply --apply` from agent shells. An agent may run `review plan` and the preview.
 
 ## Daily import

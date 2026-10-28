@@ -165,8 +165,8 @@ async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, 
   if (found.status === "ambiguous") logHook(stateRoot, { at, agent, event, code: "ambiguous-root" });
   if (event === "SessionStart") {
     const line = startLine(found, key, found.status === "bound" ? await openNoticeCount(stateRoot, found.repo.scope) : 0) + paths;
-    const summary = found.status === "bound" ? await summaryBlock(stateRoot, found, { log: (code) => logHook(stateRoot, { at, agent, event, code }) }) : "";
-    return { text: summary ? line + "\n" + summary : line, lines: 0, overflow: 0, key };
+    const summary = found.status === "bound" ? await summaryBlock(stateRoot, found, { log: (code) => logHook(stateRoot, { at, agent, event, code }) }) : { text: "", asks: [] };
+    return { text: summary.text ? line + "\n" + summary.text : line, lines: 0, overflow: 0, summaryIds: summary.asks, key };
   }
   if (found.status !== "bound") return null;
   const project = found.repo.project;
@@ -189,18 +189,19 @@ async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, 
   const out = await deliver(stateRoot, { agent, key, found, matches, now });
   return out && { ...out, key };
 }
-// U31: the cached summary block, or "" when there is none. Never throws. The stub line goes last; when the block is
-// over its cap, cached lines go before it does.
+// U31: the cached summary block ({ text, asks }), with text "" when there is none. Never throws. The stub line goes
+// last; when the block is over its cap, cached lines go before it does. asks lists the lesson IDs of the ask-before
+// lines shown (U21: the budget log counts them as delivered).
 async function summaryBlock(stateRoot, found, { log }) {
   let cache = null;
   try { cache = await readSummary(stateRoot, found.repo.scope, found.repo.project); }
   catch { log("summary-corrupt"); }
-  const cached = cache?.lines ?? [], stub = await stubLines(stateRoot, found, cache, { log });
+  const cached = cache?.lines ?? [], asks = cache?.askLessons ?? [], stub = await stubLines(stateRoot, found, cache, { log });
   for (let keep = cached.length; keep >= 0; keep--) {
     const rendered = renderSummary(found.repo.project, [...cached.slice(0, keep), ...stub]);
-    if (!rendered.dropped || !stub.length) return rendered.text;
+    if (!rendered.dropped || !stub.length) return { text: rendered.text, asks: rendered.text ? asks.slice(0, Math.min(keep, rendered.lines.length)) : [] };
   }
-  return "";
+  return { text: "", asks: [] };
 }
 // U33 (KTD32): the stop-stub line for this worktree, when the stub is newer than the cached handoff time and no
 // handoff from the stub's session exists (the cache lists the sessions of live handoffs). Read with no lock; a missing
@@ -301,8 +302,9 @@ export async function runHook(args, { stdin = process.stdin, stdout = process.st
     stdout.write(JSON.stringify(ADAPTERS[agent].output(event, result.text)) + "\n");
     if (result.next) await writeSession(stateRoot, result.key, result.next, at);
     if (result.noteNext) await writeNoteState(stateRoot, result.key, result.noteNext, at);
-    // Note report bytes count in bytes; notes counts the note lines; lessons lists the delivered lesson IDs (U32).
-    logBudget(stateRoot, { at: at.toISOString(), agent, session: result.key, event, bytes: Buffer.byteLength(result.text), lines: result.lines, overflow: result.overflow, ...(result.ids?.length ? { lessons: result.ids } : {}), ...(result.notes ? { notes: result.notes } : {}) });
+    // Note report bytes count in bytes; notes counts the note lines; lessons lists the delivered lesson IDs (U32);
+    // summaryLessons lists the lesson IDs of the summary's ask-before lines at session start (U21). IDs only, never text.
+    logBudget(stateRoot, { at: at.toISOString(), agent, session: result.key, event, bytes: Buffer.byteLength(result.text), lines: result.lines, overflow: result.overflow, ...(result.ids?.length ? { lessons: result.ids } : {}), ...(result.summaryIds?.length ? { summaryLessons: result.summaryIds } : {}), ...(result.notes ? { notes: result.notes } : {}) });
   } catch (error) {
     if (stateRoot) logHook(stateRoot, { at: at.toISOString(), agent, event, code: error instanceof Quiet ? error.code : error?.code ?? "internal" });
   }

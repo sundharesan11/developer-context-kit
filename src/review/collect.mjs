@@ -10,35 +10,42 @@
 //                          recommendation (change: setup apply --step sandbox for that one), a changed text or one the
 //                          scan no longer recommends (informational).
 //   radar-interest         a radar item you wrote a try-it guide for (radar guide --apply), whose name is not one of
-//                          your radar interests. Change: profile apply adding it.
+//                          your radar interests. Change: profile apply adding it. At most as many lines as the
+//                          profile has room for (30 interests).
 //   promoted-source-changed  an imported record whose source changed since the import, or whose change the import
 //                          skipped because the record was reviewed. Informational.
 //   promoted-source-removed  an imported record whose source file is gone. Change: undo of the import's audit entry,
 //                          when that entry replaced nothing; otherwise informational.
+//   promoted-source-skipped  an imported record whose source is still there but the import now skips (unreadable,
+//                          too large, a symlink...). The evidence names the reason. Informational.
 //   lesson-unused          a lesson older than 30 days that the hooks did not deliver in the last 30 days (the budget
-//                          log's lesson IDs). Change: undo of the entry that wrote it, when there is one.
+//                          log's lesson IDs, from hook injections and from the summary's ask-before lines). Change:
+//                          undo of the entry that wrote it, when there is one. Collected only when the budget log
+//                          reaches back at least 30 days; otherwise plan lists it under notCollected.
 //   memory-delivered-twice an imported Claude memory whose file still exists, so sessions read it twice. devtwin never
 //                          edits memory: the suggestion points at the file, and the owner decides. Informational.
 //   consent-unused         a consent older than 30 days with no audit entry under it since it was granted.
 //                          Change: consent revoke.
 //   learning-branch-stale  a learning branch that stayed local (never queued) for more than 14 days. Informational:
-//                          delete it yourself, or send it.
+//                          delete it yourself, or send it. Its reason is shown but not hashed, so a new reason alone
+//                          does not bring a decided line back.
 // Skill and template use is not collected: the hook log records error codes only, not which skill or template ran.
 import { join } from "node:path";
-import { readdir } from "node:fs/promises";
+import { readdir, lstat } from "node:fs/promises";
 import { digest } from "../storage/canonical.mjs";
 import { readPrivateText } from "../storage/fsx.mjs";
 import { configuredScopes } from "../records/isolation.mjs";
 
 export const SUGGESTION_ID = /^sug_[a-f0-9]{24}$/;
 export const SUGGESTION_KINDS = Object.freeze(["preference-overridden", "preference-declined", "sandbox-setting", "radar-interest", "promoted-source-changed",
-  "promoted-source-removed", "lesson-unused", "memory-delivered-twice", "consent-unused", "learning-branch-stale"]);
+  "promoted-source-removed", "promoted-source-skipped", "lesson-unused", "memory-delivered-twice", "consent-unused", "learning-branch-stale"]);
 export const NOT_COLLECTED = Object.freeze([{ kind: "skill-template-use", reason: "The hook log records error codes only, not which skill or template ran." }]);
-const DAY_MS = 86400000, UNUSED_DAYS = 30, BRANCH_DAYS = 14, DECLINED_MIN = 2, INTEREST_MAX = 30, INTEREST_CHARS = 80;
+export const INTEREST_MAX = 30;
+const DAY_MS = 86400000, UNUSED_DAYS = 30, BRANCH_DAYS = 14, DECLINED_MIN = 2, INTEREST_CHARS = 80;
 const suggestionId = (kind, target) => "sug_" + digest({ kind, target }).slice(7, 31);
 // One line. change.action names the route that makes the change ({ plan, apply, values }); without it the change is
-// informational and accepting it only records the decision.
-const line = (kind, target, evidence, change) => ({ id: suggestionId(kind, target), kind, target, evidence, evidenceHash: digest(evidence), change });
+// informational and accepting it only records the decision. shown joins the evidence without counting in its hash.
+const line = (kind, target, evidence, change, shown = {}) => ({ id: suggestionId(kind, target), kind, target, evidence: { ...evidence, ...shown }, evidenceHash: digest(evidence), change });
 const older = (iso, days, now) => typeof iso === "string" && Date.parse(iso) < now().getTime() - days * DAY_MS;
 // A collector that fails reports its code and gives no lines, so one damaged store does not hide the rest.
 const failure = (error) => error?.code ?? "DEVTWIN_INTERNAL";
@@ -96,13 +103,16 @@ async function radar(roots) {
   const { parseInterests } = await import("../stack/rank.mjs");
   const { INTEREST } = await import("../profile/validate.mjs");
   const interests = (await readProfile(roots)).profile?.radar?.interests ?? [], terms = new Set(parseInterests(interests).map((i) => i.term.toLowerCase()));
-  if (interests.length >= INTEREST_MAX) return [];
+  // The profile holds at most INTEREST_MAX interests: suggest no more than it has room for.
+  const room = INTEREST_MAX - interests.length;
+  if (room <= 0) return [];
   const out = [], seen = new Set();
   for (const scope of [null, ...(await configuredScopes(roots)).sort()]) {
     const dir = join(roots.dataRoot, ...(scope ? ["scopes", scope] : []), "guides", "radar");
     let names;
     try { names = (await readdir(dir)).filter((n) => GUIDE.test(n)).sort(); } catch { continue; }
     for (const name of names) {
+      if (out.length >= room) return out;
       // The guide's title is the catalog name devtwin wrote (src/stack/guide.mjs), never feed text.
       let label;
       try { label = TITLE.exec(await readPrivateText(join(dir, name), 65536))?.[1]?.trim(); } catch { continue; }
@@ -125,13 +135,18 @@ async function undoableEntry(roots, entries, done, recordId) {
 }
 const undoChange = (text, entry) => ({ text, command: "devtwin undo --id " + entry.id, action: { plan: "undo", apply: "undo", values: { id: entry.id } } });
 
+// True when a memory source file is absent from its folder (lstat ENOENT). Any other answer counts as present.
+async function gone(folder, source) {
+  if (!folder) return true;
+  try { await lstat(join(folder, "memory", source.slice(source.indexOf("/") + 1))); return false; } catch (error) { return error.code === "ENOENT"; }
+}
 async function promoted(roots, ctx, audit) {
   const { gather, readSeen } = await import("../import/commands.mjs");
   const { readSnapshot } = await import("../records/store.mjs");
   const seen = await readSeen(roots), sources = Object.entries(seen.sources).filter(([, s]) => typeof s?.recordId === "string").sort(([a], [b]) => a < b ? -1 : 1);
   if (!sources.length) return [];
-  const { items, projects } = await gather(roots, { env: ctx.env ?? process.env });
-  const current = new Map(items.map((i) => [i.source, i])), out = [], snapshots = new Map();
+  const { items, projects, skipped, memoryFolders } = await gather(roots, { env: ctx.env ?? process.env });
+  const current = new Map(items.map((i) => [i.source, i])), left = new Map(skipped.map((k) => [k.source, k.reason])), out = [], snapshots = new Map();
   const read = (s) => projects.find((p) => p.scope === s.scope && p.project === s.project);
   const record = async (s) => {
     const key = s.scope + "\0" + s.project;
@@ -143,6 +158,12 @@ async function promoted(roots, ctx, audit) {
     if (!report || report[type === "memory" ? "memory" : "solutions"] !== "read") continue;
     const r = await record(s);
     if (!r || r.effective === "superseded" || r.kind === "retraction") continue;
+    // A source the import skips (unreadable, too large, a symlink) is still there: say why, and retract nothing.
+    if (!item && (left.has(source) || (type === "memory" && !await gone(memoryFolders.get(s.scope + "\0" + s.project), source)))) {
+      out.push(line("promoted-source-skipped", s.recordId, { source, record: s.recordId, scope: s.scope, project: s.project, seenHash: s.hash, reason: left.get(source) ?? "unreadable" },
+        { text: "The import skips the source of this imported record now (" + (left.get(source) ?? "unreadable") + "), so it cannot tell whether the record still holds. Fix the file, or retract the record by hand." }));
+      continue;
+    }
     if (!item) {
       const entry = await undoableEntry(roots, audit.entries, audit.done, s.recordId);
       const text = "The source of this imported record is gone. Retract the record.";
@@ -164,10 +185,14 @@ async function promoted(roots, ctx, audit) {
   return out;
 }
 
-async function lessons(roots, ctx, audit) {
+// The budget log rotates and starts empty: unless its oldest line is UNUSED_DAYS old, a missing delivery proves nothing,
+// so the collector does not run.
+async function lessons(roots, ctx, audit, skip) {
   const { readIndex } = await import("../lessons/index.mjs");
   const { lastDelivered } = await import("../hooks/session.mjs");
-  const delivered = await lastDelivered(roots.stateRoot), since = new Date(ctx.now().getTime() - UNUSED_DAYS * DAY_MS).toISOString(), out = [], seen = new Set();
+  const { delivered, oldest } = await lastDelivered(roots.stateRoot), since = new Date(ctx.now().getTime() - UNUSED_DAYS * DAY_MS).toISOString(), out = [], seen = new Set();
+  if (oldest === null) { skip("lesson-unused", "The budget log is empty, so devtwin cannot tell which lessons sessions got."); return []; }
+  if (oldest > since) { skip("lesson-unused", "The budget log covers less than " + UNUSED_DAYS + " days, so devtwin cannot tell which lessons sessions got."); return []; }
   for (const scope of (await configuredScopes(roots)).sort()) {
     let index;
     try { index = await readIndex(roots, scope); } catch { continue; }
@@ -213,20 +238,22 @@ async function branches(roots, ctx) {
   const out = [];
   for (const b of (await waitingBranches(roots)).filter((b) => older(b.at, BRANCH_DAYS, ctx.now))) {
     const root = await learningRoot(roots, b.scope, b.project).catch(() => null);
-    out.push(line("learning-branch-stale", b.branch, { branch: b.branch, audit: b.audit, writtenAt: b.at, scope: b.scope, project: b.project, root, reason: b.reason },
-      { text: "This learning branch stayed on your machine for more than " + BRANCH_DAYS + " days. Delete it yourself" + (root ? " with git -C " + root + " branch -D " + b.branch : "") + ", or send it with devtwin learning send --branch " + b.branch + "." }));
+    out.push(line("learning-branch-stale", b.branch, { branch: b.branch, audit: b.audit, writtenAt: b.at, scope: b.scope, project: b.project, root },
+      { text: "This learning branch stayed on your machine for more than " + BRANCH_DAYS + " days. Delete it yourself" + (root ? " with git -C " + root + " branch -D " + b.branch : "") + ", or send it with devtwin learning send --branch " + b.branch + "." }, { reason: b.reason }));
   }
   return out;
 }
 
-// Every suggestion, sorted by kind and target, and the collectors that failed. ctx: { now, env }.
+// Every suggestion, sorted by kind and target, the collectors that failed, and what was not collected (NOT_COLLECTED
+// and the collectors that skipped this run, with the reason). ctx: { now, env }.
 export async function collectSuggestions(roots, ctx) {
   const { readAudit, undoneMap } = await import("../audit/log.mjs");
   const { entries } = await readAudit(roots), audit = { entries, done: undoneMap(roots, entries) };
-  const collectors = { preferences, sandbox, radar, promoted, lessons, consents, branches }, suggestions = [], failed = [];
+  const collectors = { preferences, sandbox, radar, promoted, lessons, consents, branches }, suggestions = [], failed = [], notCollected = [...NOT_COLLECTED];
+  const skip = (kind, reason) => notCollected.push({ kind, reason });
   for (const [name, collect] of Object.entries(collectors)) {
-    try { suggestions.push(...await collect(roots, ctx, audit)); } catch (error) { failed.push({ collector: name, code: failure(error) }); }
+    try { suggestions.push(...await collect(roots, ctx, audit, skip)); } catch (error) { failed.push({ collector: name, code: failure(error) }); }
   }
   suggestions.sort((a, b) => SUGGESTION_KINDS.indexOf(a.kind) - SUGGESTION_KINDS.indexOf(b.kind) || (a.target < b.target ? -1 : a.target > b.target ? 1 : 0));
-  return { suggestions, failed };
+  return { suggestions, failed, notCollected };
 }

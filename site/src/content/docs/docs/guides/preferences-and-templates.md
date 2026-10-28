@@ -70,20 +70,20 @@ Each line names one change and the evidence for it. The review suggests:
 - Writing a rule yourself when you declined two or more proposals on one topic.
 - Saving a sandbox setting that a new project scan recommends.
 - Adding a radar item you wrote a try-it guide for to your radar interests.
-- Retracting an imported record whose source is gone, or a lesson no session got in 30 days.
-- Checking an imported record whose source changed.
+- Retracting an imported record whose source is gone, or a lesson no session got in 30 days. A lesson shown in the session summary counts as delivered.
+- Checking an imported record whose source changed, or whose source the import now skips.
 - Deleting a Claude memory file that devtwin also imported, so sessions do not read it twice. devtwin never edits memory; you delete the file.
 - Revoking a consent nothing used in 30 days.
 - Deleting or sending a learning branch that stayed local for more than 14 days.
 
-Decide every line, then apply:
+Decide the lines you want, then apply. A line you leave out stays open for later:
 
 ```sh
 devtwin review apply --pilot "$LIVE_CONFIG" --accept "$LINE" --reject "$OTHER_LINE"
 devtwin review apply --pilot "$LIVE_CONFIG" --accept "$LINE" --reject "$OTHER_LINE" --apply --plan-fingerprint "$FINGERPRINT"
 ```
 
-The owner dialog lists every accepted line. Each accepted change then runs through its own command, such as `pref retire` or `consent revoke`, with that command's own checks and dialog. A rejected line stays hidden until its evidence changes. The devtwin hook denies `review apply --apply` from an agent shell.
+The owner dialog lists each accepted line in full and gives the rejected lines as a count. If the accepted lines do not fit one dialog, accept fewer at once. When you only reject lines, there is no dialog. Each accepted change then runs through its own command, such as `pref retire` or `consent revoke`, with that command's own checks and dialog. A rejected line stays hidden until its evidence changes. The devtwin hook denies `review apply --apply` from an agent shell.
 
 ## Output templates
 

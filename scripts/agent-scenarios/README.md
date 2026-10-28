@@ -131,6 +131,8 @@ The report prints one row per scenario and agent, and writes `evidence/judgement
 
 The judge reads the hook, budget and audit logs, the held queue, the summary cache, the stop stubs, the consents, the two instruction files and the fixture repositories. It cannot see what the agent said or what you saw on screen. That is why some rows ask you a question.
 
+The judge refuses a fixture whose `fixture.json` names a path outside the fixture root. It also refuses when `evidence/` or one of its files is a symlink. It writes each evidence file as a new file and then renames it into place, so it never writes through a link.
+
 Run each scenario on both agents unless it says otherwise. Start a new session for each run unless the steps say to continue one.
 
 ## Scenarios
@@ -155,7 +157,7 @@ Agents: both. AE2.
 
 Expected: no lesson about `example-http` arrives.
 
-Evidence: the budget log has hook events for the session and no delivery of the package lesson. The judge decides.
+Evidence: the budget log has a tool call for the session and no delivery of the package lesson. The judge decides. With no tool call in the window, nothing was checked, so the row needs review.
 
 ### codex-read-gap
 
@@ -259,7 +261,7 @@ Agents: both. AE4.
 
 Expected: the start line names `othercorp.ledger`. Only the ledger lesson arrives. No `example` lesson, summary or note reaches the session.
 
-Evidence: the judge checks that no `example` lesson ID was delivered in the window.
+Evidence: the judge checks that no `example` lesson ID was delivered in the window. If the ledger lesson never arrived either, the run proves nothing, so the row needs review.
 
 ### linked-worktrees
 
@@ -270,7 +272,7 @@ Agents: both.
 
 Expected: the linked worktree resolves to `example.app` through its shared Git folder. The package lesson arrives. A stop stub is written for this worktree, apart from the one for `app`.
 
-Evidence: the judge checks the delivery and reports the stop stub.
+Evidence: the judge checks the delivery and the stop stub for the linked worktree in the window. With the lesson but no stub, the row needs review: end the session in the linked worktree.
 
 ### failure-and-compaction
 

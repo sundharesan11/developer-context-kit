@@ -8,15 +8,18 @@
 //   node scripts/agent-scenarios/judge.mjs report --root <fixture>
 // A mark starts the evidence window of one run; the next mark ends it. report prints one row per scenario and agent
 // and writes evidence/judgement.json.
-import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
-import { join } from "node:path";
-import { createHash } from "node:crypto";
+// The judge refuses a fixture.json path that resolves outside the fixture root, and an evidence folder or evidence file
+// that is a symlink. It writes evidence files through a new temporary file in the same folder and a rename, so a
+// planted link is never followed.
+import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync, openSync, closeSync, renameSync, rmSync, constants } from "node:fs";
+import { join, sep } from "node:path";
+import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { ROWS, rowKey, scenarioById } from "./scenarios.mjs";
 import { worktreeHash } from "../../src/hooks/stub.mjs";
-import { assertSafeRoot, accountHome, SetupError } from "./setup.mjs";
+import { assertSafeRoot, accountHome, canonicalTarget, SetupError } from "./setup.mjs";
 
 // About 1,000 tokens at four bytes a token: the next-phase plan's budget for what devtwin adds to one session.
 export const SESSION_BYTES = 4000;
@@ -40,11 +43,49 @@ function git(cwd, words) {
   return r.status === 0 ? r.stdout.trim() : null;
 }
 
-// The fixture's evidence, read once. root must hold evidence/fixture.json from setup.mjs.
+// The evidence folder of a fixture root: a real folder, never a symlink.
+function evidenceDir(root) {
+  const dir = join(root, "evidence");
+  let st;
+  try { st = lstatSync(dir); } catch { throw new SetupError("NOT_A_FIXTURE", "No evidence folder at " + root); }
+  if (!st.isDirectory()) throw new SetupError("UNSAFE_EVIDENCE", "The evidence folder is not a plain folder: " + dir);
+  return dir;
+}
+// The path of one evidence file, refused when something other than a regular file is there.
+function evidenceFile(root, name) {
+  const path = join(evidenceDir(root), name);
+  try { if (!lstatSync(path).isFile()) throw new SetupError("UNSAFE_EVIDENCE", "The evidence file is not a regular file: " + path); }
+  catch (error) { if (error.code !== "ENOENT") throw error; }
+  return path;
+}
+// Replaces one evidence file: a new temporary file in the same folder (O_EXCL, O_NOFOLLOW), then a rename.
+function writeEvidence(root, name, text) {
+  const path = evidenceFile(root, name), tmp = join(evidenceDir(root), "." + name + "." + randomBytes(8).toString("hex") + ".tmp");
+  const fd = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  try { writeFileSync(fd, text); } finally { closeSync(fd); }
+  try { renameSync(tmp, path); } catch (error) { rmSync(tmp, { force: true }); throw error; }
+  return path;
+}
+// Adds one line to an evidence file the same way: read, then replace.
+function appendEvidence(root, name, line) {
+  const path = evidenceFile(root, name), current = existsSync(path) ? readText(path) : "";
+  if (current === null) throw new SetupError("UNSAFE_EVIDENCE", "The evidence file cannot be read: " + path);
+  return writeEvidence(root, name, current + line);
+}
+const PATHS = ["home", "kit", "liveConfig", "store", "remote"];
+// The fixture's evidence, read once. root must hold evidence/fixture.json from setup.mjs, and every path it names must
+// resolve inside root.
 export function loadFixture(root, { realHomes = accountHome() } = {}) {
   const safe = assertSafeRoot(root, { realHomes, kit: null });
-  const fixture = readJson(join(safe, "evidence", "fixture.json"));
+  const fixture = readJson(evidenceFile(safe, "fixture.json"));
   if (!fixture || fixture.schemaVersion !== 1 || fixture.root !== safe) throw new SetupError("NOT_A_FIXTURE", "No fixture made by setup.mjs at " + safe);
+  if (!fixture.repos || typeof fixture.repos !== "object") throw new SetupError("NOT_A_FIXTURE", "fixture.json names no repositories");
+  const named = [...PATHS.map((key) => [key, fixture[key]]), ...Object.entries(fixture.repos).map(([key, value]) => ["repos." + key, value])];
+  for (const [key, value] of named) {
+    if (typeof value !== "string" || !value.startsWith("/")) throw new SetupError("OUTSIDE_FIXTURE", "fixture.json " + key + " is not an absolute path");
+    const target = canonicalTarget(value);
+    if (!target.startsWith(safe + sep)) throw new SetupError("OUTSIDE_FIXTURE", "fixture.json " + key + " resolves outside the fixture root: " + target);
+  }
   return fixture;
 }
 export function collect(fixture) {
@@ -99,7 +140,12 @@ const summaryText = (e, project) => (e.summaries.find((s) => s.project === proje
 // One check per scenario: { ok: true | false | null, facts, reason }. null means the logs cannot decide yet.
 export const CHECKS = {
   "delivery": (x) => needSession(x) ?? result(x.deliveries("package").length > 0, ["package lesson deliveries: " + x.deliveries("package").length]),
-  "unrelated-files": (x) => needSession(x) ?? result(x.deliveries("package").length === 0, ["package lesson deliveries: " + x.deliveries("package").length + " (expected 0)"]),
+  "unrelated-files": (x) => {
+    const tools = x.events.filter((r) => r.event === "PreToolUse" || r.event === "PostToolUse").length, got = x.deliveries("package").length;
+    if (needSession(x)) return needSession(x);
+    if (got) return result(false, ["package lesson deliveries: " + got + " (expected 0)"]);
+    return result(tools ? true : null, ["package lesson deliveries: 0", "tool calls the hook saw: " + tools], tools ? null : "no tool call in this window, so nothing was checked; ask the agent to edit docs/notes.md");
+  },
   "codex-read-gap": (x) => needSession(x) ?? result(x.deliveries("package").length > 0, ["package lesson deliveries: " + (x.deliveries("package").map((r) => r.event).join(", ") || "none")]),
   "codex-edit-recheck": (x) => needSession(x) ?? result(x.deliveries("package").some((r) => r.event === "PreToolUse" || r.event === "PostToolUse"), ["package lesson deliveries with a tool call: " + x.deliveries("package").length]),
   "conflict-stop": (x) => {
@@ -129,12 +175,19 @@ export const CHECKS = {
     return result(got ? true : null, ["canary lesson deliveries: " + got, "canary file: absent"], got ? null : "the canary lesson never arrived; ask the agent to edit src/util/format.mjs");
   },
   "org-isolation": (x, e, f) => {
-    const leaked = x.events.filter((r) => (r.lessons ?? []).some((id) => Object.values(f.lessons).some((l) => l.id === id && l.scope === f.scopes.example.scope)));
-    return needSession(x) ?? result(leaked.length === 0, ["deliveries of example lessons: " + leaked.length + " (expected 0)", "ledger lesson deliveries: " + x.deliveries("ledger").length]);
+    const leaked = x.events.filter((r) => (r.lessons ?? []).some((id) => Object.values(f.lessons).some((l) => l.id === id && l.scope === f.scopes.example.scope))), ledger = x.deliveries("ledger").length;
+    const facts = ["deliveries of example lessons: " + leaked.length + " (expected 0)", "ledger lesson deliveries: " + ledger];
+    if (needSession(x)) return needSession(x);
+    if (leaked.length) return result(false, facts);
+    // Without the ledger lesson the run never reached the ledger file, so no leak proves nothing.
+    return result(ledger ? true : null, facts, ledger ? null : "the ledger lesson never arrived; ask the agent to edit src/ledger/post.mjs");
   },
-  "linked-worktrees": (x, e, f) => {
-    const stub = e.stubs.some((s) => s.worktree === worktreeHash(f.repos.linked));
-    return needSession(x) ?? result(x.deliveries("package").length > 0, ["package lesson deliveries: " + x.deliveries("package").length, "stop stub for the linked worktree: " + stub]);
+  "linked-worktrees": (x, e, f, w) => {
+    const stub = e.stubs.some((s) => s.worktree === worktreeHash(f.repos.linked) && within(w, s.at)), got = x.deliveries("package").length;
+    const facts = ["package lesson deliveries: " + got, "stop stub for the linked worktree in this window: " + stub];
+    if (needSession(x)) return needSession(x);
+    if (!got) return result(false, facts);
+    return result(stub ? true : null, facts, stub ? null : "no stop stub for the linked worktree yet; end the session in it");
   },
   "failure-and-compaction": (x) => {
     const first = x.compacts[0]?.at, after = first ? x.events.filter((r) => r.at > first && (r.lessons ?? []).length).length : 0;
@@ -209,15 +262,15 @@ export function mark(fixture, { scenario, agent, now = new Date() }) {
   if (!s) throw new SetupError("UNKNOWN_SCENARIO", "Unknown scenario: " + scenario);
   if (!s.agents.includes(agent)) throw new SetupError("UNKNOWN_AGENT", scenario + " runs on " + s.agents.join(" and "));
   const entry = { at: now.toISOString(), scenario, agent };
-  appendFileSync(join(fixture.root, "evidence", "marks.jsonl"), JSON.stringify(entry) + "\n", { mode: 0o600 });
+  appendEvidence(fixture.root, "marks.jsonl", JSON.stringify(entry) + "\n");
   return entry;
 }
 export function answer(fixture, { scenario, agent, result: value, note = "" }) {
   if (!ROWS.some((r) => r.scenario === scenario && r.agent === agent)) throw new SetupError("UNKNOWN_SCENARIO", "Unknown scenario and agent: " + scenario + "/" + agent);
   if (!["pass", "fail", ""].includes(value)) throw new SetupError("INVALID_RESULT", "The result is pass or fail");
-  const path = join(fixture.root, "evidence", "owner-answers.json"), answers = readJson(path) ?? {};
+  const answers = readJson(evidenceFile(fixture.root, "owner-answers.json")) ?? {};
   answers[rowKey(scenario, agent)] = { answer: value, note };
-  writeFileSync(path, JSON.stringify(answers, null, 2) + "\n", { mode: 0o600 });
+  writeEvidence(fixture.root, "owner-answers.json", JSON.stringify(answers, null, 2) + "\n");
   return answers[rowKey(scenario, agent)];
 }
 
@@ -232,8 +285,7 @@ async function run(argv) {
     const fixture = loadFixture(v.root);
     if (command === "mark") { const m = mark(fixture, v); process.stdout.write("Marked " + m.scenario + "/" + m.agent + " at " + m.at + ".\n"); return 0; }
     if (command === "answer") { answer(fixture, { ...v, result: v.result ?? "" }); process.stdout.write("Recorded " + v.scenario + "/" + v.agent + ": " + v.result + ".\n"); return 0; }
-    const report = judge(fixture), out = join(fixture.root, "evidence", "judgement.json");
-    writeFileSync(out, JSON.stringify(report, null, 2) + "\n", { mode: 0o600 });
+    const report = judge(fixture), out = writeEvidence(fixture.root, "judgement.json", JSON.stringify(report, null, 2) + "\n");
     process.stdout.write(renderTable(report) + "Evidence file: " + out + " (sha256 " + createHash("sha256").update(readFileSync(out)).digest("hex").slice(0, 16) + ")\n");
     return report.counts.fail ? 1 : 0;
   } catch (error) {
