@@ -49,8 +49,8 @@ Lessons, the hook, setup and the hub are tested against local fixtures. They hav
 | Next | **Release radar**: a weekly digest of vendor releases for your stack, with schedules and notifications. | Implemented; see [Stack watch and radar](/docs/guides/stack-watch/). |
 | P6 | **Autonomy foundations**: the tier table and standing consents, the audit log with `activity` and `undo`, daily encrypted backups, confirmed paths and terminal answers over SSH. | Implemented. |
 | P7 | **Matching and delivery**: where-things-live locations, action-matched lessons, a session summary and automatic handoffs. | Implemented. |
-| P8 | **Promotion and sharing**: a daily promotion importer, a held queue for items that leave the machine, repository write-back, the weekly owner prompt and model retirements in the radar. | Next. |
-| P9 | **Setup review**: a review of your setup, and real-agent acceptance checks. | Planned. The monthly reminder job ships with the radar. |
+| P8 | **Promotion and sharing**: a daily promotion importer, a held queue for items that leave the machine, repository write-back, the weekly owner prompt and model retirements in the radar. | Implemented. |
+| P9 | **Setup review**: a review of your setup, and real-agent acceptance checks. | Next. The monthly reminder job ships with the radar. |
 | 7 | **Skill export**: explicit file selection with privacy and rights review. | Planned. |
 | 8 | **Weekly skill updater** and scheduler, disabled until you enable it. | Planned. |
 | 9 | **Open-source release**: versioned releases and a reviewed release process. | Planned. |
