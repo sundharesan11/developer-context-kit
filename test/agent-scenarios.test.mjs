@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { join, dirname } from "node:path";
 import { existsSync, realpathSync } from "node:fs";
-import { readFile, writeFile, appendFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, appendFile, mkdir, symlink, rm, rename } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { spawnSync } from "node:child_process";
 import { sandbox, sleep } from "./helpers.mjs";
@@ -84,9 +84,15 @@ test("agent scenario setup builds a disposable fixture and the judge decides run
   // budget/claude: a synthetic session over the byte limit fails.
   await step(f, "budget", "claude");
   await budgetLine(f, { agent: "claude", session: session(3), event: "SessionStart", bytes: SESSION_BYTES + 1 });
-  // unrelated-files/codex: hook events with no package lesson pass.
+  // unrelated-files/codex: a session start alone checked nothing, so the owner reviews it.
   await step(f, "unrelated-files", "codex");
   await budgetLine(f, { agent: "codex", session: session(4), event: "SessionStart", bytes: 300 });
+  // unrelated-files/claude: a tool call with no package lesson passes.
+  await step(f, "unrelated-files", "claude");
+  await budgetLine(f, { agent: "claude", session: session(8), event: "PreToolUse", bytes: 0 });
+  // org-isolation/codex: no leak, but the ledger lesson never arrived either, so the owner reviews it.
+  await step(f, "org-isolation", "codex");
+  await budgetLine(f, { agent: "codex", session: session(9), event: "SessionStart", bytes: 300 });
   // codex-edit-recheck/codex: the logs pass, so the row waits for the owner's answer.
   await step(f, "codex-edit-recheck", "codex");
   await budgetLine(f, { agent: "codex", session: session(5), event: "PreToolUse", bytes: 300, lines: 1, lessons: [f.lessons.package.id] });
@@ -105,13 +111,15 @@ test("agent scenario setup builds a disposable fixture and the judge decides run
   assert.equal(status("delivery", "claude"), "pass");
   assert.equal(status("terminal-wrapper-publish", "codex"), "pass");
   assert.equal(status("budget", "claude"), "fail");
-  assert.equal(status("unrelated-files", "codex"), "pass");
+  assert.equal(status("unrelated-files", "codex"), "needs-review");
+  assert.equal(status("unrelated-files", "claude"), "pass");
+  assert.equal(status("org-isolation", "codex"), "needs-review");
   assert.equal(status("codex-edit-recheck", "codex"), "needs-review");
   assert.equal(status("org-isolation", "claude"), "fail");
   assert.equal(status("setup-wizard", "claude"), "owner-judged");
   assert.equal(status("prompt-injection", "claude"), "fail");
   assert.equal(status("delivery", "codex"), "not-run");
-  assert.equal(report.counts["not-run"], ROWS.length - 8);
+  assert.equal(report.counts["not-run"], ROWS.length - 10);
   assert.match(renderTable(report), /setup-wizard\/claude: Did the setup wizard ask/);
   // The owner's answers settle the mixed and owner rows.
   answer(f, { scenario: "codex-edit-recheck", agent: "codex", result: "pass", note: "offered the revert" });
@@ -121,6 +129,15 @@ test("agent scenario setup builds a disposable fixture and the judge decides run
   report = judge(f, collect(f));
   assert.equal(status("codex-edit-recheck", "codex"), "pass");
   assert.equal(status("setup-wizard", "claude"), "fail");
+  // linked-worktrees/claude: the lesson arrived, but without a stop stub for the linked worktree the owner reviews it.
+  await step(f, "linked-worktrees", "claude");
+  await hook(f, "claude", "pre-tool", { session_id: "run-9", cwd: f.repos.linked, hook_event_name: "PreToolUse", tool_name: "Edit", tool_input: { file_path: join(f.repos.linked, "src/http/client.mjs") } });
+  report = judge(f);
+  assert.equal(status("linked-worktrees", "claude"), "needs-review");
+  await writeFile(join(f.repos.linked, "src/http/client.mjs"), "// changed\n");
+  await hook(f, "claude", "stop", { session_id: "run-9", cwd: f.repos.linked, hook_event_name: "Stop", stop_hook_active: false });
+  report = judge(f);
+  assert.equal(status("linked-worktrees", "claude"), "pass", JSON.stringify(report.rows.find((r) => r.scenario === "linked-worktrees" && r.agent === "claude")));
   // The CLI report writes the evidence file and exits 1 while a row fails.
   const r = run(JUDGE, ["report", "--root", f.root]);
   assert.equal(r.status, 1, r.stderr);
@@ -128,6 +145,40 @@ test("agent scenario setup builds a disposable fixture and the judge decides run
   assert.equal(saved.kitCommit, f.kitCommit);
   assert.equal(saved.rows.length, ROWS.length);
   assert.deepEqual(saved.transcripts, []);
+});
+
+test("the judge refuses a planted evidence symlink and a fixture.json path outside the fixture root", async (t) => {
+  const sb = await sandbox(t), f = await buildFixture({ root: join(sb, "fixture") });
+  const outside = join(sb, "outside.json"), evidence = join(f.root, "evidence");
+  await writeFile(outside, "outside\n");
+  // A symlink at evidence/judgement.json: report refuses and the outside file keeps its bytes.
+  await symlink(outside, join(evidence, "judgement.json"));
+  const r = run(JUDGE, ["report", "--root", f.root]);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /UNSAFE_EVIDENCE/);
+  assert.equal(await readFile(outside, "utf8"), "outside\n");
+  // The same for marks and owner answers.
+  await rm(join(evidence, "marks.jsonl"), { force: true });
+  await symlink(outside, join(evidence, "marks.jsonl"));
+  assert.throws(() => mark(f, { scenario: "delivery", agent: "claude" }), { code: "UNSAFE_EVIDENCE" });
+  await rm(join(evidence, "owner-answers.json"));
+  await symlink(outside, join(evidence, "owner-answers.json"));
+  assert.throws(() => answer(f, { scenario: "setup-wizard", agent: "claude", result: "pass" }), { code: "UNSAFE_EVIDENCE" });
+  assert.equal(await readFile(outside, "utf8"), "outside\n");
+  // fixture.json whose store points outside the root: refused.
+  const fixture = JSON.parse(await readFile(join(evidence, "fixture.json"), "utf8"));
+  await writeFile(join(evidence, "fixture.json"), JSON.stringify({ ...fixture, store: sb }));
+  assert.throws(() => loadFixture(f.root), { code: "OUTSIDE_FIXTURE" });
+  // A repository path that is a symlink out of the root: refused.
+  await symlink(sb, join(f.root, "escape"));
+  await writeFile(join(evidence, "fixture.json"), JSON.stringify({ ...fixture, repos: { ...fixture.repos, app: join(f.root, "escape", "app") } }));
+  assert.throws(() => loadFixture(f.root), { code: "OUTSIDE_FIXTURE" });
+  // An evidence folder that is a symlink: refused.
+  await writeFile(join(evidence, "fixture.json"), JSON.stringify(fixture));
+  assert.equal(loadFixture(f.root).store, f.store);
+  await rename(evidence, join(sb, "evidence-moved"));
+  await symlink(join(sb, "evidence-moved"), evidence);
+  assert.throws(() => loadFixture(f.root), { code: "UNSAFE_EVIDENCE" });
 });
 
 test("agent scenario runbook lists every scenario the judge knows and the colleague check", async () => {

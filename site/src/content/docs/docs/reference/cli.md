@@ -1034,7 +1034,7 @@ node "$KIT/bin/devtwin.mjs" undo --pilot "$LIVE_CONFIG" --id aud_0123456789abcde
 
 ### `review plan`
 
-The monthly [setup review](/docs/guides/preferences-and-templates/#setup-review). Read-only. It lists one line for each suggestion: `id`, `kind`, `target`, `evidence` and `change`. The evidence holds IDs, counts, hashes, dates and paths, never record or preference text. `change.command` is the command an accepted line runs; `change.informational` is true when it runs none. `counts.decided` counts lines you already decided whose evidence did not change, and `notCollected` lists what the review does not check.
+The monthly [setup review](/docs/guides/preferences-and-templates/#setup-review). Read-only. It lists one line for each suggestion: `id`, `kind`, `target`, `evidence` and `change`. The evidence holds IDs, counts, hashes, dates and paths, never record or preference text. `change.command` is the command an accepted line runs; `change.informational` is true when it runs none. `counts.decided` counts lines you already decided whose evidence did not change, and `notCollected` lists what the review does not check, with the reason. It lists `lesson-unused` until the hook budget log goes back 30 days.
 
 | Flag | |
 | --- | --- |
@@ -1046,7 +1046,7 @@ node "$KIT/bin/devtwin.mjs" review plan --pilot "$LIVE_CONFIG"
 
 ### `review apply`
 
-Decides each line of `review plan`, then runs each accepted change through its own command.
+Decides lines of `review plan`, then runs each accepted change through its own command.
 
 | Flag | |
 | --- | --- |
@@ -1059,9 +1059,9 @@ Decides each line of `review plan`, then runs each accepted change through its o
 node "$KIT/bin/devtwin.mjs" review apply --pilot "$LIVE_CONFIG" --accept sug_0123456789abcdef01234567 --reject sug_76543210fedcba9876543210
 ```
 
-Every open line needs one decision. No decision, a line with none or a line with both fails with `DEVTWIN_INVALID_INPUT`. An unknown line fails with `DEVTWIN_NOT_FOUND`.
+Decide any number of open lines. A line with no decision stays open, and `open` counts those lines. No decision at all, or a line with both, fails with `DEVTWIN_INVALID_INPUT`. An unknown line fails with `DEVTWIN_NOT_FOUND`.
 
-**Owner** with `--apply`. The owner dialog lists every accepted line and the command it runs. Each accepted change then runs as its own command, plan first and then apply: `pref retire`, `consent revoke`, `undo`, `setup apply --step sandbox` or `profile apply`. That command keeps its own checks and owner dialog. A line with no command records the decision only. Each decision adds an audit entry with the route `review apply`. A change that fails is listed in `failed`, and its line comes back in the next review.
+**Owner** with `--apply`. The owner dialog lists every accepted line and the command it runs, then the number of rejected lines. When the accepted lines do not fit one dialog, it fails with `DEVTWIN_LIMIT`: accept fewer at once. With no accepted line there is no dialog, because a reject only hides the line. The devtwin hook still denies `--apply` from an agent shell. Each accepted change then runs as its own command, plan first and then apply: `pref retire`, `consent revoke`, `undo`, `setup apply --step sandbox` or `profile apply`. That command keeps its own checks and owner dialog. A line with no command records the decision only. Each decision adds an audit entry with the route `review apply`, and is saved as soon as its change is done. A change that fails is listed in `failed`, and its line comes back in the next review.
 
 ## Backups
 

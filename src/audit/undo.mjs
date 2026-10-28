@@ -191,8 +191,9 @@ export async function planUndo(roots, { id, since, session } = {}) {
     mode = "since";
     const from = sinceTime(since);
     // held-state entries only record where an outbound item went; they are not writes of their own.
-    // U25: review-reject entries record a removed waiting item; there is nothing to undo.
-    targets = entries.filter((e) => e.kind !== "undo" && e.kind !== "held-state" && e.kind !== "review-reject" && Date.parse(e.at) > from && !done.has(e.id)).reverse();
+    // U25: review-reject entries record a removed waiting item; there is nothing to undo. U21: setup-review entries
+    // record a decision; the change it ran has its own entry.
+    targets = entries.filter((e) => e.kind !== "undo" && e.kind !== "held-state" && e.kind !== "review-reject" && e.kind !== "setup-review" && Date.parse(e.at) > from && !done.has(e.id)).reverse();
   }
   const planned = [], skipped = [];
   for (const entry of targets) {

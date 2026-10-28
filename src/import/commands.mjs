@@ -97,7 +97,7 @@ export async function gather(roots, ctx) {
   const folders = listFolders(projectsDir);
   const names = new Map();
   for (const e of entries) { const name = claudeFolderName(e.path); names.set(name, [...(names.get(name) ?? []), e.project]); }
-  const items = [], projects = [], skipped = [];
+  const items = [], projects = [], skipped = [], memoryFolders = new Map();
   for (const entry of entries) {
     const { scope, project } = entry, report = { scope, project };
     projects.push(report);
@@ -114,6 +114,7 @@ export async function gather(roots, ctx) {
       else {
         const read = await readMemoryFiles(folder);
         report.memory = "read";
+        memoryFolders.set(scope + "\0" + project, folder);
         report.memoryFiles = read.items.length;
         for (const s of read.skipped) skipped.push({ source: "memory:" + project + "/" + s.file, reason: s.reason });
         for (const item of read.items) items.push({ scope, project, source: "memory:" + project + "/" + item.file, path: join(folder, "memory", item.file), hash: item.hash, sourceHash: item.hash, map: () => mapMemory(item) });
@@ -134,7 +135,8 @@ export async function gather(roots, ctx) {
     }
   }
   const mapped = new Set(names.keys());
-  return { items, projects, skipped, notOnboarded, unmapped: folders.filter((f) => !mapped.has(f)).length };
+  // memoryFolders (scope and project to the memory folder read) is for the setup review; import run does not report it.
+  return { items, projects, skipped, memoryFolders, notOnboarded, unmapped: folders.filter((f) => !mapped.has(f)).length };
 }
 
 function mergeMatch(mine = {}, theirs = {}) {

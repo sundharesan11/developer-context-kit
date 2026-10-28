@@ -90,16 +90,20 @@ function add(total, e) {
   if (e.event === "compact") { total.compactions++; return; }
   total.events++; total.bytes += e.bytes; total.lines += e.lines; total.overflow += e.overflow;
 }
-// U21: the time each lesson was last delivered, from the budget log and its rotated copy. A damaged line is skipped.
+// U21: the time each lesson was last delivered, from the budget log and its rotated copy: a hook injection (lessons)
+// or an ask-before line of the session summary (summaryLessons). oldest is the time of the oldest line kept, or null
+// when the log is missing or empty. A damaged line is skipped.
 export async function lastDelivered(stateRoot) {
-  const path = budgetLogPath(stateRoot), out = new Map();
+  const path = budgetLogPath(stateRoot), delivered = new Map();
+  let oldest = null;
   for (const row of [...await readLog(path + ".1"), ...await readLog(path)]) {
     let e;
     try { e = JSON.parse(row); } catch { continue; }
-    if (typeof e?.at !== "string" || !Array.isArray(e.lessons)) continue;
-    for (const id of e.lessons) if (typeof id === "string" && !(out.get(id) > e.at)) out.set(id, e.at);
+    if (typeof e?.at !== "string" || Number.isNaN(Date.parse(e.at))) continue;
+    if (oldest === null || e.at < oldest) oldest = e.at;
+    for (const id of [...(Array.isArray(e.lessons) ? e.lessons : []), ...(Array.isArray(e.summaryLessons) ? e.summaryLessons : [])]) if (typeof id === "string" && !(delivered.get(id) > e.at)) delivered.set(id, e.at);
   }
-  return out;
+  return { delivered, oldest };
 }
 // Totals per session and per agent from the budget log and its rotated copy. A damaged line is counted as skipped.
 export async function budgetReport(stateRoot) {

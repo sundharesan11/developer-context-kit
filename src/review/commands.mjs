@@ -1,17 +1,20 @@
 // U21 (R34, R35, R36): review plan | review apply. review plan is read-only: it lists the setup review's suggestions
 // (src/review/collect.mjs), less the ones the owner already decided while their evidence stays the same.
-// review apply takes one decision per listed line: --accept <id> or --reject <id>, repeatable. It refuses when no
-// decision is given, when a listed line has none, or when a line has both. Without --apply it previews; --apply with
-// the plan fingerprint shows the owner dialog with every accepted line, then runs each accepted change through its own
-// route, plan first and then apply, as the owner would run it: pref retire, consent revoke, undo, setup apply or profile
-// apply. That route keeps its own checks and its own owner dialog. A change that is the owner's to make (delete a
-// memory file or a branch) is informational: accepting it only records the decision.
+// review apply takes decisions for listed lines: --accept <id> or --reject <id>, repeatable. It refuses when no
+// decision is given or when a line has both. A line without a decision stays open: nothing changes for it. Without
+// --apply it previews; --apply with the plan fingerprint shows the owner dialog with every accepted line in full and
+// the rejected lines as a count, then runs each accepted change through its own route, plan first and then apply, as
+// the owner would run it: pref retire, consent revoke, undo, setup apply or profile apply. That route keeps its own
+// checks and its own owner dialog. When accepted lines alone do not fit one dialog, it refuses: accept fewer at once.
+// When nothing is accepted there is no dialog: a reject changes nothing but the decisions file. A change that is the
+// owner's to make (delete a memory file or a branch) is informational: accepting it only records the decision.
 //
 // review apply is always ask (src/policy/tiers.mjs): the hook denies review apply --apply from agent shells
 // (src/hooks/owner-block.mjs). Every decision gets an audit entry (kind "setup-review", route "review apply", target
 // accept or reject, the suggestion ID) before its change runs. Decisions are kept at stateRoot/setup-review/decisions.json
 // (0600, atomic replace under the setup review lock) with the evidence hash, so a decided line comes back only when its
-// evidence changes. A change that fails is reported and its decision is not kept, so the line comes back next time.
+// evidence changes. Each decision is saved as soon as its change completes, so an error later in the run loses none.
+// A change that fails is reported and its decision is not kept, so the line comes back next time.
 import { join } from "node:path";
 import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
@@ -20,7 +23,7 @@ import { withPilotLock } from "../storage/lock.mjs";
 import { canonicalJson, digest } from "../storage/canonical.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { requireOwnerApproval, fitsDialog } from "../owner/dialog.mjs";
-import { collectSuggestions, NOT_COLLECTED, SUGGESTION_ID } from "./collect.mjs";
+import { collectSuggestions, SUGGESTION_ID, INTEREST_MAX } from "./collect.mjs";
 
 const ROUTE = "review apply", OWNER = "human";
 const decisionsPath = (roots) => join(roots.stateRoot, "setup-review", "decisions.json");
@@ -36,40 +39,40 @@ const decided = (decisions, s) => decisions.decisions[s.id]?.evidenceHash === s.
 
 // The open lines: every suggestion the owner has not decided with the same evidence.
 export async function openSuggestions(roots, ctx) {
-  const { suggestions, failed } = await collectSuggestions(roots, ctx), decisions = await readDecisions(roots);
-  return { suggestions: suggestions.filter((s) => !decided(decisions, s)), hidden: suggestions.filter((s) => decided(decisions, s)).length, failed };
+  const { suggestions, failed, notCollected } = await collectSuggestions(roots, ctx), decisions = await readDecisions(roots);
+  return { suggestions: suggestions.filter((s) => !decided(decisions, s)), hidden: suggestions.filter((s) => decided(decisions, s)).length, failed, notCollected };
 }
 const view = ({ id, kind, target, evidence, evidenceHash, change }) => ({ id, kind, target, evidence, evidenceHash, change: { text: change.text, ...(change.command ? { command: change.command } : {}), informational: !change.action } });
 export async function planSetupReview(roots, ctx) {
   const open = await openSuggestions(roots, ctx);
-  return finalizePlan({ kind: "setup-review", suggestions: open.suggestions.map(view), counts: { open: open.suggestions.length, decided: open.hidden }, notCollected: NOT_COLLECTED, failed: open.failed,
+  return finalizePlan({ kind: "setup-review", suggestions: open.suggestions.map(view), counts: { open: open.suggestions.length, decided: open.hidden }, notCollected: open.notCollected, failed: open.failed,
     next: open.suggestions.length ? "Decide each line with --accept <id> or --reject <id> on devtwin review apply." : null });
 }
 
-// The decision for each open line. Every line needs exactly one.
+// The decided lines, in plan order. A line takes at most one decision; a line without one stays open.
 function decide(suggestions, { accept = [], reject = [] }) {
-  if (!accept.length && !reject.length) throw new DevtwinError("INVALID_INPUT", "Give one --accept or --reject for each line of review plan", { field: "decision" });
+  if (!accept.length && !reject.length) throw new DevtwinError("INVALID_INPUT", "Give --accept or --reject for the lines of review plan you decide", { field: "decision" });
   const both = accept.filter((id) => reject.includes(id));
   if (both.length) throw new DevtwinError("INVALID_INPUT", "A line takes one decision, accept or reject", { field: "decision", ids: both });
   for (const id of [...accept, ...reject]) {
     if (!SUGGESTION_ID.test(id)) throw new DevtwinError("INVALID_ID", "Invalid suggestion ID", { id });
     if (!suggestions.some((s) => s.id === id)) throw new DevtwinError("NOT_FOUND", "No open suggestion with this ID", { id });
   }
-  const missing = suggestions.filter((s) => !accept.includes(s.id) && !reject.includes(s.id)).map((s) => s.id);
-  if (missing.length) throw new DevtwinError("INVALID_INPUT", "Every line needs a decision", { field: "decision", missing });
-  return suggestions.map((s) => ({ ...s, decision: accept.includes(s.id) ? "accept" : "reject" }));
+  return suggestions.filter((s) => accept.includes(s.id) || reject.includes(s.id)).map((s) => ({ ...s, decision: accept.includes(s.id) ? "accept" : "reject" }));
 }
+// The owner dialog: every accepted line in full, with the command it runs; the rejected lines as a count.
 const dialogFor = (lines) => {
-  const accepted = lines.filter((l) => l.decision === "accept"), rejected = lines.filter((l) => l.decision === "reject");
-  return { title: "Setup review: " + accepted.length + " accepted, " + rejected.length + " rejected", body: [
+  const accepted = lines.filter((l) => l.decision === "accept"), rejected = lines.length - accepted.length;
+  return { title: "Setup review: " + accepted.length + " accepted, " + rejected + " rejected", body: [
     "Approve runs each accepted change below through its own command, which may ask you again. Deny changes nothing.",
     ...accepted.flatMap((l, i) => ["", "Accept " + (i + 1) + " of " + accepted.length + " (" + l.id + ", " + l.kind + ")", "Target: " + l.target, l.change.text, ...(l.change.command ? ["Runs: " + l.change.command] : ["Informational: devtwin records the decision only."])]),
-    ...(rejected.length ? ["", "Rejected (no change; the line stays hidden until its evidence changes):", ...rejected.map((l) => l.id + " " + l.kind + ": " + l.target)] : [])
+    ...(rejected ? ["", "And " + rejected + (rejected === 1 ? " line" : " lines") + " rejected: no change; each stays hidden until its evidence changes."] : [])
   ].join("\n") };
 };
 async function buildApply(roots, ctx, input) {
   const { suggestions } = await openSuggestions(roots, ctx), lines = decide(suggestions, input);
-  const plan = finalizePlan({ kind: "setup-review-apply", lines: lines.map((l) => ({ ...view(l), decision: l.decision })), dialog: true });
+  const accepted = lines.filter((l) => l.decision === "accept").length;
+  const plan = finalizePlan({ kind: "setup-review-apply", lines: lines.map((l) => ({ ...view(l), decision: l.decision })), open: suggestions.length - lines.length, dialog: accepted > 0 });
   return { plan, lines };
 }
 
@@ -80,7 +83,10 @@ async function runChange(action, ctx) {
   let values = action.values;
   if (action.addInterest) {
     const { readProfile } = await import("../profile/store.mjs");
-    values = { ...values, interest: [...((await readProfile(ctx.roots)).profile?.radar?.interests ?? []), action.addInterest] };
+    const interests = (await readProfile(ctx.roots)).profile?.radar?.interests ?? [];
+    // Several accepted interests in one apply: each one checks the room left after the ones before it.
+    if (interests.length >= INTEREST_MAX) throw new DevtwinError("LIMIT", "Your radar interests are full (" + INTEREST_MAX + "); remove one with profile apply first", { field: "interest", max: INTEREST_MAX });
+    values = { ...values, interest: [...interests, action.addInterest] };
   }
   const planned = await (await COMMANDS[action.plan].load()).run({ ...values }, ctx);
   if (!planned?.fingerprint) throw new DevtwinError(planned?.problem?.code ?? "PLAN_REQUIRED", "The change could not be planned", { route: action.plan, ...(planned?.problem ? { problem: planned.problem.code } : {}) });
@@ -88,32 +94,42 @@ async function runChange(action, ctx) {
 }
 const devtwinError = (error) => typeof error?.code === "string" && error.code.startsWith("DEVTWIN_");
 
-export async function applySetupReview(roots, input, { fingerprint, ctx }) {
+// Saves one decision under the setup review lock, by atomic replace.
+async function keep(roots, l, audit, at) {
+  const path = decisionsPath(roots);
+  assertWritable(roots, [path]);
+  await withPilotLock(roots, lockPath(roots), { kind: "setup-review" }, async () => {
+    const current = await readDecisions(roots);
+    current.decisions[l.id] = { decision: l.decision, kind: l.kind, evidenceHash: l.evidenceHash, at, audit };
+    ensurePrivatePath(roots.stateRoot, ["setup-review"]);
+    await atomicReplace(path, canonicalJson(current) + "\n");
+  }, { destinations: [path] });
+}
+
+// faults.beforeChange(line) is a test seam: it runs before each accepted change.
+export async function applySetupReview(roots, input, { fingerprint, ctx, faults = {} }) {
   const { plan, lines } = await buildApply(roots, ctx, input);
   assertFingerprint(plan, fingerprint);
-  const content = dialogFor(lines);
-  if (!fitsDialog(content)) throw new DevtwinError("LIMIT", "Too many accepted lines for one owner dialog; reject some now and accept them in a later review", { field: "accept" });
-  await requireOwnerApproval(ctx, content);
+  // A reject only hides a line, so an apply with no accepted line needs no dialog; the hook still keeps --apply from
+  // agent shells.
+  if (plan.dialog) {
+    const content = dialogFor(lines);
+    if (!fitsDialog(content)) throw new DevtwinError("LIMIT", "Too many accepted lines for one owner dialog; accept fewer at once and the rest in a later run", { field: "accept" });
+    await requireOwnerApproval(ctx, content);
+  }
   const { appendEntry } = await import("../audit/log.mjs");
-  const out = { applied: true, accepted: [], rejected: [], failed: [] }, kept = [];
+  const out = { applied: true, accepted: [], rejected: [], failed: [], open: plan.open };
   for (const l of lines) {
     const entry = await appendEntry(roots, { kind: "setup-review", tier: "always-ask", route: ROUTE, target: l.decision, itemIds: [l.id], actor: OWNER,
       requestId: "req_srv" + digest({ id: l.id, evidenceHash: l.evidenceHash, decision: l.decision }).slice(7, 31) }, { now: ctx.now });
-    const row = { id: l.id, kind: l.kind, target: l.target, audit: entry.id };
-    if (l.decision === "reject") { out.rejected.push(row); kept.push({ ...l, audit: entry.id }); continue; }
-    if (!l.change.action) { out.accepted.push({ ...row, informational: true }); kept.push({ ...l, audit: entry.id }); continue; }
-    try { out.accepted.push({ ...row, route: l.change.action.apply, result: await runChange(l.change.action, ctx) }); kept.push({ ...l, audit: entry.id }); }
-    catch (error) { if (!devtwinError(error)) throw error; out.failed.push({ ...row, code: error.code }); }
-  }
-  if (kept.length) {
-    const path = decisionsPath(roots);
-    assertWritable(roots, [path]);
-    await withPilotLock(roots, lockPath(roots), { kind: "setup-review" }, async () => {
-      const current = await readDecisions(roots), at = ctx.now().toISOString();
-      for (const l of kept) current.decisions[l.id] = { decision: l.decision, kind: l.kind, evidenceHash: l.evidenceHash, at, audit: l.audit };
-      ensurePrivatePath(roots.stateRoot, ["setup-review"]);
-      await atomicReplace(path, canonicalJson(current) + "\n");
-    }, { destinations: [path] });
+    const row = { id: l.id, kind: l.kind, target: l.target, audit: entry.id }, at = ctx.now().toISOString();
+    if (l.decision === "reject") { await keep(roots, l, entry.id, at); out.rejected.push(row); continue; }
+    if (!l.change.action) { await keep(roots, l, entry.id, at); out.accepted.push({ ...row, informational: true }); continue; }
+    let result;
+    try { await faults.beforeChange?.(l); result = await runChange(l.change.action, ctx); }
+    catch (error) { if (!devtwinError(error)) throw error; out.failed.push({ ...row, code: error.code }); continue; }
+    await keep(roots, l, entry.id, at);
+    out.accepted.push({ ...row, route: l.change.action.apply, result });
   }
   return out;
 }

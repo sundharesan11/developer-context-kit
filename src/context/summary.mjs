@@ -58,7 +58,7 @@ export function summaryCandidates({ project, records = [], index = null }) {
     if (entry.reach === "project" && entry.project !== project) continue;
     if (!entry.match?.commands?.length || !ASK.test(entry.title + "\n" + (entry.summary ?? ""))) continue;
     const text = entry.summary && entry.summary !== entry.title ? entry.title + ": " + entry.summary : entry.title;
-    out.push({ kind: "ask", line: label(entry) + "ask before: " + text, checked: [entry.title, entry.summary ?? ""] });
+    out.push({ kind: "ask", id: entry.id, line: label(entry) + "ask before: " + text, checked: [entry.title, entry.summary ?? ""] });
   }
   const live = records.filter((r) => isDelivered(r) && r.effective !== "superseded" && LIVE.includes(r.status));
   const actorOf = (r) => ({ status: r.status, actor: r.recordedBy?.actor, source: "project" });
@@ -130,7 +130,9 @@ export async function buildSummary(roots, scope, project, { now = () => new Date
   const rendered = renderSummary(project, kept.map((c) => c.line));
   const handoffAt = candidates.find((c) => c.kind === "handoff")?.at ?? null;
   const handoffSessions = await sessionsOfHandoffs(roots, scope, project, records);
-  const body = { schemaVersion: 1, scope, project, builtAt: now().toISOString(), handoffAt, handoffSessions, lines: rendered.lines, checkedOut: candidates.length - kept.length, dropped: rendered.dropped };
+  // The lesson IDs of the ask-before lines kept, in line order. They rank first, so askLessons[i] is lines[i]'s lesson.
+  const askLessons = kept.slice(0, rendered.lines.length).filter((c) => c.kind === "ask").map((c) => c.id);
+  const body = { schemaVersion: 1, scope, project, builtAt: now().toISOString(), handoffAt, handoffSessions, askLessons, lines: rendered.lines, checkedOut: candidates.length - kept.length, dropped: rendered.dropped };
   return { ...body, fingerprint: digest(body) };
 }
 // Rebuilds and writes one project's summary under the scope lock. The caller must not hold that lock.
@@ -168,6 +170,8 @@ export async function readSummary(stateRoot, scope, project) {
   const { fingerprint, ...body } = value ?? {};
   // handoffSessions is absent from a cache built before U33; the next rebuild adds it.
   const sessions = body.handoffSessions === undefined || (Array.isArray(body.handoffSessions) && body.handoffSessions.length <= HANDOFF_SESSIONS && body.handoffSessions.every((x) => typeof x === "string"));
-  if (body.schemaVersion !== 1 || body.scope !== scope || body.project !== project || !Array.isArray(body.lines) || body.lines.some((l) => typeof l !== "string") || !sessions || digest(body) !== fingerprint) throw new DevtwinError("INTEGRITY", "Session summary invalid");
+  // askLessons is absent from a cache built before U21's delivery count; the next rebuild adds it.
+  const asks = body.askLessons === undefined || (Array.isArray(body.askLessons) && Array.isArray(body.lines) && body.askLessons.length <= body.lines.length && body.askLessons.every((x) => typeof x === "string"));
+  if (body.schemaVersion !== 1 || body.scope !== scope || body.project !== project || !Array.isArray(body.lines) || body.lines.some((l) => typeof l !== "string") || !sessions || !asks || digest(body) !== fingerprint) throw new DevtwinError("INTEGRITY", "Session summary invalid");
   return value;
 }
