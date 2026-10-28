@@ -780,5 +780,20 @@
   "items whose full text exceeds the dialog limit get separate dialogs, and one too long for any dialog can only be rejected",
   "one dialog holds up to ten short items",
   "an item from an outside source waits with its source and is written only after the review",
-  "a parked lesson's dialog shows its match block, commands included, and its sources"
+  "a parked lesson's dialog shows its match block, commands included, and its sources",
+  "agent scenario setup and judge refuse the real home and its agent folders",
+  "agent scenario setup builds a disposable fixture and the judge decides runs from synthetic logs",
+  "agent scenario runbook lists every scenario the judge knows and the colleague check",
+  "a fresh setup has no suggestions, and the monthly job then shows no reminder (R34)",
+  "the monthly reminder counts the open review plan lines",
+  "apply with no per-line decisions refuses, and nothing changes without a decision for every line (R36)",
+  "an accepted suggestion changes only its own target, and a rejected one stays hidden until its evidence changes",
+  "a changed project scan produces a sandbox-setting suggestion, and accepting it saves only that setting",
+  "a radar item with a try-it guide suggests a radar interest, and accepting adds only that interest",
+  "imported memory gives memory-delivered-twice, promoted-source-changed and promoted-source-removed lines, and only the removed one retracts",
+  "a lesson no session got in 30 days is suggested, and accepting it runs undo on that lesson alone",
+  "a consent never used for 30 days is suggested, and accepting it revokes that consent through consent revoke",
+  "a learning branch left local for more than 14 days is an informational line; accepting it records the decision only",
+  "two declined proposals on one topic give a preference-declined line",
+  "review apply is always ask: the hook denies review apply --apply from an agent shell, and its previews stay open"
 ]

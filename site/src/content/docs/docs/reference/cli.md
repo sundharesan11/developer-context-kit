@@ -56,7 +56,7 @@ Commands that write follow one of three patterns:
 | Pattern | Commands |
 | --- | --- |
 | Preview, then `--apply` | `init`, `scope add`, `record add`, `record supersede`, `record propose`, `record publish`, `hub propose`, `lesson propose`, `lesson supersede-propose` |
-| Preview, then `--apply --plan-fingerprint <fp>` | `project onboard`, `live *`, `agents install/uninstall/recover`, `locks release`, `draft save`, `stack digest`, `radar guide`, `schedule off`, `lesson edit/reject/accept/copy`, `lesson notices --ack`, `hub join/leave/schedule`, `note revoke/consent`, `published delete`, `consent grant/revoke`, `project set`, `learning send`, `undo`, `backup create/restore`, `backup key export`, `paths confirm` |
+| Preview, then `--apply --plan-fingerprint <fp>` | `project onboard`, `live *`, `agents install/uninstall/recover`, `locks release`, `draft save`, `stack digest`, `radar guide`, `schedule off`, `lesson edit/reject/accept/copy`, `lesson notices --ack`, `hub join/leave/schedule`, `note revoke/consent`, `published delete`, `consent grant/revoke`, `project set`, `learning send`, `undo`, `review apply`, `backup create/restore`, `backup key export`, `paths confirm` |
 | Preview command, then a separate apply command with `--plan-fingerprint` | `profile plan` → `profile apply`, `stack plan` → `stack approve`, `setup plan` → `setup apply`, `schedule plan` → `schedule apply` |
 | No preview | `lesson index` and `hook verify` write only devtwin's own state. `hub sync` fetches and pushes items you already approved. |
 
@@ -64,7 +64,7 @@ The skill builder and skill-source installers add separate recorded approvals; s
 
 ### Owner actions
 
-Some commands need you at the keyboard: the **always ask** tier of the [tier table](/docs/security/security-model/#tiers). When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `consent grant`, `consent revoke`, `project set`, `undo`, `backup restore`, `backup key export`, `paths confirm`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
+Some commands need you at the keyboard: the **always ask** tier of the [tier table](/docs/security/security-model/#tiers). When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `consent grant`, `consent revoke`, `project set`, `undo`, `review apply`, `backup restore`, `backup key export`, `paths confirm`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
 
 `lesson accept` is not an owner action. Agents run it for the `project` and `repo` targets, and for the `hub` target while you hold a `hub-publish` consent. `record add` and `record supersede` of `confirmed` or `disputed` knowledge, or of a write that replaces a `confirmed` or `disputed` record, are not denied by the hook but show the owner dialog whoever runs them.
 
@@ -1031,6 +1031,37 @@ node "$KIT/bin/devtwin.mjs" undo --pilot "$LIVE_CONFIG" --id aud_0123456789abcde
 ```
 
 **Owner** with `--apply`: every undo shows the owner dialog. Each undo adds its own audit entry. An undo of an undo fails with `DEVTWIN_CONFLICT`. An undo that stopped between its retraction and its restores resumes on the next run. An undo of a hub accept cancels the lesson while it is held or waits in the outbox. A lesson already on the hub fails with `DEVTWIN_GATE_REQUIRED` and points to `published delete`. An undo of a learning branch adds a revert commit to the branch. A pushed branch gets the revert pushed after the hold. Once the lesson is in the learnings base, or the remote branch is gone, it fails with `DEVTWIN_GATE_REQUIRED` and names the `git revert` to run by hand.
+
+### `review plan`
+
+The monthly [setup review](/docs/guides/preferences-and-templates/#setup-review). Read-only. It lists one line for each suggestion: `id`, `kind`, `target`, `evidence` and `change`. The evidence holds IDs, counts, hashes, dates and paths, never record or preference text. `change.command` is the command an accepted line runs; `change.informational` is true when it runs none. `counts.decided` counts lines you already decided whose evidence did not change, and `notCollected` lists what the review does not check.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+
+```sh
+node "$KIT/bin/devtwin.mjs" review plan --pilot "$LIVE_CONFIG"
+```
+
+### `review apply`
+
+Decides each line of `review plan`, then runs each accepted change through its own command.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--accept <id>` | Repeatable. Accept this line. |
+| `--reject <id>` | Repeatable. Reject this line. It stays hidden until its evidence changes. |
+| `--apply --plan-fingerprint <fp>` | Write. |
+
+```sh
+node "$KIT/bin/devtwin.mjs" review apply --pilot "$LIVE_CONFIG" --accept sug_0123456789abcdef01234567 --reject sug_76543210fedcba9876543210
+```
+
+Every open line needs one decision. No decision, a line with none or a line with both fails with `DEVTWIN_INVALID_INPUT`. An unknown line fails with `DEVTWIN_NOT_FOUND`.
+
+**Owner** with `--apply`. The owner dialog lists every accepted line and the command it runs. Each accepted change then runs as its own command, plan first and then apply: `pref retire`, `consent revoke`, `undo`, `setup apply --step sandbox` or `profile apply`. That command keeps its own checks and owner dialog. A line with no command records the decision only. Each decision adds an audit entry with the route `review apply`. A change that fails is listed in `failed`, and its line comes back in the next review.
 
 ## Backups
 

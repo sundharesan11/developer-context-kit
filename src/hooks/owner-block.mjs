@@ -32,6 +32,8 @@ export const OWNER_ACTIONS = Object.freeze([
   { words: ["undo"], apply: true },
   // U25 (KTD38): the weekly review. An agent may list the waiting items; only the owner answers them.
   { words: ["activity", "review"], apply: true },
+  // U21 (R36): the setup review. An agent may list the suggestions and preview the decisions; only the owner applies them.
+  { words: ["review", "apply"], apply: true },
   // U24 (KTD33): printing the backup key. Its preview stays open.
   { words: ["backup", "key", "export"], apply: true }, { words: ["backup", "restore"], apply: true },
   // U27 (KTD35): recording the confirmed kit and config paths. U26 (KTD34): the owner-answer mode.

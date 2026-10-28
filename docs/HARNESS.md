@@ -231,7 +231,7 @@ These jobs run in the background for you. Each job is disabled by default. Each 
 | --- | --- | --- |
 | `radar-weekly` | Once a week | Writes one digest for each scope and shows a short notification |
 | `advisory-hourly` | Once an hour | Checks security advisories for your stack. An urgent (critical or high) advisory shows a notification at once: one for each advisory, at most three a day |
-| `review-monthly` | Once a month | Reminds you that a setup review is available, with a count of waiting preference and lesson proposals |
+| `review-monthly` | Once a month | Reminds you that a [setup review](#setup-review) is available, with the count of its open lines. With no open line, it shows no reminder |
 | `activity-weekly` | Once a week | Shows one notification with counts of what devtwin learned, holds for sending and has waiting for you. It names `activity review` when items wait for it. It does nothing else and makes no request |
 | `backup-daily` | Once a day | Writes one encrypted backup of the store into the first approved `backupTargets` folder and keeps the newest archive of each of the newest 14 days. It makes no request and no model call |
 | `import-daily` | Once a day | Runs `import run`: it imports new and changed Claude memory and `docs/solutions` files of your bound repositories as unreviewed project knowledge, at most 100 items a day. It makes no request and no model call |
@@ -284,6 +284,40 @@ node bin/devtwin.mjs activity review --pilot "$PILOT_FILE" --home "$AGENT_HOME" 
 - Accepted preferences go into the instruction block for `--home` and `--agent`, the targets that `instructions plan` takes. In live mode the live home is the default. The review writes the block only when it holds every earlier preference already; otherwise run `instructions plan` and `instructions apply`.
 - The hook denies `activity review --apply` from agent shells.
 - The digest warns while no backup folder is approved, and until `backup key export` has run once.
+
+## Setup review
+
+The setup review suggests changes to your setup. It reads what devtwin already keeps and changes nothing on its own. The `review-monthly` job reminds you once a month when it has suggestions.
+
+```sh
+node bin/devtwin.mjs review plan --pilot "$PILOT_FILE"
+node bin/devtwin.mjs review apply --pilot "$PILOT_FILE" --accept "$LINE" --reject "$OTHER_LINE"
+node bin/devtwin.mjs review apply --pilot "$PILOT_FILE" --accept "$LINE" --reject "$OTHER_LINE" --apply --plan-fingerprint "$FINGERPRINT"
+```
+
+`review plan` is read-only. Each line has an ID, a kind, a target, the evidence and the proposed change. The evidence holds IDs, counts, hashes, dates and paths, never the text of a record or preference. The kinds are:
+
+| Kind | When | Proposed change |
+| --- | --- | --- |
+| `preference-overridden` | A saved preference got a later correction on the same topic | `pref retire` |
+| `preference-declined` | You declined two or more proposals on a topic that has no saved preference | None. Write the rule yourself, or leave it |
+| `sandbox-setting` | The latest project scan recommends other sandbox settings than the ones you saved | `setup apply --step sandbox` for a new setting. A changed or dropped setting is for you to check |
+| `radar-interest` | You wrote a try-it guide for a radar item that is not one of your radar interests | `profile apply` adding it |
+| `promoted-source-changed` | The source of an imported record changed since the import | None. The next import updates an unreviewed record. A reviewed one is yours to compare |
+| `promoted-source-removed` | The source of an imported record is gone | `undo` of the import entry, when that entry replaced nothing |
+| `lesson-unused` | No session got a lesson in 30 days, from the hook budget log | `undo` of the entry that wrote it, when there is one |
+| `memory-delivered-twice` | An imported Claude memory file still exists, so sessions read it twice | None. devtwin never edits memory. The line names the file, and you decide whether to delete it |
+| `consent-unused` | Nothing ran under a consent in the 30 days or more since you granted it | `consent revoke` |
+| `learning-branch-stale` | A learning branch stayed local for more than 14 days | None. Delete the branch yourself, or send it with `learning send` |
+
+The review does not suggest unused skills or templates. The hook log keeps error codes only, not which skill or template ran.
+
+- `review apply` takes one decision for each open line: `--accept <id>` or `--reject <id>`. It refuses when no decision is given, when a line has none or when a line has both.
+- Without `--apply` it previews the decisions. `--apply` with the plan fingerprint shows the owner dialog with every accepted line.
+- Each accepted change runs through its own command, as you would run it: plan first, then apply. That command keeps its own checks and its own owner dialog, so `consent revoke` and `undo` ask you again.
+- Accepting a line with no proposed change records your decision only.
+- Each decision gets an audit entry. A decided line stays hidden until its evidence changes. A change that fails is reported, and its line comes back in the next review.
+- The hook denies `review apply --apply` from agent shells. An agent may run `review plan` and the preview.
 
 ## Daily import
 
@@ -344,3 +378,7 @@ These are optional companions. The kit does not bundle, install or detect them:
 - No install of template-made skills into real agent homes, and `devtwin-setup` is not yet in the bundled installer.
 - No enabled schedules, no Slack reading or sending, and no authenticated GitHub requests until routing lands.
 - No Linux or Windows support claim. See [Limitations](LIMITATIONS.md) and the [security model](SECURITY-MODEL.md#personal-harness-layer).
+
+## Real-agent scenarios
+
+The owner checks the behavior above with real Claude Code and Codex sessions in visible terminals, not headless runs. The runbook is [`scripts/agent-scenarios/README.md`](../scripts/agent-scenarios/README.md). `setup.mjs` there builds a disposable fixture home with its own live config, and refuses the real home. `judge.mjs` reads the fixture's hook, budget and audit logs, the held queue and the summary cache, and prints a pass, fail or needs-review row for each scenario. Acceptance lists the suite as the deferred check `real-agent-scenarios`.

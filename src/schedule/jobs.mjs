@@ -184,13 +184,13 @@ async function advisoryHourly(roots, ctx, deps, now) {
   await atomicReplace(alertsPath(roots), canonicalJson({ schemaVersion: 1, ...next }) + "\n");
   return { advisories: check.findings.filter((f) => f.group === "advisories").length, alerts: shown.map((s) => ({ id: s.finding.id, item: s.finding.item, severity: s.finding.severity, shown: s.shown })) };
 }
-async function reviewMonthly(roots, ctx) {
-  const { listPreferenceProposals } = await import("../prefs/store.mjs");
-  const { listProposals } = await import("../lessons/propose.mjs");
-  const preferences = (await listPreferenceProposals(roots)).proposals.length, lessons = (await listProposals(roots)).proposals.length;
-  const count = preferences + lessons;
-  const shown = notify(ctx, { title: "devtwin review", message: "Your monthly setup review is available with " + count + (count === 1 ? " suggestion." : " suggestions.") + " Run devtwin pref proposals and devtwin lesson proposals to see them." });
-  return { suggestions: { preferences, lessons }, notification: shown };
+// U21 (R34): the count of open setup review lines (review plan). No line, no reminder.
+async function reviewMonthly(roots, ctx, deps, now) {
+  const { openSuggestions } = await import("../review/commands.mjs");
+  const count = (await openSuggestions(roots, { now, env: ctx.env ?? process.env })).suggestions.length;
+  if (!count) return { suggestions: 0, notification: null };
+  const shown = notify(ctx, { title: "devtwin review", message: "Your monthly setup review has " + count + (count === 1 ? " suggestion." : " suggestions.") + " Run devtwin review plan to see them." });
+  return { suggestions: count, notification: shown };
 }
 async function activityWeekly(roots, ctx, deps, now) {
   const { activity, weeklyMessage } = await import("../audit/digest.mjs");

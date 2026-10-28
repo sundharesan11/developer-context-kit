@@ -56,6 +56,35 @@ When `activity review` saves a preference, it also writes the instruction block,
 
 `pref accept --apply`, `pref retire --apply`, `activity review --apply` and `instructions apply` are owner actions. An agent can preview them, but the devtwin hook denies the apply from an agent shell, and each one shows the owner dialog.
 
+## Setup review
+
+Once a month, the `review-monthly` job tells you when the setup review has suggestions. You can also run it at any time:
+
+```sh
+devtwin review plan --pilot "$LIVE_CONFIG"
+```
+
+Each line names one change and the evidence for it. The review suggests:
+
+- Retiring a saved preference after a later correction on the same topic.
+- Writing a rule yourself when you declined two or more proposals on one topic.
+- Saving a sandbox setting that a new project scan recommends.
+- Adding a radar item you wrote a try-it guide for to your radar interests.
+- Retracting an imported record whose source is gone, or a lesson no session got in 30 days.
+- Checking an imported record whose source changed.
+- Deleting a Claude memory file that devtwin also imported, so sessions do not read it twice. devtwin never edits memory; you delete the file.
+- Revoking a consent nothing used in 30 days.
+- Deleting or sending a learning branch that stayed local for more than 14 days.
+
+Decide every line, then apply:
+
+```sh
+devtwin review apply --pilot "$LIVE_CONFIG" --accept "$LINE" --reject "$OTHER_LINE"
+devtwin review apply --pilot "$LIVE_CONFIG" --accept "$LINE" --reject "$OTHER_LINE" --apply --plan-fingerprint "$FINGERPRINT"
+```
+
+The owner dialog lists every accepted line. Each accepted change then runs through its own command, such as `pref retire` or `consent revoke`, with that command's own checks and dialog. A rejected line stays hidden until its evidence changes. The devtwin hook denies `review apply --apply` from an agent shell.
+
 ## Output templates
 
 devtwin ships starter templates for an RCA (`rca`), a report (`report`) and a decision note (`decision`), each in Markdown and HTML. The bundled `devtwin-capture` skill tells agents to follow them.

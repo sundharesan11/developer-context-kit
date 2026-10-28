@@ -84,7 +84,9 @@ See the [security model](/docs/security/security-model/).
 - The deprecation extractor reads table rows only. If a vendor page loads its table with a script, moves or redirects, that source fails and reports no retirements.
 - Radar ranking uses your stack and stated interests only. Package names that are in a project but not in your profile stack do not rank.
 - The radar jobs use macOS launchd and `osascript`. On other systems you cannot install the jobs, and devtwin shows no notifications.
-- The monthly review reminder counts waiting preference and lesson proposals only, until the setup review lands.
+- The monthly review reminder counts the open lines of the setup review.
+- The setup review does not suggest unused skills or templates. The hook log does not record which skill or template ran.
+- The setup review sees only lessons delivered through the hooks, from the budget log. That log keeps about two files of history.
 - Relevance is whole-word term matching: it can miss announcements and match unrelated ones.
 - Nothing reads or sends Slack messages. Drafts saved with `draft save` cannot be sent later.
 

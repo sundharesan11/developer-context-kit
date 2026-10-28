@@ -107,6 +107,9 @@ export const COMMANDS = {
   // U25 (KTD38): the weekly owner review of the always-ask items.
   "activity review": { load: async () => (await import("./audit/commands.mjs")).activityReviewCommand },
   undo: { load: async () => (await import("./audit/commands.mjs")).undoCommand },
+  // U21 (R34-R36): the monthly setup review. review apply runs each accepted change through its own route.
+  "review plan": { load: async () => (await import("./review/commands.mjs")).reviewPlanCommand },
+  "review apply": { load: async () => (await import("./review/commands.mjs")).reviewApplyCommand },
   // U24 (KTD33): the encrypted backup. backup key export is the one three-word route.
   "backup create": { load: async () => (await import("./backup/commands.mjs")).backupCreateCommand },
   "backup restore": { load: async () => (await import("./backup/commands.mjs")).backupRestoreCommand },
@@ -213,7 +216,8 @@ export async function main(argv, options = {}) {
     if (command.startsWith("backup ") || command.startsWith("schedule ")) context.keychain = keychain;
     // U41: a hub accept enqueues a held item, which shows one notification.
     // U30: so do a repo accept, learning send and the undo of a pushed learning branch.
-    if (["lesson accept", "learning send", "undo"].includes(command)) context.notifier = notifier;
+    // U21: review apply can run undo.
+    if (["lesson accept", "learning send", "undo", "review apply"].includes(command)) context.notifier = notifier;
     if (command.startsWith("schedule ")) Object.assign(context, { notifier, stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (command.startsWith("stack ")) Object.assign(context, { stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (COMMANDS[command].interactive === true) return await impl.run(values, { ...context, stdin, stdout });

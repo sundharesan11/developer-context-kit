@@ -89,7 +89,7 @@ node scripts/acceptance.mjs \
   --report "$DEMO_PARENT/acceptance.json"
 ```
 
-On a clean checkout you should see `"ok":true`, 32 checks marked `passed`, and one check, `fresh-agent-smoke`, marked `deferred`. That check needs a real agent session, so the harness does not run it.
+On a clean checkout you should see `"ok":true`, 32 checks marked `passed`, and two checks, `fresh-agent-smoke` and `real-agent-scenarios`, marked `deferred`. These checks need real agent sessions, so the harness does not run them.
 
 :::note
 The `package-allowlist` check fails if your checkout has untracked files, because it audits what would be packaged. Run the harness on a clean clone.
