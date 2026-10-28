@@ -36,8 +36,9 @@ export async function activity(roots, { since, held = false } = {}, { now = () =
   // branch (repo-learning) is "local" until it is queued, then held, then sent, dropped or cancelled.
   const heldAudits = new Set((await (await import("../held/queue.mjs")).listHeld(roots)).map((item) => item.audit));
   const stateOf = (e) => states.get(e.id) ?? (e.kind === "repo-learning" && !heldAudits.has(e.id) ? "local" : "held");
-  // U25: a review-reject entry records an item the owner removed in activity review; nothing was learned.
-  const learned = recent.filter((e) => e.kind !== "undo" && e.kind !== "held-state" && e.kind !== "review-reject").map((e) => ({ id: e.id, at: e.at, kind: e.kind, tier: e.tier, route: e.route, target: e.target, scope: e.scope, project: e.project,
+  // U25: a review-reject entry records an item the owner removed in activity review; nothing was learned. U21: neither
+  // does a setup-review entry, a decision in review apply (the change it runs has its own entry).
+  const learned = recent.filter((e) => e.kind !== "undo" && e.kind !== "held-state" && e.kind !== "review-reject" && e.kind !== "setup-review").map((e) => ({ id: e.id, at: e.at, kind: e.kind, tier: e.tier, route: e.route, target: e.target, scope: e.scope, project: e.project,
     recordIds: e.recordIds, ...(e.kind === "hub-lesson" || e.kind === "repo-learning" ? { itemIds: e.itemIds, state: stateOf(e) } : {}), actor: e.actor, session: e.session, landed: landed(roots, e), undoneBy: done.get(e.id)?.id ?? null }));
   const undos = recent.filter((e) => e.kind === "undo").map((e) => ({ id: e.id, at: e.at, undoes: e.undoes, tier: e.tier, recordIds: e.recordIds, actor: e.actor, session: e.session, landed: landed(roots, e) }));
   const heldItems = await collect(roots, "held", { sinceMs: from, full: held }), waiting = await collect(roots, "waiting", { sinceMs: from, full: false });

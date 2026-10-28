@@ -44,7 +44,7 @@ node scripts/acceptance.mjs \
   --report "$ACCEPTANCE_PARENT/report.json"
 ```
 
-Expect `ok: true`, every check `passed` except `fresh-agent-smoke`, which is `deferred`. A deferred check is not a pass. The pilot root and report path must not already exist. The report is private; review it before sharing any part of it.
+Expect `ok: true`, every check `passed` except `fresh-agent-smoke` and `real-agent-scenarios`, which are `deferred`. A deferred check is not a pass. The pilot root and report path must not already exist. The report is private; review it before sharing any part of it.
 
 ## Make a change
 

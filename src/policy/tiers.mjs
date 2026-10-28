@@ -69,6 +69,9 @@ const TABLE = {
   // U25 (R7, R8): the owner's weekly review accepts global preferences, general lessons and capped or outside writes
   // after the owner dialog. Its preview is open; the hook denies --apply.
   "activity review": ASK,
+  // U21 (R36): the setup review. Its plan only reads; apply changes settings through other routes, so it is always ask
+  // with the owner dialog listing every accepted line, and each route it runs keeps its own tier and dialog.
+  "review plan": R, "review apply": ASK,
   // U24 (KTD33): backups are automatic and not audited. restore is always ask: it writes decrypted files into a folder a
   // cloud drive may sync. Showing the key is always ask.
   "backup create": A, "backup restore": ASK, "backup status": R, "backup key export": ASK,

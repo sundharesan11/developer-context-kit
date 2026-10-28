@@ -217,7 +217,7 @@ Three jobs run the radar for you. Each job is a user LaunchAgent with its own co
 | --- | --- | --- |
 | `radar-weekly` | Once a week | Writes one digest for each scope and shows a short notification. |
 | `advisory-hourly` | Once an hour | Checks security advisories for your stack. An urgent (critical or high) advisory shows a notification at once: one for each advisory, at most three a day. |
-| `review-monthly` | Once a month | Reminds you that a setup review is available, with a count of waiting preference and lesson proposals. |
+| `review-monthly` | Once a month | Reminds you that a [setup review](/docs/guides/preferences-and-templates/#setup-review) is available, with the count of its open lines. With no open line, it shows no reminder. |
 
 ```sh
 devtwin schedule plan   --pilot "$PILOT" --job radar-weekly

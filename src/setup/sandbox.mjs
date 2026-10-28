@@ -72,7 +72,9 @@ export function recommend(signals) {
 }
 
 const repoKey = (repo) => createHash("sha256").update(repo).digest("hex").slice(0, 12);
-const requestFor = (repo, id) => "req_setup_sandbox_" + id + "_" + repoKey(repo);
+// U21: the setup review reads these request IDs to compare the saved settings with a new scan.
+export const sandboxRequestFor = (repo, id) => "req_setup_sandbox_" + id + "_" + repoKey(repo);
+const requestFor = sandboxRequestFor;
 const RUN = "run_setup_sandbox";
 export async function planSandbox(ctx) {
   const repo = ctx.values.repo, signals = await scanSignals(ctx.pilot, repo), recommendations = recommend(signals);

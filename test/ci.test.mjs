@@ -38,13 +38,13 @@ test("CI evaluates both Node versions without claiming Linux support and checks 
   for (const value of ["macos-15", "ubuntu-24.04", "'22.13.0'", "'26.4.0'",
     "Linux evaluation (unsupported)", "Linux minimum evaluation (unsupported)",
     "npm test", "npm run check:package", "scripts/acceptance.mjs",
-    "$RUNNER_TEMP/devtwin-ci.XXXXXX", "pwd -P", "fresh-agent-smoke", "deferred",
+    "$RUNNER_TEMP/devtwin-ci.XXXXXX", "pwd -P", "fresh-agent-smoke", "real-agent-scenarios", "deferred",
     "git status --porcelain --untracked-files=all",
     "git diff --check 4b825dc642cb6eb9a060e54bf8d69288fbee4904 HEAD"]) {
     assert.ok(text.includes(value), value);
   }
   assert.ok(text.indexOf("run: npm run check:package") < text.indexOf("run: npm test"));
-  assert.match(text, /report\.checks\.length, 33/);
+  assert.match(text, /report\.checks\.length, 34/);
   assert.match(text, /status === 'passed'\)\.length, 32/);
 });
 
@@ -78,7 +78,8 @@ test("acceptance records every extra forbidden path in its report", async (t) =>
   assert.equal(r.status, 0);
   const saved = JSON.parse(await readFile(report, "utf8"));
   assert.equal(saved.ok, true);
-  assert.equal(saved.checks.length, 33);
+  assert.equal(saved.checks.length, 34);
+  assert.deepEqual(saved.checks.filter((check) => check.status !== "passed").map(({ id, status }) => ({ id, status })), [{ id: "fresh-agent-smoke", status: "deferred" }, { id: "real-agent-scenarios", status: "deferred" }]);
   for (const id of ["live-init-preview-apply", "live-install-foreign-conflict-blocks-one-agent", "live-uninstall-from-receipts", "live-rollback-check-after-uninstall",
     "profile-plan-apply", "profile-and-stack-stale-approval-refused", "stack-watch-offline-fixtures", "skill-template-render-verify"]) {
     assert.equal(saved.checks.find((check) => check.id === id)?.status, "passed", id);

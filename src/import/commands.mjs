@@ -46,7 +46,7 @@ export const seenPath = (roots) => join(roots.stateRoot, "import", "seen.json");
 const lockPath = (roots) => join(roots.stateRoot, "locks", "import.lock");
 export const newJobRunId = () => "run_job_" + randomBytes(8).toString("hex");
 
-async function readSeen(roots) {
+export async function readSeen(roots) {
   try {
     const value = await readPrivateJson(seenPath(roots), SEEN_BYTES);
     if (value?.schemaVersion !== 1 || !value.sources || typeof value.sources !== "object" || Array.isArray(value.sources)) throw new DevtwinError("INTEGRITY", "Import seen file invalid");
@@ -86,8 +86,9 @@ async function importedToday(roots, now) {
   return new Set((await readAudit(roots)).entries.filter((e) => e.route === ROUTE && e.at.slice(0, 10) === day).map((e) => e.requestId)).size + await importedPreferencesOn(roots, day);
 }
 
-// Every item to consider, with the per-project reading report.
-async function gather(roots, ctx) {
+// Every item to consider, with the per-project reading report. It only reads. U21: the setup review compares these
+// hashes with the seen file. A memory item carries the file's path, which the review points the owner at.
+export async function gather(roots, ctx) {
   const { value: registry } = await readRegistry(roots);
   const entries = latestBindings(registry);
   const repos = (roots.pilot?.repos ?? []).map(realOrSame);
@@ -115,7 +116,7 @@ async function gather(roots, ctx) {
         report.memory = "read";
         report.memoryFiles = read.items.length;
         for (const s of read.skipped) skipped.push({ source: "memory:" + project + "/" + s.file, reason: s.reason });
-        for (const item of read.items) items.push({ scope, project, source: "memory:" + project + "/" + item.file, hash: item.hash, sourceHash: item.hash, map: () => mapMemory(item) });
+        for (const item of read.items) items.push({ scope, project, source: "memory:" + project + "/" + item.file, path: join(folder, "memory", item.file), hash: item.hash, sourceHash: item.hash, map: () => mapMemory(item) });
       }
     }
     // docs/solutions from the learnings base commit, never the working copy. U30: project set records the base ref

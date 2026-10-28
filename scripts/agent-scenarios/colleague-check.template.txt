@@ -1,0 +1,32 @@
+devtwin colleague check
+=======================
+
+Fill this in after one week of devtwin on your own machine.
+Do not write real client, repository or account names. Use "a client repo" or "our team repo" instead.
+Give the finished file to the owner. The owner saves it as colleague-check-<yyyy-mm-dd>.txt and commits it.
+
+Date of the first day:
+Date of this answer:
+devtwin kit commit (git -C "$DEVTWIN_KIT" rev-parse --short HEAD):
+Agents used (Claude Code, Codex or both):
+
+The question
+------------
+
+Which store did you stop maintaining by hand this week?
+
+Mark one:
+[ ] My global instruction files (~/.claude/CLAUDE.md, ~/.codex/AGENTS.md)
+[ ] The team's docs/solutions entries
+[ ] Another store. Name its kind, not its content:
+[ ] None. I still maintain every store by hand.
+
+In one or two sentences, why:
+
+
+Optional
+--------
+
+One thing devtwin did this week that changed what your agent did:
+
+One prompt or dialog that you did not want:

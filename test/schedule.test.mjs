@@ -160,8 +160,10 @@ test("status reports installed, loaded and last run for each job", async (t) => 
   const s = await setup(t);
   await s.on("radar-weekly");
   await s.on("review-monthly");
+  const notesBefore = s.notes.length;
   await s.ok(["schedule", "run", "--job", "review-monthly"]);
-  assert.match(s.notes.at(-1).at(-2), /^Your monthly setup review is available with 0 suggestions\./);
+  // U21 (R34): no open setup review line, so no reminder.
+  assert.equal(s.notes.length, notesBefore);
   const { jobs } = await s.ok(["schedule", "status"]);
   assert.deepEqual(jobs.map((j) => [j.job, j.enabled, j.installed, j.loaded, j.lastRunAt, j.result]), [
     ["radar-weekly", true, true, true, null, null],
