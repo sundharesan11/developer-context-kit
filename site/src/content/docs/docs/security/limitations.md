@@ -54,7 +54,8 @@ See the [security model](/docs/security/security-model/).
 - **Notes are slow.** A note moves only when `hub sync` runs on both machines: up to about 20 minutes with the hub sync job. A note that waits in the outbox for more than half its 72-hour expiry is dropped.
 - **Note cleanup.** Each developer's devtwin deletes only that developer's expired notes. A hub with more than 5000 note files fails to sync with `DEVTWIN_LIMIT` until the admin prunes it.
 - **One lost item.** A publish that stops between its commit and its outbox write can lose that one item.
-- **macOS only for owner actions and the jobs.** The owner dialog needs a macOS desktop session, so owner actions deny over SSH unless you opt in with `live approval --mode dialog-or-tty`. The hub sync, activity and backup jobs are macOS LaunchAgents.
+- **The hold is a delay, not a review.** A held lesson that nobody cancels leaves after its hold. It leaves only when `hub sync` or the `learning-send` job runs, so a machine that sleeps sends late. A lesson whose consent became void stays held until you grant the consent again or cancel it.
+- **macOS only for owner actions and the jobs.** The owner dialog needs a macOS desktop session, so owner actions deny over SSH unless you opt in with `live approval --mode dialog-or-tty`. The hub sync, activity, backup and send jobs are macOS LaunchAgents.
 - **Isolation checks match whole names.** A bare project short name without its scope prefix is not matched. Lessons for every organization (`general` and `hub+general`) wait for the weekly review, which arrives in a later phase, so `lesson accept` refuses those targets today.
 
 ## Onboarding and briefs

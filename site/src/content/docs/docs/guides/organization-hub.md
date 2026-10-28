@@ -96,11 +96,26 @@ node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id prop_01234
 node "$KIT/bin/devtwin.mjs" lesson copy --pilot "$LIVE_CONFIG" --id rec_0123456789abcdef01234567 --to-scope example
 ```
 
-- `lesson accept --target hub` shows no dialog. While the consent is valid, the apply publishes the lesson. Without a valid consent, it fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent", and writes nothing: no commit, no outbox item, and the proposal stays pending.
+- `lesson accept --target hub` shows no dialog. While the consent is valid, the apply puts the lesson in the [held queue](#held-items). Without a valid consent, it fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent", and writes nothing: no held item, no commit, no outbox item, and the proposal stays pending.
 - A kit update that changes the consent rules makes the consent void. Grant it again to review the new rules.
-- The text passes the credential check and the check against every scope name before it is queued, and again when it is pushed.
+- The text passes the credential check and the check against every scope name before it is held, and again when it is sent.
 - The hub file names you by your claimed handle. Your full local record is never published.
 - `lesson copy` is an owner action. It publishes a lesson from your personal store to the hub of another scope, after the owner dialog. It first checks the text against the names of every other scope and fails with `DEVTWIN_ISOLATION` before the dialog.
+
+### Held items
+
+A lesson accepted to the hub waits in the held queue before it leaves your machine. The wait is the consent's hold time, 24 hours by default.
+
+- **Notification.** One notification names the hub and the lesson title when it is held.
+- **See it.** `activity --held` shows each held item with the full text that would leave. `activity` shows the accept with its state: `held`, `sent`, `outbox`, `dropped` or `cancelled`.
+- **Send.** After the hold, `hub sync` and the hourly `learning-send` job send it. Each send runs the credential check and the scope-name check again. A text that now names another scope is dropped and reported, not sent.
+- **Cancel.** `undo --id <audit entry>` removes the lesson from the queue, or from the outbox when its push failed. It shows the owner dialog. Once the lesson is on the hub, use `published delete`.
+- **Revoke.** `consent revoke` cancels the scope's held items too.
+
+```sh
+node "$KIT/bin/devtwin.mjs" activity --pilot "$LIVE_CONFIG" --held
+node "$KIT/bin/devtwin.mjs" undo --pilot "$LIVE_CONFIG" --id aud_0123456789abcdef01234567
+```
 
 ## Replace a lesson
 
@@ -116,7 +131,7 @@ node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id prop_01234
 
 - A replacement accepts to the `hub` target only, under the same `hub-publish` consent. The preview names the lesson it replaces.
 - After the next `hub sync`, the old lesson stops matching on every machine and the replacement is delivered in its place.
-- When another replacement reached the hub first, the accept fails with `DEVTWIN_STALE_VERSION`. Nothing is published and the proposal stays pending.
+- When another replacement reached the hub first, the send stops with `DEVTWIN_STALE_VERSION`. Nothing is published, and the held item is dropped with the reason `stale`.
 - **Contested.** Two replacements pushed before either client saw the other both land. Both are delivered with a `contested: ` prefix, and the old lesson stops matching. devtwin does not choose a winner. The contest ends when one author deletes their replacement.
 - A replacement with a wrong hash or an unknown lesson replaces nothing. It is delivered as a plain lesson.
 
@@ -175,7 +190,7 @@ These commands need you at the keyboard. The devtwin hook denies them from an ag
 
 - `hub join`, `lesson copy`, `published delete`, `hub leave`, `hub schedule`, `lesson notices --ack`, `note revoke`, `note consent`, `consent grant` and `consent revoke`, with `--apply`.
 
-An agent can run the previews and show you what an action would do. `lesson accept --target hub` is not an owner action: it publishes with no dialog while your `hub-publish` consent for the scope is valid.
+An agent can run the previews and show you what an action would do. `lesson accept --target hub` is not an owner action: it holds the lesson with no dialog while your `hub-publish` consent for the scope is valid.
 
 Without a desktop session, the dialog denies, unless you opted in to [terminal answers](/docs/security/security-model/#owner-answers-over-ssh). `hub status`, `hub sync`, `note list`, `published list` and every preview stay open to agents.
 

@@ -6,9 +6,13 @@
 //
 // An entry holds IDs, routes, tiers and the caller, never body text or titles:
 //   { schemaVersion: 1, id: "aud_<hex>", at, kind, tier, route, target, home, scope, project, recordIds, supersedes,
-//     itemIds, sourceHash, actor, session, requestId, undoes, state: "intent" }
+//     itemIds, sourceHash, actor, session, requestId, undoes, marks, state: "intent" }
 // kind is what undo dispatches on (src/audit/undo.mjs): "record" for a record write, "undo" for an undo. home is where
 // the records live (project, personal or org); supersedes lists the records the write replaced.
+//
+// U41 (KTD41): an outbound item ("hub-lesson") is appended when it enters the held queue, so its state starts as held.
+// The log stays append-only: when the item leaves the queue, a "held-state" entry is appended whose marks field names
+// the item's entry and whose target is the new state (OUTBOUND_STATES). outboundStates reads the latest one per entry.
 //
 // KTD43: an agent session (by --session) makes at most SESSION_CAP automatic knowledge writes; later ones wait for the
 // weekly activity review. Writes with no --session count in one bucket per caller and UTC day (actor:<actor>:<date>)
@@ -35,7 +39,10 @@ export const SESSION_CAP = 20, DAY_CAP = 100;
 export const HOMES = Object.freeze(["project", "personal", "org"]);
 const MONTH = /^\d{4}-\d{2}\.jsonl$/, ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const KIND = /^[a-z][a-z-]{0,31}$/, MONTH_BYTES = 16 << 20;
-const FIELDS = ["kind", "tier", "route", "target", "home", "scope", "project", "recordIds", "supersedes", "itemIds", "sourceHash", "actor", "session", "requestId", "undoes"];
+const FIELDS = ["kind", "tier", "route", "target", "home", "scope", "project", "recordIds", "supersedes", "itemIds", "sourceHash", "actor", "session", "requestId", "undoes", "marks"];
+// sent: published; outbox: the push failed and the item waits in the hub outbox; dropped: a check failed at send time;
+// cancelled: consent revoke removed it. An undo is recorded by its own undo entry.
+export const OUTBOUND_STATES = Object.freeze(["sent", "outbox", "dropped", "cancelled"]);
 export const auditDir = (roots) => join(roots.stateRoot, "audit");
 const lockPath = (roots) => join(roots.stateRoot, "locks", "audit.lock");
 const invalid = (field) => { throw new DevtwinError("INVALID_INPUT", "Invalid audit entry", { field }); };
@@ -47,7 +54,7 @@ function cleanFields(fields) {
   if (!fields || typeof fields !== "object" || Object.keys(fields).some((key) => !FIELDS.includes(key))) invalid("fields");
   const entry = { kind: fields.kind, tier: fields.tier, route: fields.route, target: fields.target ?? null, home: fields.home ?? null, scope: fields.scope ?? null, project: fields.project ?? null,
     recordIds: fields.recordIds ?? [], supersedes: fields.supersedes ?? [], itemIds: fields.itemIds ?? [], sourceHash: fields.sourceHash ?? null, actor: fields.actor, session: fields.session ?? null,
-    requestId: fields.requestId, undoes: fields.undoes ?? null };
+    requestId: fields.requestId, undoes: fields.undoes ?? null, marks: fields.marks ?? null };
   if (typeof entry.kind !== "string" || !KIND.test(entry.kind)) invalid("kind");
   if (!TIERS.includes(entry.tier)) invalid("tier");
   if (typeof entry.route !== "string" || !text(entry.route, 64)) invalid("route");
@@ -61,6 +68,8 @@ function cleanFields(fields) {
   if (entry.session !== null && (typeof entry.session !== "string" || !SESSION_ID.test(entry.session))) invalid("session");
   if (typeof entry.requestId !== "string" || !REQUEST_ID.test(entry.requestId)) invalid("requestId");
   if (entry.undoes !== null && !AUDIT_ID.test(entry.undoes)) invalid("undoes");
+  if (entry.marks !== null && !AUDIT_ID.test(entry.marks)) invalid("marks");
+  if ((entry.kind === "held-state") !== (entry.marks !== null) || (entry.kind === "held-state" && !OUTBOUND_STATES.includes(entry.target))) invalid("marks");
   return entry;
 }
 function validEntry(value) {
@@ -136,5 +145,13 @@ export function landed(roots, entry) {
 export function undoneMap(roots, entries) {
   const out = new Map();
   for (const e of entries) if (e.kind === "undo" && e.undoes && landed(roots, e)) out.set(e.undoes, e);
+  return out;
+}
+// U41: the state of each outbound entry that left the held queue, by entry ID. An outbound entry with no held-state
+// entry is still held (or was undone, which undoneMap reports). outbox is the one state an item leaves again; sent,
+// dropped and cancelled are final and win over outbox whatever the entry times say.
+export function outboundStates(entries) {
+  const out = new Map();
+  for (const e of entries) if (e.kind === "held-state" && (out.get(e.marks) ?? "outbox") === "outbox") out.set(e.marks, e.target);
   return out;
 }

@@ -22,6 +22,7 @@ Every write is still a preview followed by an apply of the exact fingerprint you
 - Live commands run only from the kit clone the live config names, and that clone must be clean and detached at the configured commit.
 - The live config changes only through `live init`, `live add-repo`, `live set-kit`, `live write-classes`, `live stack-watch`, `live approval` and `live migrate`. Each records an approved digest of the config; a `live.json` that differs from the approved one is refused.
 - Listed repositories are read-only.
+- `import run` and the `import-daily` job also read, never write, two things for each onboarded repository: its own Claude Code folder in `~/.claude/projects`, and the `docs/solutions` files of its remote default branch. See [`import run`](/docs/reference/cli/#import-run).
 
 :::caution[Turn on backups]
 Until you approve a backup folder, there is no backup: losing `~/.devtwin` loses your records, decisions and journals, and leaves installed skills unowned. Onboarding copies some repository text into the store, protected only by mode 0700 and your disk encryption. See [Backup and restore](#backup-and-restore).

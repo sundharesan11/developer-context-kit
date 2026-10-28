@@ -6,9 +6,9 @@
 //   manifest  { schemaVersion: 1, createdAt, files: [{ root, path, mode, size, sha256 }], skipped: [{ root, path, type }] }
 // root is config, data or state; path is relative to that root, with "/" between segments. The key is 32 random bytes in
 // the Keychain (src/backup/keychain.mjs), made on the first create. Create reads the store while it holds, in a fixed
-// order, the registry lock, each scope lock, the shared knowledge locks and the backup-key lock; a held lock stops it
-// with BUSY before it writes. The key is read or made under those locks, so two first creates cannot make two keys,
-// and read again from the Keychain just before sealing. Retention keeps the newest archive of each UTC day for the
+// order, the registry lock, each scope lock, the shared knowledge locks (U41: with the held-queue lock) and the
+// backup-key lock; a held lock stops it with BUSY before it writes. The key is read or made under those locks, so two
+// first creates cannot make two keys, and read again from the Keychain just before sealing. Retention keeps the newest archive of each UTC day for the
 // newest KEEP days that have archives; a create removes only older archives of its own day and archives older than
 // those days. Restore decrypts in memory, checks the tag, every path, size and hash, and only then writes, into a new
 // 0700 folder inside an approved backupTargets folder. It never writes the live store.
@@ -35,7 +35,7 @@ const EXCLUDED_FILE = /^hooks\/budget\.jsonl(?:\.\d+)?$/;
 export const EXCLUDED = Object.freeze(["state/locks", "state/lessons", "state/summaries", "state/hooks/sessions", "state/hooks/budget.jsonl*", "hub clones"]);
 // The shared locks a knowledge write takes, after the registry lock and the scope locks, then the lock under which a
 // create reads or makes the backup key (taken last: nothing else takes it).
-const SHARED_LOCKS = ["pref_proposals", "lesson_proposals", "hub-sync", "audit", "consents", "personal_records", "backup-key"];
+const SHARED_LOCKS = ["pref_proposals", "lesson_proposals", "hub-sync", "audit", "held", "consents", "personal_records", "backup-key"];
 export const exportReceiptPath = (roots) => join(roots.stateRoot, "backup", "key-export.json");
 const invalid = (message, details = {}) => { throw new DevtwinError("INTEGRITY", message, details); };
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");

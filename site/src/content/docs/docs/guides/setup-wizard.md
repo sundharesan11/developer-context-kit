@@ -45,7 +45,7 @@ node "$KIT/bin/devtwin.mjs" setup apply --pilot "$LIVE_CONFIG" --step hook-verif
 | `first-project` | Onboards one repository into the scope (`project onboard`). The live config must list it first. | |
 | `hub-join` | Joins an [organization hub](/docs/guides/organization-hub/) (`hub join`). Skipped without `--hub-remote`. | Yes |
 | `job-hub-sync` | Installs the hub sync job (`hub schedule`). Skipped when the scope has no hub. | Yes |
-| `consent-hub` | Grants the `hub-publish` consent for the scope, so `lesson accept --target hub` publishes with no dialog (`consent grant`). Skipped when the scope has no hub. | Yes |
+| `consent-hub` | Grants the `hub-publish` consent for the scope, so `lesson accept --target hub` holds a lesson with no dialog and sends it after the hold (`consent grant`). Skipped when the scope has no hub. | Yes |
 | `consent-repo` | Grants the `repo-push` consent for the bound repository at `--push-repo` (`consent grant`). No command uses this consent yet. Skipped without `--push-repo`. | Yes |
 | `sandbox` | Recommends agent sandbox settings, and a container setup when the scan finds services. Writes no agent setting. | |
 

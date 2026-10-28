@@ -356,6 +356,14 @@ Stores a handoff record: where the session stopped, the next step and where the 
 
 Returns `recordId` and `audit`.
 
+### `import run`
+
+Imports new and changed Claude Code memory and `docs/solutions` files of each onboarded repository as `observed` project records. **Automatic**: it needs no approval, and each record it writes is audited. The `import-daily` job runs it once a day. Takes `--pilot`.
+
+It reads only the Claude Code folder that belongs to the repository, and the `docs/solutions` files of the remote default branch, never the working copy. It writes only in the store. One run writes at most 100 items.
+
+Returns `runId`, `projects` (with `memory` and `solutions` states such as `read`, `ambiguous` or `no-learnings-base`), `written`, `preferences`, `unchanged`, `skipped`, `refused`, `deferred`, `ambiguous`, `notOnboarded` and `unmapped`. A refused item names its source and error code, never its text.
+
 ## Records
 
 `record add`, `record supersede` and `record propose` share these flags:
@@ -551,7 +559,7 @@ devtwin radar guide --pilot "$PILOT" --scope acme --item 0123456789ab
 
 ## Schedules
 
-Five jobs run in the background: `radar-weekly`, `advisory-hourly` and `review-monthly` for the radar, `activity-weekly` for the weekly activity notification, and `backup-daily` for the [daily backup](/docs/guides/live-mode/#backup-and-restore). Each is a user LaunchAgent. See [Schedules](/docs/guides/stack-watch/#schedules).
+These jobs run in the background: `radar-weekly`, `advisory-hourly` and `review-monthly` for the radar, `activity-weekly` for the weekly activity notification, `backup-daily` for the [daily backup](/docs/guides/live-mode/#backup-and-restore), `learning-send` for the hourly send of [held items](/docs/guides/organization-hub/#held-items), and `import-daily` for the daily [`import run`](#import-run). Each is a user LaunchAgent. See [Schedules](/docs/guides/stack-watch/#schedules).
 
 ### `schedule plan`
 
@@ -560,7 +568,7 @@ Shows the LaunchAgent path, the command it runs and the off switch for one job. 
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
-| `--job <job>` | Required. `radar-weekly`, `advisory-hourly`, `review-monthly`, `activity-weekly` or `backup-daily`. |
+| `--job <job>` | Required. `radar-weekly`, `advisory-hourly`, `review-monthly`, `activity-weekly`, `backup-daily`, `learning-send` or `import-daily`. |
 
 ### `schedule apply`
 
@@ -760,7 +768,7 @@ Accepts a proposal. It shows no owner dialog; the [tier](/docs/security/security
 | Target | Tier |
 | --- | --- |
 | `project` | Automatic. Agents run it. Writes an `observed` lesson record and an audit entry. |
-| `hub` (default) | Consented. Runs only while a `hub-publish` consent for the scope is valid; otherwise fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". |
+| `hub` (default) | Consented. Runs only while a `hub-publish` consent for the scope is valid; otherwise fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". The lesson waits in the [held queue](/docs/guides/organization-hub/#held-items) for the consent's hold time, then `hub sync` or the `learning-send` job sends it. |
 | `general`, `hub+general` | Refused with `DEVTWIN_GATE_REQUIRED`. These lessons wait for the weekly review, which arrives in a later phase. |
 
 | Flag | |
@@ -931,7 +939,7 @@ See the [tier table](/docs/security/security-model/#tiers).
 | `--kind <kind>` | Required. `hub-publish` or `repo-push`. |
 | `--scope <id>` | For `hub-publish`. A scope that joined a hub. |
 | `--repo <path>` | For `repo-push`. A bound repository. No command uses this consent yet. |
-| `--hold-hours <n>` | The hold time, from 1 to 168. Default 24. |
+| `--hold-hours <n>` | How long each item waits in the held queue, from 1 to 168. Default 24. |
 | `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |
 
 ```sh
@@ -942,7 +950,7 @@ A change to the consent rules in a later kit makes the stored consent void. Gran
 
 ### `consent revoke`
 
-**Owner** with `--apply`. Ends a consent. Takes `--pilot`, `--kind`, `--scope` or `--repo`, and `--apply --plan-fingerprint <fp>`. Agents then stop at "Needs consent" for that target.
+**Owner** with `--apply`. Ends a consent. Takes `--pilot`, `--kind`, `--scope` or `--repo`, and `--apply --plan-fingerprint <fp>`. Agents then stop at "Needs consent" for that target. It also cancels the target's held items and the outbox items that came from them; the preview lists the held items.
 
 ### `consent list`
 
@@ -950,7 +958,7 @@ Lists each consent with its target, hold time, grant time and whether it is vali
 
 ### `activity`
 
-Lists what devtwin learned in the last seven days: each automatic write with its entry ID, time, route, target, record IDs, caller and whether it landed. It also lists warnings, such as no approved backup folder. Read-only.
+Lists what devtwin learned in the last seven days: each automatic write with its entry ID, time, route, target, record IDs, caller and whether it landed. A hub accept also shows its `state`: `held`, `sent`, `outbox`, `dropped` or `cancelled`. It also lists the held items and warnings, such as no approved backup folder. Read-only.
 
 | Flag | |
 | --- | --- |
@@ -974,7 +982,7 @@ Reverses automatic writes from the audit log. A record gets a retraction, so the
 node "$KIT/bin/devtwin.mjs" undo --pilot "$LIVE_CONFIG" --id aud_0123456789abcdef01234567
 ```
 
-**Owner** with `--apply`: every undo shows the owner dialog. Each undo adds its own audit entry. An undo of an undo fails with `DEVTWIN_CONFLICT`. An undo that stopped between its retraction and its restores resumes on the next run. A lesson published to a hub fails with `DEVTWIN_GATE_REQUIRED` and points to `published delete`.
+**Owner** with `--apply`: every undo shows the owner dialog. Each undo adds its own audit entry. An undo of an undo fails with `DEVTWIN_CONFLICT`. An undo that stopped between its retraction and its restores resumes on the next run. An undo of a hub accept cancels the lesson while it is held or waits in the outbox. A lesson already on the hub fails with `DEVTWIN_GATE_REQUIRED` and points to `published delete`.
 
 ## Backups
 

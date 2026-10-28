@@ -158,7 +158,7 @@ test("the backup key is made under the backup-key lock and read again before sea
 test("a held scope lock or the audit lock makes create skip with BUSY and write nothing", async (t) => {
   const m = await machine(t);
   const plan = await m.ok(["backup", "create"]);
-  for (const lock of ["example", "audit"]) {
+  for (const lock of ["example", "audit", "held"]) {
     const path = join(m.p.stateRoot, "locks", lock + ".lock");
     await mkdir(join(m.p.stateRoot, "locks"), { recursive: true, mode: 0o700 });
     await writeFile(path, JSON.stringify({ pid: process.pid, host: "example.invalid", owner: { kind: "test" } }), { mode: 0o600 });

@@ -225,7 +225,7 @@ Personal state lives under the pilot's private roots, outside the clone:
 
 ## Schedules
 
-Five jobs run in the background for you. Each job is disabled by default. Each one is a user LaunchAgent with its own consent and its own off switch:
+These jobs run in the background for you. Each job is disabled by default. Each one is a user LaunchAgent with its own consent and its own off switch:
 
 | Job | Runs | What it does |
 | --- | --- | --- |
@@ -234,6 +234,7 @@ Five jobs run in the background for you. Each job is disabled by default. Each o
 | `review-monthly` | Once a month | Reminds you that a setup review is available, with a count of waiting preference and lesson proposals |
 | `activity-weekly` | Once a week | Shows one notification with counts of what devtwin learned, holds for sending and has waiting for you. It does nothing else and makes no request |
 | `backup-daily` | Once a day | Writes one encrypted backup of the store into the first approved `backupTargets` folder and keeps the newest archive of each of the newest 14 days. It makes no request and no model call |
+| `import-daily` | Once a day | Runs `import run`: it imports new and changed Claude memory and `docs/solutions` files of your bound repositories as unreviewed project knowledge, at most 100 items a day. It makes no request and no model call |
 
 ```sh
 node bin/devtwin.mjs schedule plan --pilot "$PILOT_FILE" --job radar-weekly
@@ -270,6 +271,38 @@ node bin/devtwin.mjs undo --pilot "$PILOT_FILE" --since 2026-10-20T00:00:00Z
 - Each undo adds its own entry to the log and rebuilds the lesson indexes. An undo of an undo is refused. An entry whose write never landed is reported, and undo leaves it alone.
 - The `activity-weekly` job sends the weekly counts as one notification.
 - The digest warns while no backup folder is approved, and until `backup key export` has run once.
+
+## Daily import
+
+`import run` turns what your agents already remember into devtwin knowledge. The `import-daily` job runs it once a day, and you or an agent can run it at any time. It is automatic: it needs no approval, and each record it writes is in the audit log.
+
+```sh
+node bin/devtwin.mjs import run --pilot "$PILOT_FILE"
+```
+
+It reads two sources for each onboarded project:
+
+- The Claude Code memory of the repository: `~/.claude/projects/<folder>/memory/*.md`. The folder name is the repository's real path with every character other than a letter or a digit changed to `-`. `MEMORY.md` is an index, so it is skipped. A linked file is skipped.
+- The `docs/solutions/**/*.md` files of the project's learnings base commit. The base is the remote default branch that `refs/remotes/origin/HEAD` names. devtwin reads the files from that commit with Git plumbing, never from the working copy. A feature branch that you checked out does not feed the import. With no remote default branch, the project reports `no-learnings-base`.
+
+devtwin reads a memory folder only when it can prove that the folder belongs to the repository. Two repositories can give the same folder name. So each session transcript in the folder must record a working directory in the repository, in a folder below it, or in one of its linked worktrees. Otherwise the project reports `ambiguous` and nothing is read. A linked worktree has its own Claude Code folder, and the import does not read it yet. Folders that belong to no bound repository are only counted, as `unmapped`.
+
+Each item becomes one record:
+
+| Source | Record |
+| --- | --- |
+| `feedback` memory | A project lesson. Habit words in the rule give the lesson its commands, from `catalog/habit-commands.json`. "Always ask before pushing" gets `git push`. |
+| `project` memory | A project constraint when the text says "must", "never" or "always". Otherwise a project fact. |
+| `reference` memory | An environment record with locations when the text names a place, such as `.env`. Otherwise a project fact. |
+| `user` memory | A preference proposal for your weekly review. devtwin never accepts it. |
+| `docs/solutions` file | A project lesson that names the file and the commit. |
+
+- Every record is `observed`. Sessions get it at once, marked as unreviewed. Confirm it later if you want.
+- Each record passes the same checks as `record add`: plain text, no secret and no other scope's name. A refused item is reported by its source and the error code, never by its text. It is not tried again until its text changes.
+- A file that did not change adds nothing. A change only to `modified` or `originSessionId` adds nothing. A body change replaces the earlier record. When you confirmed that record, the change is skipped and reported, because only you change a confirmed record.
+- One run writes at most 100 items, and all runs of one UTC day write at most 100. The rest wait for the next run. The agent session limits do not count the job's writes.
+- `undo --since` with the time before a run removes every record that the run wrote. The next run does not bring them back while the source stays the same.
+- The import writes only in the store: the records, the audit log and its seen file at `stateRoot/import/seen.json`. It never writes memory, transcripts or a repository.
 
 ## Backups
 

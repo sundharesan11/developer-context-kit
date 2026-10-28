@@ -112,9 +112,32 @@ export async function proposePreference(roots, { session, title, text, topic = n
   });
 }
 
-// pref proposals: pending proposals, or every proposal with all. The text came from an agent.
+// U28 (R7, KTD27): a preference candidate from an imported source (a Claude memory of type user). It waits as a
+// pending proposal for the owner's weekly review; nothing here accepts it. The proposal carries its source, and its
+// session is "import:<source>". It passes the same checks as pref propose. A proposal with the same text, pending,
+// declined or accepted, is the answer already, so nothing new is written. The per-session limit is for agent sessions
+// and does not apply; the importer caps its own run.
+export const PREF_SOURCES = Object.freeze(["memory"]);
+export async function proposeImportedPreference(roots, { title, text, source }, { now = () => new Date() } = {}) {
+  if (!PREF_SOURCES.includes(source)) invalid("source");
+  const pref = await checkPreference(roots, { title, text, topic: null });
+  const key = prefKey(pref.text), proposalId = "pref_" + digest({ source, key }).slice(7, 31), path = pathOf(roots, proposalId);
+  assertWritable(roots, [path]);
+  return withLock(roots, "pref-import", async () => {
+    const all = await readAll(roots), earlier = all.find((p) => p.key === key);
+    if (earlier) return { proposalId: earlier.proposalId, created: false, state: earlier.state };
+    if (all.length >= MAX_PROPOSALS) throw new DevtwinError("LIMIT", "Too many preference proposals", { max: MAX_PROPOSALS });
+    const at = now().toISOString();
+    ensurePrivatePath(roots.dataRoot, ["pref-proposals"]);
+    await writeNewFile(path, canonicalJson({ schemaVersion: 1, proposalId, session: "import:" + source, source, key, preference: pref, state: "pending", createdAt: at, updatedAt: at, outcome: null }) + "\n");
+    fsyncDir(dir(roots));
+    return { proposalId, created: true, state: "pending" };
+  });
+}
+
+// pref proposals: pending proposals, or every proposal with all. The text came from an agent, or from an import (source).
 export async function listPreferenceProposals(roots, { all = false } = {}) {
-  return { proposals: (await readAll(roots)).filter((p) => all || p.state === "pending").map((p) => ({ id: p.proposalId, state: p.state, session: p.session, title: p.preference.title, text: p.preference.text, topic: p.preference.topic, createdAt: p.createdAt, outcome: p.outcome })) };
+  return { proposals: (await readAll(roots)).filter((p) => all || p.state === "pending").map((p) => ({ id: p.proposalId, state: p.state, session: p.session, title: p.preference.title, text: p.preference.text, topic: p.preference.topic, createdAt: p.createdAt, outcome: p.outcome, ...(p.source ? { source: p.source } : {}) })) };
 }
 
 // The preferences the instruction block delivers: effective preference records of the personal store, oldest first,
