@@ -391,7 +391,7 @@ test("activity lists learned items with held and waiting lists", async (t) => {
   await learnLesson(m);
   await recordAdd(m, { requestId: "req_activity1", session: null });
   const activity = await m.ok(["activity"], { env: {} });
-  assert.deepEqual(activity.counts, { learned: 2, neverLanded: 0, undone: 0, held: 0, waiting: 0 });
+  assert.deepEqual(activity.counts, { learned: 2, neverLanded: 0, undone: 0, held: 0, waiting: 0, review: 0 });
   assert.deepEqual(activity.learned.map((x) => x.route), ["lesson accept", "record add"]);
   assert.deepEqual(activity.held, []);
   assert.deepEqual(activity.waiting, []);

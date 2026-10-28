@@ -146,7 +146,16 @@ Every automatic knowledge write appends one entry to `stateRoot/audit/<yyyy-mm>.
 - **Fields.** An entry has `schemaVersion` 1, `id` (`aud_` and 24 hex characters), `at`, `kind` (`record`, `hub-lesson` or `undo`), `tier`, `route` and `target`. Then come `home` (`project`, `personal` or `org`), `scope`, `project`, `recordIds`, `supersedes` and `itemIds`. Last come `sourceHash`, `actor`, `session`, `requestId`, `undoes` and `state` (`intent`). An entry never holds a title or body text.
 - **Writers.** `record add` and `record supersede` of any status, `lesson accept --target project`, `lesson accept --target hub` and `undo`. A `confirmed` or `disputed` record, or one that replaces a `confirmed` or `disputed` record, has tier `always-ask`. A hub accept writes a `hub-lesson` entry whose `itemIds` name the hub lesson.
 - **Reading.** A line that does not parse, or a month file that is not a private file, is skipped with a warning in the result. The other months still read. Nothing repairs the log.
+- **Review.** `activity review` writes one entry for each item it accepts (kind `record`, tier `always-ask`, actor `human`, `itemIds` naming the item) and one for each item it rejects (kind `review-reject`). `activity` does not list a reject as learned, and `undo` skips it.
 - **Retractions.** Only `undo` writes a record of kind `retraction`; `record add` and `record supersede` refuse that kind. The retraction supersedes the current head of the undone record's chain. The brief, the lesson index, handoff exports and the stack match never deliver a retraction.
+
+### Review waiting list
+
+Items that wait for `activity review` live at `stateRoot/review/<wait_id>.json`. The folder is 0700 and each file is 0600. Each file is created exclusively without following links, under `stateRoot/locks/review.lock`, and removed when the owner answers. The ID is `wait_` and 24 hex characters of a hash of the type and the request ID, so parking the same write twice keeps one file.
+
+- **Fields.** `schemaVersion` 1, `id`, `type` (`general-lesson`, `capped-record` or `outside`), `source`, `title`, `requestId`, `createdAt` and `payload`. The payload holds the full lesson or record draft, which the audit log never holds.
+- **Preferences.** Pending `pref` proposals are the preference part of the list. They stay in `dataRoot/pref-proposals`.
+- **Backup.** The folder is in the backup. Create takes the review lock first among the shared locks.
 
 ## File identity and interrupted writes
 
@@ -179,7 +188,7 @@ A lost store leaves installed entries unowned; [Live activation](LIVE.md) gives 
 
 - **Contents.** Every regular file of `configRoot`, `dataRoot` and `stateRoot`, with its path, mode, size and SHA-256. `inputsRoot` is not in the archive.
 - **Left out.** The caches that a rebuild or a new session makes again: `state/lessons/` (the lesson index), `state/summaries/`, `state/hooks/sessions/` and `state/hooks/budget.jsonl*`. Also left out are `state/locks/` and anything inside a hub clone folder. A link, or anything that is not a regular file, is not archived; the manifest lists it as skipped.
-- **Locks.** Create holds, in this order, the registry lock, each scope lock in sorted order, and the `pref_proposals`, `lesson_proposals`, `hub-sync`, `audit`, `consents` and `personal_records` locks while it reads. When one of them is held, create stops with `BUSY` before it writes, and the job tries again on its next run.
+- **Locks.** Create holds, in this order, the registry lock, each scope lock in sorted order, and the `review`, `pref_proposals`, `lesson_proposals`, `hub-sync`, `audit`, `consents` and `personal_records` locks while it reads. When one of them is held, create stops with `BUSY` before it writes, and the job tries again on its next run.
 - **Format.** The archive starts with the 8 bytes `DTBACKUP`, a version byte and a 12-byte IV. The AES-256-GCM ciphertext and the 16-byte tag follow. The first 9 bytes are authenticated with the rest. The plaintext is a 4-byte manifest length, the JSON manifest and the bytes of each file in manifest order.
 - **Name.** `devtwin-backup-<yyyymmddThhmmssZ>-<8 hex>.dtb`, mode 0600, written by atomic replace. A folder that devtwin makes has mode 0700. Each folder keeps the newest archive of each day, for the newest 14 days that have archives. A create removes only older archives of its own day and archives older than those days.
 - **Key.** 32 random bytes in the macOS Keychain, service `devtwin-backup`, account the user name. The key is never in a file or a command line. `backup key export` writes `state/backup/key-export.json` (0600) with `schemaVersion` and `exportedAt` only.

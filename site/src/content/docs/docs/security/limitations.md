@@ -56,7 +56,7 @@ See the [security model](/docs/security/security-model/).
 - **One lost item.** A publish that stops between its commit and its outbox write can lose that one item.
 - **The hold is a delay, not a review.** A held lesson that nobody cancels leaves after its hold. It leaves only when `hub sync` or the `learning-send` job runs, so a machine that sleeps sends late. A lesson whose consent became void stays held until you grant the consent again or cancel it.
 - **macOS only for owner actions and the jobs.** The owner dialog needs a macOS desktop session, so owner actions deny over SSH unless you opt in with `live approval --mode dialog-or-tty`. The hub sync, activity, backup and send jobs are macOS LaunchAgents.
-- **Isolation checks match whole names.** A bare project short name without its scope prefix is not matched. Lessons for every organization (the `general` target) wait for the weekly review, which arrives in a later phase, so `lesson accept` refuses those targets today.
+- **Isolation checks match whole names.** A bare project short name without its scope prefix is not matched. Lessons for every organization (the `general` target) wait for the weekly `activity review`.
 
 ## Onboarding and briefs
 
@@ -114,7 +114,7 @@ These are outside what devtwin does, even when it runs in the background:
 - **Commands that break when pasted.** devtwin does not check or repair shell commands for your shell.
 - **Polling long jobs.** devtwin does not watch a job and tell you when it ends.
 
-Automatic items are reviewed after they land: you read the weekly digest and reverse an item with `undo`. An agent that writes outside text again in its own words makes an agent write, which only that later review catches. The cap of 20 automatic writes counts each session on its own, and writes with no session in one bucket per caller and UTC day. A caller that passes a new session for each write still stops at 100 automatic writes per UTC day. The caller label comes from environment variables. Backups go only to folders inside your home folder, so a copy off the machine needs a folder that a sync service copies.
+Automatic items are reviewed after they land: you read the weekly digest and reverse an item with `undo`. The `activity review` dialog answers approve or deny for all the items in it, so reject the items you want to drop with `--reject` first. An item too long for one dialog can only be rejected. An agent that writes outside text again in its own words makes an agent write, which only that later review catches. The cap of 20 automatic writes counts each session on its own, and writes with no session in one bucket per caller and UTC day. A caller that passes a new session for each write still stops at 100 automatic writes per UTC day. The caller label comes from environment variables. Backups go only to folders inside your home folder, so a copy off the machine needs a folder that a sync service copies.
 
 ## Development status
 

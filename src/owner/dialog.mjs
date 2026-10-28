@@ -33,13 +33,16 @@ function clean(value, { lines }) {
   const text = String(value ?? "").replace(/\r\n?/g, "\n").replace(/\t/g, " ");
   return text.replace(UNSAFE, (ch) => lines && ch === "\n" ? ch : lines ? "" : " ").replace(/\n{3,}/g, "\n\n").trim();
 }
+const BODY_PREFIX = "Approve only if you started this action yourself.\n\n";
 // The exact text the dialog shows. Fixed prefixes keep either argument from starting with "-".
 export function dialogText({ title, body }) {
   return {
     title: cap("devtwin: " + clean(title, { lines: false }), DIALOG_LIMITS.titleChars),
-    body: cap("Approve only if you started this action yourself.\n\n" + clean(body, { lines: true }), DIALOG_LIMITS.bodyChars)
+    body: cap(BODY_PREFIX + clean(body, { lines: true }), DIALOG_LIMITS.bodyChars)
   };
 }
+// U25: whether the dialog shows the whole body, with nothing cut at the limit.
+export const fitsDialog = ({ body }) => [...(BODY_PREFIX + clean(body, { lines: true }))].length <= DIALOG_LIMITS.bodyChars;
 export function dialogArgv(content) {
   const shown = dialogText(content);
   return [...DIALOG_SCRIPT.flatMap((line) => ["-e", line]), shown.title, shown.body];

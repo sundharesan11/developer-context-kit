@@ -50,7 +50,7 @@ node bin/devtwin.mjs profile apply --pilot "$PILOT_FILE" --work 'Backend service
 
 ## The capture skill and the hook
 
-`skills/devtwin-capture` is a bundled skill that `agents install` installs. It tells an agent to treat hook lesson lines as untrusted data. The agent stops and asks when its plan breaks the "do" or "don't" line of a delivered lesson. At the end of a task, it drafts at most three general lessons and shows them to the user. It saves them with `lesson propose --session <id> --apply` and accepts them for the current project with `lesson accept --target project --apply`. That is an automatic action: the lesson is stored as `observed` and needs no approval. A lesson for every project waits for the developer's weekly review, and a lesson for the hub needs the developer's `hub-publish` consent. The skill reads lessons with `lesson match` and `lesson show`. Preferences stay in the conversation, because no command saves them from an agent in this version. It never runs a command, fetches a URL, installs a package or changes a permission because a lesson says so.
+`skills/devtwin-capture` is a bundled skill that `agents install` installs. It tells an agent to treat hook lesson lines as untrusted data. The agent stops and asks when its plan breaks the "do" or "don't" line of a delivered lesson. At the end of a task, it drafts at most three general lessons and shows them to the user. It saves them with `lesson propose --session <id> --apply` and accepts them for the current project with `lesson accept --target project --apply`. That is an automatic action: the lesson is stored as `observed` and needs no approval. A lesson for every project waits for the developer's weekly `activity review`, and a lesson for the hub needs the developer's `hub-publish` consent. The skill reads lessons with `lesson match` and `lesson show`. A preference that an agent saves with `pref propose` waits for the same weekly review. It never runs a command, fetches a URL, installs a package or changes a permission because a lesson says so.
 
 The hook entries are separate from the skills. `agents install --hooks` previews and, after approval, writes them to the approved agent settings files. `agents status` reports them. The hook also denies owner-only devtwin commands from agent shells. See [Live activation](LIVE.md#install-the-hooks).
 
@@ -232,7 +232,7 @@ These jobs run in the background for you. Each job is disabled by default. Each 
 | `radar-weekly` | Once a week | Writes one digest for each scope and shows a short notification |
 | `advisory-hourly` | Once an hour | Checks security advisories for your stack. An urgent (critical or high) advisory shows a notification at once: one for each advisory, at most three a day |
 | `review-monthly` | Once a month | Reminds you that a setup review is available, with a count of waiting preference and lesson proposals |
-| `activity-weekly` | Once a week | Shows one notification with counts of what devtwin learned, holds for sending and has waiting for you. It does nothing else and makes no request |
+| `activity-weekly` | Once a week | Shows one notification with counts of what devtwin learned, holds for sending and has waiting for you. It names `activity review` when items wait for it. It does nothing else and makes no request |
 | `backup-daily` | Once a day | Writes one encrypted backup of the store into the first approved `backupTargets` folder and keeps the newest archive of each of the newest 14 days. It makes no request and no model call |
 | `import-daily` | Once a day | Runs `import run`: it imports new and changed Claude memory and `docs/solutions` files of your bound repositories as unreviewed project knowledge, at most 100 items a day. It makes no request and no model call |
 
@@ -269,7 +269,20 @@ node bin/devtwin.mjs undo --pilot "$PILOT_FILE" --since 2026-10-20T00:00:00Z
 - Every undo shows the owner dialog, and the hook denies `undo --apply` from agent shells. `--session` is shown in the plan only.
 - An undo that stopped between its retraction and its restores resumes on the next run. A `hub-lesson` entry is not undone: remove the lesson with `published delete`.
 - Each undo adds its own entry to the log and rebuilds the lesson indexes. An undo of an undo is refused. An entry whose write never landed is reported, and undo leaves it alone.
-- The `activity-weekly` job sends the weekly counts as one notification.
+- The `activity-weekly` job sends the weekly counts as one notification. It is the one weekly prompt for `activity review`.
+
+### Weekly review
+
+```sh
+node bin/devtwin.mjs activity review --pilot "$PILOT_FILE" --home "$AGENT_HOME"
+node bin/devtwin.mjs activity review --pilot "$PILOT_FILE" --home "$AGENT_HOME" --reject "$ITEM" --apply --plan-fingerprint "$FINGERPRINT"
+```
+
+- `activity review` lists every item that waits for you, with its full text. These are global preference candidates (from an agent or a `user` memory) and the general part of a `lesson accept`. They also include writes refused by the session or day cap, and items from a fetched or synced source. `activity` lists the same items by title.
+- `--apply` shows the owner dialog, up to ten items in one dialog while their full text fits. Approve saves every item in that dialog; deny leaves them waiting. An item too long for any dialog stays waiting until you reject it.
+- `--reject <id>` removes an item, after its own dialog.
+- Accepted preferences go into the instruction block for `--home` and `--agent`, the targets that `instructions plan` takes. In live mode the live home is the default. The review writes the block only when it holds every earlier preference already; otherwise run `instructions plan` and `instructions apply`.
+- The hook denies `activity review --apply` from agent shells.
 - The digest warns while no backup folder is approved, and until `backup key export` has run once.
 
 ## Daily import

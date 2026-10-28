@@ -3,6 +3,8 @@
 // accepts or declines it. Accept is an owner action with the owner dialog; it writes a preference record to the
 // personal store, which reaches every organization's sessions through the managed instruction block (U16). A declined
 // preference is remembered, and the same text is never proposed again. Preferences never enter a hub or a handoff.
+// U25 (R7): the pending proposals are the preference part of the activity review's waiting list (src/audit/review.mjs),
+// so they are not copied anywhere else. The review accepts or declines them after its own owner dialog.
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { DevtwinError } from "../errors.mjs";
@@ -14,6 +16,7 @@ import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { validateDraft } from "../records/schema.mjs";
 import { isolationTerms, assertOutboundClean } from "../records/isolation.mjs";
 import { addPersonalRecord, readPersonalSnapshot } from "../records/personal.mjs";
+import { personalRecordIdFor } from "../identity/ids.mjs";
 import { requireOwnerApproval } from "../owner/dialog.mjs";
 import { SESSION_ID } from "../lessons/propose.mjs";
 import { plainRuleProblem } from "../audit/checks.mjs";
@@ -167,16 +170,38 @@ export async function applyAcceptPreference(roots, input, { fingerprint, now = (
   const plan = await planAcceptPreference(roots, input);
   assertFingerprint(plan, fingerprint);
   await requireOwnerApproval(ctx, acceptDialog(plan));
-  return withLock(roots, "pref-accept", async () => {
-    const proposal = await requirePending(roots, plan.proposalId);
-    const twin = (await readAll(roots)).find((p) => p.key === proposal.key && p.state === "accepted");
-    if (twin) throw new DevtwinError("CONFLICT", "This preference is already saved", { reason: "accepted", id: twin.proposalId });
-    if (hashOf(proposal) !== plan.proposalHash) throw new DevtwinError("STALE_VERSION", "Preference proposal changed", { id: plan.proposalId });
-    const added = await addPersonalRecord(roots, { requestId: plan.requestId, recordedBy: { actor: "human", runId: "run_cli00001" }, draft: prefDraft(plan.preference, "observed") }, { now });
-    const outcome = { acceptedAt: now().toISOString(), recordId: added.recordId, recordHash: added.recordHash };
-    await replace(roots, plan.proposalHash, { ...proposal, state: "accepted", updatedAt: outcome.acceptedAt, outcome });
-    return { accepted: true, proposalId: plan.proposalId, ...outcome, next: "Run devtwin instructions plan to deliver it to Claude Code and Codex." };
-  });
+  const outcome = await acceptLocked(roots, plan, { now });
+  return { accepted: true, proposalId: plan.proposalId, ...outcome, next: "Run devtwin instructions plan to deliver it to Claude Code and Codex." };
+}
+// The accept write, under the proposal lock. beforeWrite(recordId, requestId) runs after the checks and before the record is
+// written (U25: the review's audit entry).
+const acceptLocked = (roots, plan, { now, beforeWrite = null }) => withLock(roots, "pref-accept", async () => {
+  const proposal = await requirePending(roots, plan.proposalId);
+  const twin = (await readAll(roots)).find((p) => p.key === proposal.key && p.state === "accepted");
+  if (twin) throw new DevtwinError("CONFLICT", "This preference is already saved", { reason: "accepted", id: twin.proposalId });
+  if (hashOf(proposal) !== plan.proposalHash) throw new DevtwinError("STALE_VERSION", "Preference proposal changed", { id: plan.proposalId });
+  if (beforeWrite) await beforeWrite(personalRecordIdFor({ requestId: plan.requestId }), plan.requestId);
+  const added = await addPersonalRecord(roots, { requestId: plan.requestId, recordedBy: { actor: "human", runId: "run_cli00001" }, draft: prefDraft(plan.preference, "observed") }, { now });
+  const outcome = { acceptedAt: now().toISOString(), recordId: added.recordId, recordHash: added.recordHash };
+  await replace(roots, plan.proposalHash, { ...proposal, state: "accepted", updatedAt: outcome.acceptedAt, outcome });
+  return outcome;
+});
+// U25: activity review accepts a pending proposal after its own owner dialog, which showed the full text. The
+// proposal must still have the hash the review's plan read. The checks run again here.
+export async function acceptPendingPreference(roots, { id, proposalHash }, { now = () => new Date(), beforeWrite = null } = {}) {
+  const plan = await planAcceptPreference(roots, { id });
+  if (plan.proposalHash !== proposalHash) throw new DevtwinError("STALE_VERSION", "Preference proposal changed", { id });
+  return { proposalId: id, requestId: plan.requestId, ...(await acceptLocked(roots, plan, { now, beforeWrite })) };
+}
+// U25: activity review declines a pending proposal the owner rejected.
+export async function declinePendingPreference(roots, { id, proposalHash }, { now = () => new Date() } = {}) {
+  const plan = await planDeclinePreference(roots, { id });
+  if (plan.proposalHash !== proposalHash) throw new DevtwinError("STALE_VERSION", "Preference proposal changed", { id });
+  return declineLocked(roots, plan, { now });
+}
+// U25: the pending proposals as activity review reads them, each with the hash of its file.
+export async function pendingPreferences(roots) {
+  return (await readAll(roots)).filter((p) => p.state === "pending").map((p) => ({ id: p.proposalId, hash: hashOf(p), source: p.source ?? "agent", title: p.preference.title, text: p.preference.text, createdAt: p.createdAt }));
 }
 // pref decline: the developer said no. The file stays as "declined", so the same text is refused at propose time.
 export async function planDeclinePreference(roots, { id }) {
@@ -186,12 +211,13 @@ export async function planDeclinePreference(roots, { id }) {
 export async function applyDeclinePreference(roots, input, { fingerprint, now = () => new Date() } = {}) {
   const plan = await planDeclinePreference(roots, input);
   assertFingerprint(plan, fingerprint);
-  return withLock(roots, "pref-decline", async () => {
-    const proposal = await requirePending(roots, plan.proposalId);
-    await replace(roots, plan.proposalHash, { ...proposal, state: "declined", updatedAt: now().toISOString(), outcome: { declinedAt: now().toISOString() } });
-    return { declined: true, proposalId: plan.proposalId };
-  });
+  return declineLocked(roots, plan, { now });
 }
+const declineLocked = (roots, plan, { now }) => withLock(roots, "pref-decline", async () => {
+  const proposal = await requirePending(roots, plan.proposalId);
+  await replace(roots, plan.proposalHash, { ...proposal, state: "declined", updatedAt: now().toISOString(), outcome: { declinedAt: now().toISOString() } });
+  return { declined: true, proposalId: plan.proposalId };
+});
 
 // pref retire: stops delivering an accepted preference. The record stays in the personal store; its ID goes to
 // dataRoot/pref-retired.json, which the instruction block reads. Run instructions apply afterwards.

@@ -10,7 +10,7 @@ You tell an agent "use Playwright, not a manual browser". With devtwin, you say 
 ## How a preference reaches your agents
 
 1. **Propose.** After a correction, the agent asks whether it is a preference for later tasks. If you say yes, it saves a private proposal with `pref propose`. Nothing leaves your machine.
-2. **Accept.** You run `pref accept` in your own terminal. A macOS dialog shows the exact text, and the preference goes to your personal store only after you click **Approve**.
+2. **Accept.** You run `pref accept` in your own terminal, or answer all waiting preferences at once in the weekly `activity review`. A macOS dialog shows the exact text, and the preference goes to your personal store only after you click **Approve**. A `user` memory that `import run` reads waits the same way.
 3. **Deliver.** You run `instructions plan`, then `instructions apply`. devtwin writes a short managed block to your user-level agent files.
 
 ```sh
@@ -52,7 +52,9 @@ Besides your preferences, the block holds four short rules for the agent:
 
 The block has at most 1,200 characters. When your preferences do not fit, the plan leaves out the oldest ones and warns with `PREFERENCES_DROPPED`. Each preference is checked again when the block is built; one that now names a scope is left out with `PREFERENCES_REFUSED`. Sandbox advice from setup is for one repository, so it stays out of the block.
 
-`pref accept --apply`, `pref retire --apply` and `instructions apply` are owner actions. An agent can preview them, but the devtwin hook denies the apply from an agent shell, and each one shows the owner dialog.
+When `activity review` saves a preference, it also writes the instruction block, with no second dialog. It does this only when your instruction files hold the block without the new preferences, so the only new text is the text the review dialog showed. Otherwise run `instructions plan` and `instructions apply`. Pass `--home` and `--agent` to `activity review` as you pass them to `instructions plan`; in live mode the live home is the default.
+
+`pref accept --apply`, `pref retire --apply`, `activity review --apply` and `instructions apply` are owner actions. An agent can preview them, but the devtwin hook denies the apply from an agent shell, and each one shows the owner dialog.
 
 ## Output templates
 

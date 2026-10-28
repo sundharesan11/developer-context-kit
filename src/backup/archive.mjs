@@ -34,8 +34,9 @@ const EXCLUDED_DIRS = ["locks", "lessons", "summaries", "hooks/sessions"];
 const EXCLUDED_FILE = /^hooks\/budget\.jsonl(?:\.\d+)?$/;
 export const EXCLUDED = Object.freeze(["state/locks", "state/lessons", "state/summaries", "state/hooks/sessions", "state/hooks/budget.jsonl*", "hub clones"]);
 // The shared locks a knowledge write takes, after the registry lock and the scope locks, then the lock under which a
-// create reads or makes the backup key (taken last: nothing else takes it).
-const SHARED_LOCKS = ["pref_proposals", "lesson_proposals", "hub-sync", "audit", "held", "consents", "personal_records", "backup-key"];
+// create reads or makes the backup key (taken last: nothing else takes it). U25: the review lock comes first, because
+// lesson accept and activity review take it before the proposal and knowledge locks.
+const SHARED_LOCKS = ["review", "pref_proposals", "lesson_proposals", "hub-sync", "audit", "held", "consents", "personal_records", "backup-key"];
 export const exportReceiptPath = (roots) => join(roots.stateRoot, "backup", "key-export.json");
 const invalid = (message, details = {}) => { throw new DevtwinError("INTEGRITY", message, details); };
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");

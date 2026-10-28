@@ -30,6 +30,8 @@ export const OWNER_ACTIONS = Object.freeze([
   // U37: undo. Review fix: every undo apply is owner-only, since a caller's --session cannot be proven; its preview
   // stays open. The one word "undo" with --apply is enough, so a harmless command naming both is denied too.
   { words: ["undo"], apply: true },
+  // U25 (KTD38): the weekly review. An agent may list the waiting items; only the owner answers them.
+  { words: ["activity", "review"], apply: true },
   // U24 (KTD33): printing the backup key. Its preview stays open.
   { words: ["backup", "key", "export"], apply: true }, { words: ["backup", "restore"], apply: true },
   // U27 (KTD35): recording the confirmed kit and config paths. U26 (KTD34): the owner-answer mode.

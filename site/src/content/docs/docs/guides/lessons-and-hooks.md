@@ -79,11 +79,11 @@ devtwin lesson reject --pilot "$PILOT" --id prop_0123456789abcdef01234567
 | `project` | An `observed` lesson record in the proposal's project, or in `--project` | Automatic: an agent runs it with no prompt |
 | `hub` | One file in the scope's hub | Consented: needs a valid `hub-publish` consent for the scope |
 | `repo` | A learning branch in the project's repository; see [Write a lesson to the repository](/docs/guides/organization-hub/#write-a-lesson-to-the-repository) | Automatic for the branch. The push needs a valid `repo-push` consent |
-| `general` | Nothing yet: refused with `DEVTWIN_GATE_REQUIRED` | Waits for the weekly review |
+| `general` | A waiting item for your weekly `activity review`. The other targets are written at once | Always ask: the review writes it after the owner dialog |
 
 - **Project lessons are automatic.** The bundled skill accepts its own proposals for the current project. The record names the agent in `recordedBy`, and the write adds an entry to the audit log. You see it in `activity` and the weekly notification, and you reverse it with `undo --id` after the owner dialog.
 - **Hub lessons need a consent.** Without a valid `hub-publish` consent, the accept fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". You grant it once with `consent grant`; see [Organization hub](/docs/guides/organization-hub/#publish-a-lesson).
-- **General lessons wait.** Your personal store follows you to every organization, so a lesson for it waits for the weekly review, which arrives in a later phase.
+- **General lessons wait.** Your personal store follows you to every organization, so a lesson for it waits for your weekly `activity review`. The review shows its full text in the owner dialog before it writes the lesson.
 - **Plain text only.** A title or summary with Markdown structure, an `@` import, a devtwin marker or text that tells the reader to ignore other instructions is refused.
 
 `lesson copy --apply` stays an owner action. The devtwin hook denies it from an agent shell, and the dialog asks you first.
@@ -101,8 +101,23 @@ devtwin undo --pilot "$PILOT" --id aud_0123456789abcdef01234567
 - `undo --id` reverses one entry. A record gets a retraction, so the next session no longer sees it.
 - `undo --since <time>` reverses every entry after a time.
 - Every undo is an owner action: the hook denies `undo --apply` from an agent shell, and the apply shows the owner dialog. A lesson published to a hub is removed with `published delete` instead.
-- An agent session makes at most 20 automatic writes, and writes with no `--session` share one count per caller and UTC day. A caller makes at most 100 automatic writes per UTC day across all sessions. After that, a write fails with `DEVTWIN_GATE_REQUIRED`.
+- An agent session makes at most 20 automatic writes, and writes with no `--session` share one count per caller and UTC day. A caller makes at most 100 automatic writes per UTC day across all sessions. After that, a write fails with `DEVTWIN_GATE_REQUIRED`, and its draft waits for your `activity review`.
 - The `activity-weekly` job sends one notification each week with the counts. Turn it on with `schedule plan` and `schedule apply --job activity-weekly`.
+
+## Weekly review
+
+A few items always wait for you: preferences for every agent session, lessons for every organization, writes past the session cap and items from a fetched or synced source. They wait in one place, and you answer them once a week:
+
+```sh
+devtwin activity review --pilot "$PILOT"
+devtwin activity review --pilot "$PILOT" --apply --plan-fingerprint 'sha256:...'
+```
+
+- The preview shows each item's full text. `activity` lists the same items by title.
+- The apply shows the owner dialog, with up to ten items in one dialog while their full text fits. **Approve** saves every item in that dialog. **Deny** leaves them waiting for next time.
+- `--reject <id>` removes an item, after its own dialog. An item too long for any dialog can only be rejected.
+- Saved preferences go into your instruction block. See [Preferences and templates](/docs/guides/preferences-and-templates/).
+- The devtwin hook denies `activity review --apply` from an agent shell.
 
 ## The agent hook
 

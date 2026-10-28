@@ -104,22 +104,22 @@ node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> 
 
 Each command previews first. Run each apply only with explicit approval from the owner. `lesson edit` takes `--title`, `--summary`, `--body`, `--body-file`, and `--path`, `--package`, `--topic` and `--command`, which replace the whole `match` block. Its preview shows the new lesson.
 
-`--target` selects where the lesson goes. It takes one target or a set of them, joined by commas, such as `--target project,repo`. devtwin checks each target first. If any target is refused, the whole accept fails and writes nothing. `hub+general` is the older spelling of `general,hub`.
+`--target` selects where the lesson goes. It takes one target or a set of them, joined by commas, such as `--target project,repo`. devtwin checks each target first. If any target is refused, the whole accept fails and writes nothing. The `general` target is parked, not refused. `hub+general` is the older spelling of `general,hub`.
 
 | Target | Writes | Tier |
 | --- | --- | --- |
 | `project` | A lesson record in the proposal's project, or in `--project` | Automatic |
-| `general` | Nothing yet: refused with `GATE_REQUIRED` | Waits for the weekly `activity review` |
+| `general` | A waiting item for the weekly `activity review`. The review writes the personal record after the owner dialog | Always ask, through `activity review` |
 | `hub` | One file in the scope's hub, after the hold | Consented: needs a valid `hub-publish` consent |
 | `repo` | A learning branch in the project's repository. The push waits for the hold | Automatic for the branch. The push needs a valid `repo-push` consent |
 
 - **Consent.** No accept shows the owner dialog. The owner grants the consent once with `consent grant --kind hub-publish --scope <scope>`, which shows the dialog. Without a valid consent, the hub apply fails with `APPROVAL_REQUIRED`, "Needs consent", and writes nothing: no held item, no commit, no outbox item, and the proposal stays pending. See [Tiers](SECURITY-MODEL.md#tiers).
 - **Hold.** A hub accept does not publish at once. The lesson waits in the held queue for the consent's hold time, 24 hours by default. A notification names the hub and the title when it is held. `activity --held` shows its full text, and `undo --id <audit entry>` cancels it. See [Held items](#held-items).
-- **General.** Your personal store follows you to every organization. For this reason, a lesson for the personal store waits for the weekly `activity review`. The `hub` target writes no personal copy.
+- **General.** Your personal store follows you to every organization. For this reason, a lesson for the personal store waits for the weekly `activity review`, and the other targets are written at once. The `hub` target writes no personal copy.
 - **Org copy.** The hub file is the organization's copy of the lesson. Accept writes no second copy to the org home in the store.
 - **Identity.** The lesson ID is `lsn_` and a hash of the hub ID, your handle, the request ID and the creation time. The author is your claimed handle. The file's `localRecordHash` points back to the accepted draft. The full local record is never published.
 - **Push.** After the hold, the sender publishes one file and pushes it. A rejected push fetches, rebases and checks again, three tries in all. After the last try, the lesson goes to the outbox, and `hub status` counts it. The next `hub sync` pushes it.
-- **Index.** After an accept, devtwin rebuilds the lesson index of the scope. A personal record is in every scope's index, so a general target rebuilds all of them.
+- **Index.** After an accept, devtwin rebuilds the lesson index of the scope. A personal record is in every scope's index, so the review rebuilds all of them when it writes a general lesson.
 
 ### Write a lesson to the repository
 

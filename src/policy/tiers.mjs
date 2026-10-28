@@ -66,6 +66,9 @@ const TABLE = {
   // U37 (KTD40): activity reads the audit log. Review fix: every undo needs the owner, because a caller's --session
   // cannot be proven. The hook denies undo --apply by its words (OWNER_ACTIONS) and the apply shows the owner dialog.
   activity: R, undo: ASK,
+  // U25 (R7, R8): the owner's weekly review accepts global preferences, general lessons and capped or outside writes
+  // after the owner dialog. Its preview is open; the hook denies --apply.
+  "activity review": ASK,
   // U24 (KTD33): backups are automatic and not audited. restore is always ask: it writes decrypted files into a folder a
   // cloud drive may sync. Showing the key is always ask.
   "backup create": A, "backup restore": ASK, "backup status": R, "backup key export": ASK,

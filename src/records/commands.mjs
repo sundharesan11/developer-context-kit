@@ -78,7 +78,16 @@ export async function auditedWrite(ctx, route, input, session, { targets = [], e
   assertOutboundClean([input.draft.title, input.draft.body, ...locationLines(input.draft.locations)].join("\n"), await isolationTerms(ctx.roots), { except: input.scope });
   if (tier === "always-ask") await (await import("../owner/dialog.mjs")).requireOwnerApproval(ctx, ownerDialog(route, input, target, targets));
   const { appendEntry } = await import("../audit/log.mjs");
-  return appendEntry(ctx.roots, { kind: "record", tier, route, target, home: "project", scope: input.scope, project: input.project, recordIds: [recordId], supersedes: targets, actor: input.recordedBy.actor, session: session ?? null, requestId: input.requestId, sourceHash }, { now: ctx.now, cap: !isJobRecorder(input.recordedBy) });
+  try {
+    return await appendEntry(ctx.roots, { kind: "record", tier, route, target, home: "project", scope: input.scope, project: input.project, recordIds: [recordId], supersedes: targets, actor: input.recordedBy.actor, session: session ?? null, requestId: input.requestId, sourceHash }, { now: ctx.now, cap: !isJobRecorder(input.recordedBy) });
+  } catch (error) {
+    // U25: a write over the session or day cap is not lost. Its draft waits in the activity review's waiting list, and
+    // the refusal names the item. The audit log never holds the text.
+    if (error.code !== "DEVTWIN_GATE_REQUIRED" || error.details?.via !== "activity review") throw error;
+    const { parkCappedRecord } = await import("../audit/review.mjs");
+    const parked = await parkCappedRecord(ctx.roots, { route, input, session: session ?? null, targets, expectHashes }, { now: ctx.now });
+    throw new DevtwinError("GATE_REQUIRED", error.message, { ...error.details, waiting: parked.id });
+  }
 }
 const withAudit = (result, entry) => ({ ...result, audit: entry.id });
 export const recordAddCommand = { options, async run(values, ctx) {

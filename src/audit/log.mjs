@@ -19,6 +19,7 @@
 // with the same cap, so leaving out --session does not lift it. Fresh --session values do not lift it either: each caller
 // makes at most DAY_CAP automatic writes per UTC day across all its sessions (bucket day:<actor>:<date>). Whichever
 // limit is reached first refuses, and the error names that bucket. Undo entries do not count.
+// U25: a refused record write keeps its draft in the activity review's waiting list (src/records/commands.mjs).
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { openSync, closeSync, fstatSync, writeSync, fsyncSync, constants } from "node:fs";

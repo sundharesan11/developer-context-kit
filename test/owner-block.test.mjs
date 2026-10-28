@@ -45,7 +45,8 @@ const OWNER_COMMANDS = [
   `${KIT} live add-repo --pilot '/x/live.json' --repo /r --apply`,
   `${KIT} live init --pilot '/x/live.json' --agent claude --apply`,
   `${KIT} backup key export --pilot '/x/live.json' --apply --plan-fingerprint 'sha256:00'`,
-  `${KIT} backup restore --pilot '/x/live.json' --from /b/a.dtb --to /b/r --apply --plan-fingerprint 'sha256:00'`
+  `${KIT} backup restore --pilot '/x/live.json' --from /b/a.dtb --to /b/r --apply --plan-fingerprint 'sha256:00'`,
+  `${KIT} activity review --pilot '/x/live.json' --apply --plan-fingerprint 'sha256:00'`
 ];
 const WRAPPED = [
   "script -q /dev/null devtwin lesson copy --id rec_1 --apply",
@@ -72,6 +73,9 @@ const ALLOWED = [
   `${KIT} undo --pilot '/x/live.json' --id aud_000000000000000000000000 --session ses_one`,
   `${KIT} record add --pilot '/x/live.json' --scope example --project example.atlas --kind fact --title Queue --body x --status confirmed --request-id req_example1 --apply`,
   `${KIT} activity --pilot '/x/live.json' --since 2026-01-01`,
+  // U25: an agent may list what waits for the review, and accept a lesson whose general member waits there.
+  `${KIT} activity review --pilot '/x/live.json'`,
+  `${KIT} lesson accept --pilot '/x/live.json' --id prop_1 --target general,project --apply --plan-fingerprint 'sha256:00'`,
   `${KIT} live migrate --pilot '/x/live.json' --legacy '/x/old'`,
   `${KIT} agents install --pilot '/x/live.json' --agent claude`,
   // U36: lesson accept left the owner-only list; the route refuses the targets its tier does not allow.
@@ -104,7 +108,7 @@ test("owner block denies devtwin owner-only actions run directly from an agent s
     assert.match(out.permissionDecisionReason, /Ask your developer to run it themselves/);
     assert.doesNotMatch(result.out, /additionalContext/);
   }
-  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "backup key export", "backup restore", "consent grant", "consent revoke", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson copy", "lesson notices", "live add-repo", "live approval", "live init", "live migrate", "live set-kit", "live stack-watch", "live write-classes", "note consent", "note revoke", "paths confirm", "pref accept", "pref retire", "project set", "published delete", "record publish", "schedule apply", "schedule off", "undo"]);
+  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["activity review", "agents install", "agents uninstall", "backup key export", "backup restore", "consent grant", "consent revoke", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson copy", "lesson notices", "live add-repo", "live approval", "live init", "live migrate", "live set-kit", "live stack-watch", "live write-classes", "note consent", "note revoke", "paths confirm", "pref accept", "pref retire", "project set", "published delete", "record publish", "schedule apply", "schedule off", "undo"]);
 });
 
 test("owner block denies owner-only actions through terminal wrappers", async (t) => {

@@ -104,6 +104,8 @@ export const COMMANDS = {
   "consent revoke": { load: async () => (await import("./consent/commands.mjs")).consentRevokeCommand },
   "consent list": { load: async () => (await import("./consent/commands.mjs")).consentListCommand },
   activity: { load: async () => (await import("./audit/commands.mjs")).activityCommand },
+  // U25 (KTD38): the weekly owner review of the always-ask items.
+  "activity review": { load: async () => (await import("./audit/commands.mjs")).activityReviewCommand },
   undo: { load: async () => (await import("./audit/commands.mjs")).undoCommand },
   // U24 (KTD33): the encrypted backup. backup key export is the one three-word route.
   "backup create": { load: async () => (await import("./backup/commands.mjs")).backupCreateCommand },
