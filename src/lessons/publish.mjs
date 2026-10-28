@@ -237,7 +237,7 @@ export async function applyAccept(roots, input, { fingerprint, now = () => new D
       const entry = await appendEntry(roots, { kind: "hub-lesson", tier: "consented", route: "lesson accept", target: "hub", scope: plan.scope, itemIds: [plan.hub.lessonId], actor: recordedBy.actor, session: plan.session ?? null, requestId: plan.hubRequestId }, { now });
       result.audit = entry.id;
       const held = await enqueueHeld(roots, { target: hubTarget(plan.scope), kind: "hub-lesson", title: plan.lesson.title, audit: entry.id, requestId: plan.hubRequestId,
-        consent: { kind: consent.kind, holdHours: consent.holdHours, ruleDigest: consent.ruleDigest }, payload: { ...plan.hub, createdAt: plan.createdAt, message: "Add lesson " + plan.hub.lessonId } }, { now, ctx });
+        consent: { kind: consent.kind, holdHours: consent.holdHours, ruleDigest: consent.ruleDigest, grantedAt: consent.grantedAt }, payload: { ...plan.hub, createdAt: plan.createdAt, message: "Add lesson " + plan.hub.lessonId } }, { now, ctx });
       result.hub = { lessonId: plan.hub.lessonId, hubId: plan.hub.hubId, held: true, heldId: held.item.id, sendAfter: held.item.sendAfter, ...(held.notification ? { notification: held.notification } : {}) };
     }
     if (plan.repo) {

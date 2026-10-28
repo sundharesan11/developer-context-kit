@@ -4,12 +4,14 @@
 // default branch that refs/remotes/origin/HEAD names). Writing the branch is automatic (src/policy/tiers.mjs); pushing
 // it is the consented step (src/learnings/push.mjs).
 //
-// Only Git plumbing runs, through git() (src/identity/git.mjs: hooks, fsmonitor, global and system config off):
+// Only Git plumbing runs, through git() (src/identity/git.mjs: hooks, fsmonitor, global and system config and replace
+// refs off):
 // hash-object --stdin --no-filters, ls-tree, mktree, commit-tree and update-ref, plus reads (rev-parse, cat-file,
 // config --get, merge-base). None of them reads or writes the working tree or the index, runs a filter or moves HEAD,
 // so a filter driver in the repository's own config never runs. The one ref devtwin creates is its own learning ref,
 // and update-ref creates it only when it does not exist yet. The only later move is an undo, which adds a revert
-// commit to that same ref by fast-forward (revertLearning).
+// commit to that same ref by fast-forward (revertLearning). Before the ref is made, the new commit is checked: one
+// parent, the base, and a diff to it that adds the one file and changes nothing else (addsOnly).
 //
 // Every check runs before anything is written: the repository is an approved repoLearnings root bound to the project,
 // the scope has a recorded Git identity (its hub binding's handle and email, passed as per-command -c user.name and
@@ -50,6 +52,33 @@ const oid = (text, step) => {
 };
 export const refValue = (root, ref) => { const r = repoGit(root, ["rev-parse", "-q", "--verify", ref + "^{commit}"]); return r.ok ? oid(r.stdout, "rev-parse") : null; };
 export const isAncestor = (root, commit, of) => repoGit(root, ["merge-base", "--is-ancestor", commit, of]).status === 0;
+// The parents a commit object records, read from the object itself (cat-file), so no graft changes them. null when it
+// is not a commit.
+export function commitParents(root, commit) {
+  if (!OID.test(commit ?? "")) return null;
+  const r = repoGit(root, ["cat-file", "commit", commit]);
+  if (!r.ok) return null;
+  return r.stdout.split("\n\n", 1)[0].split("\n").filter((line) => line.startsWith("parent ")).map((line) => line.slice(7));
+}
+// The changes from one commit's tree to another's: [{ from, to, status, path }] with file modes, no rename detection.
+// null when Git fails.
+export function changesBetween(root, from, to) {
+  const r = repoGit(root, ["diff-tree", "--no-renames", "--ignore-submodules=none", "-r", "--raw", "-z", from, to]);
+  if (!r.ok) return null;
+  const parts = r.stdout.split("\0"), out = [];
+  for (let i = 0; i + 1 < parts.length; i += 2) {
+    const [from, to, , , status] = parts[i].replace(/^:/, "").split(" ");
+    out.push({ from, to, status, path: parts[i + 1] });
+  }
+  return out;
+}
+// True when the commit has exactly one parent, that parent, and its only change is one new regular file at rel.
+export function addsOnly(root, commit, parent, rel) {
+  const parents = commitParents(root, commit);
+  if (parents?.length !== 1 || parents[0] !== parent) return false;
+  const changes = changesBetween(root, parent, commit);
+  return changes?.length === 1 && changes[0].status === "A" && changes[0].to === "100644" && changes[0].path === rel;
+}
 
 // The push URL of the repository's origin, as Git resolves it from the repository's own config (pushurl and any
 // insteadOf rewrite applied), with credentials in an HTTPS URL removed. null when there is no origin.
@@ -163,7 +192,9 @@ export function buildLearningCommit(prepared) {
   const { root } = prepared;
   const blob = oid(required(repoGit(root, ["hash-object", "-w", "--no-filters", "--stdin"], { input: prepared.content }), "hash-object"), "hash-object");
   const tree = treeWith(root, prepared.base.commit, prepared.rel, blob);
-  return oid(required(repoGit(root, [...identityArgs(prepared.identity), "commit-tree", "--no-gpg-sign", tree, "-p", prepared.base.commit, "-m", prepared.message]), "commit-tree"), "commit-tree");
+  const commit = oid(required(repoGit(root, [...identityArgs(prepared.identity), "commit-tree", "--no-gpg-sign", tree, "-p", prepared.base.commit, "-m", prepared.message]), "commit-tree"), "commit-tree");
+  if (!addsOnly(root, commit, prepared.base.commit, prepared.rel)) throw new DevtwinError("INTEGRITY", "The learning commit does not add exactly one file to the learnings base", { rel: prepared.rel });
+  return commit;
 }
 // A commit an earlier, stopped accept made: the same tree on the same base.
 export function sameLearningCommit(prepared, commit) {
@@ -172,7 +203,7 @@ export function sameLearningCommit(prepared, commit) {
   const parent = repoGit(root, ["rev-parse", "-q", "--verify", commit + "^1"]);
   if (!parent.ok || parent.stdout.trim() !== prepared.base.commit) return false;
   const blob = repoGit(root, ["rev-parse", "-q", "--verify", commit + ":" + prepared.rel]);
-  return blob.ok && repoGit(root, ["cat-file", "blob", commit + ":" + prepared.rel]).stdout === prepared.content;
+  return blob.ok && addsOnly(root, commit, prepared.base.commit, prepared.rel) && repoGit(root, ["cat-file", "blob", commit + ":" + prepared.rel]).stdout === prepared.content;
 }
 // Creates the learning ref. update-ref with an all-zero old value fails when the ref exists, so it never moves one.
 export function createLearningRef(prepared, commit) {

@@ -114,14 +114,18 @@ async function checkRecordDraft(roots, { scope, project, draft }) {
   assertOutboundClean([draft.title, draft.body, ...locationLines(draft.locations)].join("\n"), await isolationTerms(roots), { except: scope });
 }
 
-// The full text the owner dialog shows for one item.
+// The full text the owner dialog shows for one item: everything the write would save, including where a lesson is
+// delivered (its match block: paths, packages, topics and commands) and its sources.
 const matchLine = (match = {}) => ["paths", "packages", "topics", "commands"].filter((key) => match[key]?.length).map((key) => key + ": " + match[key].join(", ")).join("; ");
-const recordLines = (draft) => ["Title: " + draft.title, ...(draft.locations ?? []).map((l) => "Location: " + l.name + " (" + l.kind + "): " + l.where), "", draft.body.trim() || "(no further text)"];
+const sourceLine = (sources = []) => sources.map((s) => typeof s === "string" ? s : s?.ref).filter((ref) => typeof ref === "string" && ref).join(", ");
+const recordLines = (draft) => ["Title: " + draft.title, ...(draft.locations ?? []).map((l) => "Location: " + l.name + " (" + l.kind + "): " + l.where), "", draft.body.trim() || "(no further text)",
+  ...(matchLine(draft.match) ? ["", "Matches " + matchLine(draft.match)] : []), ...(sourceLine(draft.sources) ? ["Sources: " + sourceLine(draft.sources)] : [])];
 function itemText(item) {
   if (item.type === "preference") return ["Preference for every agent session, from " + (item.source === "memory" ? "your Claude memory" : "an agent session") + ".", "Title: " + item.title, "", item.text].join("\n");
   const p = item.payload;
   if (item.type === "general-lesson") return ["Lesson for every organization (your personal store), from scope " + p.scope + ".", "Title: " + p.lesson.title,
-    ...(p.lesson.summary ? ["Do or don't: " + p.lesson.summary] : []), "", p.lesson.text.trim() || "(no further text)", ...(matchLine(p.lesson.match) ? ["", "Matches " + matchLine(p.lesson.match)] : [])].join("\n");
+    ...(p.lesson.summary ? ["Do or don't: " + p.lesson.summary] : []), "", p.lesson.text.trim() || "(no further text)", ...(matchLine(p.lesson.match) ? ["", "Matches " + matchLine(p.lesson.match)] : []),
+    ...(sourceLine(p.lesson.sources) ? ["Sources: " + sourceLine(p.lesson.sources)] : [])].join("\n");
   const head = item.type === "capped-record" ? "Project record held back by the session cap (" + p.route + "), project " + p.project + ", kind " + p.draft.kind + "."
     : "Project record from a " + item.source + " source, project " + p.project + ", kind " + p.draft.kind + ".";
   return [head, ...(p.targets?.length ? ["Replaces: " + p.targets.join(", ")] : []), ...recordLines(p.draft)].join("\n");

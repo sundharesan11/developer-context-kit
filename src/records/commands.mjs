@@ -51,9 +51,10 @@ const ownerDialog = (route, input, target, targets) => ({ title: REPLACED[target
     ...(targets.length ? ["Replaces: " + targets.join(", ")] : []), "", "Title: " + input.draft.title].join("\n") });
 // The checks that run before the audit entry, so a write refused here leaves no entry behind. An always-ask write
 // shows the owner dialog after the checks and before the entry.
-// U28: sourceHash names the imported source a job write came from. A devtwin job (actor other with a job run ID,
+// U28: sourceHash names the imported source an import write came from. A devtwin job (actor other with a job run ID,
 // src/policy/actor.mjs) is not an agent session, so the KTD43 session and day caps do not count its writes; the job
-// keeps its own cap (src/import/commands.mjs).
+// keeps its own cap (src/import/commands.mjs). Only the import-daily job writes with a job recorder: it passes its job
+// context from src/schedule/jobs.mjs. An `import run` from a shell writes as its caller, under the caps.
 export async function auditedWrite(ctx, route, input, session, { targets = [], expectHashes = [], sourceHash = null } = {}) {
   const { SESSION_ID } = await import("../lessons/propose.mjs");
   if (session !== undefined && !SESSION_ID.test(session)) throw new DevtwinError("INVALID_INPUT", "Invalid session ID", { field: "session" });

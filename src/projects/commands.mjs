@@ -2,8 +2,9 @@
 // previews, then applies with the plan fingerprint after the owner dialog, and the hook denies its --apply from agent
 // shells (src/hooks/owner-block.mjs).
 //   --learnings-dir   the repo-relative folder a learning branch adds its file to (default docs/solutions/lessons)
-//   --learnings-base  the full ref a learning branch starts from, such as refs/remotes/origin/main; "default" goes
-//                     back to the remote default branch that refs/remotes/origin/HEAD names
+//   --learnings-base  the remote-tracking ref a learning branch starts from, such as refs/remotes/origin/main (a local
+//                     branch is refused); "default" goes back to the remote default branch that refs/remotes/origin/HEAD
+//                     names
 // The settings live next to the project's binding versions, at configRoot/projects/<scope>/<project>/learnings.json
 // (0600, atomic replace under the scope lock):
 //   { schemaVersion: 1, scope, project, learningsDir: <rel> | null, learningsBase: <ref> | null, updatedAt }
@@ -26,7 +27,7 @@ import { requireCommittedProject } from "../records/store.mjs";
 
 export const DEFAULT_LEARNINGS_DIR = "docs/solutions/lessons";
 export const DEFAULT_LEARNINGS_BASE = "refs/remotes/origin/HEAD";
-const REF = /^refs\/(?:remotes|heads)\/[A-Za-z0-9._\/-]{1,200}$/;
+const REF = /^refs\/remotes\/[A-Za-z0-9._\/-]{1,200}$/;
 const KEYS = ["schemaVersion", "scope", "project", "learningsDir", "learningsBase", "updatedAt"];
 const invalid = (field, message) => { throw new DevtwinError("INVALID_INPUT", message, { field }); };
 
@@ -37,7 +38,7 @@ export function assertLearningsDir(dir) {
 }
 // The same ref form the import reads (src/import/solutions.mjs).
 export function assertLearningsBase(ref) {
-  if (typeof ref !== "string" || !REF.test(ref) || ref.split("/").some((part) => !part || part === "." || part === "..")) invalid("learnings-base", "The learnings base must be a full ref such as refs/remotes/origin/main");
+  if (typeof ref !== "string" || !REF.test(ref) || ref.split("/").some((part) => !part || part === "." || part === "..")) invalid("learnings-base", "The learnings base must be a remote-tracking ref such as refs/remotes/origin/main");
   return ref;
 }
 const settingsPath = (roots, scope, project) => { assertScopeId(scope); assertProjectId(project, scope); return join(roots.configRoot, "projects", scope, project, "learnings.json"); };

@@ -287,7 +287,7 @@ node bin/devtwin.mjs activity review --pilot "$PILOT_FILE" --home "$AGENT_HOME" 
 
 ## Daily import
 
-`import run` turns what your agents already remember into devtwin knowledge. The `import-daily` job runs it once a day, and you or an agent can run it at any time. It is automatic: it needs no approval, and each record it writes is in the audit log.
+`import run` turns what your agents already remember into devtwin knowledge. The `import-daily` job runs it once a day, and you or an agent can run it at any time. It is automatic: it needs no approval, and each record it writes is in the audit log. Only the job writes as the job. An `import run` from a shell writes as its caller, like `record add`, and the caller's session and day limits count its writes.
 
 ```sh
 node bin/devtwin.mjs import run --pilot "$PILOT_FILE"
@@ -296,9 +296,9 @@ node bin/devtwin.mjs import run --pilot "$PILOT_FILE"
 It reads two sources for each onboarded project:
 
 - The Claude Code memory of the repository: `~/.claude/projects/<folder>/memory/*.md`. The folder name is the repository's real path with every character other than a letter or a digit changed to `-`. `MEMORY.md` is an index, so it is skipped. A linked file is skipped.
-- The `docs/solutions/**/*.md` files of the project's learnings base commit. The base is the remote default branch that `refs/remotes/origin/HEAD` names. devtwin reads the files from that commit with Git plumbing, never from the working copy. A feature branch that you checked out does not feed the import. With no remote default branch, the project reports `no-learnings-base`.
+- The `docs/solutions/**/*.md` files of the project's learnings base commit. The base is the remote default branch that `refs/remotes/origin/HEAD` names, or the remote-tracking ref that `project set` records. devtwin reads the files from that commit with Git plumbing, never from the working copy, and with replace refs off. A feature branch that you checked out does not feed the import. With no remote default branch, the project reports `no-learnings-base`.
 
-devtwin reads a memory folder only when it can prove that the folder belongs to the repository. Two repositories can give the same folder name. So each session transcript in the folder must record a working directory in the repository, in a folder below it, or in one of its linked worktrees. Otherwise the project reports `ambiguous` and nothing is read. A linked worktree has its own Claude Code folder, and the import does not read it yet. Folders that belong to no bound repository are only counted, as `unmapped`.
+devtwin reads a memory folder only when it can prove that the folder belongs to the repository. Two repositories can give the same folder name. So each session transcript in the folder must record a working directory in the repository, in a folder below it, or in one of its linked worktrees. Otherwise the project reports `ambiguous` and nothing is read. The check reads at most 200 transcripts of at most 8 MB each. A folder with more, or a longer transcript, reports `ambiguous` with the reason `proof-capped`, because some lines went unchecked. A linked worktree has its own Claude Code folder, and the import does not read it yet. Folders that belong to no bound repository are only counted, as `unmapped`.
 
 Each item becomes one record:
 
@@ -313,7 +313,8 @@ Each item becomes one record:
 - Every record is `observed`. Sessions get it at once, marked as unreviewed. Confirm it later if you want.
 - Each record passes the same checks as `record add`: plain text, no secret and no other scope's name. A refused item is reported by its source and the error code, never by its text. It is not tried again until its text changes.
 - A file that did not change adds nothing. A change only to `modified` or `originSessionId` adds nothing. A body change replaces the earlier record. When you confirmed that record, the change is skipped and reported, because only you change a confirmed record.
-- One run writes at most 100 items, and all runs of one UTC day write at most 100. The rest wait for the next run. The agent session limits do not count the job's writes.
+- One run writes at most 100 items, and all runs of one UTC day write at most 100. Preference proposals count as items. The rest wait for the next run. The agent session limits do not count the job's writes.
+- A shell `import run` stops at its caller's limit. The write that hits the limit waits in `activity review`, and the result names it in `parked`. The items after it wait for a later run.
 - `undo --since` with the time before a run removes every record that the run wrote. The next run does not bring them back while the source stays the same.
 - The import writes only in the store: the records, the audit log and its seen file at `stateRoot/import/seen.json`. It never writes memory, transcripts or a repository.
 

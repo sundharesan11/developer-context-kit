@@ -135,9 +135,11 @@ node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> 
 - **Approval.** The repository must be listed in the `repoLearnings` class. See [Set the write classes](LIVE.md#set-the-write-classes).
 - **Identity.** The commit uses the handle and email that `hub join` recorded for the scope. With no hub joined, the write fails before it writes anything.
 - **Place.** The learnings folder defaults to `docs/solutions/lessons`. The learnings base defaults to the remote default branch that `refs/remotes/origin/HEAD` names. The owner changes them with `project set`. With no base, the write fails and names `project set`.
+- **Commit check.** devtwin builds the commit with replace refs off. Before it creates the branch, it checks that the commit has one parent, the base, and adds the one file and nothing else.
 - **Refusals.** The write fails before it writes anything when the branch or the file already exists, or when the repository requires signed commits. It also fails when the text names another organization or looks like a credential.
 - **Push.** With a valid `repo-push` consent, the push waits in the held queue for the consent's hold time. The hourly `learning-send` job then checks it again and pushes it to the URL the consent recorded. It never force-pushes. Without a consent, the branch stays local, and `activity` lists it as waiting for consent.
-- **Later consent.** `consent grant` does not queue branches written before it. `learning send --branch devtwin/learning-<id>` queues one under the consent.
+- **Push checks.** The push runs from a new, empty bare repository that devtwin makes for it and removes afterwards. That repository reads the source repository's objects but none of its config, refs or hooks. So no `pushurl`, `insteadOf`, `pushInsteadOf`, `receivepack` or `push.followTags` setting in the repository applies, and no replace ref does. devtwin checks the commit again: one parent, and the one lesson file added. It reads the base branch on the remote. The commit's parent must be the remote tip, or an older commit of the remote branch. Otherwise the item stays held with the reason `base-not-on-remote`. Then it pushes the commit by its ID to `refs/heads/devtwin/learning-<id>`.
+- **Later consent.** `consent grant` does not queue branches written before it. `learning send --branch devtwin/learning-<id>` queues one under the consent. A held branch is sent only under the grant it was queued under. After a new grant, it stays held with the reason `consent-changed`, and `learning send --branch` queues it again with a new hold.
 - **HTTPS.** devtwin pushes only over SSH. For an HTTPS remote, it pushes nothing and prints the exact `git push` command for you.
 - **Undo.** `undo --id <audit entry>` adds a revert commit to the learning branch. When the branch was pushed, the revert is pushed after the hold. When it was never pushed, the held push is cancelled and nothing is pushed. Once the lesson is in the learnings base, or the remote branch is gone, undo refuses and names the `git revert` command to run by hand.
 
@@ -147,7 +149,7 @@ node "$KIT/bin/devtwin.mjs" project set --pilot "$LIVE_CONFIG" --scope <scope> -
 node "$KIT/bin/devtwin.mjs" learning send --pilot "$LIVE_CONFIG" --branch devtwin/learning-<id>
 ```
 
-`project set` is an owner action. It shows the owner dialog, and the hook denies its apply from agent shells. `--learnings-base` takes a full ref such as `refs/remotes/origin/main`, or `default`. A new folder or base voids the repository's `repo-push` consent, so the owner grants it again.
+`project set` is an owner action. It shows the owner dialog, and the hook denies its apply from agent shells. `--learnings-base` takes a remote-tracking ref such as `refs/remotes/origin/main`, or `default`. A local branch is refused. A new folder or base voids the repository's `repo-push` consent, so the owner grants it again.
 
 ### Copy a personal lesson to another hub
 
@@ -167,8 +169,9 @@ A lesson accepted to the hub under the consent waits in the held queue before it
 - **See it.** `activity --held` lists held items with the full text that would leave. `activity` lists the accept with `state`: `held`, then `sent`, `outbox`, `dropped` or `cancelled`.
 - **Send.** After `sendAfter`, `hub sync` and the hourly `learning-send` job send due items. Neither touches an item before its `sendAfter`. Each send runs the sensitive scan and the isolation check again, then hands the lesson to the publish path above. A failed push goes to the outbox.
 - **Drop.** An item that fails a check at send time is dropped and listed in `held.dropped` with its reason. For example, `isolation` means the text names a scope added after the accept. An item whose consent is gone or void, or whose hub binding changed, stays held and is listed in `held.kept`.
+- **Grant.** The sender reads the consent again for each item and sends it only under the grant it was queued under. An item queued before a new grant stays held with the reason `consent-changed`. `activity --held` shows the reason in `blocked`, and `undo` cancels the item.
 - **Cancel.** `undo --id <audit entry>` removes a held item from the queue, or from the outbox when its push failed. It is always ask. Once the lesson is on the hub, undo refuses and points to `published delete`.
-- **Revoke.** `consent revoke --kind hub-publish --scope <scope>` cancels the scope's held items and the outbox items that came from them. Its preview lists the held items.
+- **Revoke.** `consent revoke --kind hub-publish --scope <scope>` cancels the scope's held items and the outbox items that came from them, then removes the consent. It does both under the held-queue lock, so a sender sees the consent with its items or neither. When a sender holds the lock, the revoke stops with `BUSY` and changes nothing; run it again. Its preview lists the held items.
 - **Job.** `schedule plan --job learning-send`, then `schedule apply`, turns on the hourly job. Without it, `hub sync` still sends a joined hub's due items.
 
 ## Replace a lesson

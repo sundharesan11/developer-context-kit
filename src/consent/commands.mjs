@@ -3,7 +3,10 @@
 // (src/hooks/owner-block.mjs). list is read-only and also shows each hub's note consent (KTD10), which note consent
 // and note revoke manage.
 // U41 (KTD39): revoke also cancels the target's held items and the outbox items that came from them. The preview lists
-// the held items; the apply cancels what is held when it runs, after the consent is gone, so no sender can take one.
+// the held items. The apply takes the hub-sync lock, the held lock and the consent lock, in that order, then cancels
+// what is held and removes the consent while it holds all three. A sender checks the consent under the held lock, so
+// it sees either the consent and its items or neither. When a lock is busy (a sender is running), the revoke stops
+// with BUSY before it changes anything, and the owner runs it again.
 import { realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
@@ -100,15 +103,19 @@ const revokeDialog = (plan) => ({ title: "Revoke a standing consent", body: [
 ].join("\n") });
 // The held-queue target of a consent. A repo-push target is the repository root's hash.
 const heldTarget = (kind, target) => kind === "hub-publish" ? hubTarget(target) : "repo:" + createHash("sha256").update(target).digest("hex");
-// Cancels every held item of the target, and each outbox item a sender moved there from the held queue. Each gets a
-// held-state audit entry "cancelled". The hub-sync lock, then the held lock, as the senders take them.
-async function cancelHeld(roots, plan, { now }) {
+// Cancels every held item of the target, and each outbox item a sender moved there from the held queue, then removes
+// the consent, all under the hub-sync, held and consent locks (the senders' order; the consent lock comes last). Each
+// cancelled item gets a held-state audit entry "cancelled" after the locks are released, since the audit lock comes
+// before the held lock.
+async function revokeAndCancel(roots, plan, { now }) {
   const target = heldTarget(plan.consent.kind, plan.consent.target), cancelled = { held: [], outbox: [] };
   const { entries } = await readAudit(roots);
   const states = outboundStates(entries);
   const waiting = entries.filter((e) => e.kind === "held-state" && e.target === "outbox" && states.get(e.marks) === "outbox" && e.scope === plan.consent.target && plan.consent.kind === "hub-publish");
   const marks = [];
-  await withHubLock(roots, () => withHeldLock(roots, "consent-revoke", async () => {
+  const revoked = await withHubLock(roots, () => withHeldLock(roots, "consent-revoke", () => withConsentLock(roots, "consent-revoke", async () => {
+    const current = await readConsent(roots, plan.consent.kind, plan.consent.target);
+    if (JSON.stringify(current) !== JSON.stringify(plan.current)) throw new DevtwinError("STALE_VERSION", "Consent changed");
     for (const item of await listHeld(roots, { target })) {
       if (removeHeld(roots, target, item.id)) { cancelled.held.push(item.id); marks.push([item, []]); }
     }
@@ -119,22 +126,17 @@ async function cancelHeld(roots, plan, { now }) {
       cancelled.outbox.push(outboxId);
       marks.push([{ id: entry.itemIds.find((x) => x.startsWith("hld_")), audit: entry.marks, payload: { scope: entry.scope, lessonId: entry.itemIds.find((x) => x.startsWith("lsn_")) } }, [outboxId]]);
     }
-  }));
+    return removeConsent(roots, plan.consent);
+  })));
   for (const [item, extra] of marks) await markState(roots, item, "cancelled", { now, route: "consent revoke", tier: "always-ask", actor: "human", extra });
-  return cancelled;
+  return { revoked, cancelled };
 }
 export async function applyRevoke(roots, input, { fingerprint, now = () => new Date(), ctx = {} } = {}) {
   const plan = await planRevoke(roots, input);
   assertFingerprint(plan, fingerprint);
   await requireOwnerApproval(ctx, revokeDialog(plan));
-  const revoked = await withConsentLock(roots, "consent-revoke", async () => {
-    const current = await readConsent(roots, plan.consent.kind, plan.consent.target);
-    if (JSON.stringify(current) !== JSON.stringify(plan.current)) throw new DevtwinError("STALE_VERSION", "Consent changed");
-    return removeConsent(roots, plan.consent);
-  });
-  // After the consent lock is released: the consent lock comes last in the lock order. A sender that runs meanwhile
-  // finds no consent and keeps the item held.
-  return { revoked, kind: plan.consent.kind, target: plan.consent.target, cancelled: await cancelHeld(roots, plan, { now }) };
+  const { revoked, cancelled } = await revokeAndCancel(roots, plan, { now });
+  return { revoked, kind: plan.consent.kind, target: plan.consent.target, cancelled };
 }
 
 // Read-only. Note consents are shown as they are; consent grant and consent revoke never change them.

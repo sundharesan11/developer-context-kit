@@ -302,7 +302,7 @@ devtwin project onboard --pilot "$PILOT" --scope example --project example.atlas
 | `--pilot <file>` | Required. |
 | `--scope <id>`, `--project <id>` | Required. An onboarded project. |
 | `--learnings-dir <rel path>` | The repo-relative folder a learning branch adds its file to. Default `docs/solutions/lessons`. |
-| `--learnings-base <ref>` | The full ref a learning branch starts from, such as `refs/remotes/origin/main`. `default` uses the branch that `refs/remotes/origin/HEAD` names. The daily import reads `docs/solutions` from the same base. |
+| `--learnings-base <ref>` | The remote-tracking ref a learning branch starts from, such as `refs/remotes/origin/main`. A local branch is refused. `default` uses the branch that `refs/remotes/origin/HEAD` names. The daily import reads `docs/solutions` from the same base. |
 | `--apply --plan-fingerprint <fp>` | Write. |
 
 ### `context resolve`
@@ -373,9 +373,11 @@ Returns `recordId` and `audit`.
 
 Imports new and changed Claude Code memory and `docs/solutions` files of each onboarded repository as `observed` project records. **Automatic**: it needs no approval, and each record it writes is audited. The `import-daily` job runs it once a day. Takes `--pilot`.
 
-It reads only the Claude Code folder that belongs to the repository, and the `docs/solutions` files of the remote default branch, never the working copy. It writes only in the store. One run writes at most 100 items.
+It reads only the Claude Code folder that belongs to the repository, and the `docs/solutions` files of the remote default branch, never the working copy. It writes only in the store. One run writes at most 100 items, preference proposals included.
 
-Returns `runId`, `projects` (with `memory` and `solutions` states such as `read`, `ambiguous` or `no-learnings-base`), `written`, `preferences`, `unchanged`, `skipped`, `refused`, `deferred`, `ambiguous`, `notOnboarded` and `unmapped`. A refused item names its source and error code, never its text.
+Only the `import-daily` job writes as the job. A run from a shell writes as its caller, like `record add`, and the caller's session and day limits count its writes. The first write over a limit waits in `activity review`, and the run stops there; the rest wait for a later run.
+
+Returns `runId`, `projects` (with `memory` and `solutions` states such as `read`, `ambiguous` or `no-learnings-base`), `written`, `preferences`, `unchanged`, `skipped`, `refused`, `deferred`, `ambiguous`, `notOnboarded`, `unmapped` and `parked`. After a stop at a limit, `capped` names the limit. A refused item names its source and error code, never its text.
 
 ## Records
 
@@ -966,7 +968,7 @@ A `repo-push` consent also covers the project's learnings folder and base. `proj
 
 ### `learning send`
 
-Queues the push of a learning branch written before the repository had a `repo-push` consent. Consented: it runs only while the consent is valid, and the push still waits the hold time. A grant does not queue earlier branches; `activity` lists them as waiting.
+Queues the push of a learning branch written before the repository had a `repo-push` consent. Consented: it runs only while the consent is valid, and the push still waits the hold time. A grant does not queue earlier branches; `activity` lists them as waiting. It also queues again a held branch that stays held as `consent-changed` because it was queued under an earlier grant: the branch then waits a new hold under the current grant.
 
 | Flag | |
 | --- | --- |
@@ -976,7 +978,7 @@ Queues the push of a learning branch written before the repository had a `repo-p
 
 ### `consent revoke`
 
-**Owner** with `--apply`. Ends a consent. Takes `--pilot`, `--kind`, `--scope` or `--repo`, and `--apply --plan-fingerprint <fp>`. Agents then stop at "Needs consent" for that target. It also cancels the target's held items and the outbox items that came from them; the preview lists the held items.
+**Owner** with `--apply`. Ends a consent. Takes `--pilot`, `--kind`, `--scope` or `--repo`, and `--apply --plan-fingerprint <fp>`. Agents then stop at "Needs consent" for that target. It also cancels the target's held items and the outbox items that came from them, then removes the consent; the preview lists the held items. When a send is running, it fails with `DEVTWIN_BUSY` and changes nothing; run it again.
 
 ### `consent list`
 
