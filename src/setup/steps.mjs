@@ -286,7 +286,7 @@ const consentStep = (id, kind, title, what, why, target, skip, doneTarget) => ({
 const pushRepo = (ctx) => { try { return realpathSync(ctx.values["push-repo"]); } catch { return ctx.values["push-repo"]; } };
 const consentRepo = consentStep("consent-repo", "repo-push", "Consent: push learning branches to a repository",
   "Records a standing consent for the bound repository at --push-repo: agents and jobs may push learning branches to its remote without asking each time. Runs consent grant --kind repo-push.",
-  "Lets lessons reach a repository's docs without a prompt for each branch. No command pushes a learning branch yet; the consent waits for that step.",
+  "Lets lessons reach a repository's docs without a prompt for each branch: lesson accept --target repo writes a learning branch, and its push waits in the held queue before it is sent.",
   (ctx) => ({ kind: "repo-push", repo: ctx.values["push-repo"] }), (ctx) => ctx.values["push-repo"] ? null : "no --push-repo given", pushRepo);
 const consentHub = consentStep("consent-hub", "hub-publish", "Consent: publish lessons to the organization hub",
   "Records a standing consent for the hub that --scope joined: lesson accept --target hub then holds a lesson with no owner dialog and sends it after the hold. Runs consent grant --kind hub-publish.",

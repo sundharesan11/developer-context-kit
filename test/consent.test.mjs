@@ -64,7 +64,8 @@ test("lesson accept to general or hub+general waits for the activity review", as
     for (const args of [accept(id, target), [...accept(id, target), "--apply", "--plan-fingerprint", "sha256:" + "0".repeat(64)]]) {
       const error = await m.fail(args, "DEVTWIN_GATE_REQUIRED", { env: { CLAUDECODE: "1" } });
       assert.match(error.message, /waits for the weekly activity review/);
-      assert.deepEqual([error.details.target, error.details.via], [target, "activity review"]);
+      // U30: hub+general is the older spelling of the target set general,hub.
+      assert.deepEqual([error.details.target, error.details.via], [target === "hub+general" ? "general,hub" : target, "activity review"]);
     }
   }
   assert.equal(await treeSnapshot(m.p.pilot.pilotRoot), before, "nothing is written");
@@ -80,7 +81,8 @@ test("consent grant for repo-push after the owner dialog records the target and 
   const plan = await m.ok(args);
   assert.deepEqual([plan.consent.kind, plan.consent.target, plan.consent.holdHours, plan.current], ["repo-push", m.repo, 24, null]);
   assert.equal(plan.consent.ruleDigest, ruleDigestFor("repo-push", 24));
-  assert.deepEqual([plan.consent.rules.learningsDir, plan.consent.rules.base, plan.consent.rules.remoteUrl], [null, null, null]);
+  // U30: the repository part of the rules: the default learnings folder and base, and no origin remote to record.
+  assert.deepEqual([plan.consent.rules.learningsDir, plan.consent.rules.learningsBase, plan.consent.rules.remoteUrl, plan.consent.remoteUrl], ["docs/solutions/lessons", "refs/remotes/origin/HEAD", null, null]);
   assert.equal(await treeSnapshot(m.p.pilot.pilotRoot), before, "the preview writes nothing");
   assert.equal(m.dialogs.length, 0);
   // A denied dialog writes nothing; an approved one writes the consent.
@@ -97,7 +99,7 @@ test("consent grant for repo-push after the owner dialog records the target and 
   const dir = join(m.p.stateRoot, "consents", "repo-push"), file = join(dir, createHash("sha256").update(m.repo).digest("hex") + ".json");
   assert.equal((await stat(dir)).mode & 0o777, 0o700);
   assert.equal((await stat(file)).mode & 0o777, 0o600);
-  assert.deepEqual(JSON.parse(await readFile(file, "utf8")), { schemaVersion: 1, kind: "repo-push", target: m.repo, holdHours: 24, ruleDigest: plan.consent.ruleDigest, grantedAt: now().toISOString() });
+  assert.deepEqual(JSON.parse(await readFile(file, "utf8")), { schemaVersion: 1, kind: "repo-push", target: m.repo, holdHours: 24, ruleDigest: plan.consent.ruleDigest, grantedAt: now().toISOString(), remoteUrl: null });
   assert.deepEqual((await m.ok(["consent", "list"])).consents.map((c) => [c.kind, c.target, c.valid]), [["repo-push", m.repo, true]]);
   // Hold hours from 1 to 168; another hold time is another rule digest.
   const one = await m.ok([...args, "--hold-hours", "1"]);

@@ -106,7 +106,8 @@ A live config can hold an optional top-level `writeClasses` block. It names the 
   "hubRoot": ["/Users/<you>/.devtwin/hubs"],
   "hookTargets": ["/Users/<you>/.claude/settings.json", "/Users/<you>/.codex/hooks.json"],
   "launchAgents": ["/Users/<you>/Library/LaunchAgents/devtwin.hub-sync.example.plist"],
-  "backupTargets": ["/Users/<you>/devtwin-backups"]
+  "backupTargets": ["/Users/<you>/devtwin-backups"],
+  "repoLearnings": ["/Users/<you>/code/atlas"]
 }
 ```
 
@@ -117,6 +118,7 @@ A live config can hold an optional top-level `writeClasses` block. It names the 
 | `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) and `~/.codex/hooks.json`. | `agents install --hooks`, `agents uninstall --hooks` |
 | `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. | `hub schedule`, `schedule apply`, `schedule off` |
 | `backupTargets` | Folders inside your home for backup archives and restores. Writes are allowed in the folder and below it, never in a sibling or a parent. | `backup create`, `backup restore`, the `backup-daily` job |
+| `repoLearnings` | Exact roots of repositories listed in `repos`. devtwin writes there only Git objects and one new `devtwin/learning-<id>` branch, never a file. | `lesson accept --target repo`, `undo` of a learning branch |
 
 - Set the classes only with [`live write-classes`](/docs/reference/cli/#live-write-classes). The classes are part of the approved config digest, so a hand edit is refused with `DEVTWIN_GATE_REQUIRED`.
 - Every path must be canonical and inside your home. A link, or a path whose folder is a link, is refused. A hub root or backup folder must not overlap the store, the kit, a listed repository, a skill folder, a protected agent home or another approved folder.

@@ -59,6 +59,8 @@ export const COMMANDS = {
   "setup plan": { load: async () => (await import("./setup/commands.mjs")).setupPlanCommand },
   "setup apply": { load: async () => (await import("./setup/commands.mjs")).setupApplyCommand },
   "project onboard": { load: async () => (await import("./onboarding/commands.mjs")).projectOnboardCommand },
+  // U30 (KTD29): where a project's lessons go in its repository. Owner only.
+  "project set": { load: async () => (await import("./projects/commands.mjs")).projectSetCommand },
   "profile show": { load: async () => (await import("./profile/commands.mjs")).profileShowCommand },
   "profile plan": { load: async () => (await import("./profile/commands.mjs")).profilePlanCommand },
   "profile apply": { load: async () => (await import("./profile/commands.mjs")).profileApplyCommand },
@@ -76,6 +78,8 @@ export const COMMANDS = {
   "handoff write": { load: async () => (await import("./handoff/commands.mjs")).handoffWriteCommand },
   // U28 (R6, KTD26, KTD27): promotes Claude memory and docs/solutions of bound repositories to observed records.
   "import run": { load: async () => (await import("./import/commands.mjs")).importRunCommand },
+  // U30 (KTD39): queues a learning branch written before its repository had a consent.
+  "learning send": { load: async () => (await import("./learnings/commands.mjs")).learningSendCommand },
   "agents install": { load: async () => (await import("./agents/commands.mjs")).agentsInstallCommand },
   "agents uninstall": { load: async () => (await import("./agents/commands.mjs")).agentsUninstallCommand },
   "agents status": { load: async () => (await import("./agents/commands.mjs")).agentsStatusCommand },
@@ -206,7 +210,8 @@ export async function main(argv, options = {}) {
     if (command === "lesson propose" || command === "lesson edit" || command === "lesson supersede-propose") context.stdin = stdin;
     if (command.startsWith("backup ") || command.startsWith("schedule ")) context.keychain = keychain;
     // U41: a hub accept enqueues a held item, which shows one notification.
-    if (command === "lesson accept") context.notifier = notifier;
+    // U30: so do a repo accept, learning send and the undo of a pushed learning branch.
+    if (["lesson accept", "learning send", "undo"].includes(command)) context.notifier = notifier;
     if (command.startsWith("schedule ")) Object.assign(context, { notifier, stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (command.startsWith("stack ")) Object.assign(context, { stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (COMMANDS[command].interactive === true) return await impl.run(values, { ...context, stdin, stdout });

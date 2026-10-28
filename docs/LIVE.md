@@ -35,9 +35,11 @@ A live config can hold an optional `writeClasses` block. It names the only other
 | `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) and `~/.codex/hooks.json`. |
 | `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. |
 | `backupTargets` | Folders inside the home for backup archives and restores. Writes are allowed in the folder and below it, never in a sibling or a parent. |
+| `repoLearnings` | Exact roots of listed repositories that may get learning branches. devtwin writes there only Git objects and one new `devtwin/learning-<id>` branch, never a file. |
 
 - The classes are part of the approved config digest. A live config whose classes differ from the approved ones is refused with `GATE_REQUIRED`, `live.approval`. Set the classes only with `live write-classes` (see [Set the write classes](#set-the-write-classes)). Do not edit them in `live.json` by hand.
 - Every path must be canonical and inside the home. A path whose folder is a link, or that is itself a link, is refused. A `hubRoot` or `backupTargets` folder must not overlap the store, the kit, a listed repository, a skill folder, a protected agent home or another approved folder.
+- A `repoLearnings` path must be one of the config's `repos`, exactly. It lets a lesson accepted with `--target repo` write a learning branch in that repository ([HUB.md](HUB.md#write-a-lesson-to-the-repository)). Pushing the branch also needs the owner's `repo-push` consent.
 - A write outside the store is allowed only when the writing code names one class and the path is exactly in it. Every other file in `~/.claude`, `~/.codex`, `~/.agents` and `~/Library/LaunchAgents` stays refused.
 - `hub join`, `hub sync` and `hub leave` write only inside an approved `hubRoot` folder, and `hub schedule` writes only its own `devtwin.hub-sync.<scope>.plist` in `launchAgents` ([HUB.md](HUB.md)).
 - Only `agents install --hooks`, `agents uninstall --hooks` and `hub schedule` edit files in a file class, and each edits only its own class. See [Install the hooks](#install-the-hooks). The shared edit step works as follows. In `CLAUDE.md` and `AGENTS.md`, it changes only the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. Every byte outside the markers stays the same. Malformed markers stop the edit with `CONFLICT`. In a JSON settings file, it changes only devtwin's own hook entries; the other values stay, but the file can be re-indented.
@@ -96,7 +98,7 @@ node "$KIT/bin/devtwin.mjs" live approval --pilot "$LIVE_CONFIG" --mode dialog-o
 
 ### Set the write classes
 
-`live write-classes` changes the approved classes. Each class flag replaces the paths of that class: `--hub-root`, `--instruction-target`, `--hook-target`, `--launch-agent` and `--backup-target`. Give a flag once for each path. `--clear <class>` removes a class. A class that you do not name stays as it is. Preview, review, then apply after approval:
+`live write-classes` changes the approved classes. Each class flag replaces the paths of that class: `--hub-root`, `--instruction-target`, `--hook-target`, `--launch-agent`, `--backup-target` and `--repo-learnings`. Give a flag once for each path. `--clear <class>` removes a class. A class that you do not name stays as it is. Preview, review, then apply after approval:
 
 ```sh
 node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --hook-target "$HOME/.claude/settings.json" --hook-target "$HOME/.codex/hooks.json"

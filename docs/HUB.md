@@ -104,14 +104,14 @@ node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> 
 
 Each command previews first. Run each apply only with explicit approval from the owner. `lesson edit` takes `--title`, `--summary`, `--body`, `--body-file`, and `--path`, `--package`, `--topic` and `--command`, which replace the whole `match` block. Its preview shows the new lesson.
 
-`--target` selects where the lesson goes:
+`--target` selects where the lesson goes. It takes one target or a set of them, joined by commas, such as `--target project,repo`. devtwin checks each target first. If any target is refused, the whole accept fails and writes nothing. `hub+general` is the older spelling of `general,hub`.
 
 | Target | Writes | Tier |
 | --- | --- | --- |
-| `hub` | One file in the scope's hub, after the hold | Consented: needs a valid `hub-publish` consent |
-| `hub+general` | Nothing yet: refused with `GATE_REQUIRED` | Waits for the weekly `activity review` |
 | `project` | A lesson record in the proposal's project, or in `--project` | Automatic |
 | `general` | Nothing yet: refused with `GATE_REQUIRED` | Waits for the weekly `activity review` |
+| `hub` | One file in the scope's hub, after the hold | Consented: needs a valid `hub-publish` consent |
+| `repo` | A learning branch in the project's repository. The push waits for the hold | Automatic for the branch. The push needs a valid `repo-push` consent |
 
 - **Consent.** No accept shows the owner dialog. The owner grants the consent once with `consent grant --kind hub-publish --scope <scope>`, which shows the dialog. Without a valid consent, the hub apply fails with `APPROVAL_REQUIRED`, "Needs consent", and writes nothing: no held item, no commit, no outbox item, and the proposal stays pending. See [Tiers](SECURITY-MODEL.md#tiers).
 - **Hold.** A hub accept does not publish at once. The lesson waits in the held queue for the consent's hold time, 24 hours by default. A notification names the hub and the title when it is held. `activity --held` shows its full text, and `undo --id <audit entry>` cancels it. See [Held items](#held-items).
@@ -120,6 +120,34 @@ Each command previews first. Run each apply only with explicit approval from the
 - **Identity.** The lesson ID is `lsn_` and a hash of the hub ID, your handle, the request ID and the creation time. The author is your claimed handle. The file's `localRecordHash` points back to the accepted draft. The full local record is never published.
 - **Push.** After the hold, the sender publishes one file and pushes it. A rejected push fetches, rebases and checks again, three tries in all. After the last try, the lesson goes to the outbox, and `hub status` counts it. The next `hub sync` pushes it.
 - **Index.** After an accept, devtwin rebuilds the lesson index of the scope. A personal record is in every scope's index, so a general target rebuilds all of them.
+
+### Write a lesson to the repository
+
+The `repo` target writes the lesson into the project's own repository as a learning branch. Your team reviews it there like any other change. devtwin opens no pull request.
+
+```sh
+node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> --target project,repo
+node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id <prop_id> --target project,repo --apply --plan-fingerprint '<fingerprint>'
+```
+
+- **Branch.** devtwin writes one commit on a new branch, `devtwin/learning-<id>`. The commit adds one file, `<learnings folder>/<slug>.md`, on top of the learnings base. The file has front matter with the title, the date, `category: lesson`, the tags and `source: devtwin <record id>`, then the lesson text.
+- **Working copy.** devtwin writes Git objects and the one new branch with Git plumbing. It never changes the working copy, the index, HEAD or the current branch. Uncommitted work stays as it is.
+- **Approval.** The repository must be listed in the `repoLearnings` class. See [Set the write classes](LIVE.md#set-the-write-classes).
+- **Identity.** The commit uses the handle and email that `hub join` recorded for the scope. With no hub joined, the write fails before it writes anything.
+- **Place.** The learnings folder defaults to `docs/solutions/lessons`. The learnings base defaults to the remote default branch that `refs/remotes/origin/HEAD` names. The owner changes them with `project set`. With no base, the write fails and names `project set`.
+- **Refusals.** The write fails before it writes anything when the branch or the file already exists, or when the repository requires signed commits. It also fails when the text names another organization or looks like a credential.
+- **Push.** With a valid `repo-push` consent, the push waits in the held queue for the consent's hold time. The hourly `learning-send` job then checks it again and pushes it to the URL the consent recorded. It never force-pushes. Without a consent, the branch stays local, and `activity` lists it as waiting for consent.
+- **Later consent.** `consent grant` does not queue branches written before it. `learning send --branch devtwin/learning-<id>` queues one under the consent.
+- **HTTPS.** devtwin pushes only over SSH. For an HTTPS remote, it pushes nothing and prints the exact `git push` command for you.
+- **Undo.** `undo --id <audit entry>` adds a revert commit to the learning branch. When the branch was pushed, the revert is pushed after the hold. When it was never pushed, the held push is cancelled and nothing is pushed. Once the lesson is in the learnings base, or the remote branch is gone, undo refuses and names the `git revert` command to run by hand.
+
+```sh
+node "$KIT/bin/devtwin.mjs" project set --pilot "$LIVE_CONFIG" --scope <scope> --project <project> --learnings-dir docs/lessons
+node "$KIT/bin/devtwin.mjs" project set --pilot "$LIVE_CONFIG" --scope <scope> --project <project> --learnings-dir docs/lessons --apply --plan-fingerprint '<fingerprint>'
+node "$KIT/bin/devtwin.mjs" learning send --pilot "$LIVE_CONFIG" --branch devtwin/learning-<id>
+```
+
+`project set` is an owner action. It shows the owner dialog, and the hook denies its apply from agent shells. `--learnings-base` takes a full ref such as `refs/remotes/origin/main`, or `default`. A new folder or base voids the repository's `repo-push` consent, so the owner grants it again.
 
 ### Copy a personal lesson to another hub
 

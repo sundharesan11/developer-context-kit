@@ -1,8 +1,9 @@
 // U28 (R6, KTD26): reading docs/solutions of a bound repository. The files come from the tree of the project's learnings
 // base commit through Git plumbing (src/identity/git.mjs: hooks, fsmonitor and global config off; cat-file applies no
 // filters), never from the working copy, so a checked-out feature branch or an unreviewed pull request does not feed the
-// import. The learnings base is the binding's learningsBase ref when one is set, or else the remote default branch that
-// refs/remotes/origin/HEAD names. With neither, solutions are skipped and reported.
+// import. The learnings base is the learningsBase ref that project set records (src/projects/commands.mjs) when one
+// is set, or else the remote default branch that refs/remotes/origin/HEAD names. With neither, solutions are skipped
+// and reported. The learning-branch write (src/learnings/repo-write.mjs) starts from the same base.
 import { git } from "../identity/git.mjs";
 import { assertSourceRel, isDeniedRel, SOURCE_LIMITS } from "../storage/source-read.mjs";
 import { sha256 } from "../storage/canonical.mjs";

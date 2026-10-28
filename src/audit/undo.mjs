@@ -15,6 +15,9 @@
 // An undo that stopped between the retraction and the restores (a crash) is resumed: the next preview finds the
 // retraction and plans only the missing restores.
 //
+// U30 (KTD40): a learning-branch entry ("repo-learning") registers its own kind in src/learnings/push.mjs, loaded on
+// use. Its undo adds a revert commit to the branch, and queues the revert's push when the branch was pushed.
+//
 // U41 (KTD40, KTD41): a hub-lesson entry (a lesson accepted to a hub under consent) is undone while it waits: undo
 // removes it from the held queue, or from the hub outbox when its push failed. Once it was sent it cannot be undone
 // here: the lesson is in the hub's Git history, and removing it is `published delete`, which the owner runs.
@@ -169,6 +172,7 @@ function sinceTime(since) {
 }
 // The undo preview. Nothing is written.
 export async function planUndo(roots, { id, since, session } = {}) {
+  await import("../learnings/push.mjs");
   if ((id === undefined) === (since === undefined)) throw new DevtwinError("INVALID_INPUT", "Give --id or --since", { field: "id" });
   if (session !== undefined && session !== null && (typeof session !== "string" || !SESSION_ID.test(session))) throw new DevtwinError("INVALID_INPUT", "Invalid session ID", { field: "session" });
   const { entries } = await readAudit(roots);
@@ -199,15 +203,16 @@ export async function planUndo(roots, { id, since, session } = {}) {
     try { preview = await handler.preview(roots, entry); }
     catch (error) { if (mode === "since" && error.details?.reason) { skipped.push({ id: entry.id, reason: error.details.reason }); continue; } throw error; }
     if (preview.skip) { skipped.push({ id: entry.id, reason: preview.skip }); continue; }
-    planned.push({ id: entry.id, at: entry.at, kind: entry.kind, route: entry.route, target: entry.target, recordIds: entry.recordIds, heads: preview.heads, restores: preview.restores, ...(preview.resume ? { resume: true } : {}), ...(preview.cancel ? { cancel: preview.cancel } : {}) });
+    planned.push({ id: entry.id, at: entry.at, kind: entry.kind, route: entry.route, target: entry.target, recordIds: entry.recordIds, heads: preview.heads, restores: preview.restores, ...(preview.resume ? { resume: true } : {}), ...(preview.cancel ? { cancel: preview.cancel } : {}), ...(preview.revert ? { revert: preview.revert } : {}) });
   }
   const tier = tierOf({ route: "undo" });
   return finalizePlan({ kind: "undo", mode, ...(mode === "since" ? { since } : { id }), session: session ?? null, tier, dialog: tier !== "automatic", entries: planned, skipped });
 }
+const revertLine = (revert) => "adds a revert commit to " + revert.branch + (revert.held ? ", cancels its held push" : "") + (revert.push ? " and pushes the revert after the hold" : "; nothing is pushed");
 const cancelLine = (cancel) => cancel.held ? "cancels the held item \"" + cancel.title + "\" for " + cancel.target + " before it is sent" : "cancels the outbox item " + cancel.outbox + " before it is pushed";
 const dialogFor = (plan) => ({ title: plan.mode === "since" ? "Undo devtwin writes since " + plan.since : "Undo a devtwin write", body: [
   plan.entries.length + " entr" + (plan.entries.length === 1 ? "y" : "ies") + ", newest first. Each record gets a retraction, so sessions stop seeing it; a replaced earlier version comes back.", "",
-  ...plan.entries.slice(0, DIALOG_ENTRIES).map((e) => e.id + " " + e.at + " " + e.route + ": " + (e.cancel ? cancelLine(e.cancel) : e.heads.map((h) => h.id).join(", "))),
+  ...plan.entries.slice(0, DIALOG_ENTRIES).map((e) => e.id + " " + e.at + " " + e.route + ": " + (e.cancel ? cancelLine(e.cancel) : e.revert ? revertLine(e.revert) : e.heads.map((h) => h.id).join(", "))),
   ...(plan.entries.length > DIALOG_ENTRIES ? ["and " + (plan.entries.length - DIALOG_ENTRIES) + " more"] : [])
 ].join("\n") });
 
@@ -223,7 +228,7 @@ export async function applyUndo(roots, input, { fingerprint, now = () => new Dat
     const entry = entries.find((e) => e.id === planned.id), handler = KINDS.get(entry.kind);
     const audit = await appendEntry(roots, { kind: "undo", tier: plan.tier, route: "undo", target: plan.mode, home: entry.home, scope: entry.scope, project: entry.project,
       recordIds: await handler.recordIds(roots, entry), supersedes: planned.heads.map((h) => h.id), actor: recordedBy.actor, session: plan.session, requestId: deterministicRequestId("undo", { entry: entry.id }), undoes: entry.id }, { now, cap: false });
-    const result = await handler.apply(roots, entry, { recordedBy, now, faults });
+    const result = await handler.apply(roots, entry, { recordedBy, now, faults, audit: audit.id, ctx });
     undone.push({ entry: entry.id, audit: audit.id, ...result });
     homes.push(entry);
   }

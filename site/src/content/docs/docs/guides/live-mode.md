@@ -155,6 +155,20 @@ Never use --apply and never edit files.
 
 The session should list `devtwin-capture`, `devtwin-onboard`, `devtwin-record` and `devtwin-resume`, run `context resolve` through `DEVTWIN_KIT`, and name your project. A kit-commit warning means the installed skills came from another commit; reinstall from the current kit.
 
+## Learning branches
+
+A lesson accepted with `--target repo` becomes a learning branch in the project's repository. Approve the repository once, and grant the push consent once. Preview each command, review it, then apply it:
+
+```sh
+node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --repo-learnings "$REPO"
+node "$KIT/bin/devtwin.mjs" consent grant --pilot "$LIVE_CONFIG" --kind repo-push --repo "$REPO"
+```
+
+- `--repo-learnings` takes the exact root of a repository in the config's `repos`. It replaces the whole `repoLearnings` list, so also give every repository that you approved before.
+- devtwin writes only Git objects and the new branch `devtwin/learning-<id>`. Your working copy, index and current branch never change.
+- The push waits in the held queue for the consent's hold time. The hourly `learning-send` job then pushes it over SSH to the URL the consent recorded. For an HTTPS remote, devtwin prints the `git push` command for you instead.
+- `project set` changes the learnings folder or base. A change voids the consent; grant it again. See [Write a lesson to the repository](/docs/guides/organization-hub/#write-a-lesson-to-the-repository).
+
 ## Backup and restore
 
 devtwin can keep encrypted backups of the store in a folder that you approve. There is no sync.

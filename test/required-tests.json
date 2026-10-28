@@ -752,5 +752,15 @@
   "held queue: an item not yet due is left alone",
   "held queue: an item that fails the isolation check at send time is dropped and reported",
   "held queue: a revoked consent cancels its queued items",
-  "held queue: no item leaves before sendAfter"
+  "held queue: no item leaves before sendAfter",
+  "repo target with a consent writes the record and a learning branch from the learnings base and holds the push",
+  "repo target without a consent writes the branch but queues nothing, and learning send queues it once granted",
+  "repo target fails before any write for an existing branch, an unapproved repository, no identity or no learnings base",
+  "undo of a learning branch whose commit is in the learnings base refuses and names the manual revert",
+  "undo of a learning branch never pushed adds a revert commit on its own ref and queues nothing",
+  "project set is owner-only and a changed learnings dir voids the repository's consent",
+  "learning push refuses when the configured push URL differs from the consent's",
+  "learning push to an HTTPS remote prints the command and pushes nothing",
+  "learning push integration: the bare remote receives the branch after the hold and a planted filter never runs",
+  "undo of a pushed learning branch refuses once the remote branch is gone"
 ]

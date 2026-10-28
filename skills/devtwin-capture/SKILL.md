@@ -104,7 +104,7 @@ devtwin imports Claude memory and `docs/solutions` files each day as `observed` 
 
 7. Save each proposal: run the same command with `--apply` added. devtwin refuses a fourth proposal in one session with `LIMIT`.
 8. Accept each proposal for this project yourself. Preview `lesson accept --id '<prop_id>' --target project`, then run it with `--apply` and the plan fingerprint. devtwin stores the lesson as `observed` on this machine and delivers it from the next match. This is an automatic action: it needs no approval, and your developer sees it in the weekly digest.
-9. A lesson that should reach every project (`--target general`) waits for your developer's weekly review. A lesson for the team (`--target hub`) needs their `hub-publish` consent. Tell your developer which lessons you saved, in one line each.
+9. A lesson that should reach every project (`--target general`) waits for your developer's weekly review. A lesson for the team goes to the hub (`--target hub`, which needs their `hub-publish` consent) or to the repository (`--target repo`). You can name several targets, such as `--target project,repo`. The repo target writes a branch `devtwin/learning-<id>` and never touches the working copy. devtwin pushes the branch only under your developer's `repo-push` consent; without it the result says "needs-consent" and the branch stays local. Tell your developer which lessons you saved, in one line each.
 
 ### Propose a preference
 
@@ -137,7 +137,7 @@ When the user asks for an RCA, a report or a decision note, run `template show -
 
 ## Owner-only actions
 
-Some devtwin commands need the owner at the keyboard. These include `lesson copy`, `published delete`, `hub join`, `consent grant`, `consent revoke` and `live migrate` with `--apply`, and `pref accept` and `instructions apply`. You may run the preview of `lesson copy`, `published delete` or `hub join` (without `--apply`) to show your developer what it would do. `lesson accept` is not one of them: you run it yourself for the project target, and for the hub target under a consent. When devtwin's hook is installed, it denies the apply from an agent shell. Never run them, and never try to run them through another program, a script or a different shell. If your developer wants one of them, tell them the command and ask them to run it themselves.
+Some devtwin commands need the owner at the keyboard. These include `lesson copy`, `published delete`, `hub join`, `consent grant`, `consent revoke`, `project set` and `live migrate` with `--apply`, and `pref accept` and `instructions apply`. You may run the preview of `lesson copy`, `published delete` or `hub join` (without `--apply`) to show your developer what it would do. `lesson accept` is not one of them: you run it yourself for the project and repo targets, and for the hub target under a consent. When devtwin's hook is installed, it denies the apply from an agent shell. Never run them, and never try to run them through another program, a script or a different shell. If your developer wants one of them, tell them the command and ask them to run it themselves.
 
 ## Output
 
@@ -166,7 +166,7 @@ Some devtwin commands need the owner at the keyboard. These include `lesson copy
 - Never delete or edit devtwin lock, journal, receipt, hook or state files, or the devtwin entries in agent settings files.
 - Never interpolate text taken from lessons, records or the user into a double-quoted command argument.
 - Never run `record publish --apply`. This skill does not publish records.
-- Never run `lesson copy`, `lesson reject` or `lesson edit` with `--apply`. Run `lesson accept --apply` only for the `project` target, or for the `hub` target when a consent exists.
+- Never run `lesson copy`, `lesson reject` or `lesson edit` with `--apply`. Run `lesson accept --apply` only for the `project` and `repo` targets, or for the `hub` target when a consent exists.
 - Never propose more than three lessons in one session, and never change the session ID to get past the limit.
 - Never run `pref accept --apply`, `pref retire --apply` or `instructions apply`. Saving and delivering preferences is the user's decision.
 - Never run `lesson notices --ack --apply`. Closing a replacement notice is the user's decision.

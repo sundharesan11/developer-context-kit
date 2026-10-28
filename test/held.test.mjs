@@ -167,11 +167,11 @@ test("held queue: an item not yet due is left alone", async (t) => {
   assert.deepEqual(synced.held.sent, []);
   assert.equal(await hub.head(), head);
   assert.equal((await listHeld(roots)).length, 1);
-  // A repository item has no sender until repository pushes land; it stays held.
+  // A repository item goes to the repo sender (U30), which keeps an item that names no repository root.
   const repoTarget = "repo:" + createHash("sha256").update("/example/repo").digest("hex");
   await enqueueHeld(roots, { target: repoTarget, kind: "repo-push", title: "Learning branch", audit: "aud_" + "a".repeat(24), requestId: "req_heldrepo01", consent: { kind: "repo-push", holdHours: 1, ruleDigest: "sha256:" + "0".repeat(64) }, payload: { branch: "devtwin/learning-x" } }, { now, ctx: { notifier: () => ({ status: 0 }) } });
   const later = await sendDue(roots, { now: at(2), target: repoTarget });
-  assert.deepEqual(later.kept.map((x) => x.reason), ["no-sender"]);
+  assert.deepEqual(later.kept.map((x) => x.reason), ["invalid"]);
 });
 
 test("held queue: an item that fails the isolation check at send time is dropped and reported", async (t) => {
