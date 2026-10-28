@@ -120,9 +120,9 @@ test("repo target with a consent writes the record and a learning branch from th
   const head = await fixtureGit(m.repo, ["rev-parse", "HEAD"]), base = (await fixtureGit(m.repo, ["rev-parse", "refs/remotes/origin/main"])).trim();
   const tree = await workingTree(m.repo);
   const id = await m.propose();
-  // general is still refused, so general,repo fails before any write.
-  const refused = await untouched(m, () => m.fail(m.accept(id, "general,repo"), "DEVTWIN_GATE_REQUIRED", { env: { CLAUDECODE: "1" } }));
-  assert.deepEqual([refused.details.target, refused.details.member, refused.details.via], ["general,repo", "general", "activity review"]);
+  // U25: general is parked for the activity review; the preview of general,repo writes nothing.
+  const parked = await untouched(m, () => m.ok(m.accept(id, "general,repo"), { env: { CLAUDECODE: "1" } }));
+  assert.deepEqual([parked.target, parked.parked, parked.tiers], ["general,repo", ["general"], { general: "always-ask", repo: "automatic" }]);
   const plan = await m.ok(m.accept(id, "project,repo"), { env: { CLAUDECODE: "1" } });
   assert.deepEqual([plan.target, plan.targets, plan.tier, plan.tiers], ["project,repo", ["project", "repo"], "automatic", { project: "automatic", repo: "automatic" }]);
   assert.match(plan.repo.branch, /^devtwin\/learning-[a-f0-9]{24}$/);

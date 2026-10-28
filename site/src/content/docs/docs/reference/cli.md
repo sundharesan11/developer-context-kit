@@ -783,7 +783,7 @@ Accepts a proposal. It shows no owner dialog; the [tier](/docs/security/security
 | `project` | Automatic. Agents run it. Writes an `observed` lesson record and an audit entry. |
 | `repo` | Automatic for the branch. Writes a learning branch `devtwin/learning-<id>` in the project's repository, which must be in the `repoLearnings` class. It never touches the working copy. Under a valid `repo-push` consent, the push waits in the held queue; without one, the result says `needs-consent` and the branch stays local. See [Write a lesson to the repository](/docs/guides/organization-hub/#write-a-lesson-to-the-repository). |
 | `hub` | Consented. Runs only while a `hub-publish` consent for the scope is valid; otherwise fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". The lesson waits in the [held queue](/docs/guides/organization-hub/#held-items) for the consent's hold time, then `hub sync` or the `learning-send` job sends it. |
-| `general` | Refused with `DEVTWIN_GATE_REQUIRED`, alone or in a set. These lessons wait for the weekly review, which arrives in a later phase. `hub+general` is the older spelling of `general,hub`. |
+| `general` | Parked, alone or in a set: the other targets are written now, and the general part waits for [`activity review`](#activity-review). The plan lists it in `parked`. `hub+general` is the older spelling of `general,hub`. |
 
 | Flag | |
 | --- | --- |
@@ -991,6 +991,26 @@ Lists what devtwin learned in the last seven days: each automatic write with its
 | `--pilot <file>` | Required. |
 | `--since <time>` | An ISO time, such as `2026-10-01T00:00:00Z`. |
 | `--held` | Only the held items, with their full text. |
+
+The items that wait for [`activity review`](#activity-review) are listed by title, and `counts.review` counts them.
+
+### `activity review`
+
+The weekly owner review. It lists every item that waits for you, with its full text. These are global preference candidates from an agent or a `user` memory, and the general part of a `lesson accept`. They also include record writes refused by the session or day cap, and items from a fetched or synced source.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--reject <id>` | Repeatable. Remove this item for good, at most 20 in one review. |
+| `--home <dir>` | The agent home whose instruction block gets the saved preferences, as in `instructions plan`. In live mode the live home is the default. |
+| `--agent <agent>` | Repeatable. `claude` or `codex`. Both by default. |
+| `--apply --plan-fingerprint <fp>` | Write. |
+
+```sh
+node "$KIT/bin/devtwin.mjs" activity review --pilot "$LIVE_CONFIG"
+```
+
+**Owner** with `--apply`. One dialog holds up to ten items while their full text fits the dialog limit; an item that does not fit with others gets its own dialog. An item too long for any dialog stays waiting, listed in `tooLong`, until you reject it. Approve accepts every item in the dialog; deny leaves them waiting. Rejected items get one dialog of their own. Each accept and reject adds an audit entry with the route `activity review`. A saved preference is written to the instruction block only when the block there has every earlier preference already; otherwise the result says to run `instructions plan`.
 
 ### `undo`
 

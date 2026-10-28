@@ -276,23 +276,26 @@ test("lesson accept with a rejected push after three tries lands in the outbox a
   assert.equal((await m.ok(["activity"], { clock: at(24.2) })).learned.find((x) => x.id === accepted.audit).state, "sent");
 });
 
-test("lesson accept as hub+general waits for the activity review and hub only still publishes", async (t) => {
+test("lesson accept as hub+general holds the hub file and parks the general part for the activity review", async (t) => {
   const hub = await hubFixture(t), m = await machine(t, { scopes: [SCOPE, OTHER] });
   await m.join(hub);
   const id = await propose(m);
   const head = await hub.head();
-  const error = await m.fail(accept(id, "hub+general"), "DEVTWIN_GATE_REQUIRED");
-  assert.match(error.message, /activity review/);
-  await m.fail([...accept(id, "hub+general"), "--apply", "--plan-fingerprint", "sha256:" + "0".repeat(64)], "DEVTWIN_GATE_REQUIRED");
-  assert.equal(await hub.head(), head);
-  assert.deepEqual((await readPersonalSnapshot(await m.roots())).records, [], "no personal copy");
-  // A lesson that names its own scope may still go to that scope's hub: the hub belongs to that scope.
+  const plan = await m.ok(accept(id, "hub+general"));
+  assert.deepEqual([plan.target, plan.parked], ["general,hub", ["general"]]);
+  const both = await m.applied(accept(id, "hub+general"));
+  assert.equal(both.hub.held, true);
+  assert.equal(both.general.waiting, true);
+  assert.equal(await hub.head(), head, "the hub file waits in the held queue");
+  assert.deepEqual((await readPersonalSnapshot(await m.roots())).records, [], "no personal copy before the review");
+  // A lesson that names its own scope may still go to that scope's hub, but never to general: the personal store
+  // reaches every organization.
   const named = await propose(m, { title: "Example billing retries", session: "ses_named" });
-  await m.fail(accept(named, "general"), "DEVTWIN_GATE_REQUIRED");
+  await m.fail(accept(named, "general"), "DEVTWIN_ISOLATION");
   const result = await m.applied(accept(named, "hub"));
   assert.equal(result.hub.held, true);
-  assert.equal((await sendHeld(m)).sent[0].state, "sent");
-  assert.equal(result.personal, undefined);
+  assert.ok((await sendHeld(m)).sent.every((x) => x.state === "sent"));
+  assert.equal(result.general, undefined);
   assert.deepEqual(result.index.map((x) => x.scope), [SCOPE], "a hub-only accept rebuilds only its own scope");
 });
 
@@ -427,9 +430,9 @@ test("lesson edit reject and the project target work with no owner dialog", asyn
   await m.fail(["lesson", "edit", "--id", toGeneral, "--summary", "Do pass a fixed clock to time-based tests.", "--topic", "testing"], "DEVTWIN_INVALID_INPUT");
   await m.applied(["lesson", "reject", "--id", toReject]);
   const project = await m.applied(accept(fromStdin, "project"));
-  // U36: the project target is automatic and the general target waits for the activity review.
+  // U36: the project target is automatic. U25: the general target waits for the activity review.
   assert.equal(project.tier, "automatic");
-  await m.fail(accept(toGeneral, "general"), "DEVTWIN_GATE_REQUIRED");
+  assert.deepEqual((await m.ok(accept(toGeneral, "general"))).parked, ["general"]);
   assert.equal(m.dialogs.length, 0, "no accept shows the owner dialog");
   const records = (await readSnapshot(roots, SCOPE, "example.atlas")).records.filter((r) => r.kind === "lesson");
   assert.deepEqual(records.map((r) => [r.id, r.reach, r.title]), [[project.project.recordId, "project", "Seed after migrations"]]);

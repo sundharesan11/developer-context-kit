@@ -7,6 +7,7 @@
 // repository's own instruction files are never a target: the paths come only from the agent home. The block is capped
 // at 1,200 characters; when the preferences do not fit, the oldest ones are left out with a warning.
 // instructions apply is an owner action: the hook denies it from agent shells, and it shows the owner dialog.
+// U25: activity review re-renders the block after its own dialog showed each new preference (applyReviewedPreferences).
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { DevtwinError } from "../errors.mjs";
@@ -84,12 +85,13 @@ function analyze(roots, target, block, remove) {
   if (text === null && remove) return { status: "unchanged", before: null };
   return { status: text === null ? "create" : remove ? "remove" : "update", before: hashText(text), after: hashText(next) };
 }
-export async function planInstructions(roots, pilot, { targetHome, agents, remove = false, kitRoot }) {
+// exclude (U25) leaves the named preferences out, so the review can see the block as it was before its accepts.
+export async function planInstructions(roots, pilot, { targetHome, agents, remove = false, kitRoot, exclude = null }) {
   const dirs = homeFor(pilot, targetHome), context = hookContext(pilot, kitRoot);
   // Each preference is checked again at render time: a scope added after the accept, or a record that did not come
   // through pref propose, can fail now. A failing preference is left out with a warning, not written.
   const terms = await isolationTerms(roots), preferences = [], refused = [];
-  for (const pref of await activePreferences(roots)) {
+  for (const pref of (await activePreferences(roots)).filter((p) => !exclude?.has(p.id))) {
     try { checkInjection(pref.title + "\n" + pref.text); assertOutboundClean(pref.title + "\n" + pref.text, terms); preferences.push(pref); }
     catch (error) { if (!error.code?.startsWith("DEVTWIN_")) throw error; refused.push({ id: pref.id, title: pref.title, code: error.code }); }
   }
@@ -106,7 +108,8 @@ const dialogFor = (plan) => ({ title: plan.mode === "remove" ? "Remove the devtw
   ...(plan.block ? ["Every Claude Code and Codex session on this machine reads this block:", "", plan.block] : ["The block is removed. Text outside the devtwin markers stays."])
 ].join("\n") });
 // One apply at a time: the lock covers the plan check, the dialog and every edit.
-export const applyInstructions = (roots, pilot, input, options) => withPilotLock(roots, join(roots.stateRoot, "locks", "instructions.lock"), { kind: "instructions-apply" }, () => applyLocked(roots, pilot, input, options), { destinations: [join(roots.stateRoot, "runs")] });
+const withInstructionsLock = (roots, kind, action) => withPilotLock(roots, join(roots.stateRoot, "locks", "instructions.lock"), { kind }, action, { destinations: [join(roots.stateRoot, "runs")] });
+export const applyInstructions = (roots, pilot, input, options) => withInstructionsLock(roots, "instructions-apply", () => applyLocked(roots, pilot, input, options));
 async function applyLocked(roots, pilot, input, { fingerprint, runId, ctx = {} }) {
   const plan = await planInstructions(roots, pilot, input);
   assertFingerprint(plan, fingerprint);
@@ -115,6 +118,24 @@ async function applyLocked(roots, pilot, input, { fingerprint, runId, ctx = {} }
   const changes = plan.actions.filter((a) => a.status !== "unchanged");
   if (!changes.length) return { applied: false, actions: plan.actions };
   await requireOwnerApproval(ctx, dialogFor(plan));
+  return writeChanges(roots, pilot, input, plan, changes, runId);
+}
+// U25 (KTD38): the activity review's re-render after it accepted preferences. Its owner dialog showed the full text of
+// each one (shown), so this writes with no second dialog, but only when every target holds exactly the block without
+// those preferences: then the only new text is what the dialog showed. Otherwise it writes nothing, and the owner runs
+// instructions plan and instructions apply, whose dialog shows the whole block.
+export const applyReviewedPreferences = (roots, pilot, input, { shown, runId }) => withInstructionsLock(roots, "instructions-review", async () => {
+  const next = "Run devtwin instructions plan, then devtwin instructions apply.";
+  const base = await planInstructions(roots, pilot, { ...input, remove: false, exclude: new Set(shown) });
+  if (base.actions.some((a) => a.status !== "unchanged")) return { applied: false, reason: "block-not-current", next };
+  const plan = await planInstructions(roots, pilot, { ...input, remove: false });
+  if (plan.preferences.some((id) => !base.preferences.includes(id) && !shown.includes(id))) return { applied: false, reason: "unshown-preference", next };
+  const changes = plan.actions.filter((a) => a.status !== "unchanged");
+  if (changes.some((a) => a.status === "blocked" || a.status === "conflict")) return { applied: false, reason: "target-unwritable", next };
+  if (!changes.length) return { applied: false, reason: "unchanged", actions: plan.actions };
+  return writeChanges(roots, pilot, input, plan, changes, runId);
+});
+async function writeChanges(roots, pilot, input, plan, changes, runId) {
   const targets = targetsFor(homeFor(pilot, input.targetHome), input.agents);
   const written = [];
   // The owned file goes first, so the import never points at a missing file.

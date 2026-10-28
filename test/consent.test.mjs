@@ -56,22 +56,22 @@ test("agent lesson accept to a project writes with no dialog and records the age
   for (const command of ["devtwin lesson accept --id prop_1 --target project --apply --plan-fingerprint sha256:00", "script -q /dev/null devtwin lesson accept --id prop_1 --target project --apply"]) assert.equal(ownerAction("claude", bash(command)), null, command);
 });
 
-test("lesson accept to general or hub+general waits for the activity review", async (t) => {
+test("lesson accept to general parks the lesson for the activity review and writes no personal record", async (t) => {
   const m = await machine(t);
   const id = await propose(m);
-  const before = await treeSnapshot(m.p.pilot.pilotRoot);
-  for (const target of ["general", "hub+general"]) {
-    for (const args of [accept(id, target), [...accept(id, target), "--apply", "--plan-fingerprint", "sha256:" + "0".repeat(64)]]) {
-      const error = await m.fail(args, "DEVTWIN_GATE_REQUIRED", { env: { CLAUDECODE: "1" } });
-      assert.match(error.message, /waits for the weekly activity review/);
-      // U30: hub+general is the older spelling of the target set general,hub.
-      assert.deepEqual([error.details.target, error.details.via], [target === "hub+general" ? "general,hub" : target, "activity review"]);
-    }
-  }
-  assert.equal(await treeSnapshot(m.p.pilot.pilotRoot), before, "nothing is written");
-  assert.deepEqual((await readPersonalSnapshot(m.roots)).records, []);
+  // hub+general (general,hub) still needs a joined hub for its hub member, and fails before any write without one.
+  await m.fail(accept(id, "hub+general"), "DEVTWIN_HUB_NOT_JOINED", { env: { CLAUDECODE: "1" } });
+  const plan = await m.ok(accept(id, "general"), { env: { CLAUDECODE: "1" } });
+  assert.deepEqual([plan.target, plan.parked, plan.waitsFor], ["general", ["general"], "activity review"]);
+  const result = await m.ok([...accept(id, "general"), "--apply", "--plan-fingerprint", plan.fingerprint], { env: { CLAUDECODE: "1" } });
+  assert.deepEqual([result.general.waiting, result.general.via], [true, "activity review"]);
+  assert.match(result.general.id, /^wait_[a-f0-9]{24}$/);
+  assert.deepEqual((await readPersonalSnapshot(m.roots)).records, [], "nothing reaches the personal store before the review");
   assert.equal(m.dialogs.length, 0);
-  assert.deepEqual((await m.ok(["lesson", "proposals"])).proposals.map((x) => [x.id, x.state]), [[id, "pending"]]);
+  // The lesson now waits in one place: the activity digest lists its title.
+  const waiting = (await m.ok(["activity"])).waiting.filter((w) => w.kind === "review");
+  assert.deepEqual(waiting.map((w) => [w.id, w.type, w.title]), [[result.general.id, "general-lesson", "Seed after migrations"]]);
+  assert.deepEqual((await m.ok(["lesson", "proposals", "--all"])).proposals.map((x) => [x.id, x.state]), [[id, "accepted"]]);
 });
 
 test("consent grant for repo-push after the owner dialog records the target and rule digest", async (t) => {

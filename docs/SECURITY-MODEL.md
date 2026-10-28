@@ -87,9 +87,30 @@ The full guide is [HUB.md](HUB.md).
 | --- | --- | --- |
 | Automatic | Agents and jobs, with no prompt | `record add` and `record supersede` of `observed` or `proposed` knowledge, `lesson accept --target project`, `lesson accept --target repo` (the local branch), `handoff write`, `handoff export`, `project onboard` |
 | Consented | Agents and jobs, while a standing consent for the target is valid | `lesson accept --target hub`, the push of a learning branch, `learning send` |
-| Always ask | The owner only, after the owner dialog | `consent grant`, `consent revoke`, `project set`, `pref accept`, `lesson copy`, `hub join`, `instructions apply`, every `undo`, a `record add` or `record supersede` of `confirmed` or `disputed` knowledge or one that replaces a `confirmed` or `disputed` record, and the other owner actions |
+| Always ask | The owner only, after the owner dialog | `activity review --apply`, `consent grant`, `consent revoke`, `project set`, `pref accept`, `lesson copy`, `hub join`, `instructions apply`, every `undo`, a `record add` or `record supersede` of `confirmed` or `disputed` knowledge or one that replaces a `confirmed` or `disputed` record, and the other owner actions |
 
-- `lesson accept` refuses `--target general` with `GATE_REQUIRED`, alone or in a set such as `general,repo`. A lesson in the personal store reaches every organization, so it waits for the weekly `activity review`. Any refused target fails the whole accept before it writes anything.
+- `lesson accept --target general`, alone or in a set such as `general,repo`, writes the other targets now and parks the general part in the waiting list of `activity review`. A lesson in the personal store reaches every organization, so only the owner's review writes it. The plan names it in `parked`. Any refused target still fails the whole accept before it writes anything.
+
+## Weekly review
+
+`activity review` is the one place where the owner answers the always-ask items. Its waiting list holds:
+
+- Global preference candidates: the pending `pref` proposals, from an agent's `pref propose` or from a `user` memory that `import run` read. The proposal store is this part of the list.
+- The general part of a `lesson accept`.
+- A record write refused by the session or day cap. The waiting item keeps the draft. The audit log never holds its text.
+- Items from content that devtwin fetched or synced itself. No automatic write path makes one today: `hub sync` delivers hub lessons from the clone, and the radar writes digests.
+
+The last three are files at `stateRoot/review/<wait_id>.json`, in a folder at mode 0700 and files at mode 0600. Each is written with an exclusive, no-follow create under the review lock and removed when the owner answers.
+
+- `activity review` previews every item with its full text. It writes nothing, and agents may run it.
+- `--apply` with the plan fingerprint shows the owner dialog. The hook denies it from agent shells.
+- One dialog holds up to ten items, as long as their full text fits the dialog limit of 2000 characters. An item that does not fit with others gets its own dialog. An item too long for any dialog stays waiting, and the owner can only reject it.
+- The dialog answers approve or deny. Approving a dialog accepts every item in it. Denying leaves them all waiting.
+- `--reject <id>` removes an item for good, after one dialog that lists the rejected titles.
+- Each accept and each reject adds an audit entry with route `activity review` and actor `human` before it writes.
+- An accepted preference becomes a personal `preference` record. The review then writes the instruction block again with no second dialog, but only when every target holds the block without the new preferences. Then the only new text is text the dialog showed. Otherwise the review writes nothing to the targets, and `instructions apply` shows the whole block first.
+- An accepted general lesson becomes a personal `lesson` record. A record draft becomes an `observed` project record. The owner is the actor of both.
+- The `activity-weekly` job sends one notification a week with the counts, and names `activity review` when items wait for it.
 - A consent stores the target, the hold time in hours (1 to 168, 24 by default), the time it was granted and the digest of its rules. The rules list the checks that the consented action runs. A change to the rules changes the digest, and the stored consent is then void. A consented action with no valid consent fails with `APPROVAL_REQUIRED` and the message "Needs consent".
 - There are two consent kinds. `repo-push` names the real path of a bound repository root. It also records the repository's push URL at grant time, and its rules include the project's learnings folder and base, so `project set` voids it. `hub-publish` names a scope that joined a hub. Consents live at `stateRoot/consents/<kind>/<sha256 of the target>.json`, in folders at mode 0700 and files at mode 0600, written by atomic replace under a lock.
 - `consent list` is read-only. It also shows the note consent of each hub, which `note consent` and `note revoke` manage.
@@ -102,7 +123,7 @@ The full guide is [HUB.md](HUB.md).
 - `undo` of a learning branch adds a revert commit on its own ref. A pushed branch gets the revert pushed after the hold. Once the lesson is in the learnings base, or the remote branch is gone or moved, `undo` refuses and names the manual `git revert`.
 - `consent revoke` also cancels the target's held items and the outbox items that came from them. The consent rules include the held queue, so a consent granted before the queue existed is void and must be granted again.
 - `paths confirm` is always ask. A confirmation makes skills stop asking for the kit and config paths, so an agent must not be able to write one. The hook denies `paths confirm --apply` from agent shells, and the apply shows the owner dialog with both paths. While the confirmed values match, the hook renews the kit receipt at session start. A changed kit HEAD, kit path, config path or config file ends the confirmation, and the receipt then is not renewed. Renewal also stops 90 days after the confirmation: the session-start line then asks for `paths confirm` again, which runs the full checks.
-- An agent session makes at most 20 automatic knowledge writes. Writes with no `--session` count in one bucket per caller and UTC day, with the same cap. Each caller also makes at most 100 automatic writes per UTC day across all sessions. The write past either limit fails with `GATE_REQUIRED`, names the limit in `details.bucket`, and waits for the weekly activity review.
+- An agent session makes at most 20 automatic knowledge writes. Writes with no `--session` count in one bucket per caller and UTC day, with the same cap. Each caller also makes at most 100 automatic writes per UTC day across all sessions. The write past either limit fails with `GATE_REQUIRED` and names the limit in `details.bucket`. Its draft is not lost: it waits for the weekly `activity review`, and `details.waiting` names the item.
 - Automatic lesson and record text passes the plain-rule checks that preferences use, plus the sensitive and scope-name checks. Titles and summaries get every check. Bodies get the marker and override checks only, because a body can use Markdown structure and package names such as `@types/node`.
 - A record that a CLI write makes names its caller in `recordedBy`: `claude` when `CLAUDECODE` is set, `codex` when a `CODEX_` variable is set, and `human` otherwise. This is a label for the audit trail, not a gate: any process can unset those variables. A `confirmed` record needs a reviewer, and a `confirmed` or `disputed` write shows the owner dialog whoever runs it. Every record write, whatever its status, passes the text checks and adds an audit entry. Only `undo` writes a `retraction`; `record add` and `record supersede` refuse that kind.
 

@@ -559,7 +559,7 @@
   "lesson copy through a terminal wrapper from a hooked agent shell is denied and lesson accept is not",
   "lesson propose refuses a fourth proposal in one session",
   "lesson accept with a rejected push after three tries lands in the outbox and hub status shows it",
-  "lesson accept as hub+general waits for the activity review and hub only still publishes",
+  "lesson accept as hub+general holds the hub file and parks the general part for the activity review",
   "lesson propose refuses another scope's project name",
   "lesson propose refuses a credential pattern",
   "lesson copy publishes a personal lesson to another scope's hub only after the isolation check and dialog",
@@ -640,7 +640,7 @@
   "always-ask routes in the tier table are exactly the owner-block actions and owner setup steps",
   "caller actor comes from the agent environment",
   "agent lesson accept to a project writes with no dialog and records the agent",
-  "lesson accept to general or hub+general waits for the activity review",
+  "lesson accept to general parks the lesson for the activity review and writes no personal record",
   "consent grant for repo-push after the owner dialog records the target and rule digest",
   "a consent whose rule digest changed reads as void and the action needs consent",
   "consent grant and revoke apply from a hooked agent shell are denied",
@@ -762,5 +762,13 @@
   "learning push refuses when the configured push URL differs from the consent's",
   "learning push to an HTTPS remote prints the command and pushes nothing",
   "learning push integration: the bare remote receives the branch after the hold and a planted filter never runs",
-  "undo of a pushed learning branch refuses once the remote branch is gone"
+  "undo of a pushed learning branch refuses once the remote branch is gone",
+  "a user memory waits for the activity review, then enters the instruction block after the dialog that showed it (AE6)",
+  "nothing enters the global instruction block without a dialog that showed its full text",
+  "activity review --apply from a hooked agent shell is denied, and its preview is open",
+  "a general lesson accept parks the item, and the review writes it to the personal store",
+  "a write refused by the session cap waits in the review list with its text, and the review writes it",
+  "items whose full text exceeds the dialog limit get separate dialogs, and one too long for any dialog can only be rejected",
+  "one dialog holds up to ten short items",
+  "an item from an outside source waits with its source and is written only after the review"
 ]
