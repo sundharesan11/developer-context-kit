@@ -266,3 +266,18 @@ test("an item from an outside source waits with its source and is written only a
   const record = (await readSnapshot(m.roots, SCOPE, PROJECT)).records.find((r) => r.id === result.accepted[0].recordId);
   assert.deepEqual([record.title, record.recordedBy.actor], ["Upstream rate limit", "human"]);
 });
+
+test("a parked lesson's dialog shows its match block, commands included, and its sources", async (t) => {
+  const m = await machine(t);
+  await fillSession(m);
+  const refused = await m.cli(["record", "add", "--scope", SCOPE, "--project", PROJECT, "--kind", "lesson", "--title", "Ask before pushing", "--body", "Ask the developer before a push.\n",
+    "--path", "deploy/**", "--package", "fastlane", "--topic", "release", "--command", "git push", "--source", "file:docs/deploy.md", "--request-id", "req_capmatch01", "--session", "ses_cap", "--apply"], { env: AGENT });
+  assert.equal(refused.error.code, "DEVTWIN_GATE_REQUIRED");
+  const plan = await m.ok(["activity", "review"]);
+  const text = plan.items.find((item) => item.id === refused.error.details.waiting).text;
+  assert.match(text, /Matches paths: deploy\/\*\*; packages: fastlane; topics: release; commands: git push/);
+  assert.match(text, /Sources: file:docs\/deploy\.md/);
+  await m.review();
+  assert.match(m.dialogs.at(-1).body, /commands: git push/);
+  assert.match(m.dialogs.at(-1).body, /Sources: file:docs\/deploy\.md/);
+});

@@ -29,10 +29,10 @@ export const ARCHIVE_NAME = /^devtwin-backup-(\d{8}T\d{6}Z)-[0-9a-f]{8}\.dtb$/;
 export const LIMITS = Object.freeze({ fileBytes: 256 << 20, totalBytes: 512 << 20, files: 100000, manifestBytes: 64 << 20 });
 export const ROOTS = Object.freeze([["config", "configRoot"], ["data", "dataRoot"], ["state", "stateRoot"]]);
 // stateRoot caches that are rebuilt or remade: the lesson index, session summaries, the hook's session files and budget
-// log, and the locks themselves.
-const EXCLUDED_DIRS = ["locks", "lessons", "summaries", "hooks/sessions"];
+// log, the locks themselves, and tmp (the throwaway repositories a learning-branch push runs from).
+const EXCLUDED_DIRS = ["locks", "lessons", "summaries", "hooks/sessions", "tmp"];
 const EXCLUDED_FILE = /^hooks\/budget\.jsonl(?:\.\d+)?$/;
-export const EXCLUDED = Object.freeze(["state/locks", "state/lessons", "state/summaries", "state/hooks/sessions", "state/hooks/budget.jsonl*", "hub clones"]);
+export const EXCLUDED = Object.freeze(["state/locks", "state/lessons", "state/summaries", "state/hooks/sessions", "state/hooks/budget.jsonl*", "state/tmp", "hub clones"]);
 // The shared locks a knowledge write takes, after the registry lock and the scope locks, then the lock under which a
 // create reads or makes the backup key (taken last: nothing else takes it). U25: the review lock comes first, because
 // lesson accept and activity review take it before the proposal and knowledge locks.

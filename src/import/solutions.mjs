@@ -4,6 +4,9 @@
 // import. The learnings base is the learningsBase ref that project set records (src/projects/commands.mjs) when one
 // is set, or else the remote default branch that refs/remotes/origin/HEAD names. With neither, solutions are skipped
 // and reported. The learning-branch write (src/learnings/repo-write.mjs) starts from the same base.
+// The base is always a remote-tracking ref (refs/remotes/...), never a local branch. The import has no network, so it
+// trusts that ref as the repository holds it: a process running as the same user can move it (docs/LIMITATIONS.md).
+// The learning-branch push checks the base against the remote itself (src/learnings/push.mjs).
 import { git } from "../identity/git.mjs";
 import { assertSourceRel, isDeniedRel, SOURCE_LIMITS } from "../storage/source-read.mjs";
 import { sha256 } from "../storage/canonical.mjs";
@@ -11,7 +14,7 @@ import { parseFrontMatter } from "./memory.mjs";
 
 export const SOLUTIONS_DIR = "docs/solutions";
 export const SOLUTION_FILES = 200;
-const REF = /^refs\/(?:remotes|heads)\/[A-Za-z0-9._\/-]{1,200}$/;
+const REF = /^refs\/remotes\/[A-Za-z0-9._\/-]{1,200}$/;
 const COMMIT = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
 
 // { ref, commit } of the learnings base, or null.

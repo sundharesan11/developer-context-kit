@@ -218,8 +218,9 @@ async function learningSend(roots, ctx, deps, now) {
 }
 // U28: the import counts only; its full report is what import run prints.
 async function importDaily(roots, ctx, deps, now) {
-  const { runImport } = await import("../import/commands.mjs");
-  const r = await runImport(roots, { now, env: ctx.env ?? process.env });
+  const { runImport, newJobRunId } = await import("../import/commands.mjs");
+  // The job context: only this job passes it, so only its writes are recorded as the job's (src/import/commands.mjs).
+  const r = await runImport(roots, { now, env: ctx.env ?? process.env, job: { runId: newJobRunId() } });
   return { runId: r.runId, written: r.written.length, preferences: r.preferences.filter((p) => p.created).length, unchanged: r.unchanged, skipped: r.skipped.length, refused: r.refused.length, deferred: r.deferred, ambiguous: r.ambiguous.length, notOnboarded: r.notOnboarded, unmapped: r.unmapped };
 }
 const WORK = { "import-daily": importDaily, "learning-send": learningSend, "radar-weekly": radarWeekly, "advisory-hourly": advisoryHourly, "review-monthly": reviewMonthly, "activity-weekly": activityWeekly, "backup-daily": backupDaily };

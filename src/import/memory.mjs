@@ -9,6 +9,11 @@
 // proven to belong to the bound root: no other bound root computes the same name, and every cwd its transcripts record
 // is the root, a folder under it, or a linked worktree of it (sessions cd into subfolders). A folder with a cwd elsewhere,
 // or with no recorded cwd, is "ambiguous" and is skipped. A linked worktree has its own folder; it is not imported here.
+// The proof fails closed: a folder with more transcripts than the cap, or a transcript longer than the byte cap, has
+// lines nobody checked, so it is "ambiguous" with the reason "proof-capped".
+//
+// Claude Code shortens a very long folder name and adds a hash to it. devtwin does not compute that form, so a root
+// whose folder name is long enough to be shortened reads as "absent" (docs/LIMITATIONS.md).
 //
 // This is the importer's read-only exception for the computed folder: memory files go through the no-follow,
 // regular-file, size-capped reader (src/storage/source-read.mjs); transcripts are read with no-follow opens up to a byte
@@ -55,7 +60,8 @@ export function worktreesOf(root) {
   return [...out].sort();
 }
 const realOrSame = (path) => { try { return realpathSync(path); } catch { return path; } };
-// The cwd values one transcript records, read with a no-follow open up to the byte cap. Lines past the cap are not read.
+// The cwd values one transcript records, read with a no-follow open up to the byte cap. capped: the file is longer than
+// the cap, so its later lines were not read.
 function transcriptCwds(path) {
   let fd;
   try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); } catch { return { skipped: true, cwds: [] }; }
@@ -77,15 +83,21 @@ function transcriptCwds(path) {
       lines.forEach(take);
     }
     if (read < MEMORY_LIMITS.transcriptBytes) take(carry);
+    else if (readSync(fd, Buffer.alloc(1), 0, 1, read) > 0) return { skipped: false, capped: true, cwds: [...cwds] };
   } finally { closeSync(fd); }
   return { skipped: false, cwds: [...cwds] };
 }
 // Whether the folder can be proven to belong to the root: { ok } or { ok: false, reason }.
 export function proveFolder(folder, allowed) {
   let names;
-  try { names = readdirSync(folder).filter((name) => name.endsWith(".jsonl")).sort().slice(0, MEMORY_LIMITS.transcripts); } catch { return { ok: false, reason: "unreadable" }; }
+  try { names = readdirSync(folder).filter((name) => name.endsWith(".jsonl")).sort(); } catch { return { ok: false, reason: "unreadable" }; }
+  if (names.length > MEMORY_LIMITS.transcripts) return { ok: false, reason: "proof-capped" };
   const cwds = new Set();
-  for (const name of names) for (const cwd of transcriptCwds(join(folder, name)).cwds) cwds.add(cwd);
+  for (const name of names) {
+    const read = transcriptCwds(join(folder, name));
+    if (read.capped) return { ok: false, reason: "proof-capped" };
+    for (const cwd of read.cwds) cwds.add(cwd);
+  }
   if (!cwds.size) return { ok: false, reason: "no-cwd" };
   const inside = (cwd) => allowed.some((root) => isWithin(cwd, root));
   for (const cwd of cwds) if (!inside(cwd) && !inside(realOrSame(cwd))) return { ok: false, reason: "outside-cwd" };

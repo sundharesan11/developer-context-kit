@@ -138,6 +138,12 @@ export async function proposeImportedPreference(roots, { title, text, source }, 
   });
 }
 
+// U28 (KTD43): the preference proposals imports made on one UTC day (YYYY-MM-DD), whatever their state now. The import's
+// day budget counts them with its records (src/import/commands.mjs).
+export async function importedPreferencesOn(roots, day) {
+  return (await readAll(roots)).filter((p) => typeof p.session === "string" && p.session.startsWith("import:") && p.createdAt.slice(0, 10) === day).length;
+}
+
 // pref proposals: pending proposals, or every proposal with all. The text came from an agent, or from an import (source).
 export async function listPreferenceProposals(roots, { all = false } = {}) {
   return { proposals: (await readAll(roots)).filter((p) => all || p.state === "pending").map((p) => ({ id: p.proposalId, state: p.state, session: p.session, title: p.preference.title, text: p.preference.text, topic: p.preference.topic, createdAt: p.createdAt, outcome: p.outcome, ...(p.source ? { source: p.source } : {}) })) };

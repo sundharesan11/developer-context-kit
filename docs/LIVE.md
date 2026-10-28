@@ -51,7 +51,7 @@ A live config can hold an optional `writeClasses` block. It names the only other
 `import run` and the `import-daily` job read files outside the store, for each onboarded repository ([HARNESS.md](HARNESS.md#daily-import)):
 
 - In `~/.claude/projects` (or `$CLAUDE_CONFIG_DIR/projects`), only the one folder whose name devtwin computes from the repository's real path. In it, devtwin reads the `*.jsonl` session transcripts for their working directory only, and the `memory/*.md` files. It opens each file with no link following, reads only regular files and stops at a size limit.
-- In the repository, only the `docs/solutions` files of the learnings base commit, through Git plumbing with hooks and filters off. It never reads the working copy for this.
+- In the repository, only the `docs/solutions` files of the learnings base commit, through Git plumbing with hooks, filters and replace refs off. It never reads the working copy for this. The base is a remote-tracking ref, and the import trusts it as the repository holds it.
 
 This exception is for reading only. The import writes nothing outside the store.
 

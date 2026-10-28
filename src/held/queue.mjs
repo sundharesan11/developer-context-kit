@@ -4,10 +4,12 @@
 //   target      "hub:<scope>" for a hub lesson; "repo:<sha256 of the repository root>" for a learning-branch push (U30)
 //   target dir  the target with ":" replaced by "-" (hub-example, repo-<hex>)
 //   item        { schemaVersion: 1, id: "hld_<hex>", target, kind, title, audit, requestId, createdAt, sendAfter,
-//                 consent: { kind, holdHours, ruleDigest }, payload }
+//                 consent: { kind, holdHours, ruleDigest, grantedAt }, payload, blocked? }
 // kind picks the sender; payload is what that sender needs (for "hub-lesson": hubId, scope, author, lessonId, rel,
 // content, supersedes). audit is the ID of the audit entry appended before the enqueue (KTD40). The ID comes from the
-// target and the request ID, so a retried enqueue finds the same file and writes nothing new.
+// target and the request ID, so a retried enqueue finds the same file and writes nothing new. consent.grantedAt is the
+// grant the item was queued under: a sender sends it only under that same grant (src/held/send.mjs). blocked
+// ({ reason, at }) is the last reason a sender kept the item; the activity digest shows it.
 // enqueueHeld sends one notification naming the target and the title; ctx.notifier is the test seam.
 import { join } from "node:path";
 import { readdirSync, unlinkSync } from "node:fs";
@@ -16,7 +18,7 @@ import { assertWritable } from "../config/pilot.mjs";
 import { SCOPE_ID } from "../identity/ids.mjs";
 import { REQUEST_ID } from "../storage/plan.mjs";
 import { canonicalJson, digest } from "../storage/canonical.mjs";
-import { ensurePrivatePath, fsyncDir, info, readPrivateJson, writeNewFile } from "../storage/fsx.mjs";
+import { atomicReplace, ensurePrivatePath, fsyncDir, info, readPrivateJson, writeNewFile } from "../storage/fsx.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { notify } from "../schedule/notify.mjs";
 
@@ -25,7 +27,7 @@ const TARGET = /^(hub):([a-z][a-z0-9-]{1,31})$|^(repo):([a-f0-9]{64})$/;
 const DIR = /^(?:hub-[a-z][a-z0-9-]{1,31}|repo-[a-f0-9]{64})$/;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const ITEM_BYTES = 262144, QUEUE_LIMIT = 500;
-const KEYS = ["schemaVersion", "id", "target", "kind", "title", "audit", "requestId", "createdAt", "sendAfter", "consent", "payload"];
+const KEYS = ["schemaVersion", "id", "target", "kind", "title", "audit", "requestId", "createdAt", "sendAfter", "consent", "payload", "blocked"];
 
 export const heldRoot = (roots) => join(roots.stateRoot, "held");
 export const hubTarget = (scope) => "hub:" + scope;
@@ -53,12 +55,14 @@ function checkItem(item) {
   if (!/^aud_[a-f0-9]{24}$/.test(item.audit ?? "") || !REQUEST_ID.test(item.requestId ?? "")) bad("audit");
   if (!ISO.test(item.createdAt ?? "") || !ISO.test(item.sendAfter ?? "")) bad("time");
   if (!item.consent || typeof item.consent.kind !== "string" || !Number.isInteger(item.consent.holdHours)) bad("consent");
+  if (item.consent.grantedAt !== undefined && !ISO.test(item.consent.grantedAt)) bad("consent");
+  if (item.blocked !== undefined && (typeof item.blocked?.reason !== "string" || !/^[a-z][a-z-]{0,39}$/.test(item.blocked.reason) || !ISO.test(item.blocked.at ?? ""))) bad("blocked");
   if (!item.payload || typeof item.payload !== "object" || Array.isArray(item.payload)) bad("payload");
   return item;
 }
 
-// Adds one item and notifies. fields: { target, kind, title, audit, requestId, consent: { kind, holdHours, ruleDigest },
-// payload }. sendAfter is now plus the consent's hold. -> { item, queued, notification }
+// Adds one item and notifies. fields: { target, kind, title, audit, requestId, consent: { kind, holdHours, ruleDigest,
+// grantedAt }, payload }. sendAfter is now plus the consent's hold. -> { item, queued, notification }
 export async function enqueueHeld(roots, fields, { now = () => new Date(), ctx = {} } = {}) {
   const at = now(), target = assertTarget(fields.target);
   const item = checkItem({ schemaVersion: 1, id: heldIdFor(target, fields.requestId), target, kind: fields.kind, title: fields.title, audit: fields.audit, requestId: fields.requestId,
@@ -126,3 +130,24 @@ export function removeHeld(roots, target, id) {
   return true;
 }
 export const isDue = (item, at) => Date.parse(item.sendAfter) <= at.getTime();
+async function replaceItem(roots, item) {
+  const path = itemPath(roots, item.target, item.id);
+  assertWritable(roots, [path]);
+  await atomicReplace(path, canonicalJson(checkItem(item)) + "\n");
+  return item;
+}
+// Records why a sender kept an item. The caller holds the held lock. The same reason is not written again.
+export async function noteBlocked(roots, target, id, reason, at) {
+  const item = await readHeldItem(roots, target, id);
+  if (!item || item.blocked?.reason === reason) return item;
+  return replaceItem(roots, { ...item, blocked: { reason, at: at.toISOString() } });
+}
+// learning send for an item kept as "consent-changed": the item goes under the current consent with a new hold, and
+// one notification names it. The caller holds the held lock. -> { item, notification }
+export async function rearmHeld(roots, item, consent, { now = () => new Date(), ctx = {} } = {}) {
+  const at = now(), { blocked, ...rest } = item;
+  const next = await replaceItem(roots, { ...rest, consent: { kind: consent.kind, holdHours: consent.holdHours, ruleDigest: consent.ruleDigest, grantedAt: consent.grantedAt },
+    sendAfter: new Date(at.getTime() + consent.holdHours * 3600 * 1000).toISOString() });
+  const notification = notify(ctx, { title: "devtwin held an item", message: "Held again for " + next.target + ": " + next.title + ". It is sent after " + next.sendAfter + ". devtwin undo cancels it." });
+  return { item: next, notification: { shown: notification.shown } };
+}

@@ -1,5 +1,10 @@
 // U28 (R6, R7; KTD25, KTD26, KTD27, KTD42): `import run`, the daily promotion importer. Automatic: the import-daily job
-// runs it, and an agent or the owner may run it on demand. For each onboarded project it reads the Claude Code memory of
+// runs it, and an agent or the owner may run it on demand. Who writes (KTD38, KTD43): the import-daily job passes its
+// job context (src/schedule/jobs.mjs), so its writes are recorded as the job (actor other, a run_job_ run ID) and the
+// agent session caps do not count them. No argument or variable gives a CLI run that context: `import run` writes as
+// its caller (cliRecorder, as record add does), under the caller's session and day caps. The first write over a cap
+// waits in the activity review (U25), as a capped record add does, and the run stops there; the items after it are
+// deferred to a later run. For each onboarded project it reads the Claude Code memory of
 // the bound root (src/import/memory.mjs) and the docs/solutions files of the learnings base commit
 // (src/import/solutions.mjs), maps each new or changed item (src/import/map.mjs) and writes it as an observed project
 // record through the audited write that record add uses: plain-rule, sensitive and scope-name checks, then an audit
@@ -10,6 +15,7 @@
 // but only when that head is still observed: a record the owner confirmed changes only through the owner, so the change
 // is skipped and reported. A refused item is reported by source and code, never by content, and is not tried again until
 // its text changes. One run writes at most RUN_CAP new items, and runs write at most RUN_CAP a UTC day; the rest wait.
+// Preference proposals count toward both: the day count reads the proposal store for the day's imported proposals.
 //
 // Writes go only inside the store: records and pref proposals in dataRoot; the audit log, the seen file, the import lock,
 // summaries and lesson indexes in stateRoot. Memory, transcripts and repositories are only read.
@@ -26,7 +32,7 @@ import { canonicalJson, digest } from "../storage/canonical.mjs";
 import { deterministicRequestId } from "../storage/plan.mjs";
 import { recordIdFor } from "../identity/ids.mjs";
 import { MATCH_LIMITS } from "../records/schema.mjs";
-import { jobRecorder } from "../policy/actor.mjs";
+import { jobRecorder, cliRecorder } from "../policy/actor.mjs";
 import { auditedWrite } from "../records/commands.mjs";
 import { addRecord, supersedeRecord, readSnapshot, requireCommittedProject } from "../records/store.mjs";
 import { claudeDirFor, projectsDirOf, listFolders, claudeFolderName, worktreesOf, proveFolder, readMemoryFiles } from "./memory.mjs";
@@ -72,11 +78,12 @@ function headsOf(records, id) {
   }
   return heads;
 }
-// Imports written today (UTC) by any run, from the audit log.
+// Imports written today (UTC) by any run: record writes from the audit log, and preference proposals from their store.
 async function importedToday(roots, now) {
   const { readAudit } = await import("../audit/log.mjs");
+  const { importedPreferencesOn } = await import("../prefs/store.mjs");
   const day = now().toISOString().slice(0, 10);
-  return new Set((await readAudit(roots)).entries.filter((e) => e.route === ROUTE && e.at.slice(0, 10) === day).map((e) => e.requestId)).size;
+  return new Set((await readAudit(roots)).entries.filter((e) => e.route === ROUTE && e.at.slice(0, 10) === day).map((e) => e.requestId)).size + await importedPreferencesOn(roots, day);
 }
 
 // Every item to consider, with the per-project reading report.
@@ -164,19 +171,20 @@ async function writeRecord(ctx, item, draft, prior, recordedBy) {
   return { seen: { hash: item.hash, scope, project, recordId: done.recordId, state: "written" }, written: { source: item.source, recordId: done.recordId, kind: draft.kind, audit: entry.id, ...(targets.length ? { supersedes: targets } : {}) } };
 }
 
-// The run. Holds the import lock, so an on-demand run and the daily job never overlap.
-export async function runImport(roots, { now = () => new Date(), env = process.env, runId = newJobRunId() } = {}) {
-  const recordedBy = jobRecorder(runId), ctx = { roots, now, env };
+// The run. Holds the import lock, so an on-demand run and the daily job never overlap. job is the import-daily job's
+// context ({ runId }), which only src/schedule/jobs.mjs passes; without it the run writes as the CLI caller in env.
+export async function runImport(roots, { now = () => new Date(), env = process.env, job = null } = {}) {
+  const recordedBy = job ? jobRecorder(job.runId) : cliRecorder(env), runId = recordedBy.runId, ctx = { roots, now, env };
   return withPilotLock(roots, lockPath(roots), { kind: "import-run" }, async () => {
     const { items, projects, skipped, notOnboarded, unmapped } = await gather(roots, ctx);
     const seen = await readSeen(roots);
     const budget = Math.max(0, Math.min(RUN_CAP, RUN_CAP - await importedToday(roots, now)));
-    const written = [], preferences = [], refused = [], scopes = new Set();
-    let unchanged = 0, deferred = 0, count = 0;
+    const written = [], preferences = [], refused = [], parked = [], scopes = new Set();
+    let unchanged = 0, deferred = 0, count = 0, capped = null;
     for (const item of items) {
       const prior = seen.sources[item.source];
       if (prior?.hash === item.hash) { unchanged++; continue; }
-      if (count >= budget) { deferred++; continue; }
+      if (count >= budget || capped) { deferred++; continue; }
       const mapped = item.map();
       let next;
       try {
@@ -195,6 +203,14 @@ export async function runImport(roots, { now = () => new Date(), env = process.e
         }
       } catch (error) {
         if (!(error instanceof DevtwinError)) throw error;
+        // A CLI run over its caller's cap: the write waits in the activity review, and the run stops.
+        if (error.code === "DEVTWIN_GATE_REQUIRED" && error.details?.waiting) {
+          capped = { bucket: error.details.bucket ?? null, max: error.details.max ?? null };
+          parked.push({ source: item.source, waiting: error.details.waiting });
+          seen.sources[item.source] = { ...prior, hash: item.hash, scope: item.scope, project: item.project, state: "parked", waiting: error.details.waiting };
+          await writeSeen(roots, seen);
+          continue;
+        }
         // Reported by source and code only. The details hold reason and type names, never text.
         const reason = error.details?.reason ?? error.details?.types?.join(",") ?? null;
         refused.push({ source: item.source, code: error.code, ...(reason ? { reason } : {}) });
@@ -206,11 +222,12 @@ export async function runImport(roots, { now = () => new Date(), env = process.e
     // KTD22: lesson indexes see the new lessons (and rebuild the session summaries).
     const { rebuildIndexes } = await import("../lessons/publish.mjs");
     const index = scopes.size ? await rebuildIndexes(roots, [...scopes].sort()) : [];
-    return { runId, projects, written, preferences, unchanged, skipped, refused, deferred, notOnboarded, unmapped, index,
+    return { runId, projects, written, preferences, unchanged, skipped, refused, deferred, notOnboarded, unmapped, index, parked, ...(capped ? { capped } : {}),
       ambiguous: projects.filter((p) => p.memory === "ambiguous").map(({ scope, project, reason }) => ({ scope, project, reason })) };
   }, { destinations: [seenPath(roots)] });
 }
 
+// The CLI run: never the job context, so its writes are its caller's.
 export const importRunCommand = { options: {}, async run(values, ctx) {
   return runImport(ctx.roots, { now: ctx.now, env: ctx.env ?? process.env });
 } };

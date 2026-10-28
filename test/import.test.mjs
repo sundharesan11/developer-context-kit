@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { mkdir, writeFile, symlink, stat } from "node:fs/promises";
 import { main } from "../src/cli.mjs";
-import { makePilot, makeRepo, fixtureGit, treeSnapshot, now } from "./helpers.mjs";
+import { makePilot, makeRepo, fixtureGit, treeSnapshot, sandbox, now } from "./helpers.mjs";
 import { applyInit, applyScopeAdd } from "../src/config/store.mjs";
 import { loadPilot, rootsFromPilot } from "../src/config/pilot.mjs";
 import { planOnboard, applyOnboard } from "../src/onboarding/onboard.mjs";
 import { readSnapshot } from "../src/records/store.mjs";
 import { readAudit } from "../src/audit/log.mjs";
-import { claudeFolderName, parseFrontMatter } from "../src/import/memory.mjs";
+import { claudeFolderName, parseFrontMatter, proveFolder, MEMORY_LIMITS } from "../src/import/memory.mjs";
 import { habitCommands, placesIn } from "../src/import/map.mjs";
-import { runImport, seenPath } from "../src/import/commands.mjs";
+import { runImport, seenPath, newJobRunId } from "../src/import/commands.mjs";
 
 const SCOPE = "example", OTHER = "sample";
 const SESSION = "9060c0de-0000-4000-8000-000000000001";
@@ -108,12 +108,12 @@ test("import turns a feedback memory into an observed project lesson with git pu
   assert.equal(await m.sources(), before, "memory, transcripts and the repository are byte-identical");
   assert.deepEqual([result.unmapped, result.notOnboarded], [1, 0]);
   assert.deepEqual(result.projects.map((p) => [p.project, p.memory, p.solutions]), [[m.project, "read", "read"]]);
-  assert.match(result.runId, /^run_job_[a-f0-9]{16}$/);
+  assert.equal(result.runId, "run_cli00001", "a CLI run writes as its caller, not as the job");
   const byKind = Object.fromEntries(result.written.map((w) => [w.source, w.kind]));
   assert.deepEqual(byKind, { ["memory:" + m.project + "/ask-before-pushing.md"]: "lesson", ["memory:" + m.project + "/local-secrets.md"]: "environment", ["memory:" + m.project + "/no-friday-migrations.md"]: "constraint", ["memory:" + m.project + "/staging-queue.md"]: "fact", ["solutions:" + m.project + "/docs/solutions/seed-order.md"]: "lesson" });
   const records = await m.records();
   const lesson = records.find((r) => r.title === "Always ask before pushing");
-  assert.deepEqual([lesson.kind, lesson.status, lesson.reach, lesson.match.commands, lesson.recordedBy.actor, lesson.recordedBy.runId], ["lesson", "observed", "project", ["git push"], "other", result.runId]);
+  assert.deepEqual([lesson.kind, lesson.status, lesson.reach, lesson.match.commands, lesson.recordedBy.actor, lesson.recordedBy.runId], ["lesson", "observed", "project", ["git push"], "human", result.runId]);
   const env = records.find((r) => r.kind === "environment");
   assert.deepEqual(env.locations, [{ name: "Local service settings", kind: "file", where: ".env" }]);
   const solution = records.find((r) => r.title === "Seed after migrations");
@@ -123,10 +123,10 @@ test("import turns a feedback memory into an observed project lesson with git pu
   const prefs = await m.ok(["pref", "proposals"]);
   assert.deepEqual(prefs.proposals.map((p) => [p.source, p.state, p.text]), [["memory", "pending", "Prefer short answers with the command first."]]);
   assert.equal((await m.ok(["pref", "list"])).preferences.length, 0);
-  // Each record write has an automatic audit entry by the job, with its source hash.
+  // Each record write has an automatic audit entry by the caller, with its source hash.
   const entries = (await readAudit(m.roots)).entries;
   assert.equal(entries.length, 5);
-  for (const e of entries) assert.deepEqual([e.route, e.tier, e.actor, e.session, e.kind], ["import run", "automatic", "other", null, "record"]);
+  for (const e of entries) assert.deepEqual([e.route, e.tier, e.actor, e.session, e.kind], ["import run", "automatic", "human", null, "record"]);
   assert.ok(entries.every((e) => /^sha256:[a-f0-9]{64}$/.test(e.sourceHash)));
   // The lesson is delivered at the command it is about, and the session summary asks before the push.
   const matched = await m.ok(["lesson", "match", "--scope", SCOPE, "--cwd", m.repo, "--command", "git push origin main"]);
@@ -281,10 +281,65 @@ test("import job writes are not held by the agent session caps, and a run writes
   const files = {};
   for (let i = 0; i < 105; i++) files["fact-" + String(i).padStart(3, "0") + ".md"] = memory({ name: "fact-" + i, type: "project", description: "Fact number " + i, body: "The worker pool has " + i + " slots." });
   await m.folder(m.repo, { files });
-  const result = await m.unchanged(() => runImport(m.roots, { now }));
+  const job = () => ({ runId: newJobRunId() });
+  const result = await m.unchanged(() => runImport(m.roots, { now, job: job() }));
   assert.deepEqual([result.written.length, result.deferred], [100, 5]);
-  assert.equal((await m.unchanged(() => runImport(m.roots, { now }))).written.length, 0, "the day's budget is spent");
+  assert.match(result.runId, /^run_job_[a-f0-9]{16}$/);
+  assert.equal((await m.unchanged(() => runImport(m.roots, { now, job: job() }))).written.length, 0, "the day's budget is spent");
   const tomorrow = () => new Date(now().getTime() + 86400000);
-  const later = await m.unchanged(() => runImport(m.roots, { now: tomorrow }));
+  const later = await m.unchanged(() => runImport(m.roots, { now: tomorrow, job: job() }));
   assert.deepEqual([later.written.length, later.unchanged], [5, 100]);
+});
+
+test("import run from an agent shell writes as the agent, stops at the session cap and parks the capped item for the review", async (t) => {
+  const m = await machine(t, { solutions: {} });
+  const files = {};
+  for (let i = 0; i < 25; i++) files["fact-" + String(i).padStart(3, "0") + ".md"] = memory({ name: "fact-" + i, type: "project", description: "Fact number " + i, body: "The worker pool has " + i + " slots." });
+  await m.folder(m.repo, { files });
+  // No variable gives a CLI run the job's recorder: a job-looking run ID in the environment changes nothing.
+  const result = await m.unchanged(() => m.ok(["import", "run"], { env: { CLAUDECODE: "1", DEVTWIN_JOB_RUN_ID: "run_job_0123456789abcdef" } }));
+  assert.equal(result.runId, "run_cli00001");
+  assert.deepEqual([result.written.length, result.parked.length, result.deferred, result.capped.max], [20, 1, 4, 20]);
+  const entries = (await readAudit(m.roots)).entries;
+  assert.ok(entries.length === 20 && entries.every((e) => e.actor === "claude" && e.route === "import run"));
+  const ids = new Set(result.written.map((w) => w.recordId));
+  assert.deepEqual([...new Set((await m.records()).filter((r) => ids.has(r.id)).map((r) => r.recordedBy.actor))], ["claude"]);
+  // The capped item waits in the activity review with its text, by its waiting ID.
+  const waiting = (await m.ok(["activity"])).waiting.filter((w) => w.kind === "review");
+  assert.deepEqual(waiting.map((w) => [w.id, w.type]), [[result.parked[0].waiting, "capped-record"]]);
+  // A second run the same day writes nothing more: the caller's bucket is full.
+  const again = await m.unchanged(() => m.ok(["import", "run"], { env: { CLAUDECODE: "1" } }));
+  assert.deepEqual([again.written.length, again.parked.length, again.capped.max], [0, 1, 20]);
+});
+
+test("import preference proposals count toward the run and day budgets", async (t) => {
+  const m = await machine(t, { solutions: {} });
+  const files = {};
+  for (let i = 0; i < 60; i++) files["pref-" + String(i).padStart(3, "0") + ".md"] = memory({ name: "pref-" + i, type: "user", description: "Preference " + i, body: "Prefer answers that name tool " + i + " first." });
+  for (let i = 0; i < 60; i++) files["fact-" + String(i).padStart(3, "0") + ".md"] = memory({ name: "fact-" + i, type: "project", description: "Fact number " + i, body: "The worker pool has " + i + " slots." });
+  await m.folder(m.repo, { files });
+  const job = () => ({ runId: newJobRunId() });
+  const first = await m.unchanged(() => runImport(m.roots, { now, job: job() }));
+  assert.equal(first.preferences.filter((p) => p.created).length + first.written.length, 100, "a run writes at most 100 items, proposals included");
+  assert.equal(first.deferred, 20);
+  // The day's budget counts the proposals too, so a second run that day writes nothing.
+  const second = await m.unchanged(() => runImport(m.roots, { now, job: job() }));
+  assert.deepEqual([second.written.length, second.preferences.length, second.deferred], [0, 0, 20]);
+});
+
+test("the memory folder proof fails closed when the transcript count or size cap leaves lines unchecked", async (t) => {
+  const root = "/srv/example/atlas";
+  // Within both caps, every cwd is checked.
+  const fine = await sandbox(t);
+  await writeFile(join(fine, "a.jsonl"), transcript([root]));
+  assert.deepEqual(proveFolder(fine, [root]), { ok: true, transcripts: 1 });
+  // One transcript past the count cap: the folder is not proven, even though the checked ones are inside the root.
+  const many = await sandbox(t);
+  for (let i = 0; i <= MEMORY_LIMITS.transcripts; i++) await writeFile(join(many, "s" + String(i).padStart(4, "0") + ".jsonl"), transcript([root]));
+  assert.deepEqual(proveFolder(many, [root]), { ok: false, reason: "proof-capped" });
+  // A transcript longer than the byte cap, whose cwd outside the root comes after the cap.
+  const long = await sandbox(t);
+  const filler = JSON.stringify({ type: "summary", summary: "x".repeat(1000) }) + "\n";
+  await writeFile(join(long, "a.jsonl"), transcript([root]) + filler.repeat(Math.ceil(MEMORY_LIMITS.transcriptBytes / filler.length)) + transcript(["/srv/elsewhere"]));
+  assert.deepEqual(proveFolder(long, [root]), { ok: false, reason: "proof-capped" });
 });

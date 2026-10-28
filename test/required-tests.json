@@ -745,6 +745,9 @@
   "undo --since after an import retracts everything the run wrote",
   "the import-daily job runs once a day with the owner's consent and makes no model call",
   "import job writes are not held by the agent session caps, and a run writes at most 100 items",
+  "import run from an agent shell writes as the agent, stops at the session cap and parks the capped item for the review",
+  "import preference proposals count toward the run and day budgets",
+  "the memory folder proof fails closed when the transcript count or size cap leaves lines unchecked",
   "held queue: enqueueing sends the notification before sendAfter",
   "held queue: an item due now is sent and its audit entry moves from held to sent",
   "held queue: undo of a held item removes it from the queue before it is sent",
@@ -753,6 +756,8 @@
   "held queue: an item that fails the isolation check at send time is dropped and reported",
   "held queue: a revoked consent cancels its queued items",
   "held queue: no item leaves before sendAfter",
+  "held queue: a revoke while a sender holds the held lock stops with BUSY and changes nothing",
+  "held queue: a later grant does not release items held under an earlier grant",
   "repo target with a consent writes the record and a learning branch from the learnings base and holds the push",
   "repo target without a consent writes the branch but queues nothing, and learning send queues it once granted",
   "repo target fails before any write for an existing branch, an unapproved repository, no identity or no learnings base",
@@ -763,6 +768,10 @@
   "learning push to an HTTPS remote prints the command and pushes nothing",
   "learning push integration: the bare remote receives the branch after the hold and a planted filter never runs",
   "undo of a pushed learning branch refuses once the remote branch is gone",
+  "learning push ignores the repository's pushurl and pushInsteadOf for the consent URL and never runs its receivepack",
+  "replace refs change neither the learning commit nor what the push or the import reads",
+  "a learning branch on a moved local base stays held, and one on a base the remote moved past is sent",
+  "a revoke during a send run stops the items after it, and a later grant does not release a held branch until learning send queues it again",
   "a user memory waits for the activity review, then enters the instruction block after the dialog that showed it (AE6)",
   "nothing enters the global instruction block without a dialog that showed its full text",
   "activity review --apply from a hooked agent shell is denied, and its preview is open",
@@ -770,5 +779,6 @@
   "a write refused by the session cap waits in the review list with its text, and the review writes it",
   "items whose full text exceeds the dialog limit get separate dialogs, and one too long for any dialog can only be rejected",
   "one dialog holds up to ten short items",
-  "an item from an outside source waits with its source and is written only after the review"
+  "an item from an outside source waits with its source and is written only after the review",
+  "a parked lesson's dialog shows its match block, commands included, and its sources"
 ]

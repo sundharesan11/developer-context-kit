@@ -53,9 +53,10 @@ export async function activity(roots, { since, held = false } = {}, { now = () =
 // the review when items wait for it.
 export const weeklyMessage = (counts) => "This week devtwin learned " + counts.learned + (counts.learned === 1 ? " item" : " items") + ", holds " + counts.held + " for sending and has " + counts.waiting + " waiting for you. "
   + (counts.review ? "Run devtwin activity review to answer " + counts.review + " of them." : "Run devtwin activity to see them.");
-// U41 (R5): the held queue. --held adds each item's full text, which is what leaves the machine.
+// U41 (R5): the held queue. --held adds each item's full text, which is what leaves the machine. blocked is the reason
+// a sender last kept the item (such as consent-changed or base-not-on-remote).
 registerActivitySource("held", async (roots, { full }) => (await import("../held/queue.mjs")).listHeld(roots).then((items) => items.map((item) => ({ id: item.id, target: item.target, kind: item.kind,
-  title: item.title, audit: item.audit, createdAt: item.createdAt, sendAfter: item.sendAfter, ...(full ? { text: item.payload.content } : {}) }))));
+  title: item.title, audit: item.audit, createdAt: item.createdAt, sendAfter: item.sendAfter, ...(item.blocked ? { blocked: item.blocked.reason } : {}), ...(full ? { text: item.payload.content } : {}) }))));
 // U30 (KTD39): learning branches written without a repo-push consent wait for it ("needs consent").
 registerActivitySource("waiting", async (roots) => (await import("../learnings/push.mjs")).waitingBranches(roots));
 // U25: the items that wait for the owner's activity review, by title only.

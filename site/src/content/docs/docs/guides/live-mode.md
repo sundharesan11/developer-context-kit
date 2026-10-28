@@ -22,7 +22,7 @@ Every write is still a preview followed by an apply of the exact fingerprint you
 - Live commands run only from the kit clone the live config names, and that clone must be clean and detached at the configured commit.
 - The live config changes only through `live init`, `live add-repo`, `live set-kit`, `live write-classes`, `live stack-watch`, `live approval` and `live migrate`. Each records an approved digest of the config; a `live.json` that differs from the approved one is refused.
 - Listed repositories are read-only.
-- `import run` and the `import-daily` job also read, never write, two things for each onboarded repository: its own Claude Code folder in `~/.claude/projects`, and the `docs/solutions` files of its remote default branch. See [`import run`](/docs/reference/cli/#import-run).
+- `import run` and the `import-daily` job also read, never write, two things for each onboarded repository: its own Claude Code folder in `~/.claude/projects`, and the `docs/solutions` files of its remote default branch. See [`import run`](/docs/reference/cli/#import-run). A shell `import run` writes as its caller, under the caller's limits; only the `import-daily` job writes as the job.
 
 :::caution[Turn on backups]
 Until you approve a backup folder, there is no backup: losing `~/.devtwin` loses your records, decisions and journals, and leaves installed skills unowned. Onboarding copies some repository text into the store, protected only by mode 0700 and your disk encryption. See [Backup and restore](#backup-and-restore).
@@ -166,7 +166,7 @@ node "$KIT/bin/devtwin.mjs" consent grant --pilot "$LIVE_CONFIG" --kind repo-pus
 
 - `--repo-learnings` takes the exact root of a repository in the config's `repos`. It replaces the whole `repoLearnings` list, so also give every repository that you approved before.
 - devtwin writes only Git objects and the new branch `devtwin/learning-<id>`. Your working copy, index and current branch never change.
-- The push waits in the held queue for the consent's hold time. The hourly `learning-send` job then pushes it over SSH to the URL the consent recorded. For an HTTPS remote, devtwin prints the `git push` command for you instead.
+- The push waits in the held queue for the consent's hold time. The hourly `learning-send` job then pushes it over SSH to the URL the consent recorded. It runs from a clean repository of its own, so your repository's Git config cannot redirect it, and it checks that the base is on the remote first. For an HTTPS remote, devtwin prints the `git push` command for you instead.
 - `project set` changes the learnings folder or base. A change voids the consent; grant it again. See [Write a lesson to the repository](/docs/guides/organization-hub/#write-a-lesson-to-the-repository).
 
 ## Backup and restore

@@ -9,7 +9,8 @@ import { loadPilot, rootsFromPilot } from "../src/config/pilot.mjs";
 import { applyScopeAdd, readHubBinding } from "../src/config/store.mjs";
 import { listOutbox } from "../src/hubs/git-write.mjs";
 import { readAudit } from "../src/audit/log.mjs";
-import { listHeld, enqueueHeld, heldRoot } from "../src/held/queue.mjs";
+import { listHeld, enqueueHeld, heldRoot, withHeldLock } from "../src/held/queue.mjs";
+import { readConsent } from "../src/consent/store.mjs";
 import { sendDue } from "../src/held/send.mjs";
 
 const SCOPE = "example";
@@ -228,4 +229,40 @@ test("held queue: no item leaves before sendAfter", async (t) => {
   }
   assert.deepEqual((await sendDue(await m.roots(), { now: at(2) })).sent.map((x) => x.state), ["sent"]);
   assert.notEqual(await hub.head(), head);
+});
+
+test("held queue: a revoke while a sender holds the held lock stops with BUSY and changes nothing", async (t) => {
+  const hub = await hubFixture(t), m = await machine(t, hub);
+  const accepted = await m.accept();
+  const roots = await m.roots();
+  const plan = await m.ok(["consent", "revoke", "--kind", "hub-publish", "--scope", SCOPE]);
+  let release;
+  const holder = withHeldLock(roots, "held-send", () => new Promise((resolve) => { release = resolve; }));
+  const error = await m.fail(["consent", "revoke", "--kind", "hub-publish", "--scope", SCOPE, "--apply", "--plan-fingerprint", plan.fingerprint], "DEVTWIN_BUSY");
+  release();
+  await holder;
+  assert.equal(error.details.holder.owner.kind, "held-send");
+  // The consent and the held item are both still there, so the owner runs the revoke again.
+  assert.equal((await readConsent(roots, "hub-publish", SCOPE)).valid, true);
+  assert.deepEqual((await listHeld(roots)).map((x) => x.id), [accepted.hub.heldId]);
+  const again = await m.ok(["consent", "revoke", "--kind", "hub-publish", "--scope", SCOPE, "--apply", "--plan-fingerprint", plan.fingerprint]);
+  assert.deepEqual(again.cancelled.held, [accepted.hub.heldId]);
+  assert.equal(await readConsent(roots, "hub-publish", SCOPE), null);
+});
+
+test("held queue: a later grant does not release items held under an earlier grant", async (t) => {
+  const hub = await hubFixture(t), m = await machine(t, hub);
+  const accepted = await m.accept();
+  const roots = await m.roots(), head = await hub.head();
+  assert.equal((await listHeld(roots))[0].consent.grantedAt, (await readConsent(roots, "hub-publish", SCOPE)).grantedAt, "the item records its grant");
+  // The owner grants again with the same rules an hour later: a new grant.
+  await m.applied(["consent", "grant", "--kind", "hub-publish", "--scope", SCOPE], { clock: at(1) });
+  const out = await sendDue(roots, { now: at(25) });
+  assert.deepEqual([out.sent, out.kept.map((x) => [x.id, x.reason])], [[], [[accepted.hub.heldId, "consent-changed"]]]);
+  assert.equal(await hub.head(), head);
+  // The activity digest lists the item with the reason, and undo cancels it.
+  const held = (await m.ok(["activity", "--held"], { clock: at(25) })).held;
+  assert.deepEqual(held.map((x) => [x.id, x.blocked]), [[accepted.hub.heldId, "consent-changed"]]);
+  await m.applied(["undo", "--id", accepted.audit], { clock: at(26) });
+  assert.deepEqual(await listHeld(roots), []);
 });
