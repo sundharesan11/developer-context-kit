@@ -74,6 +74,8 @@ export const COMMANDS = {
   "context brief": { load: async () => (await import("./context/commands.mjs")).contextBriefCommand },
   "handoff export": { rootOptions: false, load: async () => (await import("./handoff/commands.mjs")).handoffExportCommand },
   "handoff write": { load: async () => (await import("./handoff/commands.mjs")).handoffWriteCommand },
+  // U28 (R6, KTD26, KTD27): promotes Claude memory and docs/solutions of bound repositories to observed records.
+  "import run": { load: async () => (await import("./import/commands.mjs")).importRunCommand },
   "agents install": { load: async () => (await import("./agents/commands.mjs")).agentsInstallCommand },
   "agents uninstall": { load: async () => (await import("./agents/commands.mjs")).agentsUninstallCommand },
   "agents status": { load: async () => (await import("./agents/commands.mjs")).agentsStatusCommand },
@@ -203,6 +205,8 @@ export async function main(argv, options = {}) {
     // --body-file - reads the lesson body from stdin.
     if (command === "lesson propose" || command === "lesson edit" || command === "lesson supersede-propose") context.stdin = stdin;
     if (command.startsWith("backup ") || command.startsWith("schedule ")) context.keychain = keychain;
+    // U41: a hub accept enqueues a held item, which shows one notification.
+    if (command === "lesson accept") context.notifier = notifier;
     if (command.startsWith("schedule ")) Object.assign(context, { notifier, stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (command.startsWith("stack ")) Object.assign(context, { stackCatalog: options.stackCatalog, resolvePublicRead: options.resolvePublicRead, request: options.request, lookup: options.lookup });
     if (COMMANDS[command].interactive === true) return await impl.run(values, { ...context, stdin, stdout });

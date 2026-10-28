@@ -5,7 +5,8 @@
 //
 // U36 (KTD38): lesson accept asks the tier table (src/policy/tiers.mjs) and shows no dialog.
 // Targets:   hub          consented: one file in the scope's hub, only while a hub-publish consent for the scope is
-//                         valid (publishToHub; a rejected push goes to the outbox)
+//                         valid. U41 (KTD41): the file waits in the held queue for the consent's hold time
+//                         (src/held/queue.mjs); a sender then publishes it (src/held/send.mjs, publishLesson below)
 //            hub+general  refused: the general half waits for the weekly activity review
 //            project      automatic: a project lesson record in the proposal's project; local
 //            general      refused: a personal-store record reaches every organization, so it waits for activity review
@@ -13,13 +14,14 @@
 //
 // U37 (KTD40, KTD43): the project target is an automatic knowledge write. The lesson text passes the plain-rule checks
 // (checkLesson), and an audit entry with the caller's --session goes into the log before the record is written. The
-// hub target appends a hub-lesson entry (tier consented, itemIds the hub lesson ID) before it publishes; undo refuses
-// that kind and points to `published delete` (src/audit/undo.mjs).
+// hub target appends a hub-lesson entry (tier consented, itemIds the hub lesson ID) before it enqueues the held item.
+// Undo of that entry cancels the item while it is held or waits in the outbox; once sent, undo points to
+// `published delete` (src/audit/undo.mjs).
 //
 // U12: a replacement proposal (lesson supersede-propose) accepts to the hub target only. Its hub file names the
 // predecessor as supersedes: [{ id, hash }]. The predecessor is checked against the local clone at preview and on the
-// fetched remote branch before the commit and after every rebase. STALE_VERSION drops the local commit, queues
-// nothing and leaves the proposal pending with the reason in lastAttempt.
+// fetched remote branch before the commit and after every rebase, when the held item is sent. STALE_VERSION drops the
+// local commit and the held item, queues nothing and reports the item as dropped with the reason "stale".
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -33,13 +35,14 @@ import { tierRule } from "../policy/tiers.mjs";
 import { cliRecorder } from "../policy/actor.mjs";
 import { appendEntry } from "../audit/log.mjs";
 import { requireConsent } from "../consent/store.mjs";
+import { enqueueHeld, hubTarget } from "../held/queue.mjs";
 import { isolationTerms, assertOutboundClean } from "../records/isolation.mjs";
 import { addPersonalRecord, readPersonalSnapshot } from "../records/personal.mjs";
 import { addRecord, requireCommittedProject } from "../records/store.mjs";
 import { renderHubLesson } from "../hubs/read.mjs";
 import { publishToHub, hubGit, checkRemoteSupersession } from "../hubs/git-write.mjs";
 import { rebuildIndex } from "./index.mjs";
-import { checkLesson, lessonBody, lessonDraft, lessonText, requirePending, proposalHash, markAccepted, markAttempt, withProposalLock, SESSION_ID } from "./propose.mjs";
+import { checkLesson, lessonBody, lessonDraft, lessonText, requirePending, proposalHash, markAccepted, withProposalLock, SESSION_ID } from "./propose.mjs";
 import { checkLocalSupersession } from "./supersede.mjs";
 
 export const TARGETS = Object.freeze(["hub", "hub+general", "project", "general"]);
@@ -118,13 +121,14 @@ export async function planAccept(roots, { id, target, scope, project, session = 
 }
 // Publishes one lesson file. The precondition runs before the commit and after each rebase: the file must not be there,
 // and for a replacement the predecessor must be there unchanged with no other replacement (U12).
-async function publishLesson(roots, binding, hub, { now, createdAt }) {
+// U41: the held-queue sender calls it with locked: true under the hub-sync lock.
+export async function publishLesson(roots, binding, hub, { now, createdAt, locked = false }) {
   // The check reads the fetched remote branch, not the clone's work tree, which holds the new file after a rebase.
   const preconditions = async () => {
     if (hubGit(binding, ["cat-file", "-e", "refs/remotes/origin/" + binding.branch + ":" + hub.rel]).ok) throw new DevtwinError("CONFLICT", "Hub already has this lesson", { lessonId: hub.lessonId });
     if (hub.supersedes) checkRemoteSupersession(binding, { lessonId: hub.lessonId, supersedes: hub.supersedes });
   };
-  const result = await publishToHub(roots, binding, { writes: [{ rel: hub.rel, content: hub.content }], message: "Add lesson " + hub.lessonId, preconditions, now, kind: "lesson", createdAt });
+  const result = await publishToHub(roots, binding, { writes: [{ rel: hub.rel, content: hub.content }], message: "Add lesson " + hub.lessonId, preconditions, now, kind: "lesson", createdAt, locked });
   return { lessonId: hub.lessonId, hubId: hub.hubId, pushed: result.pushed, ...(result.pushed ? { commit: result.commit, attempts: result.attempts } : { reason: result.reason, queued: result.queued }) };
 }
 async function configuredScopes(roots) {
@@ -147,7 +151,7 @@ export async function applyAccept(roots, input, { fingerprint, now = () => new D
   const plan = await planAccept(roots, input);
   assertFingerprint(plan, fingerprint);
   // A consented target needs its standing consent; no owner dialog runs for any accept target.
-  if (plan.consent) await requireConsent(roots, plan.consent, plan.scope);
+  const consent = plan.consent ? await requireConsent(roots, plan.consent, plan.scope) : null;
   const recordedBy = cliRecorder(ctx.env ?? process.env);
   const outcome = await withProposalLock(roots, "lesson-accept", async () => {
     const proposal = await requirePending(roots, plan.proposalId);
@@ -168,13 +172,12 @@ export async function applyAccept(roots, input, { fingerprint, now = () => new D
       result.project = { project: plan.project, recordId: added.recordId, recordHash: added.recordHash };
     }
     if (binding) {
+      // KTD41: the lesson waits in the held queue; the audit entry goes first, so its state starts as held.
       const entry = await appendEntry(roots, { kind: "hub-lesson", tier: plan.tier, route: "lesson accept", target: plan.target, scope: plan.scope, itemIds: [plan.hub.lessonId], actor: recordedBy.actor, session: plan.session ?? null, requestId: plan.requestId }, { now });
       result.audit = entry.id;
-      try { result.hub = await publishLesson(roots, binding, plan.hub, { now, createdAt: plan.createdAt }); }
-      catch (error) {
-        if (error.code === "DEVTWIN_STALE_VERSION" && plan.supersedes) await markAttempt(roots, proposal, plan.proposalHash, { code: error.code, reason: error.details?.reason ?? null, ...(error.details?.successorId ? { successorId: error.details.successorId } : {}) }, { now });
-        throw error;
-      }
+      const held = await enqueueHeld(roots, { target: hubTarget(plan.scope), kind: "hub-lesson", title: plan.lesson.title, audit: entry.id, requestId: plan.requestId,
+        consent: { kind: consent.kind, holdHours: consent.holdHours, ruleDigest: consent.ruleDigest }, payload: { ...plan.hub, createdAt: plan.createdAt, message: "Add lesson " + plan.hub.lessonId } }, { now, ctx });
+      result.hub = { lessonId: plan.hub.lessonId, hubId: plan.hub.hubId, held: true, heldId: held.item.id, sendAfter: held.item.sendAfter, ...(held.notification ? { notification: held.notification } : {}) };
     }
     await markAccepted(roots, proposal, plan.proposalHash, result, { now });
     return result;

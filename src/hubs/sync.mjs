@@ -5,6 +5,8 @@
 // U13: it writes the notes cache that the hook reads (src/notes/post.mjs).
 // U14: after the outbox it deletes this developer's own expired notes (src/hubs/published.mjs), and it adds each valid
 // tombstone it sees to the tombstone memory before the index rebuild, so that lesson never reaches agents again.
+// U41 (KTD41): after the outbox it sends the scope's held items whose hold has passed (src/held/send.mjs), and moves
+// the audit state of outbox items that came from the held queue. A failed fetch sends nothing.
 import { join } from "node:path";
 import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
@@ -18,6 +20,8 @@ import { recordNotices } from "../lessons/supersede.mjs";
 import { writeNotesCache } from "../notes/post.mjs";
 import { HUB_SCHEMA_VERSION, readHub, readHubManifest } from "./read.mjs";
 import { hubGit, withHubLock, hubStateDir, drainOutbox, listOutbox } from "./git-write.mjs";
+import { sendDue, settleOutbox } from "../held/send.mjs";
+import { hubTarget } from "../held/queue.mjs";
 import { cleanExpiredNotes, readTombstoneMemory, rememberTombstones, validTombstones } from "./published.mjs";
 
 export const FETCH_TIMEOUT_MS = 30_000;
@@ -86,6 +90,8 @@ export async function syncHub(roots, scope, { now = () => new Date(), job = fals
       await writeHubBinding(roots, binding);
     }
     const outbox = fetched && !readOnly ? await drainOutbox(roots, binding, { now, terms: await isolationTerms(roots) }) : { pushed: [], dropped: [], kept: (await listOutbox(roots, binding)).map((x) => x.id) };
+    await settleOutbox(roots, outbox, { now, route: "hub sync" });
+    const held = fetched && !readOnly ? await sendDue(roots, { target: hubTarget(binding.scope), now, route: "hub sync", binding, locked: true }) : { sent: [], dropped: [], kept: [], skipped: readOnly ? "read-only" : "fetch-failed" };
     // A failed cleanup is reported, not fatal; it never queues, and the next sync tries again.
     let noteCleanup = { deleted: 0, skipped: readOnly ? "read-only" : "fetch-failed" };
     if (fetched && !readOnly) {
@@ -115,7 +121,7 @@ export async function syncHub(roots, scope, { now = () => new Date(), job = fals
     await writeSyncState(roots, binding.hubId, state);
     const age = syncAge(state, now());
     return { scope: binding.scope, hubId: binding.hubId, fetched, readOnly, lastSyncedAt: state.lastSyncedAt, hoursSinceSync: age.hours, warning: age.warning,
-      outbox, lessons: read.lessons.length, notes: read.notes.length, expiredNotes: read.expiredNotes, notesCache, refused: read.refused,
+      outbox, held, lessons: read.lessons.length, notes: read.notes.length, expiredNotes: read.expiredNotes, notesCache, refused: read.refused,
       noteCleanup, tombstones: { removed: read.removed, ignored: read.ignoredTombstones, seen, heldBack: read.heldBack, ...(memoryProblem ? { problem: memoryProblem } : {}) },
       supersession: { superseded: read.superseded.map((x) => x.id), contested: read.contested, ignored: read.ignoredSupersessions }, notices, warnings: read.warnings, index: { written: index.written, fingerprint: index.fingerprint, counts: index.counts } };
   });

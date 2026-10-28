@@ -108,16 +108,17 @@ Each command previews first. Run each apply only with explicit approval from the
 
 | Target | Writes | Tier |
 | --- | --- | --- |
-| `hub` | One file in the scope's hub | Consented: needs a valid `hub-publish` consent |
+| `hub` | One file in the scope's hub, after the hold | Consented: needs a valid `hub-publish` consent |
 | `hub+general` | Nothing yet: refused with `GATE_REQUIRED` | Waits for the weekly `activity review` |
 | `project` | A lesson record in the proposal's project, or in `--project` | Automatic |
 | `general` | Nothing yet: refused with `GATE_REQUIRED` | Waits for the weekly `activity review` |
 
-- **Consent.** No accept shows the owner dialog. The owner grants the consent once with `consent grant --kind hub-publish --scope <scope>`, which shows the dialog. Without a valid consent, the hub apply fails with `APPROVAL_REQUIRED`, "Needs consent", and writes nothing: no commit, no outbox item, and the proposal stays pending. See [Tiers](SECURITY-MODEL.md#tiers).
+- **Consent.** No accept shows the owner dialog. The owner grants the consent once with `consent grant --kind hub-publish --scope <scope>`, which shows the dialog. Without a valid consent, the hub apply fails with `APPROVAL_REQUIRED`, "Needs consent", and writes nothing: no held item, no commit, no outbox item, and the proposal stays pending. See [Tiers](SECURITY-MODEL.md#tiers).
+- **Hold.** A hub accept does not publish at once. The lesson waits in the held queue for the consent's hold time, 24 hours by default. A notification names the hub and the title when it is held. `activity --held` shows its full text, and `undo --id <audit entry>` cancels it. See [Held items](#held-items).
 - **General.** Your personal store follows you to every organization. For this reason, a lesson for the personal store waits for the weekly `activity review`. The `hub` target writes no personal copy.
 - **Org copy.** The hub file is the organization's copy of the lesson. Accept writes no second copy to the org home in the store.
 - **Identity.** The lesson ID is `lsn_` and a hash of the hub ID, your handle, the request ID and the creation time. The author is your claimed handle. The file's `localRecordHash` points back to the accepted draft. The full local record is never published.
-- **Push.** Accept publishes one file and pushes it. A rejected push fetches, rebases and checks again, three tries in all. After the last try, the lesson goes to the outbox, and `hub status` counts it. The next `hub sync` pushes it.
+- **Push.** After the hold, the sender publishes one file and pushes it. A rejected push fetches, rebases and checks again, three tries in all. After the last try, the lesson goes to the outbox, and `hub status` counts it. The next `hub sync` pushes it.
 - **Index.** After an accept, devtwin rebuilds the lesson index of the scope. A personal record is in every scope's index, so a general target rebuilds all of them.
 
 ### Copy a personal lesson to another hub
@@ -128,6 +129,19 @@ node "$KIT/bin/devtwin.mjs" lesson copy --pilot "$LIVE_CONFIG" --id <personal-re
 ```
 
 Run the apply only with explicit approval from the owner. `lesson copy` publishes a lesson from your personal store to the hub of the target scope. It first checks the lesson against the names of every scope but the target, and fails with `ISOLATION` before the dialog. It then shows the owner dialog with the exact lesson text, and publishes through the same push and outbox path as accept.
+
+## Held items
+
+A lesson accepted to the hub under the consent waits in the held queue before it leaves the machine.
+
+- **Queue.** Each item is one file at `state/held/hub-<scope>/<hld_id>.json`, in folders at mode 0700 and files at mode 0600. It holds the target, the title, the audit entry, the lesson file and `sendAfter`: the accept time plus the consent's hold time.
+- **Notification.** One notification names the target and the title when the item is held.
+- **See it.** `activity --held` lists held items with the full text that would leave. `activity` lists the accept with `state`: `held`, then `sent`, `outbox`, `dropped` or `cancelled`.
+- **Send.** After `sendAfter`, `hub sync` and the hourly `learning-send` job send due items. Neither touches an item before its `sendAfter`. Each send runs the sensitive scan and the isolation check again, then hands the lesson to the publish path above. A failed push goes to the outbox.
+- **Drop.** An item that fails a check at send time is dropped and listed in `held.dropped` with its reason. For example, `isolation` means the text names a scope added after the accept. An item whose consent is gone or void, or whose hub binding changed, stays held and is listed in `held.kept`.
+- **Cancel.** `undo --id <audit entry>` removes a held item from the queue, or from the outbox when its push failed. It is always ask. Once the lesson is on the hub, undo refuses and points to `published delete`.
+- **Revoke.** `consent revoke --kind hub-publish --scope <scope>` cancels the scope's held items and the outbox items that came from them. Its preview lists the held items.
+- **Job.** `schedule plan --job learning-send`, then `schedule apply`, turns on the hourly job. Without it, `hub sync` still sends a joined hub's due items.
 
 ## Replace a lesson
 
@@ -143,7 +157,7 @@ Run each apply only with explicit approval from the owner.
 
 - **Propose.** `lesson supersede-propose` takes the same options as `lesson propose`, plus `--predecessor`. It writes a private pending proposal and counts toward the same cap of three per session. With `--apply`, it first tries a `hub sync`. It then reads the predecessor from the local clone and records its ID, the SHA-256 of its exact hub file, its title and its author. An unknown ID fails with `NOT_FOUND`. A lesson that its author removed fails with `CONFLICT` and the reason `removed`. A lesson that already has a valid replacement fails with `CONFLICT` and the reason `superseded`.
 - **Accept.** A replacement accepts to the `hub` target only; other targets fail with `INVALID_INPUT`. The owner dialog shows the new lesson and names the lesson it replaces, with its title, ID and claimed author. The hub file carries `"supersedes":[{"id":"<lsn_id>","hash":"sha256:<hex>"}]` in its front matter.
-- **Check.** Before the commit and after each fetch and rebase, devtwin reads the fetched remote branch. The predecessor must be there with the same hash and without its author's tombstone, and no other lesson may already replace it. When another replacement got there first, the accept fails with `STALE_VERSION` and the reason `already-superseded`. devtwin then resets the clone to the remote head, so the local commit is gone. Nothing goes to the outbox, and the proposal stays pending with the reason in `lastAttempt`. The accept preview runs the same check against the local clone.
+- **Check.** When the held replacement is sent, devtwin reads the fetched remote branch before the commit and after each fetch and rebase. The predecessor must be there with the same hash and without its author's tombstone, and no other lesson may already replace it. When another replacement got there first, the send stops with `STALE_VERSION`. devtwin then resets the clone to the remote head, so the local commit is gone. Nothing goes to the outbox. The sender drops the held item and reports it in `held.dropped` with the reason `stale` and `stale: "already-superseded"`; its audit state is `dropped`. The accept preview runs the same check against the local clone.
 - **Outbox.** A replacement can still go to the outbox when the remote refuses every push. Each `hub sync` runs the check again before it pushes the item. When another replacement landed meanwhile, the sync drops the item and reports it in `outbox.dropped` with the reason `stale`.
 
 ### What agents receive
@@ -236,4 +250,4 @@ A hub that holds more than 5000 note files fails to sync with `LIMIT`. The clean
 
 ## Owner actions
 
-`hub join --apply`, `hub leave --apply`, `hub schedule --apply`, `lesson copy --apply`, `lesson notices --ack --apply`, `note revoke --apply`, `note consent --apply` and `published delete --apply` are owner actions. The devtwin hook denies them from an agent shell, also through terminal wrappers. Each one but `lesson notices` shows the owner dialog. The hook reads command text, so the dialog is the second gate when the text check misses an apply. An agent can list the notices, but it cannot close one, so it cannot hide a replacement from its developer. Every preview, and `note list` and `published list`, stay open to agents. An agent can preview `published delete` and show its developer the result before the developer runs the apply. `lesson accept --target hub` is not an owner action: it publishes with no dialog while a valid `hub-publish` consent exists for the scope (`consent grant --kind hub-publish --scope <scope>`), and fails with "Needs consent" otherwise. A stale `hub-sync` lock is released with `locks release --lock hub-sync`.
+`hub join --apply`, `hub leave --apply`, `hub schedule --apply`, `lesson copy --apply`, `lesson notices --ack --apply`, `note revoke --apply`, `note consent --apply` and `published delete --apply` are owner actions. The devtwin hook denies them from an agent shell, also through terminal wrappers. Each one but `lesson notices` shows the owner dialog. The hook reads command text, so the dialog is the second gate when the text check misses an apply. An agent can list the notices, but it cannot close one, so it cannot hide a replacement from its developer. Every preview, and `note list` and `published list`, stay open to agents. An agent can preview `published delete` and show its developer the result before the developer runs the apply. `lesson accept --target hub` is not an owner action: it holds the lesson with no dialog while a valid `hub-publish` consent exists for the scope (`consent grant --kind hub-publish --scope <scope>`), and fails with "Needs consent" otherwise. A stale `hub-sync` lock is released with `locks release --lock hub-sync`.

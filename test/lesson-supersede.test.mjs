@@ -8,6 +8,7 @@ import { loadPilot, rootsFromPilot } from "../src/config/pilot.mjs";
 import { applyScopeAdd, readHubBinding } from "../src/config/store.mjs";
 import { planOnboard, applyOnboard } from "../src/onboarding/onboard.mjs";
 import { listOutbox } from "../src/hubs/git-write.mjs";
+import { sendDue } from "../src/held/send.mjs";
 import { parseHubLesson, renderHubLesson, readHub } from "../src/hubs/read.mjs";
 import { sha256 } from "../src/storage/canonical.mjs";
 import { ownerAction } from "../src/hooks/owner-block.mjs";
@@ -57,7 +58,7 @@ async function machine(t, { handle }) {
   let decision = "approved";
   const cli = async (args, { clock = now, stdin } = {}) => {
     const chunks = [];
-    const code = await main([...args, "--pilot", path], { now: clock, home: p.fakeHome, env: {}, stdin, ownerDialog: async (content) => { dialogs.push(content); return decision; }, stdout: { write: (v) => { chunks.push(v); return true; } } });
+    const code = await main([...args, "--pilot", path], { now: clock, home: p.fakeHome, env: {}, stdin, ownerDialog: async (content) => { dialogs.push(content); return decision; }, notifier: () => ({ status: 0 }), stdout: { write: (v) => { chunks.push(v); return true; } } });
     return { code, json: JSON.parse(chunks.join("")) };
   };
   const ok = async (args, extra) => { const out = await cli(args, extra); assert.equal(out.json.ok, true, args.join(" ") + ": " + JSON.stringify(out.json.error)); return out.json.result; };
@@ -81,10 +82,13 @@ const supersedeArgs = (predecessor, { session = "ses_two", lesson = REPLACEMENT 
 const accept = (id, target = "hub") => ["lesson", "accept", "--id", id, "--target", target];
 const sync = (m, clock = at(0.1)) => m.ok(["hub", "sync", "--scope", SCOPE], { clock });
 const matchIds = async (m, clock = at(0.1)) => (await m.ok(["lesson", "match", "--scope", SCOPE, "--path", "src/billing/client.js"], { clock })).matches.map((x) => x.id).sort();
-// The author publishes the original lesson to the hub.
-async function published(m) {
-  const result = await m.applied(accept(await propose(m)));
-  assert.equal(result.hub.pushed, true);
+// U41: a hub accept is held for 24 hours; the sender (as the hourly learning-send job runs it) sends what is due.
+const sendHeld = async (m, clock = at(30)) => sendDue(await m.roots(), { now: clock });
+// The author publishes a lesson (by default the original) to the hub: accept, then send after the hold.
+async function published(m, proposalId) {
+  const result = await m.applied(accept(proposalId ?? await propose(m)));
+  assert.equal(result.hub.held, true);
+  assert.deepEqual((await sendHeld(m)).sent.map((x) => [x.lessonId, x.state]), [[result.hub.lessonId, "sent"]]);
   return result.hub.lessonId;
 }
 async function cloneState(m, hub) {
@@ -123,7 +127,8 @@ test("lesson supersede accepted and published appears in the author's next brief
   assert.deepEqual(plan.replaces, { id: original, title: ORIGINAL.title, author: "handle:alice" });
   const dialogs = b.dialogs.length;
   const result = await b.ok([...accept(created.proposalId), "--apply", "--plan-fingerprint", plan.fingerprint], { clock: at(0.2) });
-  assert.equal(result.hub.pushed, true);
+  assert.equal(result.hub.held, true);
+  assert.deepEqual((await sendHeld(b)).sent.map((x) => [x.lessonId, x.state]), [[result.hub.lessonId, "sent"]]);
   assert.equal(b.dialogs.length, dialogs);
   const meta = parseHubLesson(await hub.show("lessons/" + result.hub.lessonId + ".md")).meta;
   assert.deepEqual(meta.supersedes, [{ id: original, hash: preview.supersedes.hash }]);
@@ -169,25 +174,26 @@ test("lesson supersede concurrent replacements leave one winner and the second f
   const fromB = (await b.ok([...supersedeArgs(original), "--apply"])).proposalId;
   const fromC = (await c.ok([...supersedeArgs(original, { lesson: { title: "Batch billing calls", summary: "Do batch billing calls once a minute." } }), "--apply"])).proposalId;
   const planC = await c.ok(accept(fromC));
-  const won = await b.applied(accept(fromB));
-  assert.equal(won.hub.pushed, true);
-  // carol's clone has not seen bob's replacement, so her push is rejected; the check after the rebase stops it.
+  const won = { hub: { lessonId: await published(b, fromB) } };
+  // carol's clone has not seen bob's replacement, so her push is rejected; the check after the rebase stops it, and
+  // the sender drops her held replacement with the reason.
   const headAfterB = await hub.head();
   assert.notEqual((await cloneState(c, hub)).head, headAfterB, "carol's clone has not fetched bob's replacement");
-  const error = await c.fail([...accept(fromC), "--apply", "--plan-fingerprint", planC.fingerprint], "DEVTWIN_STALE_VERSION");
-  assert.equal(error.details.reason, "already-superseded");
-  assert.equal(error.details.successorId, won.hub.lessonId);
+  const accepted = await c.ok([...accept(fromC), "--apply", "--plan-fingerprint", planC.fingerprint]);
+  assert.equal(accepted.hub.held, true);
+  const sent = await sendHeld(c);
+  assert.deepEqual(sent.sent, []);
+  assert.deepEqual(sent.dropped.map((x) => [x.lessonId, x.reason, x.stale, x.successorId]), [[accepted.hub.lessonId, "stale", "already-superseded", won.hub.lessonId]]);
+  assert.equal((await c.ok(["activity"], { clock: at(30) })).learned.find((x) => x.id === accepted.audit).state, "dropped");
   assert.equal(await hub.head(), headAfterB, "nothing of carol's reached the hub");
   const state = await cloneState(c, hub);
   assert.equal(state.head, state.remote, "carol's local commit is dropped: the clone sits at the remote head");
   assert.equal(state.dirty, "");
   const rootsC = await c.roots();
   assert.deepEqual(await listOutbox(rootsC, await c.binding()), [], "a stale replacement is never queued");
-  const pending = (await c.ok(["lesson", "proposals"])).proposals;
-  assert.deepEqual(pending.map((x) => [x.id, x.state, x.lastAttempt.code, x.lastAttempt.reason]), [[fromC, "pending", "DEVTWIN_STALE_VERSION", "already-superseded"]]);
-  // After a sync, carol's preview fails the same way, and every fixture delivers only the winner.
+  // After a sync, a new replacement from carol fails at its preview, and every fixture delivers only the winner.
   await sync(c, at(0.2));
-  await c.fail(accept(fromC), "DEVTWIN_STALE_VERSION");
+  await c.fail(accept(fromC), "DEVTWIN_CONFLICT");
   await sync(a, at(0.2));
   for (const m of [a, b, c]) assert.deepEqual(await matchIds(m, at(0.2)), [won.hub.lessonId], m.handle);
   await c.fail([...supersedeArgs(original, { session: "ses_three" })], "DEVTWIN_CONFLICT");
@@ -197,7 +203,7 @@ test("lesson supersede raced double push shows both replacements as contested", 
   const hub = await hubFixture(t), a = await machine(t, { handle: "alice" });
   await a.join(hub);
   const original = await published(a);
-  const second = (await a.applied(accept(await propose(a, { session: "ses_more", lesson: { title: "Log billing retries", summary: "Do log each billing retry." } })))).hub.lessonId;
+  const second = await published(a, await propose(a, { session: "ses_more", lesson: { title: "Log billing retries", summary: "Do log each billing retry." } }));
   const hashOf = async (id) => sha256(await hub.show("lessons/" + id + ".md"));
   const successor = (id, author, title, supersedes) => renderHubLesson({ schemaVersion: 1, id, author, title, match: { paths: ["src/billing/**"], packages: [], topics: [] }, createdAt: "2026-10-06T00:00:00.000Z", supersedes }, "Do use the " + title.toLowerCase() + ".\n");
   const fromBob = "lsn_" + "b".repeat(24), fromCarol = "lsn_" + "c".repeat(24), wrongHash = "lsn_" + "d".repeat(24);
@@ -234,8 +240,8 @@ test("lesson supersede-propose refuses an unknown or tombstoned predecessor and 
   await a.join(hub);
   await b.join(hub);
   const original = await published(a);
-  const removed = (await a.applied(accept(await propose(a, { session: "ses_more", lesson: { title: "Removed lesson", summary: "Do remove this later." } })))).hub.lessonId;
-  const kept = (await a.applied(accept(await propose(a, { session: "ses_kept", lesson: { title: "Kept lesson", summary: "Do keep this one." } })))).hub.lessonId;
+  const removed = await published(a, await propose(a, { session: "ses_more", lesson: { title: "Removed lesson", summary: "Do remove this later." } }));
+  const kept = await published(a, await propose(a, { session: "ses_kept", lesson: { title: "Kept lesson", summary: "Do keep this one." } }));
   // The author's tombstone removes one lesson; a tombstone signed by someone else is not honored.
   await hub.push({
     ["tombstones/" + removed + ".json"]: JSON.stringify({ schemaVersion: 1, id: removed, handle: "alice", createdAt: "2026-10-06T00:00:00.000Z" }),
@@ -287,12 +293,13 @@ test("hub outbox drain drops a queued replacement whose predecessor was supersed
   const fromC = (await c.ok([...supersedeArgs(original, { lesson: { title: "Batch billing calls", summary: "Do batch billing calls once a minute." } }), "--apply"])).proposalId;
   // carol's push is refused three times, so her replacement waits in the outbox.
   await hub.refusePushes();
-  const queued = await c.applied(accept(fromC));
-  assert.equal(queued.hub.pushed, false);
+  const accepted = await c.applied(accept(fromC));
+  const queued = { hub: { lessonId: accepted.hub.lessonId, ...(await sendHeld(c)).sent[0] } };
+  assert.equal(queued.hub.state, "outbox");
   assert.match(queued.hub.queued, /^obx_/);
   // bob's replacement lands first.
   await hub.allowPushes();
-  assert.equal((await b.applied(accept(fromB))).hub.pushed, true);
+  await published(b, fromB);
   const head = await hub.head();
   const synced = await sync(c, at(0.2));
   assert.deepEqual(synced.outbox.dropped, [{ id: queued.hub.queued, reason: "stale" }]);
@@ -300,6 +307,7 @@ test("hub outbox drain drops a queued replacement whose predecessor was supersed
   assert.equal(await hub.head(), head, "the drain pushed nothing");
   assert.ok(!(await hub.files()).includes("lessons/" + queued.hub.lessonId + ".md"));
   assert.deepEqual(await listOutbox(await c.roots(), await c.binding()), []);
+  assert.equal((await c.ok(["activity"], { clock: at(0.2) })).learned.find((x) => x.id === accepted.audit).state, "dropped", "the drop moves the audit state");
   const state = await cloneState(c, hub);
   assert.equal(state.head, state.remote);
   assert.deepEqual(await matchIds(c, at(0.2)), [(await b.ok(["lesson", "proposals", "--all"])).proposals[0].outcome.hub.lessonId]);

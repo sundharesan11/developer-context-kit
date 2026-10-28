@@ -48,6 +48,8 @@ const TABLE = {
   "draft save": A, "context resolve": R, "context brief": R, "handoff export": A,
   // U33 (KTD32): a handoff is an observed project record, so it is automatic like record add.
   "handoff write": { observed: A },
+  // U28 (KTD42): the daily import writes observed project records only, and supersedes only observed ones.
+  "import run": { observed: A },
   "agents install": ASK, "agents uninstall": ASK, "agents status": R, "agents recover": A, "agents rollback-check": R,
   "locks release": A,
   "pref propose": A, "pref proposals": R, "pref list": R, "pref accept": ASK, "pref decline": A, "pref retire": ASK,

@@ -18,11 +18,12 @@ import { withPilotLock } from "../storage/lock.mjs";
 
 export const CONSENT_KINDS = Object.freeze(["repo-push", "hub-publish"]);
 export const HOLD_HOURS = Object.freeze({ default: 24, min: 1, max: 168 });
-// The checks every consented action of the kind runs before it acts. A change here voids every consent of the kind, so
-// the held queue (U41) adds its check here and every consent is asked for again.
+// The checks every consented action of the kind runs before it acts. A change here voids every consent of the kind.
+// U41 added the held queue here, so consents granted before it (when items went out at once) are void and asked for
+// again: the hold is now real, and the grant dialog says so.
 const RULES = Object.freeze({
-  "repo-push": Object.freeze({ schemaVersion: 1, checks: Object.freeze(["bound repository", "isolation", "credential patterns"]), learningsDir: null, base: null, remoteUrl: null }),
-  "hub-publish": Object.freeze({ schemaVersion: 1, checks: Object.freeze(["joined hub binding", "lesson draft checks", "isolation", "credential patterns"]), layout: "lessons/<lesson id>.md" })
+  "repo-push": Object.freeze({ schemaVersion: 1, checks: Object.freeze(["bound repository", "isolation", "credential patterns", "held queue"]), learningsDir: null, base: null, remoteUrl: null }),
+  "hub-publish": Object.freeze({ schemaVersion: 1, checks: Object.freeze(["joined hub binding", "lesson draft checks", "isolation", "credential patterns", "held queue"]), layout: "lessons/<lesson id>.md" })
 });
 export const assertKind = (kind) => {
   if (!CONSENT_KINDS.includes(kind)) throw new DevtwinError("INVALID_INPUT", "Invalid consent kind", { field: "kind", allowed: CONSENT_KINDS });

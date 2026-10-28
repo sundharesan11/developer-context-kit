@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "habits": [
+    {"words": ["push", "pushes", "pushed", "pushing"], "commands": ["git push"]},
+    {"words": ["merge", "merges", "merged", "merging"], "commands": ["gh pr merge"]},
+    {"words": ["deploy", "deploys", "deployed", "deploying"], "commands": ["npm run deploy", "make deploy"]},
+    {"words": ["print env", "printenv"], "commands": ["printenv"]}
+  ]
+}

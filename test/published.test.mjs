@@ -10,6 +10,7 @@ import { applyScopeAdd, readHubBinding } from "../src/config/store.mjs";
 import { planOnboard, applyOnboard } from "../src/onboarding/onboard.mjs";
 import { rebuildIndex, indexPath } from "../src/lessons/index.mjs";
 import { listOutbox } from "../src/hubs/git-write.mjs";
+import { sendDue } from "../src/held/send.mjs";
 import { renderHubLesson, readHub } from "../src/hubs/read.mjs";
 import { NOTE_CLEANUP_BATCH, DELETE_CAVEAT } from "../src/hubs/published.mjs";
 import { sha256 } from "../src/storage/canonical.mjs";
@@ -74,7 +75,7 @@ async function machine(t, { handle, onboard = false }) {
   let decision = "approved";
   const cli = async (args, { clock = now } = {}) => {
     const chunks = [];
-    const code = await main([...args, "--pilot", path], { now: clock, home: p.fakeHome, env: {}, ownerDialog: async (content) => { dialogs.push(content); return decision; }, stdout: { write: (v) => { chunks.push(v); return true; } } });
+    const code = await main([...args, "--pilot", path], { now: clock, home: p.fakeHome, env: {}, ownerDialog: async (content) => { dialogs.push(content); return decision; }, notifier: () => ({ status: 0 }), stdout: { write: (v) => { chunks.push(v); return true; } } });
     return { code, json: JSON.parse(chunks.join("")) };
   };
   const ok = async (args, extra) => { const out = await cli(args, extra); assert.equal(out.json.ok, true, args.join(" ") + ": " + JSON.stringify(out.json.error)); return out.json.result; };
@@ -106,10 +107,13 @@ const sync = (m, clock = at(0.1)) => m.ok(["hub", "sync", "--scope", SCOPE], { c
 const matchIds = async (m, clock = at(0.1)) => (await m.ok(["lesson", "match", "--scope", SCOPE, "--path", "src/billing/client.js"], { clock })).matches.map((x) => x.id).sort();
 const del = (id) => ["published", "delete", "--scope", SCOPE, "--id", id];
 const list = (m, clock = at(0.1)) => m.ok(["published", "list", "--scope", SCOPE], { clock });
-// The author publishes one lesson to the hub.
+// The author publishes one lesson to the hub. U41: the accept holds it, and the sender (as the hourly learning-send
+// job runs it) publishes it once the 24-hour hold has passed.
 async function published(m, options) {
   const result = await m.applied(accept(await propose(m, options)));
-  assert.equal(result.hub.pushed, true);
+  assert.equal(result.hub.held, true);
+  const sent = await sendDue(await m.roots(), { now: at(24) });
+  assert.deepEqual(sent.sent.map((x) => [x.lessonId, x.state]), [[result.hub.lessonId, "sent"]]);
   return result.hub.lessonId;
 }
 async function cloneState(m, hub) {

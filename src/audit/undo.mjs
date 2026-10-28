@@ -15,8 +15,9 @@
 // An undo that stopped between the retraction and the restores (a crash) is resumed: the next preview finds the
 // retraction and plans only the missing restores.
 //
-// A hub-lesson entry (a lesson published to a hub under consent) cannot be undone here: the lesson is in the hub's Git
-// history, and removing it is `published delete`, which the owner runs.
+// U41 (KTD40, KTD41): a hub-lesson entry (a lesson accepted to a hub under consent) is undone while it waits: undo
+// removes it from the held queue, or from the hub outbox when its push failed. Once it was sent it cannot be undone
+// here: the lesson is in the hub's Git history, and removing it is `published delete`, which the owner runs.
 import { DevtwinError } from "../errors.mjs";
 import { finalizePlan, assertFingerprint, deterministicRequestId } from "../storage/plan.mjs";
 import { recordIdFor, personalRecordIdFor, orgRecordIdFor } from "../identity/ids.mjs";
@@ -24,7 +25,7 @@ import { requireOwnerApproval } from "../owner/dialog.mjs";
 import { tierOf } from "../policy/tiers.mjs";
 import { cliRecorder } from "../policy/actor.mjs";
 import { SESSION_ID } from "../lessons/propose.mjs";
-import { readAudit, appendEntry, landed, undoneMap, AUDIT_ID } from "./log.mjs";
+import { readAudit, appendEntry, landed, undoneMap, outboundStates, AUDIT_ID } from "./log.mjs";
 
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2}))?$/;
 const DIALOG_ENTRIES = 20;
@@ -113,10 +114,45 @@ const recordKind = {
     return { retraction: retraction.recordId, retracted: heads.map((r) => r.id), restored };
   }
 };
+const published = (message) => new DevtwinError("GATE_REQUIRED", message, { field: "id", reason: "published-delete", via: "published delete" });
+// Where a hub-lesson entry's item waits now: { held } (the held item), { outbox } (the outbox item and its hub), a
+// skip reason for an item that already left, or null once it was sent.
+async function hubLessonState(roots, entry) {
+  const { heldForAudit } = await import("../held/queue.mjs");
+  const held = await heldForAudit(roots, entry.id);
+  if (held) return { held };
+  const { entries } = await readAudit(roots), state = outboundStates(entries).get(entry.id);
+  if (state === "dropped" || state === "cancelled") return { skip: state };
+  if (state !== "outbox") return null;
+  const marker = entries.find((e) => e.kind === "held-state" && e.marks === entry.id && e.target === "outbox");
+  const { listOutbox } = await import("../hubs/git-write.mjs");
+  const { readHubBinding } = await import("../config/store.mjs");
+  const binding = await readHubBinding(roots, entry.scope);
+  const outboxId = marker.itemIds.find((x) => x.startsWith("obx_"));
+  const item = binding ? (await listOutbox(roots, binding)).find((x) => x.id === outboxId) : null;
+  return item ? { outbox: { id: item.id, hubId: binding.hubId } } : null;
+}
 const hubLessonKind = {
-  preview() { throw new DevtwinError("GATE_REQUIRED", "A lesson published to a hub is removed with `devtwin published delete`, which the owner runs", { field: "id", reason: "published-delete", via: "published delete" }); },
+  async preview(roots, entry) {
+    const state = await hubLessonState(roots, entry);
+    if (!state) throw published("A lesson sent to a hub is removed with `devtwin published delete`, which the owner runs");
+    if (state.skip) return { skip: state.skip };
+    return { heads: [], cancel: state.held ? { held: state.held.id, target: state.held.target, title: state.held.title, sendAfter: state.held.sendAfter } : { outbox: state.outbox.id, hubId: state.outbox.hubId } };
+  },
   recordIds: async () => [],
-  apply() { throw new DevtwinError("GATE_REQUIRED", "A lesson published to a hub is removed with `devtwin published delete`", { field: "id", reason: "published-delete", via: "published delete" }); }
+  // The hub-sync lock first, then the held lock, the order the senders use; a sender that already took the item wins
+  // and undo stops with STALE_VERSION.
+  async apply(roots, entry) {
+    const { withHubLock, removeOutboxItem } = await import("../hubs/git-write.mjs");
+    const { withHeldLock, removeHeld } = await import("../held/queue.mjs");
+    return withHubLock(roots, () => withHeldLock(roots, "undo", async () => {
+      const state = await hubLessonState(roots, entry);
+      if (!state || state.skip) throw new DevtwinError("STALE_VERSION", "The held item already left the queue", { id: entry.id });
+      if (state.held) { removeHeld(roots, state.held.target, state.held.id); return { cancelled: { held: state.held.id } }; }
+      removeOutboxItem(roots, { hubId: state.outbox.hubId }, state.outbox.id);
+      return { cancelled: { outbox: state.outbox.id } };
+    }));
+  }
 };
 const KINDS = new Map([["record", recordKind], ["hub-lesson", hubLessonKind]]);
 // For later units: a held or outbound kind registers { preview, recordIds, apply } under its entry kind.
@@ -150,7 +186,8 @@ export async function planUndo(roots, { id, since, session } = {}) {
   } else {
     mode = "since";
     const from = sinceTime(since);
-    targets = entries.filter((e) => e.kind !== "undo" && Date.parse(e.at) > from && !done.has(e.id)).reverse();
+    // held-state entries only record where an outbound item went; they are not writes of their own.
+    targets = entries.filter((e) => e.kind !== "undo" && e.kind !== "held-state" && Date.parse(e.at) > from && !done.has(e.id)).reverse();
   }
   const planned = [], skipped = [];
   for (const entry of targets) {
@@ -162,14 +199,15 @@ export async function planUndo(roots, { id, since, session } = {}) {
     try { preview = await handler.preview(roots, entry); }
     catch (error) { if (mode === "since" && error.details?.reason) { skipped.push({ id: entry.id, reason: error.details.reason }); continue; } throw error; }
     if (preview.skip) { skipped.push({ id: entry.id, reason: preview.skip }); continue; }
-    planned.push({ id: entry.id, at: entry.at, kind: entry.kind, route: entry.route, target: entry.target, recordIds: entry.recordIds, heads: preview.heads, restores: preview.restores, ...(preview.resume ? { resume: true } : {}) });
+    planned.push({ id: entry.id, at: entry.at, kind: entry.kind, route: entry.route, target: entry.target, recordIds: entry.recordIds, heads: preview.heads, restores: preview.restores, ...(preview.resume ? { resume: true } : {}), ...(preview.cancel ? { cancel: preview.cancel } : {}) });
   }
   const tier = tierOf({ route: "undo" });
   return finalizePlan({ kind: "undo", mode, ...(mode === "since" ? { since } : { id }), session: session ?? null, tier, dialog: tier !== "automatic", entries: planned, skipped });
 }
+const cancelLine = (cancel) => cancel.held ? "cancels the held item \"" + cancel.title + "\" for " + cancel.target + " before it is sent" : "cancels the outbox item " + cancel.outbox + " before it is pushed";
 const dialogFor = (plan) => ({ title: plan.mode === "since" ? "Undo devtwin writes since " + plan.since : "Undo a devtwin write", body: [
   plan.entries.length + " entr" + (plan.entries.length === 1 ? "y" : "ies") + ", newest first. Each record gets a retraction, so sessions stop seeing it; a replaced earlier version comes back.", "",
-  ...plan.entries.slice(0, DIALOG_ENTRIES).map((e) => e.id + " " + e.at + " " + e.route + ": " + e.heads.map((h) => h.id).join(", ")),
+  ...plan.entries.slice(0, DIALOG_ENTRIES).map((e) => e.id + " " + e.at + " " + e.route + ": " + (e.cancel ? cancelLine(e.cancel) : e.heads.map((h) => h.id).join(", "))),
   ...(plan.entries.length > DIALOG_ENTRIES ? ["and " + (plan.entries.length - DIALOG_ENTRIES) + " more"] : [])
 ].join("\n") });
 

@@ -289,7 +289,7 @@ const consentRepo = consentStep("consent-repo", "repo-push", "Consent: push lear
   "Lets lessons reach a repository's docs without a prompt for each branch. No command pushes a learning branch yet; the consent waits for that step.",
   (ctx) => ({ kind: "repo-push", repo: ctx.values["push-repo"] }), (ctx) => ctx.values["push-repo"] ? null : "no --push-repo given", pushRepo);
 const consentHub = consentStep("consent-hub", "hub-publish", "Consent: publish lessons to the organization hub",
-  "Records a standing consent for the hub that --scope joined: lesson accept --target hub then publishes with no owner dialog. Runs consent grant --kind hub-publish.",
+  "Records a standing consent for the hub that --scope joined: lesson accept --target hub then holds a lesson with no owner dialog and sends it after the hold. Runs consent grant --kind hub-publish.",
   "Lets accepted lessons reach colleagues' agents without a prompt for each lesson.",
   (ctx) => ({ kind: "hub-publish", scope: ctx.values.scope }), (ctx) => hubBindingSync(ctx) ? null : "no hub joined for this scope", (ctx) => ctx.values.scope);
 

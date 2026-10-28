@@ -168,7 +168,9 @@ test("status reports installed, loaded and last run for each job", async (t) => 
     ["advisory-hourly", false, false, false, null, null],
     ["review-monthly", true, true, true, now().toISOString(), "ok"],
     ["activity-weekly", false, false, false, null, null],
-    ["backup-daily", false, false, false, null, null]
+    ["backup-daily", false, false, false, null, null],
+    ["learning-send", false, false, false, null, null],
+    ["import-daily", false, false, false, null, null]
   ]);
   assert.equal(s.net.log.length, 0, "the review job and status make no request");
 });

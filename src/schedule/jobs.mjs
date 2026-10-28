@@ -1,5 +1,5 @@
-// U20 (R10, R30, R31, R34; KTD15, KTD24): the radar, advisory and review jobs, U37's weekly activity job and U24's
-// daily backup job. Each job is a user LaunchAgent with its
+// U20 (R10, R30, R31, R34; KTD15, KTD24): the radar, advisory and review jobs, U37's weekly activity job, U24's
+// daily backup job, U41's hourly learning-send job and U28's daily import job. Each job is a user LaunchAgent with its
 // own consent (schedule apply, after the owner dialog) and its own off switch (schedule off). A run checks, in order,
 // the live gate (the pilot load), the job's own flag and its last-run receipt, and only then makes a request. A
 // disabled job makes no request and writes nothing. Turning off the radar also turns off the advisory job.
@@ -24,7 +24,12 @@ export const JOBS = Object.freeze({
   "activity-weekly": { interval: 7 * DAY, skipSeconds: 6 * DAY, runs: "a weekly notification with counts of what devtwin learned, holds for sending and has waiting for you" },
   // U24 (KTD33): one encrypted backup a day into the first approved backupTargets folder, keeping 14. No model call and
   // no request. A held store lock skips the run with BUSY; the next run tries again.
-  "backup-daily": { interval: DAY, skipSeconds: 20 * 3600, runs: "an encrypted backup of your store once a day into your first approved backup folder, keeping the newest 14" }
+  "backup-daily": { interval: DAY, skipSeconds: 20 * 3600, runs: "an encrypted backup of your store once a day into your first approved backup folder, keeping the newest 14" },
+  // U41 (KTD41): sends held items whose hold has passed, after the checks run again (src/held/send.mjs).
+  "learning-send": { interval: 3600, skipSeconds: 3000, runs: "an hourly send of the lessons held under a consent once their hold has passed, after the sensitive and isolation checks run again" },
+  // U28 (R6, KTD26): promotes Claude memory and docs/solutions of bound repositories to observed records. It reads those
+  // sources and writes only inside the store. No model call and no request.
+  "import-daily": { interval: DAY, skipSeconds: 20 * 3600, runs: "a daily import of the Claude memory and docs/solutions of your bound repositories as unreviewed project knowledge, at most 100 items a day" }
 });
 export const JOB_IDS = Object.freeze(Object.keys(JOBS));
 export const OFF_SWITCH = {
@@ -32,7 +37,9 @@ export const OFF_SWITCH = {
   "advisory-hourly": "Turning off the advisory job stops the hourly advisory check and its notifications. The weekly digest still lists advisories when you approved that group.",
   "review-monthly": "Turning off the review job stops the monthly reminder. You can still run the review by hand.",
   "activity-weekly": "Turning off the activity job stops the weekly notification. devtwin still records what it does; run devtwin activity to see it.",
-  "backup-daily": "Turning off the backup job stops the daily backup. The archives already made stay. Run backup create to make one by hand."
+  "backup-daily": "Turning off the backup job stops the daily backup. The archives already made stay. Run backup create to make one by hand.",
+  "learning-send": "Turning off the send job stops the hourly send. Held items stay held; hub sync still sends a joined hub's items, and undo still cancels them.",
+  "import-daily": "Turning off the import job stops the daily import. What it imported stays; run import run to import by hand, and undo to remove a run's records."
 };
 export const jobLabel = (job) => "devtwin." + job;
 const jobsPath = (roots) => join(roots.stateRoot, "schedule", "jobs.json");
@@ -75,7 +82,7 @@ async function requirements(roots, job, state) {
     if (!(roots.pilot.writeClasses?.backupTargets ?? []).length) throw new DevtwinError("GATE_REQUIRED", "No backup folder approved", { field: "writeClasses.backupTargets", remedy: "live write-classes --backup-target <folder>" });
     return;
   }
-  if (job === "review-monthly" || job === "activity-weekly") return;
+  if (job === "review-monthly" || job === "activity-weekly" || job === "learning-send" || job === "import-daily") return;
   const { readStackApproval } = await import("../stack/plan.mjs");
   const approval = await readStackApproval(roots);
   if (!approval) throw new DevtwinError("APPROVAL_REQUIRED", "Approve the stack sources first", { remedy: "stack plan, then stack approve" });
@@ -203,7 +210,19 @@ async function backupDaily(roots, ctx, deps, now) {
     return { skipped: "busy", code: error.code, lock: error.details?.lock ?? null };
   }
 }
-const WORK = { "radar-weekly": radarWeekly, "advisory-hourly": advisoryHourly, "review-monthly": reviewMonthly, "activity-weekly": activityWeekly, "backup-daily": backupDaily };
+// U41: a held hub-sync lock leaves that target's items held with the reason "busy"; the next run tries again.
+async function learningSend(roots, ctx, deps, now) {
+  const { sendDue } = await import("../held/send.mjs");
+  const result = await sendDue(roots, { now, route: "learning-send" });
+  return { sent: result.sent, dropped: result.dropped, kept: result.kept.length };
+}
+// U28: the import counts only; its full report is what import run prints.
+async function importDaily(roots, ctx, deps, now) {
+  const { runImport } = await import("../import/commands.mjs");
+  const r = await runImport(roots, { now, env: ctx.env ?? process.env });
+  return { runId: r.runId, written: r.written.length, preferences: r.preferences.filter((p) => p.created).length, unchanged: r.unchanged, skipped: r.skipped.length, refused: r.refused.length, deferred: r.deferred, ambiguous: r.ambiguous.length, notOnboarded: r.notOnboarded, unmapped: r.unmapped };
+}
+const WORK = { "import-daily": importDaily, "learning-send": learningSend, "radar-weekly": radarWeekly, "advisory-hourly": advisoryHourly, "review-monthly": reviewMonthly, "activity-weekly": activityWeekly, "backup-daily": backupDaily };
 
 // The scheduled run. A run within the job's skip window of the last good run is skipped, so missed runs collapse into
 // one run, and two runs inside one period write one digest. lastRunAt moves only on success: a failed or interrupted

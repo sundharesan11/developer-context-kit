@@ -16,6 +16,7 @@ import { listOutbox } from "../src/hubs/git-write.mjs";
 import { parseHubLesson } from "../src/hubs/read.mjs";
 import { ownerAction } from "../src/hooks/owner-block.mjs";
 import { planAccept, applyAccept, planCopy, applyCopy, TARGETS, leavesMachine } from "../src/lessons/publish.mjs";
+import { listHeld } from "../src/held/queue.mjs";
 
 const SCOPE = "example", OTHER = "contoso";
 const HOUR = 3600 * 1000;
@@ -48,9 +49,10 @@ async function machine(t, { handle = "alice", scopes = [SCOPE] } = {}) {
   const path = await p.with({ writeClasses: { hubRoot: [hubRoot] } });
   const roots = async () => rootsFromPilot(await loadPilot(path, { home: p.fakeHome, env: {} }));
   for (const scope of scopes) await applyScopeAdd(await roots(), { scope, hubs: [], policies: [], now });
-  const dialogs = [];
+  const dialogs = [], notes = [];
   let decision = "approved";
-  const options = (clock = now) => ({ now: clock, home: p.fakeHome, env: {}, ownerDialog: async (content) => { dialogs.push(content); return decision; } });
+  // U41: a hub accept shows one notification; the seam keeps it off the desktop.
+  const options = (clock = now) => ({ now: clock, home: p.fakeHome, env: {}, ownerDialog: async (content) => { dialogs.push(content); return decision; }, notifier: (args) => { notes.push(args); return { status: 0 }; } });
   const cli = async (args, { clock, stdin } = {}) => {
     const chunks = [];
     const code = await main([...args, "--pilot", path], { ...options(clock), stdin, stdout: { write: (v) => { chunks.push(v); return true; } } });
@@ -69,8 +71,11 @@ async function machine(t, { handle = "alice", scopes = [SCOPE] } = {}) {
     if (grant) await consent(scope);
     return joined;
   };
-  return { p, path, roots, cli, ok, fail, applied, join: join_, consent, dialogs, setDialog: (value) => { decision = value; }, handle };
+  return { p, path, roots, cli, ok, fail, applied, join: join_, consent, dialogs, notes, setDialog: (value) => { decision = value; }, handle };
 }
+// U41: a hub accept waits 24 hours in the held queue; hub sync after the hold sends it.
+const SENT = at(24);
+const sendHeld = async (m, clock = SENT) => (await m.ok(["hub", "sync", "--scope", SCOPE], { clock })).held;
 
 const lessonArgs = ({ session = "ses_one", scope = SCOPE, title = "Retry the billing client", summary = "Do wrap billing calls in the retry helper.", body = "A billing call can fail once under load. The helper retries with backoff.\n", paths = ["src/billing/**"], extra = [] } = {}) =>
   ["lesson", "propose", "--session", session, "--scope", scope, "--title", title, "--summary", summary, "--body", body, ...paths.flatMap((x) => ["--path", x]), ...extra];
@@ -105,10 +110,13 @@ test("lesson propose then accept to the hub under the hub-publish consent reache
   const result = await a.ok([...accept(id, "hub"), "--apply", "--plan-fingerprint", plan.fingerprint]);
   assert.equal(a.dialogs.length, dialogsBefore, "under the consent the apply shows no owner dialog");
   assert.equal(result.tier, "consented");
-  assert.equal(result.hub.pushed, true);
-  assert.equal(result.hub.lessonId, plan.hub.lessonId);
+  assert.deepEqual([result.hub.held, result.hub.lessonId, result.hub.sendAfter], [true, plan.hub.lessonId, SENT().toISOString()]);
   assert.equal(result.personal, undefined, "hub only writes no personal copy");
+  assert.equal(await hub.head(), headBefore, "the accept holds the lesson");
+  assert.equal(a.notes.length, 1, "one notification names the held lesson");
   const rel = "lessons/" + plan.hub.lessonId + ".md";
+  const sent = await sendHeld(a);
+  assert.deepEqual(sent.sent.map((x) => [x.lessonId, x.state]), [[plan.hub.lessonId, "sent"]]);
   assert.ok((await hub.files()).includes(rel));
   const published = parseHubLesson(await fixtureGit(hub.bare, ["show", "main:" + rel]));
   assert.equal(published.meta.author, "handle:alice");
@@ -118,8 +126,8 @@ test("lesson propose then accept to the hub under the hub-publish consent reache
   assert.deepEqual(await matchIds(a, "src/billing/client.js"), [plan.hub.lessonId], "accept rebuilt the author's index");
   // The colleague's machine gets the lesson on its next sync.
   assert.deepEqual(await matchIds(b, "src/billing/client.js"), []);
-  assert.equal((await b.ok(["hub", "sync", "--scope", SCOPE], { clock: at(0.2) })).lessons, 1);
-  const match = await b.ok(["lesson", "match", "--scope", SCOPE, "--path", "src/billing/client.js"], { clock: at(0.2) });
+  assert.equal((await b.ok(["hub", "sync", "--scope", SCOPE], { clock: at(24.2) })).lessons, 1);
+  const match = await b.ok(["lesson", "match", "--scope", SCOPE, "--path", "src/billing/client.js"], { clock: at(24.2) });
   assert.deepEqual(match.matches.map((x) => x.id), [plan.hub.lessonId]);
   assert.match(match.matches[0].line, /claimed by handle:alice/);
   assert.match(match.matches[0].line, /Do wrap billing calls/);
@@ -134,15 +142,17 @@ test("a hub publish under the consent is audited, and undo points to published d
   const since = new Date(now().getTime() - 1000).toISOString();
   const plan = await a.ok(accept(id, "hub", ["--session", "ses_one"]));
   const result = await a.ok([...accept(id, "hub", ["--session", "ses_one"]), "--apply", "--plan-fingerprint", plan.fingerprint]);
-  assert.equal(result.hub.pushed, true);
+  assert.equal(result.hub.held, true);
+  assert.equal((await a.ok(["activity"])).learned.find((x) => x.id === result.audit).state, "held");
+  assert.equal((await sendHeld(a)).sent.length, 1);
   const entries = (await readAudit(await a.roots())).entries.filter((e) => e.kind === "hub-lesson");
   assert.equal(entries.length, 1);
   const [entry] = entries;
   assert.deepEqual([entry.route, entry.target, entry.tier, entry.scope, entry.itemIds, entry.recordIds, entry.session], ["lesson accept", "hub", "consented", SCOPE, [plan.hub.lessonId], [], "ses_one"]);
   assert.equal(result.audit, entry.id);
-  const learned = (await a.ok(["activity"])).learned.find((x) => x.id === entry.id);
-  assert.deepEqual([learned.kind, learned.landed], ["hub-lesson", true]);
-  // undo cannot take a lesson back out of the hub's Git history; the owner removes it with published delete.
+  const learned = (await a.ok(["activity"], { clock: SENT })).learned.find((x) => x.id === entry.id);
+  assert.deepEqual([learned.kind, learned.landed, learned.state], ["hub-lesson", true, "sent"]);
+  // undo cannot take a lesson that was sent back out of the hub's Git history; the owner removes it with published delete.
   const error = await a.fail(["undo", "--id", entry.id], "DEVTWIN_GATE_REQUIRED");
   assert.deepEqual([error.details.reason, error.details.via], ["published-delete", "published delete"]);
   assert.match(error.message, /published delete/);
@@ -242,8 +252,11 @@ test("lesson accept with a rejected push after three tries lands in the outbox a
   const id = await propose(m);
   await hub.refusePushes();
   const head = await hub.head();
-  const result = await m.applied(accept(id, "hub"));
-  assert.equal(result.hub.pushed, false);
+  const accepted = await m.applied(accept(id, "hub"));
+  // U41: the push happens when hub sync runs after the hold.
+  const { sent } = await sendHeld(m);
+  const result = { hub: { lessonId: accepted.hub.lessonId, ...sent[0] } };
+  assert.equal(result.hub.state, "outbox");
   assert.equal(result.hub.reason, "rejected");
   assert.match(result.hub.queued, /^obx_[a-f0-9]{24}$/);
   assert.equal(await hub.head(), head);
@@ -252,13 +265,15 @@ test("lesson accept with a rejected push after three tries lands in the outbox a
   assert.deepEqual(outbox.map((x) => [x.id, x.kind, x.writes[0].rel]), [[result.hub.queued, "lesson", "lessons/" + result.hub.lessonId + ".md"]]);
   const status = await m.ok(["hub", "status", "--scope", SCOPE]);
   assert.equal(status.outbox, 1);
-  assert.deepEqual((await m.ok(["lesson", "proposals", "--all"])).proposals.map((x) => [x.state, x.outcome.hub.queued]), [["accepted", result.hub.queued]]);
-  // Once the remote takes pushes again, the next sync pushes the queued lesson.
+  assert.deepEqual((await m.ok(["lesson", "proposals", "--all"])).proposals.map((x) => [x.state, x.outcome.hub.heldId]), [["accepted", accepted.hub.heldId]]);
+  assert.equal((await m.ok(["activity"], { clock: SENT })).learned.find((x) => x.id === accepted.audit).state, "outbox");
+  // Once the remote takes pushes again, the next sync pushes the queued lesson, and its audit state moves to sent.
   await writeFile(join(hub.bare, "hooks", "pre-receive"), "#!/bin/sh\nexit 0\n");
-  const synced = await m.ok(["hub", "sync", "--scope", SCOPE], { clock: at(0.2) });
+  const synced = await m.ok(["hub", "sync", "--scope", SCOPE], { clock: at(24.2) });
   assert.deepEqual(synced.outbox.pushed, [result.hub.queued]);
   assert.ok((await hub.files()).includes("lessons/" + result.hub.lessonId + ".md"));
-  assert.equal((await m.ok(["hub", "status", "--scope", SCOPE], { clock: at(0.2) })).outbox, 0);
+  assert.equal((await m.ok(["hub", "status", "--scope", SCOPE], { clock: at(24.2) })).outbox, 0);
+  assert.equal((await m.ok(["activity"], { clock: at(24.2) })).learned.find((x) => x.id === accepted.audit).state, "sent");
 });
 
 test("lesson accept as hub+general waits for the activity review and hub only still publishes", async (t) => {
@@ -275,7 +290,8 @@ test("lesson accept as hub+general waits for the activity review and hub only st
   const named = await propose(m, { title: "Example billing retries", session: "ses_named" });
   await m.fail(accept(named, "general"), "DEVTWIN_GATE_REQUIRED");
   const result = await m.applied(accept(named, "hub"));
-  assert.equal(result.hub.pushed, true);
+  assert.equal(result.hub.held, true);
+  assert.equal((await sendHeld(m)).sent[0].state, "sent");
   assert.equal(result.personal, undefined);
   assert.deepEqual(result.index.map((x) => x.scope), [SCOPE], "a hub-only accept rebuilds only its own scope");
 });
@@ -373,13 +389,17 @@ test("lesson publish paths never write to a hub without a consent or an approved
   // dialog (copy).
   const source = await readFile(join(import.meta.dirname, "..", "src", "lessons", "publish.mjs"), "utf8");
   assert.equal(source.match(/publishToHub\(/g).length, 1, "one publish call");
-  assert.equal(source.match(/publishLesson\(/g).length, 3, "the helper and its two callers");
-  for (const [fn, gate] of [["applyAccept", "requireConsent("], ["applyCopy", "requireOwnerApproval("]]) {
+  assert.equal(source.match(/publishLesson\(/g).length, 2, "the helper and lesson copy; a hub accept goes to the held queue");
+  for (const [fn, gate, write] of [["applyAccept", "requireConsent(", "enqueueHeld("], ["applyCopy", "requireOwnerApproval(", "publishLesson("]]) {
     const body = source.slice(source.indexOf("export async function " + fn));
     const end = body.indexOf("\n}\n");
     const text = body.slice(0, end);
-    assert.ok(text.indexOf(gate) > 0 && text.indexOf(gate) < text.indexOf("publishLesson("), fn + " checks " + gate + " before it publishes");
+    assert.ok(text.indexOf(gate) > 0 && text.indexOf(gate) < text.indexOf(write), fn + " checks " + gate + " before it publishes");
   }
+  // The held-queue sender publishes only behind a valid consent.
+  const sender = await readFile(join(import.meta.dirname, "..", "src", "held", "send.mjs"), "utf8");
+  assert.ok(sender.indexOf("consent?.valid") > 0 && sender.indexOf("consent?.valid") < sender.indexOf("publishLesson(roots"), "the sender checks the consent before it publishes");
+  assert.deepEqual(await listHeld(roots), [], "nothing is held");
   for (const name of await readdir(join(import.meta.dirname, "..", "src", "lessons"))) {
     if (name === "publish.mjs") continue;
     assert.doesNotMatch(await readFile(join(import.meta.dirname, "..", "src", "lessons", name), "utf8"), /publishToHub|enqueueOutbox/, name);

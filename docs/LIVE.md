@@ -44,6 +44,15 @@ A live config can hold an optional `writeClasses` block. It names the only other
 - Before each edit, it writes the exact prior bytes to `store/state/runs/<run_id>/backups/` at mode 0600, with a record that names the path. For a file that did not exist, only the record is written. If the file changed during the edit, the edit stops with `INTEGRITY` and the file is not replaced. The edited file is replaced atomically and keeps its own mode. A file that devtwin creates gets mode 0600.
 - An edited file must be a regular file you own, with one link, that is not group or other writable.
 
+### The import read-only exception
+
+`import run` and the `import-daily` job read files outside the store, for each onboarded repository ([HARNESS.md](HARNESS.md#daily-import)):
+
+- In `~/.claude/projects` (or `$CLAUDE_CONFIG_DIR/projects`), only the one folder whose name devtwin computes from the repository's real path. In it, devtwin reads the `*.jsonl` session transcripts for their working directory only, and the `memory/*.md` files. It opens each file with no link following, reads only regular files and stops at a size limit.
+- In the repository, only the `docs/solutions` files of the learnings base commit, through Git plumbing with hooks and filters off. It never reads the working copy for this.
+
+This exception is for reading only. The import writes nothing outside the store.
+
 ### The stack-watch exception
 
 The stack watch, the radar digests and the radar jobs fetch from the network. In live mode they run only under the `stackWatch` exception, a separate entry in `live.json` next to the write classes:
