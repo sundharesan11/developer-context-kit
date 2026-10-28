@@ -29,6 +29,7 @@ const OWNER_COMMANDS = [
   "devtwin lesson copy --pilot /x/live.json --id rec_1 --apply",
   `${KIT} consent grant --pilot '/x/live.json' --kind hub-publish --scope example --apply --plan-fingerprint 'sha256:00'`,
   `${KIT} consent revoke --pilot '/x/live.json' --kind repo-push --repo /r --apply`,
+  `${KIT} project set --pilot '/x/live.json' --scope example --project example.atlas --learnings-dir docs/lessons --apply --plan-fingerprint 'sha256:00'`,
   `${KIT} undo --pilot '/x/live.json' --since 2026-01-01 --apply --plan-fingerprint 'sha256:00'`,
   `${KIT} undo --pilot '/x/live.json' --id aud_000000000000000000000000 --session ses_one --apply --plan-fingerprint 'sha256:00'`,
   `${KIT} lesson copy --pilot '/x/live.json' --id rec_1 --apply`,
@@ -103,7 +104,7 @@ test("owner block denies devtwin owner-only actions run directly from an agent s
     assert.match(out.permissionDecisionReason, /Ask your developer to run it themselves/);
     assert.doesNotMatch(result.out, /additionalContext/);
   }
-  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "backup key export", "backup restore", "consent grant", "consent revoke", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson copy", "lesson notices", "live add-repo", "live approval", "live init", "live migrate", "live set-kit", "live stack-watch", "live write-classes", "note consent", "note revoke", "paths confirm", "pref accept", "pref retire", "published delete", "record publish", "schedule apply", "schedule off", "undo"]);
+  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["agents install", "agents uninstall", "backup key export", "backup restore", "consent grant", "consent revoke", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson copy", "lesson notices", "live add-repo", "live approval", "live init", "live migrate", "live set-kit", "live stack-watch", "live write-classes", "note consent", "note revoke", "paths confirm", "pref accept", "pref retire", "project set", "published delete", "record publish", "schedule apply", "schedule off", "undo"]);
 });
 
 test("owner block denies owner-only actions through terminal wrappers", async (t) => {

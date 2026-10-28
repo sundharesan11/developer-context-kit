@@ -4,12 +4,18 @@
 // under dataRoot/scopes/<scope>/org.
 //
 // U36 (KTD38): lesson accept asks the tier table (src/policy/tiers.mjs) and shows no dialog.
-// Targets:   hub          consented: one file in the scope's hub, only while a hub-publish consent for the scope is
+// U30 (R8): --target is a non-empty set of targets, comma-separated (project,repo). Each member is asked on its own,
+// and a member the tier table refuses fails the whole accept before anything is written. "hub+general" is the older
+// spelling of general,hub.
+// Targets:   project      automatic: a project lesson record in the proposal's project; local
+//            general      refused: a personal-store record reaches every organization, so it waits for activity review
+//                         (U25 routes it through the review; see refusedMember below)
+//            hub          consented: one file in the scope's hub, only while a hub-publish consent for the scope is
 //                         valid. U41 (KTD41): the file waits in the held queue for the consent's hold time
 //                         (src/held/queue.mjs); a sender then publishes it (src/held/send.mjs, publishLesson below)
-//            hub+general  refused: the general half waits for the weekly activity review
-//            project      automatic: a project lesson record in the proposal's project; local
-//            general      refused: a personal-store record reaches every organization, so it waits for activity review
+//            repo         automatic: a learning branch in the project's repository (src/learnings/repo-write.mjs).
+//                         Under a valid repo-push consent its push waits in the held queue (src/learnings/push.mjs);
+//                         without one the branch stays local and activity lists it as "needs consent"
 // recordedBy names the caller (src/policy/actor.mjs).
 //
 // U37 (KTD40, KTD43): the project target is an automatic knowledge write. The lesson text passes the plain-rule checks
@@ -34,8 +40,9 @@ import { requireOwnerApproval, dialogText, DIALOG_LIMITS } from "../owner/dialog
 import { tierRule } from "../policy/tiers.mjs";
 import { cliRecorder } from "../policy/actor.mjs";
 import { appendEntry } from "../audit/log.mjs";
-import { requireConsent } from "../consent/store.mjs";
+import { requireConsent, readConsent } from "../consent/store.mjs";
 import { enqueueHeld, hubTarget } from "../held/queue.mjs";
+import { enqueueLearningPush } from "../learnings/push.mjs";
 import { isolationTerms, assertOutboundClean } from "../records/isolation.mjs";
 import { addPersonalRecord, readPersonalSnapshot } from "../records/personal.mjs";
 import { addRecord, requireCommittedProject } from "../records/store.mjs";
@@ -45,9 +52,16 @@ import { rebuildIndex } from "./index.mjs";
 import { checkLesson, lessonBody, lessonDraft, lessonText, requirePending, proposalHash, markAccepted, withProposalLock, SESSION_ID } from "./propose.mjs";
 import { checkLocalSupersession } from "./supersede.mjs";
 
-export const TARGETS = Object.freeze(["hub", "hub+general", "project", "general"]);
-export const leavesMachine = (target) => target === "hub" || target === "hub+general";
-const general = (target) => target === "hub+general" || target === "general";
+export const TARGETS = Object.freeze(["project", "general", "hub", "repo"]);
+export const leavesMachine = (target) => target === "hub" || target === "repo";
+// The members of a --target value, in TARGETS order.
+export function parseTargets(value) {
+  const parts = value === "hub+general" ? ["general", "hub"] : typeof value === "string" ? value.split(",").map((part) => part.trim()) : [];
+  if (!parts.length || parts.some((part) => !TARGETS.includes(part)) || new Set(parts).size !== parts.length) throw new DevtwinError("INVALID_INPUT", "Invalid lesson target", { field: "target", allowed: TARGETS });
+  return TARGETS.filter((target) => parts.includes(target));
+}
+// The first member the tier table hands to another route, or null. U25 sends general through activity review here.
+const refusedMember = (rules) => Object.entries(rules).find(([, rule]) => rule.via) ?? null;
 const hex = (text) => createHash("sha256").update(text).digest("hex").slice(0, 24);
 // KTD3: lsn_ plus a hash of hub ID, author handle, request ID and creation time.
 export const hubLessonId = ({ hubId, handle, requestId, createdAt }) => "lsn_" + hex([hubId, handle, requestId, createdAt].join("\0"));
@@ -81,19 +95,26 @@ const copyDialog = (plan) => lessonDialog("Copy a personal lesson to another org
 
 // lesson accept preview. It re-runs the draft and isolation checks; general targets are also checked against the
 // lesson's own scope, because the personal store reaches every organization.
-export async function planAccept(roots, { id, target, scope, project, session = null }) {
-  if (!TARGETS.includes(target)) throw new DevtwinError("INVALID_INPUT", "Invalid lesson target", { field: "target", allowed: TARGETS });
+export async function planAccept(roots, { id, target: value, scope, project, session = null }) {
+  const members = parseTargets(value), target = members.join(","), has = (member) => members.includes(member);
   if (session !== null && (typeof session !== "string" || !SESSION_ID.test(session))) throw new DevtwinError("INVALID_INPUT", "Invalid session ID", { field: "session" });
   const proposal = await requirePending(roots, id);
   if (scope !== undefined && assertScopeId(scope) !== proposal.scope) throw new DevtwinError("CONFLICT", "Proposal belongs to another scope", { scope: proposal.scope });
   const lesson = await checkLesson(roots, proposal.scope, proposal.lesson);
   if (proposal.supersedes && target !== "hub") throw new DevtwinError("INVALID_INPUT", "A replacement lesson goes to the hub only", { field: "target", allowed: ["hub"] });
-  const rule = tierRule({ route: "lesson accept", target });
-  if (rule.via) throw new DevtwinError("GATE_REQUIRED", "A lesson for every organization waits for the weekly " + rule.via + "; accept it to a project or the hub now", { target, tier: rule.tier, via: rule.via });
-  if (general(target)) assertOutboundClean(lessonText(lesson), await isolationTerms(roots));
+  const rules = Object.fromEntries(members.map((member) => [member, tierRule({ route: "lesson accept", target: member })]));
+  const refused = refusedMember(rules);
+  if (refused) throw new DevtwinError("GATE_REQUIRED", "A lesson for every organization waits for the weekly " + refused[1].via + "; accept it to a project, the hub or the repository now", { target, member: refused[0], tier: refused[1].tier, via: refused[1].via });
+  if (has("general")) assertOutboundClean(lessonText(lesson), await isolationTerms(roots));
+  // One request ID per member, so each write keeps its own audit entry and record ID. A one-member accept keeps the
+  // request ID it always had.
+  const requestOf = (member) => requestIdFor("lsn", { proposalId: id, revision: proposal.revision, target: member });
   const requestId = requestIdFor("lsn", { proposalId: id, revision: proposal.revision, target });
-  const plan = { kind: "lesson-accept", proposalId: id, proposalHash: proposalHash(proposal), revision: proposal.revision, scope: proposal.scope, target, tier: rule.tier, ...(rule.consent ? { consent: rule.consent } : {}), requestId, lesson };
-  if (leavesMachine(target)) {
+  const tier = members.some((member) => rules[member].tier === "consented") ? "consented" : "automatic";
+  const plan = { kind: "lesson-accept", proposalId: id, proposalHash: proposalHash(proposal), revision: proposal.revision, scope: proposal.scope, target, targets: members, tier,
+    ...(members.length > 1 ? { tiers: Object.fromEntries(members.map((member) => [member, rules[member].tier])) } : {}), ...(rules.hub?.consent ? { consent: rules.hub.consent } : {}), requestId, lesson };
+  if (has("hub")) {
+    const requestId = requestOf("hub");
     const binding = await writableBinding(roots, proposal.scope);
     let supersedes = null;
     if (proposal.supersedes) {
@@ -103,11 +124,12 @@ export async function planAccept(roots, { id, target, scope, project, session = 
       plan.replaces = { id: proposal.supersedes.id, title: proposal.supersedes.title, author: proposal.supersedes.author };
     }
     plan.hub = hubFile(binding, { requestId, createdAt: proposal.createdAt, lesson, localRecordHash: digest(lessonDraft(lesson)), supersedes });
+    plan.hubRequestId = requestId;
     plan.createdAt = proposal.createdAt;
     plan.session = session;
   }
-  if (general(target)) plan.personalRecordId = personalRecordIdFor({ requestId });
-  if (target === "project") {
+  if (has("general")) plan.personalRecordId = personalRecordIdFor({ requestId: requestOf("general") });
+  if (has("project") || has("repo")) {
     const name = project ?? proposal.project;
     if (name === null || name === undefined) throw new DevtwinError("INVALID_INPUT", "Project target needs --project", { field: "project" });
     if (project !== undefined && proposal.project !== null && project !== proposal.project) throw new DevtwinError("CONFLICT", "Proposal belongs to another project", { project: proposal.project });
@@ -115,7 +137,13 @@ export async function planAccept(roots, { id, target, scope, project, session = 
     await requireCommittedProject(roots, proposal.scope, name);
     plan.project = name;
     plan.session = session;
-    plan.projectRecordId = recordIdFor({ scope: proposal.scope, project: name, requestId });
+  }
+  if (has("project")) plan.projectRecordId = recordIdFor({ scope: proposal.scope, project: plan.project, requestId: requestOf("project") });
+  if (has("repo")) {
+    // Every check of the learning branch runs here, so a refusal stops the accept before any write.
+    const { prepareLearning, learningIdFor } = await import("../learnings/repo-write.mjs");
+    const sourceId = plan.projectRecordId ?? plan.personalRecordId ?? learningIdFor(requestOf("repo"));
+    plan.repo = await prepareLearning(roots, { scope: proposal.scope, project: plan.project, lesson, requestId: requestOf("repo"), sourceId, createdAt: proposal.createdAt });
   }
   return finalizePlan(plan);
 }
@@ -147,11 +175,32 @@ export async function rebuildIndexes(roots, scopes) {
   return out;
 }
 
+// The request ID of one member's write (the same one planAccept used for its record ID).
+const requestOf = (plan, member) => requestIdFor("lsn", { proposalId: plan.proposalId, revision: plan.revision, target: member });
+const members = (plan) => plan.targets ?? [plan.target];
+// U30: the learning branch's audit entry comes before its ref (KTD40). The objects are written first, so the entry can
+// name the commit; until the ref exists they are unreachable and change nothing. A retry after a stop between the
+// entry and the ref uses the commit the entry names.
+async function writeLearning(roots, prepared, { recordedBy, session, now }) {
+  const view = { root: prepared.root, branch: prepared.branch, learningId: prepared.learningId, rel: prepared.rel, base: prepared.base.ref, baseCommit: prepared.base.commit };
+  if (prepared.resumed) return { ...view, commit: prepared.resumed.commit, audit: prepared.resumed.audit, resumed: true };
+  const { buildLearningCommit, sameLearningCommit, createLearningRef } = await import("../learnings/repo-write.mjs");
+  const commit = buildLearningCommit(prepared);
+  const entry = await appendEntry(roots, { kind: "repo-learning", tier: "automatic", route: "lesson accept", target: "repo", scope: prepared.scope, project: prepared.project,
+    itemIds: [prepared.learningId, "cmt_" + commit], actor: recordedBy.actor, session, requestId: prepared.requestId }, { now });
+  const named = entry.itemIds.find((x) => x.startsWith("cmt_")).slice(4);
+  if (named !== commit && !sameLearningCommit(prepared, named)) throw new DevtwinError("STALE_VERSION", "An earlier write of this learning branch differs", { branch: prepared.branch });
+  createLearningRef(prepared, named);
+  return { ...view, commit: named, audit: entry.id };
+}
+
 export async function applyAccept(roots, input, { fingerprint, now = () => new Date(), ctx = {} } = {}) {
   const plan = await planAccept(roots, input);
   assertFingerprint(plan, fingerprint);
   // A consented target needs its standing consent; no owner dialog runs for any accept target.
   const consent = plan.consent ? await requireConsent(roots, plan.consent, plan.scope) : null;
+  // U30: the repo target writes its branch either way; the consent decides only whether the push is queued.
+  const repoConsent = plan.repo ? await readConsent(roots, "repo-push", plan.repo.root) : null;
   const recordedBy = cliRecorder(ctx.env ?? process.env);
   const outcome = await withProposalLock(roots, "lesson-accept", async () => {
     const proposal = await requirePending(roots, plan.proposalId);
@@ -160,24 +209,33 @@ export async function applyAccept(roots, input, { fingerprint, now = () => new D
     const binding = plan.hub ? await writableBinding(roots, plan.scope) : null;
     if (binding && (binding.hubId !== plan.hub.hubId || binding.actorRef !== plan.hub.author)) throw new DevtwinError("STALE_VERSION", "Hub binding changed");
     // Local writes come first. They are idempotent by request ID, so if the publish then fails, the same accept can run
-    // again; the hub precondition keeps a second publish out.
+    // again; the hub precondition keeps a second publish out. The learning branch is first of all: its ref is the
+    // write most likely to fail, and a retry finds the branch it wrote through its audit entry (resumed).
+    if (plan.repo) result.repo = await writeLearning(roots, plan.repo, { recordedBy, session: plan.session ?? null, now });
     if (plan.personalRecordId) {
-      const added = await addPersonalRecord(roots, { requestId: plan.requestId, recordedBy, draft: lessonDraft(plan.lesson, { reach: "personal", status: "observed" }) }, { now });
+      const added = await addPersonalRecord(roots, { requestId: requestOf(plan, "general"), recordedBy, draft: lessonDraft(plan.lesson, { reach: "personal", status: "observed" }) }, { now });
       result.personal = { recordId: added.recordId, recordHash: added.recordHash };
     }
     if (plan.projectRecordId) {
-      const entry = await appendEntry(roots, { kind: "record", tier: plan.tier, route: "lesson accept", target: "project", home: "project", scope: plan.scope, project: plan.project, recordIds: [plan.projectRecordId], actor: recordedBy.actor, session: plan.session, requestId: plan.requestId }, { now });
+      const entry = await appendEntry(roots, { kind: "record", tier: "automatic", route: "lesson accept", target: "project", home: "project", scope: plan.scope, project: plan.project, recordIds: [plan.projectRecordId], actor: recordedBy.actor, session: plan.session, requestId: requestOf(plan, "project") }, { now });
       result.audit = entry.id;
-      const added = await addRecord(roots, { scope: plan.scope, project: plan.project, requestId: plan.requestId, recordedBy, draft: { ...lessonDraft(plan.lesson, { reach: "project", status: "observed" }), applicability: { level: "project" } } }, { now });
+      const added = await addRecord(roots, { scope: plan.scope, project: plan.project, requestId: requestOf(plan, "project"), recordedBy, draft: { ...lessonDraft(plan.lesson, { reach: "project", status: "observed" }), applicability: { level: "project" } } }, { now });
       result.project = { project: plan.project, recordId: added.recordId, recordHash: added.recordHash };
     }
     if (binding) {
       // KTD41: the lesson waits in the held queue; the audit entry goes first, so its state starts as held.
-      const entry = await appendEntry(roots, { kind: "hub-lesson", tier: plan.tier, route: "lesson accept", target: plan.target, scope: plan.scope, itemIds: [plan.hub.lessonId], actor: recordedBy.actor, session: plan.session ?? null, requestId: plan.requestId }, { now });
+      const entry = await appendEntry(roots, { kind: "hub-lesson", tier: "consented", route: "lesson accept", target: "hub", scope: plan.scope, itemIds: [plan.hub.lessonId], actor: recordedBy.actor, session: plan.session ?? null, requestId: plan.hubRequestId }, { now });
       result.audit = entry.id;
-      const held = await enqueueHeld(roots, { target: hubTarget(plan.scope), kind: "hub-lesson", title: plan.lesson.title, audit: entry.id, requestId: plan.requestId,
+      const held = await enqueueHeld(roots, { target: hubTarget(plan.scope), kind: "hub-lesson", title: plan.lesson.title, audit: entry.id, requestId: plan.hubRequestId,
         consent: { kind: consent.kind, holdHours: consent.holdHours, ruleDigest: consent.ruleDigest }, payload: { ...plan.hub, createdAt: plan.createdAt, message: "Add lesson " + plan.hub.lessonId } }, { now, ctx });
       result.hub = { lessonId: plan.hub.lessonId, hubId: plan.hub.hubId, held: true, heldId: held.item.id, sendAfter: held.item.sendAfter, ...(held.notification ? { notification: held.notification } : {}) };
+    }
+    if (plan.repo) {
+      result.repo.push = repoConsent?.valid
+        ? await enqueueLearningPush(roots, repoConsent, { kind: "repo-learning", root: plan.repo.root, scope: plan.scope, project: plan.project, learningId: plan.repo.learningId, branch: plan.repo.branch,
+          commit: result.repo.commit, rel: plan.repo.rel, content: plan.repo.content, title: plan.lesson.title }, { audit: result.repo.audit, requestId: plan.repo.requestId, now, ctx })
+        : { queued: false, reason: "needs-consent", message: "The branch stays local. Ask your developer to run consent grant --kind repo-push --repo " + plan.repo.root + ", then learning send --branch " + plan.repo.branch, ...(repoConsent ? { voidReason: repoConsent.voidReason } : {}) };
+      if (members(plan).length === 1) result.audit = result.repo.audit;
     }
     await markAccepted(roots, proposal, plan.proposalHash, result, { now });
     return result;

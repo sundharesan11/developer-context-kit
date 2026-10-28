@@ -17,7 +17,8 @@ import { readAudit, outboundStates } from "../audit/log.mjs";
 import { withHubLock, removeOutboxItem } from "../hubs/git-write.mjs";
 import { listHeld, removeHeld, withHeldLock, hubTarget } from "../held/queue.mjs";
 import { markState } from "../held/send.mjs";
-import { HOLD_HOURS, assertKind, assertHoldHours, consentRules, ruleDigestFor, readConsent, listConsents, writeConsent, removeConsent, withConsentLock } from "./store.mjs";
+import { configuredPushUrl } from "../learnings/repo-write.mjs";
+import { HOLD_HOURS, assertKind, assertHoldHours, consentRules, ruleDigestFor, consentParams, readConsent, listConsents, writeConsent, removeConsent, withConsentLock } from "./store.mjs";
 
 const usage = (message, field) => { throw new DevtwinError("INVALID_INPUT", message, { field }); };
 async function isBound(roots, path) {
@@ -47,20 +48,30 @@ function holdHoursFrom(value) {
   return assertHoldHours(Number(value));
 }
 const targetLine = (plan) => plan.consent.kind === "repo-push" ? "Repository: " + plan.consent.target : "Scope: " + plan.consent.target + (plan.hub ? "\nHub: " + plan.hub : "");
+// U30: the repository rules a repo-push grant shows: where pushes go and what a learning branch holds.
+const repoLines = (rules) => rules.kind !== "repo-push" ? [] : [
+  "Pushes go to: " + (rules.remoteUrl ?? "(no origin remote; nothing can be pushed)") + (rules.remoteUrl && !/^ssh:\/\//.test(rules.remoteUrl) && /^[a-z][a-z0-9+.-]*:\/\//i.test(rules.remoteUrl) ? " (not SSH: devtwin prints the push command for you instead)" : ""),
+  "Learnings folder: " + rules.learningsDir, "Learnings base: " + rules.learningsBase,
+  "A change to the folder, the base or this remote voids the consent."
+];
 const ACTION = {
-  "repo-push": "push learning branches to this repository's remote without asking each time. No command pushes a learning branch yet; this consent is kept for that step.",
+  "repo-push": "push learning branches (devtwin/learning-<id>) to this repository's remote without asking each time (lesson accept --target repo, learning send). Each branch adds one lesson file. devtwin never force-pushes and opens no pull request.",
   "hub-publish": "publish lessons to this hub without asking each time (lesson accept --target hub). Everyone with access to the hub can read them, and Git history keeps the text."
 };
 
 export async function planGrant(roots, input) {
   const kind = assertKind(input.kind), holdHours = holdHoursFrom(input.holdHours);
   const { target, hub } = await targetFor(roots, input, { grant: true });
-  return finalizePlan({ kind: "consent-grant", consent: { kind, target, holdHours, ruleDigest: ruleDigestFor(kind, holdHours), rules: consentRules(kind, holdHours) }, hub,
+  // U30: a repo-push consent records the repository's push URL now; pushes go there and nowhere else.
+  const remoteUrl = kind === "repo-push" ? configuredPushUrl(target) : undefined;
+  const params = await consentParams(roots, kind, target, remoteUrl ?? null);
+  return finalizePlan({ kind: "consent-grant", consent: { kind, target, holdHours, ruleDigest: ruleDigestFor(kind, holdHours, params), rules: consentRules(kind, holdHours, params), ...(kind === "repo-push" ? { remoteUrl } : {}) }, hub,
     current: await readConsent(roots, kind, target), destination: { root: "stateRoot", path: "consents/" + kind } });
 }
 const grantDialog = (plan) => ({ title: plan.consent.kind === "repo-push" ? "Allow learning-branch pushes to a repository" : "Allow lessons to go to an organization hub", body: [
   targetLine(plan), "", "Agents and scheduled jobs may " + ACTION[plan.consent.kind],
   "Each item waits " + plan.consent.holdHours + " hours in the held queue before it is sent. A notification names it when it is held, devtwin activity --held shows its text, and devtwin undo cancels it.",
+  ...repoLines(plan.consent.rules),
   "Checks: " + plan.consent.rules.checks.join(", ") + ".",
   "A change to these rules voids the consent. consent revoke ends it."
 ].join("\n") });

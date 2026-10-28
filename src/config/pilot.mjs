@@ -17,7 +17,10 @@ const liveKeys = ["configId", "home", "skillDirs", "kitRoot", "kitCommit"];
 const SKILL_PARENTS = ["real-claude-home", "real-agents-home", "CLAUDE_CONFIG_DIR"];
 // Write classes are the reviewed fence exceptions outside the store. Each lists exact paths; the folder classes
 // (hubRoot, and U24's backupTargets for backup archives and restores) list folders.
-export const WRITE_CLASSES = ["hubRoot", "instructionTargets", "hookTargets", "launchAgents", "backupTargets"];
+// U30 (KTD29): repoLearnings lists exact bound repository roots that may get learning branches. devtwin writes there
+// only Git objects and one new ref, through Git itself (src/learnings/repo-write.mjs), so the class never lets a file
+// write through the fence: inClass is false for it.
+export const WRITE_CLASSES = ["hubRoot", "instructionTargets", "hookTargets", "launchAgents", "backupTargets", "repoLearnings"];
 export const FOLDER_CLASSES = Object.freeze(["hubRoot", "backupTargets"]);
 const MAX_CLASS_PATHS = 16;
 // U18 (KTD16): live-mode exceptions that are not file paths. stackWatch lets the stack watch and the radar fetch from
@@ -90,6 +93,11 @@ function validateClasses(pilot, context) {
       validateRoot(path, field, !folder);
       if (seen.has(comparable(path))) fail(field);
       seen.add(comparable(path));
+      // A repository root must be one of the listed repositories, exactly.
+      if (writeClass === "repoLearnings") {
+        if (!pilot.repos.some((repo) => comparable(repo) === comparable(path))) fail(field);
+        continue;
+      }
       if (folder) {
         if (pilot.live && (!isWithin(path, pilot.live.home) || path === pilot.live.home)) fail(field);
         continue;
@@ -256,10 +264,12 @@ function inTarget(pilot, target, path) {
   return !pilot.live || top.startsWith("devtwin-") || top.startsWith(LEGACY_SKILL_PREFIX);
 }
 // A write class destination needs the caller to name its one class, as an installer names its one target home.
-export const inClass = (pilot, writeClass, path) => writeClass !== undefined && (pilot.writeClasses?.[writeClass] ?? []).some((approved) => FOLDER_CLASSES.includes(writeClass) ? isWithin(comparable(path), comparable(approved)) : comparable(path) === comparable(approved));
+export const inClass = (pilot, writeClass, path) => writeClass !== undefined && writeClass !== "repoLearnings" && (pilot.writeClasses?.[writeClass] ?? []).some((approved) => FOLDER_CLASSES.includes(writeClass) ? isWithin(comparable(path), comparable(approved)) : comparable(path) === comparable(approved));
 // U24: the approved folder of a folder class that holds path, or null; samePath compares two paths as the fence does.
 export const approvedFolder = (pilot, writeClass, path) => FOLDER_CLASSES.includes(writeClass) ? (pilot?.writeClasses?.[writeClass] ?? []).find((approved) => isWithin(comparable(path), comparable(approved))) ?? null : null;
 export const samePath = (a, b) => comparable(a) === comparable(b);
+// U30: true when root is an approved repoLearnings repository.
+export const repoLearningsAllowed = (pilot, root) => (pilot?.writeClasses?.repoLearnings ?? []).some((approved) => samePath(approved, root));
 export function assertWritable(roots, destinations, { targetHome, writeClass } = {}) {
   const pilot = roots?.pilot;
   if (!pilot || pilotDigest(pilot) !== pilot.digest || roots.configRoot !== pilot.configRoot || roots.dataRoot !== pilot.dataRoot || roots.stateRoot !== pilot.stateRoot) fail("pilot");

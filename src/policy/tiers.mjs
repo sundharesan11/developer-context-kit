@@ -36,13 +36,19 @@ const TABLE = {
   "live approval": ASK,
   "record add": RECORD_WRITE, "record supersede": { ...RECORD_WRITE, "replaces-confirmed": DIALOG, "replaces-disputed": DIALOG }, "record propose": A, "record publish": ASK,
   "lesson match": R, "lesson show": R, "lesson index": R, "lesson propose": A, "lesson proposals": R, "lesson edit": A, "lesson reject": A,
-  "lesson accept": { project: A, hub: { tier: C, consent: "hub-publish" }, "hub+general": REVIEW, general: REVIEW },
+  // U30 (R8): the targets of lesson accept. A --target value is a set of them; each member is asked on its own. repo
+  // writes a local learning branch (automatic); pushing it is the consented "learning send" step below.
+  "lesson accept": { project: A, general: REVIEW, hub: { tier: C, consent: "hub-publish" }, repo: A },
   "lesson copy": ASK, "lesson supersede-propose": A, "lesson notices": ASK,
   hook: A, "hook verify": A, "budget report": R,
   // U27 (KTD35): a confirmation makes skills stop asking for the paths, so only the owner records it.
   "paths confirm": ASK, "paths check": R,
   setup: ASK, "setup status": R, "setup plan": R, "setup apply": SETUP_STEPS,
   "project onboard": A,
+  // U30 (KTD29, KTD39): project set changes where lessons go in a repository, which voids its consent; learning send
+  // queues the push of a branch written before the consent existed.
+  // learning send needs the repository's repo-push consent (src/learnings/push.mjs).
+  "project set": ASK, "learning send": C,
   "profile show": R, "profile plan": R, "profile apply": A, "profile export": R, "profile suggest-stack": R,
   "stack plan": R, "stack approve": A, "stack check": A, "stack digest": A, "radar guide": R,
   "draft save": A, "context resolve": R, "context brief": R, "handoff export": A,

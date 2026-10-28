@@ -117,6 +117,23 @@ node "$KIT/bin/devtwin.mjs" activity --pilot "$LIVE_CONFIG" --held
 node "$KIT/bin/devtwin.mjs" undo --pilot "$LIVE_CONFIG" --id aud_0123456789abcdef01234567
 ```
 
+## Write a lesson to the repository
+
+A lesson can also go into the project's own repository as a learning branch, so the team reviews it there like any other change. devtwin opens no pull request.
+
+```sh
+node "$KIT/bin/devtwin.mjs" lesson accept --pilot "$LIVE_CONFIG" --id prop_0123456789abcdef01234567 --target project,repo
+```
+
+- **Branch.** devtwin writes one commit on a new branch, `devtwin/learning-<id>`. It adds one file, `docs/solutions/lessons/<slug>.md` by default, on top of the learnings base. The file has front matter with the title, the date, `category: lesson`, the tags and `source: devtwin <record id>`.
+- **Your work stays.** devtwin writes Git objects and the new branch only. It never changes your working copy, the index, HEAD or your current branch.
+- **Approval.** List the repository in the `repoLearnings` [write class](/docs/reference/configuration/#write-classes). The commit uses the handle and email that `hub join` recorded for the scope.
+- **Place.** The learnings base defaults to the branch that `refs/remotes/origin/HEAD` names. Change the folder or the base with [`project set`](/docs/reference/cli/#project-set), an owner action. With no base, the write fails and names `project set`.
+- **Push.** Grant `consent grant --kind repo-push --repo <root>` once. The grant records the repository's push URL. Each branch then waits in the held queue for the hold time, and the hourly `learning-send` job pushes it to that URL over SSH. It never force-pushes. Without a consent, the branch stays local and `activity` lists it as waiting. `learning send --branch` queues it after you grant the consent.
+- **HTTPS.** devtwin does not push over HTTPS. It prints the exact `git push` command for you instead.
+- **Refusals.** An existing branch or file, a repository that requires signed commits, a changed push URL, or text that names another organization stops the write or the push.
+- **Undo.** `undo --id <audit entry>` adds a revert commit to the learning branch, and pushes it after the hold when the branch was pushed. Once the lesson is in the learnings base, or the remote branch is gone, undo refuses and names the `git revert` to run by hand.
+
 ## Replace a lesson
 
 A lesson can go stale, and a colleague can be right. When planned work conflicts with a delivered lesson, the agent stops and asks you. You follow the lesson, or you replace it:
@@ -188,7 +205,7 @@ A tombstone removes a lesson on other machines only when its handle matches the 
 
 These commands need you at the keyboard. The devtwin hook denies them from an agent shell, and each one except `lesson notices` shows the owner dialog:
 
-- `hub join`, `lesson copy`, `published delete`, `hub leave`, `hub schedule`, `lesson notices --ack`, `note revoke`, `note consent`, `consent grant` and `consent revoke`, with `--apply`.
+- `hub join`, `lesson copy`, `published delete`, `hub leave`, `hub schedule`, `lesson notices --ack`, `note revoke`, `note consent`, `consent grant`, `consent revoke` and `project set`, with `--apply`.
 
 An agent can run the previews and show you what an action would do. `lesson accept --target hub` is not an owner action: it holds the lesson with no dialog while your `hub-publish` consent for the scope is valid.
 

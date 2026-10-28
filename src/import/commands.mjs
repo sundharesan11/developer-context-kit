@@ -31,6 +31,7 @@ import { auditedWrite } from "../records/commands.mjs";
 import { addRecord, supersedeRecord, readSnapshot, requireCommittedProject } from "../records/store.mjs";
 import { claudeDirFor, projectsDirOf, listFolders, claudeFolderName, worktreesOf, proveFolder, readMemoryFiles } from "./memory.mjs";
 import { learningsBase, readSolutions } from "./solutions.mjs";
+import { readLearningsSettings } from "../projects/commands.mjs";
 import { mapMemory, mapSolution } from "./map.mjs";
 
 export const RUN_CAP = 100;
@@ -110,8 +111,10 @@ async function gather(roots, ctx) {
         for (const item of read.items) items.push({ scope, project, source: "memory:" + project + "/" + item.file, hash: item.hash, sourceHash: item.hash, map: () => mapMemory(item) });
       }
     }
-    // docs/solutions from the learnings base commit, never the working copy.
-    const base = learningsBase(root, binding);
+    // docs/solutions from the learnings base commit, never the working copy. U30: project set records the base ref
+    // (src/projects/commands.mjs); the binding's own field is read when no setting exists.
+    const settings = await readLearningsSettings(roots, scope, project);
+    const base = learningsBase(root, { learningsBase: settings.learningsBase ?? binding.learningsBase });
     if (!base) report.solutions = "no-learnings-base";
     else {
       const read = readSolutions(root, base.commit);

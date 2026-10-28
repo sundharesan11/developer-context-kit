@@ -56,7 +56,7 @@ Commands that write follow one of three patterns:
 | Pattern | Commands |
 | --- | --- |
 | Preview, then `--apply` | `init`, `scope add`, `record add`, `record supersede`, `record propose`, `record publish`, `hub propose`, `lesson propose`, `lesson supersede-propose` |
-| Preview, then `--apply --plan-fingerprint <fp>` | `project onboard`, `live *`, `agents install/uninstall/recover`, `locks release`, `draft save`, `stack digest`, `radar guide`, `schedule off`, `lesson edit/reject/accept/copy`, `lesson notices --ack`, `hub join/leave/schedule`, `note revoke/consent`, `published delete`, `consent grant/revoke`, `undo`, `backup create/restore`, `backup key export`, `paths confirm` |
+| Preview, then `--apply --plan-fingerprint <fp>` | `project onboard`, `live *`, `agents install/uninstall/recover`, `locks release`, `draft save`, `stack digest`, `radar guide`, `schedule off`, `lesson edit/reject/accept/copy`, `lesson notices --ack`, `hub join/leave/schedule`, `note revoke/consent`, `published delete`, `consent grant/revoke`, `project set`, `learning send`, `undo`, `backup create/restore`, `backup key export`, `paths confirm` |
 | Preview command, then a separate apply command with `--plan-fingerprint` | `profile plan` → `profile apply`, `stack plan` → `stack approve`, `setup plan` → `setup apply`, `schedule plan` → `schedule apply` |
 | No preview | `lesson index` and `hook verify` write only devtwin's own state. `hub sync` fetches and pushes items you already approved. |
 
@@ -64,9 +64,9 @@ The skill builder and skill-source installers add separate recorded approvals; s
 
 ### Owner actions
 
-Some commands need you at the keyboard: the **always ask** tier of the [tier table](/docs/security/security-model/#tiers). When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `consent grant`, `consent revoke`, `undo`, `backup restore`, `backup key export`, `paths confirm`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
+Some commands need you at the keyboard: the **always ask** tier of the [tier table](/docs/security/security-model/#tiers). When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `consent grant`, `consent revoke`, `project set`, `undo`, `backup restore`, `backup key export`, `paths confirm`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
 
-`lesson accept` is not an owner action. Agents run it for the `project` target, and for the `hub` target while you hold a `hub-publish` consent. `record add` and `record supersede` of `confirmed` or `disputed` knowledge, or of a write that replaces a `confirmed` or `disputed` record, are not denied by the hook but show the owner dialog whoever runs them.
+`lesson accept` is not an owner action. Agents run it for the `project` and `repo` targets, and for the `hub` target while you hold a `hub-publish` consent. `record add` and `record supersede` of `confirmed` or `disputed` knowledge, or of a write that replaces a `confirmed` or `disputed` record, are not denied by the hook but show the owner dialog whoever runs them.
 
 ### Identifiers
 
@@ -222,7 +222,8 @@ node "$HOME/.devtwin/kit/bin/devtwin.mjs" live migrate --pilot "$HOME/.devtwin/l
 | `--hook-target <file>` | `~/.claude/settings.json` or `~/.codex/hooks.json`. Repeatable. |
 | `--launch-agent <file>` | A `devtwin.<name>.plist` file in `~/Library/LaunchAgents`. Repeatable. |
 | `--backup-target <folder>` | A folder inside your home for backup archives and restores. Repeatable. |
-| `--clear <class>` | Remove a class: `hubRoot`, `instructionTargets`, `hookTargets`, `launchAgents` or `backupTargets`. Repeatable. |
+| `--repo-learnings <root>` | A listed repository root that may get learning branches from `lesson accept --target repo`. Repeatable. |
+| `--clear <class>` | Remove a class: `hubRoot`, `instructionTargets`, `hookTargets`, `launchAgents`, `backupTargets` or `repoLearnings`. Repeatable. |
 | `--apply --plan-fingerprint <fp>` | Write. |
 
 ```sh
@@ -291,6 +292,18 @@ Scans a repository, proposes records and binds the worktree to a project. Never 
 devtwin project onboard --pilot "$PILOT" --scope example --project example.atlas \
   --repo "$REPO" --request-id req_atlas_onboard_01 --accept all
 ```
+
+### `project set`
+
+**Owner** with `--apply`. Sets where a project's lessons go in its repository, after the owner dialog. A change voids the repository's `repo-push` consent; the preview lists it.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--scope <id>`, `--project <id>` | Required. An onboarded project. |
+| `--learnings-dir <rel path>` | The repo-relative folder a learning branch adds its file to. Default `docs/solutions/lessons`. |
+| `--learnings-base <ref>` | The full ref a learning branch starts from, such as `refs/remotes/origin/main`. `default` uses the branch that `refs/remotes/origin/HEAD` names. The daily import reads `docs/solutions` from the same base. |
+| `--apply --plan-fingerprint <fp>` | Write. |
 
 ### `context resolve`
 
@@ -763,20 +776,21 @@ Drops a pending proposal. Takes `--id <prop_id>`; apply with `--apply --plan-fin
 
 ### `lesson accept`
 
-Accepts a proposal. It shows no owner dialog; the [tier](/docs/security/security-model/#tiers) of the target decides who may run the apply.
+Accepts a proposal. It shows no owner dialog; the [tier](/docs/security/security-model/#tiers) of each target decides who may run the apply. `--target` takes one target or a set joined by commas, such as `project,repo`. When any target is refused, the whole accept fails before it writes anything.
 
 | Target | Tier |
 | --- | --- |
 | `project` | Automatic. Agents run it. Writes an `observed` lesson record and an audit entry. |
-| `hub` (default) | Consented. Runs only while a `hub-publish` consent for the scope is valid; otherwise fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". The lesson waits in the [held queue](/docs/guides/organization-hub/#held-items) for the consent's hold time, then `hub sync` or the `learning-send` job sends it. |
-| `general`, `hub+general` | Refused with `DEVTWIN_GATE_REQUIRED`. These lessons wait for the weekly review, which arrives in a later phase. |
+| `repo` | Automatic for the branch. Writes a learning branch `devtwin/learning-<id>` in the project's repository, which must be in the `repoLearnings` class. It never touches the working copy. Under a valid `repo-push` consent, the push waits in the held queue; without one, the result says `needs-consent` and the branch stays local. See [Write a lesson to the repository](/docs/guides/organization-hub/#write-a-lesson-to-the-repository). |
+| `hub` | Consented. Runs only while a `hub-publish` consent for the scope is valid; otherwise fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". The lesson waits in the [held queue](/docs/guides/organization-hub/#held-items) for the consent's hold time, then `hub sync` or the `learning-send` job sends it. |
+| `general` | Refused with `DEVTWIN_GATE_REQUIRED`, alone or in a set. These lessons wait for the weekly review, which arrives in a later phase. `hub+general` is the older spelling of `general,hub`. |
 
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
 | `--id <prop_id>` | Required. |
-| `--target <target>` | `hub` (default), `hub+general`, `project` or `general`. See [Review proposals](/docs/guides/lessons-and-hooks/#review-proposals). |
-| `--scope <id>`, `--project <id>` | The project for a `project` target when the proposal names none. |
+| `--target <targets>` | Required. `project`, `general`, `hub` or `repo`, or a set such as `project,repo`. See [Review proposals](/docs/guides/lessons-and-hooks/#review-proposals). |
+| `--scope <id>`, `--project <id>` | The project for a `project` or `repo` target when the proposal names none. |
 | `--session <id>` | Optional. The session ID from the hook, kept in the audit entry. |
 | `--apply --plan-fingerprint <fp>` | Write. |
 
@@ -938,7 +952,7 @@ See the [tier table](/docs/security/security-model/#tiers).
 | `--pilot <file>` | Required. |
 | `--kind <kind>` | Required. `hub-publish` or `repo-push`. |
 | `--scope <id>` | For `hub-publish`. A scope that joined a hub. |
-| `--repo <path>` | For `repo-push`. A bound repository. No command uses this consent yet. |
+| `--repo <path>` | For `repo-push`. A bound repository. The grant records its push URL; learning branches are pushed there only. |
 | `--hold-hours <n>` | How long each item waits in the held queue, from 1 to 168. Default 24. |
 | `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |
 
@@ -947,6 +961,18 @@ node "$KIT/bin/devtwin.mjs" consent grant --pilot "$LIVE_CONFIG" --kind hub-publ
 ```
 
 A change to the consent rules in a later kit makes the stored consent void. Grant it again to review the new rules.
+
+A `repo-push` consent also covers the project's learnings folder and base. `project set` voids it.
+
+### `learning send`
+
+Queues the push of a learning branch written before the repository had a `repo-push` consent. Consented: it runs only while the consent is valid, and the push still waits the hold time. A grant does not queue earlier branches; `activity` lists them as waiting.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Required. |
+| `--branch <name>` | Required. `devtwin/learning-<id>`. |
+| `--apply --plan-fingerprint <fp>` | Write. |
 
 ### `consent revoke`
 
@@ -958,7 +984,7 @@ Lists each consent with its target, hold time, grant time and whether it is vali
 
 ### `activity`
 
-Lists what devtwin learned in the last seven days: each automatic write with its entry ID, time, route, target, record IDs, caller and whether it landed. A hub accept also shows its `state`: `held`, `sent`, `outbox`, `dropped` or `cancelled`. It also lists the held items and warnings, such as no approved backup folder. Read-only.
+Lists what devtwin learned in the last seven days: each automatic write with its entry ID, time, route, target, record IDs, caller and whether it landed. A hub accept also shows its `state`: `held`, `sent`, `outbox`, `dropped` or `cancelled`. A learning branch shows `local` until it is queued. It also lists the held items, the learning branches that wait for a consent, and warnings, such as no approved backup folder. Read-only.
 
 | Flag | |
 | --- | --- |
@@ -982,7 +1008,7 @@ Reverses automatic writes from the audit log. A record gets a retraction, so the
 node "$KIT/bin/devtwin.mjs" undo --pilot "$LIVE_CONFIG" --id aud_0123456789abcdef01234567
 ```
 
-**Owner** with `--apply`: every undo shows the owner dialog. Each undo adds its own audit entry. An undo of an undo fails with `DEVTWIN_CONFLICT`. An undo that stopped between its retraction and its restores resumes on the next run. An undo of a hub accept cancels the lesson while it is held or waits in the outbox. A lesson already on the hub fails with `DEVTWIN_GATE_REQUIRED` and points to `published delete`.
+**Owner** with `--apply`: every undo shows the owner dialog. Each undo adds its own audit entry. An undo of an undo fails with `DEVTWIN_CONFLICT`. An undo that stopped between its retraction and its restores resumes on the next run. An undo of a hub accept cancels the lesson while it is held or waits in the outbox. A lesson already on the hub fails with `DEVTWIN_GATE_REQUIRED` and points to `published delete`. An undo of a learning branch adds a revert commit to the branch. A pushed branch gets the revert pushed after the hold. Once the lesson is in the learnings base, or the remote branch is gone, it fails with `DEVTWIN_GATE_REQUIRED` and names the `git revert` to run by hand.
 
 ## Backups
 

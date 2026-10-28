@@ -72,14 +72,14 @@ devtwin lesson reject --pilot "$PILOT" --id prop_0123456789abcdef01234567
 
 `lesson proposals` lists pending proposals; `--all` lists every state. `lesson edit`, `lesson reject` and `lesson accept` preview first, then apply with `--apply --plan-fingerprint <fp>`.
 
-`lesson accept` shows no owner dialog. `--target` selects where the lesson goes, and the [tier](/docs/security/security-model/#tiers) of the target decides who may run the apply:
+`lesson accept` shows no owner dialog. `--target` selects where the lesson goes, and the [tier](/docs/security/security-model/#tiers) of each target decides who may run the apply. It takes one target or a set joined by commas, such as `project,repo`. If any target is refused, the whole accept writes nothing.
 
 | Target | Writes | Tier |
 | --- | --- | --- |
 | `project` | An `observed` lesson record in the proposal's project, or in `--project` | Automatic: an agent runs it with no prompt |
-| `hub` (default) | One file in the scope's hub | Consented: needs a valid `hub-publish` consent for the scope |
+| `hub` | One file in the scope's hub | Consented: needs a valid `hub-publish` consent for the scope |
+| `repo` | A learning branch in the project's repository; see [Write a lesson to the repository](/docs/guides/organization-hub/#write-a-lesson-to-the-repository) | Automatic for the branch. The push needs a valid `repo-push` consent |
 | `general` | Nothing yet: refused with `DEVTWIN_GATE_REQUIRED` | Waits for the weekly review |
-| `hub+general` | Nothing yet: refused with `DEVTWIN_GATE_REQUIRED` | Waits for the weekly review |
 
 - **Project lessons are automatic.** The bundled skill accepts its own proposals for the current project. The record names the agent in `recordedBy`, and the write adds an entry to the audit log. You see it in `activity` and the weekly notification, and you reverse it with `undo --id` after the owner dialog.
 - **Hub lessons need a consent.** Without a valid `hub-publish` consent, the accept fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". You grant it once with `consent grant`; see [Organization hub](/docs/guides/organization-hub/#publish-a-lesson).

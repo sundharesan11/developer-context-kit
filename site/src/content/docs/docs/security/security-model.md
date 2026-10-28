@@ -51,14 +51,14 @@ One table in the kit (`src/policy/tiers.mjs`) gives each CLI route a tier. A tes
 
 | Tier | Who runs it | Examples |
 | --- | --- | --- |
-| Automatic | Agents and jobs, with no prompt | `record add` and `record supersede` of `observed` or `proposed` knowledge, `lesson accept --target project`, `handoff write`, `handoff export`, `project onboard`, `backup create` |
-| Consented | Agents and jobs, while a standing consent for the target is valid | `lesson accept --target hub` |
-| Always ask | You only, after the owner dialog | `consent grant`, `consent revoke`, `pref accept`, `lesson copy`, `hub join`, `instructions apply`, every `undo`, a `confirmed` or `disputed` record or one that replaces a `confirmed` or `disputed` record, and the other owner actions |
+| Automatic | Agents and jobs, with no prompt | `record add` and `record supersede` of `observed` or `proposed` knowledge, `lesson accept --target project`, `lesson accept --target repo` (the local branch), `handoff write`, `handoff export`, `project onboard`, `backup create` |
+| Consented | Agents and jobs, while a standing consent for the target is valid | `lesson accept --target hub`, the push of a learning branch, `learning send` |
+| Always ask | You only, after the owner dialog | `consent grant`, `consent revoke`, `project set`, `pref accept`, `lesson copy`, `hub join`, `instructions apply`, every `undo`, a `confirmed` or `disputed` record or one that replaces a `confirmed` or `disputed` record, and the other owner actions |
 
 - **Review after the write.** Automatic writes land with no prompt. Each knowledge write adds an entry to the [audit log](/docs/concepts/where-data-lives/#activity-consents-and-backups). `activity` lists them, and `undo` reverses one after you approve the owner dialog. A `--session` that a caller passes cannot be proven, so it grants nothing. A lesson accepted to a hub can be cancelled with `undo` while it is held. Once it is on the hub, it is removed with `published delete`.
-- **Consents.** `consent grant --kind hub-publish --scope <scope>` lets agents send lessons to that scope's hub after a hold. `--kind repo-push --repo <path>` names a bound repository; no command uses it yet. A consent stores its target, a hold time of 1 to 168 hours (24 by default), the grant time and the digest of its rules. A change to the rules voids it. Without a valid consent, a consented action fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". `consent revoke` also cancels the target's held items.
+- **Consents.** `consent grant --kind hub-publish --scope <scope>` lets agents send lessons to that scope's hub after a hold. `--kind repo-push --repo <path>` lets agents push learning branches to that repository after a hold. It records the repository's push URL, and its rules include the project's learnings folder and base, so `project set` voids it. A consent stores its target, a hold time of 1 to 168 hours (24 by default), the grant time and the digest of its rules. A change to the rules voids it. Without a valid consent, a consented action fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". `consent revoke` also cancels the target's held items.
 - **Held queue.** A consented lesson waits in the held queue for the hold time. One notification names it at once, and `activity --held` shows its full text. Before it is sent, the credential check and the scope-name check run again; an item that fails is dropped and reported. A consent granted before the held queue existed is void; grant it again.
-- **Lessons for every organization.** `lesson accept --target general` and `--target hub+general` fail with `DEVTWIN_GATE_REQUIRED`. A lesson in your personal store reaches every organization, so it waits for the weekly review, which arrives in a later phase.
+- **Lessons for every organization.** `lesson accept --target general` fails with `DEVTWIN_GATE_REQUIRED`, alone or in a set such as `general,repo`. Any refused target fails the whole accept before it writes anything. A lesson in your personal store reaches every organization, so it waits for the weekly review, which arrives in a later phase.
 - **Session cap.** An agent session makes at most 20 automatic knowledge writes. The 21st fails with `DEVTWIN_GATE_REQUIRED`. Writes with no `--session` count in one bucket per caller and UTC day, with the same cap. Each caller also makes at most 100 automatic writes per UTC day across all sessions, so a new `--session` does not lift the cap.
 - **Plain text only.** Automatic lesson and record text passes the checks that preferences use, plus the credential and scope-name checks. A title or summary with Markdown structure, an `@` import, a devtwin marker or text that tells the reader to ignore other instructions is refused.
 - **Caller label.** A record that a CLI write makes names its caller in `recordedBy`: `claude` when `CLAUDECODE` is set, `codex` when a `CODEX_` variable is set, and `human` otherwise. This is a label for the audit trail, not a gate: any process can unset those variables. A `confirmed` record needs a reviewer, and a `confirmed` or `disputed` write shows the owner dialog whoever runs it. Only `undo` writes a retraction.
@@ -111,6 +111,15 @@ The full contract is in the [Organization hub](/docs/guides/organization-hub/) g
 - **Outbound checks.** Every lesson and note passes the credential check and the check against the names of every scope before it is queued, and again when it is pushed. devtwin never force-pushes.
 - **Standing consents.** "Working on" notes leave your machine with no per-item yes, under the consent you gave at `hub join`. Only the hook's edit path posts one. The line is built from the branch name and folder areas only. Lessons reach the hub with no dialog only under a `hub-publish` consent that you granted for the scope, and only after the hold.
 
+## Learning branches
+
+The full contract is in [Write a lesson to the repository](/docs/guides/organization-hub/#write-a-lesson-to-the-repository).
+
+- **Plumbing only.** devtwin writes Git objects and one new `devtwin/learning-<id>` branch with `hash-object --no-filters`, `mktree`, `commit-tree` and `update-ref`. Hooks, fsmonitor and global config stay off. Nothing reads your working tree, so a filter driver in the repository's config never runs. Your working copy, index, HEAD and current branch never change.
+- **One ref.** devtwin creates only its own learning branch, and only when it does not exist. The one later move is an undo, which adds a revert commit to that branch by fast-forward.
+- **Approved repositories.** The repository must be in the `repoLearnings` write class, and the commit uses the identity that `hub join` recorded for the scope. A repository that requires signed commits is refused.
+- **Pinned push.** The push goes to the URL the `repo-push` consent recorded, named in the command. Per-command config maps that URL to itself for `insteadOf` and `pushInsteadOf` and allows only SSH. A changed push URL in the repository stops the push. devtwin never force-pushes. For an HTTPS remote it pushes nothing and prints the command for you.
+
 ## Live-mode write classes
 
 The approved [write classes](/docs/reference/configuration/#write-classes) are the only writes outside the store and the skill folders. They widen the fence by exact paths only, and they are covered by the approved config digest. In an agent settings file, devtwin changes only its own entries, and backs up the exact prior bytes first.
@@ -124,6 +133,7 @@ Most commands make no network request. The exceptions are explicit:
 | `skill-sources check`, `preview`, `stage` | `api.github.com` (unauthenticated) | Repository, release, tag, commit and selected-file requests |
 | `stack check`, `stack digest` (preview), the `radar-weekly` and `advisory-hourly` jobs | Only hosts in your stored approval | Feed URLs and identifiers; exact versions to OSV only when advisories are enabled |
 | `hub join`, `hub sync`, `lesson accept --target hub`, `lesson copy`, `lesson supersede-propose --apply`, `published delete` | Your hub remote, over SSH | Accepted lessons, your "working on" notes and your tombstones |
+| The `learning-send` job, `undo` of a pushed learning branch | The push URL your `repo-push` consent recorded, over SSH | Learning branches and their revert commits |
 
 Hosts still see your IP address and the request time. The stack watch never follows redirects, refuses hosts that resolve to private or reserved addresses, and caps request count, size and time. Fetched text is rendered as inert, fenced text. No environment variable or record is read for a token.
 

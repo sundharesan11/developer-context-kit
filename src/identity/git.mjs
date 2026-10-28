@@ -4,13 +4,14 @@ import { resolve, isAbsolute } from "node:path";
 import { DevtwinError } from "../errors.mjs";
 export const GIT_LIMITS = Object.freeze({ timeoutMs: 30_000, maxBuffer: 16 << 20, maxRemotes: 16, maxUrlBytes: 2048 });
 // sshCommand is the one variable a caller may add: the hub's own SSH command (KTD18). Git runs it through a shell.
-export function git(cwd, args, { timeoutMs = GIT_LIMITS.timeoutMs, sshCommand } = {}) {
+// input is text for Git's standard input (U30: hash-object --stdin and mktree).
+export function git(cwd, args, { timeoutMs = GIT_LIMITS.timeoutMs, sshCommand, input } = {}) {
   if (!Array.isArray(args)) throw new DevtwinError("INVALID_INPUT", "Git arguments must be an array");
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
   env.LC_ALL = "C"; env.GIT_TERMINAL_PROMPT = "0"; env.GIT_OPTIONAL_LOCKS = "0";
   env.GIT_CONFIG_GLOBAL = "/dev/null"; env.GIT_CONFIG_NOSYSTEM = "1";
   if (sshCommand !== undefined) env.GIT_SSH_COMMAND = sshCommand;
-  const r = spawnSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "core.untrackedCache=false", "-C", cwd, ...args], { env, encoding: "utf8", maxBuffer: GIT_LIMITS.maxBuffer, timeout: timeoutMs, killSignal: "SIGKILL" });
+  const r = spawnSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "core.untrackedCache=false", "-C", cwd, ...args], { env, encoding: "utf8", ...(input === undefined ? {} : { input }), maxBuffer: GIT_LIMITS.maxBuffer, timeout: timeoutMs, killSignal: "SIGKILL" });
   if (r.error?.code === "ENOENT") throw new DevtwinError("GIT_UNAVAILABLE", "Git unavailable");
   if (r.error?.code === "ETIMEDOUT") throw new DevtwinError("GIT_QUERY_FAILED", "Git query timed out", { command: args[0], reason: "timeout" });
   if (r.error?.code === "ENOBUFS") throw new DevtwinError("LIMIT", "Git output too large", { command: args[0] });

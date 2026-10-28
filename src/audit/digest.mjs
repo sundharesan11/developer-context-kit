@@ -32,9 +32,12 @@ export async function activity(roots, { since, held = false } = {}, { now = () =
   const { entries, warnings } = await readAudit(roots);
   const done = undoneMap(roots, entries);
   const recent = entries.filter((e) => Date.parse(e.at) >= from), states = outboundStates(entries);
-  // U41: an outbound entry (hub-lesson) carries its state: held until a held-state entry moves it on.
+  // U41: an outbound entry (hub-lesson) carries its state: held until a held-state entry moves it on. U30: a learning
+  // branch (repo-learning) is "local" until it is queued, then held, then sent, dropped or cancelled.
+  const heldAudits = new Set((await (await import("../held/queue.mjs")).listHeld(roots)).map((item) => item.audit));
+  const stateOf = (e) => states.get(e.id) ?? (e.kind === "repo-learning" && !heldAudits.has(e.id) ? "local" : "held");
   const learned = recent.filter((e) => e.kind !== "undo" && e.kind !== "held-state").map((e) => ({ id: e.id, at: e.at, kind: e.kind, tier: e.tier, route: e.route, target: e.target, scope: e.scope, project: e.project,
-    recordIds: e.recordIds, ...(e.kind === "hub-lesson" ? { itemIds: e.itemIds, state: states.get(e.id) ?? "held" } : {}), actor: e.actor, session: e.session, landed: landed(roots, e), undoneBy: done.get(e.id)?.id ?? null }));
+    recordIds: e.recordIds, ...(e.kind === "hub-lesson" || e.kind === "repo-learning" ? { itemIds: e.itemIds, state: stateOf(e) } : {}), actor: e.actor, session: e.session, landed: landed(roots, e), undoneBy: done.get(e.id)?.id ?? null }));
   const undos = recent.filter((e) => e.kind === "undo").map((e) => ({ id: e.id, at: e.at, undoes: e.undoes, tier: e.tier, recordIds: e.recordIds, actor: e.actor, session: e.session, landed: landed(roots, e) }));
   const heldItems = await collect(roots, "held", { sinceMs: from, full: held }), waiting = await collect(roots, "waiting", { sinceMs: from, full: false });
   warnings.push(...await collect(roots, "warnings", { sinceMs: from, full: false }));
@@ -48,6 +51,8 @@ export const weeklyMessage = (counts) => "This week devtwin learned " + counts.l
 // U41 (R5): the held queue. --held adds each item's full text, which is what leaves the machine.
 registerActivitySource("held", async (roots, { full }) => (await import("../held/queue.mjs")).listHeld(roots).then((items) => items.map((item) => ({ id: item.id, target: item.target, kind: item.kind,
   title: item.title, audit: item.audit, createdAt: item.createdAt, sendAfter: item.sendAfter, ...(full ? { text: item.payload.content } : {}) }))));
+// U30 (KTD39): learning branches written without a repo-push consent wait for it ("needs consent").
+registerActivitySource("waiting", async (roots) => (await import("../learnings/push.mjs")).waitingBranches(roots));
 // U24 (KTD33): no approved backup folder, and a key not yet exported, each add a warning. Loaded on use, so the digest
 // does not load the backup code until it runs.
 registerActivitySource("warnings", async (roots) => (await import("../backup/commands.mjs")).backupWarnings(roots));

@@ -33,7 +33,9 @@ export const OWNER_ACTIONS = Object.freeze([
   // U24 (KTD33): printing the backup key. Its preview stays open.
   { words: ["backup", "key", "export"], apply: true }, { words: ["backup", "restore"], apply: true },
   // U27 (KTD35): recording the confirmed kit and config paths. U26 (KTD34): the owner-answer mode.
-  { words: ["paths", "confirm"], apply: true }, { words: ["live", "approval"], apply: true }
+  { words: ["paths", "confirm"], apply: true }, { words: ["live", "approval"], apply: true },
+  // U30 (KTD29): where a project's lessons go in its repository; a change voids the repository's consent.
+  { words: ["project", "set"], apply: true }
 ].map((action) => Object.freeze({ ...action, words: Object.freeze(action.words) })));
 // U9: setup steps whose apply runs an owner action above (src/setup/steps.mjs marks them owner: true). "setup apply"
 // naming one of them is denied, and so is the "setup" terminal loop, which can apply them. setup status, setup plan

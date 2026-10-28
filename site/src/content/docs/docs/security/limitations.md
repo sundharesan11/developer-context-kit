@@ -56,7 +56,7 @@ See the [security model](/docs/security/security-model/).
 - **One lost item.** A publish that stops between its commit and its outbox write can lose that one item.
 - **The hold is a delay, not a review.** A held lesson that nobody cancels leaves after its hold. It leaves only when `hub sync` or the `learning-send` job runs, so a machine that sleeps sends late. A lesson whose consent became void stays held until you grant the consent again or cancel it.
 - **macOS only for owner actions and the jobs.** The owner dialog needs a macOS desktop session, so owner actions deny over SSH unless you opt in with `live approval --mode dialog-or-tty`. The hub sync, activity, backup and send jobs are macOS LaunchAgents.
-- **Isolation checks match whole names.** A bare project short name without its scope prefix is not matched. Lessons for every organization (`general` and `hub+general`) wait for the weekly review, which arrives in a later phase, so `lesson accept` refuses those targets today.
+- **Isolation checks match whole names.** A bare project short name without its scope prefix is not matched. Lessons for every organization (the `general` target) wait for the weekly review, which arrives in a later phase, so `lesson accept` refuses those targets today.
 
 ## Onboarding and briefs
 
