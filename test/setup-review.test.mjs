@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { join, basename } from "node:path";
 import { realpathSync } from "node:fs";
-import { mkdir, writeFile, rm, chmod, readFile } from "node:fs/promises";
+import { mkdir, writeFile, rm, readFile } from "node:fs/promises";
 import { makePilot, makeRepo, fixtureGit, treeSnapshot, now } from "./helpers.mjs";
 import { main } from "../src/cli.mjs";
 import { applyInit, applyScopeAdd } from "../src/config/store.mjs";
@@ -327,19 +327,19 @@ async function learnAs(m, session, title, match, summary = "Do check this first.
   const proposal = await m.ok(["lesson", "propose", "--session", session, "--scope", SCOPE, "--project", PROJECT, "--title", title, "--summary", summary, "--body", "It broke before.\n", ...match, "--apply"], { env: AGENT });
   return (await m.applied(["lesson", "accept", "--id", proposal.proposalId, "--target", "project", "--session", session], { env: AGENT })).project.recordId;
 }
-test("an imported memory file the import now skips is reported as skipped, not removed", { skip: process.getuid?.() === 0 && "root reads any file" }, async (t) => {
+test("an imported memory file the import now skips is reported as skipped, not removed", async (t) => {
   const m = await machine(t);
   await m.memoryFile("queue.md", memory({ name: "queue", type: "project", description: "Queue", body: "The staging queue drains every hour." }));
   await m.memoryFile("ports.md", memory({ name: "ports", type: "project", description: "Ports", body: "The API listens on port 8080 in development." }));
   assert.equal((await m.ok(["import", "run"])).written.length, 2);
   const locked = join(m.memoryDir, "memory", "ports.md");
-  await chmod(locked, 0o000);
-  t.after(() => chmod(locked, 0o600).catch(() => {}));
+  // Bytes that are not UTF-8 make the import skip a file that still exists, for any user (root reads a 0000 file).
+  await writeFile(locked, Buffer.from([0xff, 0xfe, 0xfd]));
   const plan = await m.plan();
   assert.deepEqual(ofKind(plan, "promoted-source-removed"), []);
   const [skipped] = ofKind(plan, "promoted-source-skipped");
   assert.equal(skipped.evidence.source, "memory:" + PROJECT + "/ports.md");
-  assert.equal(skipped.evidence.reason, "unreadable");
+  assert.equal(skipped.evidence.reason, "not-utf8");
   assert.equal(skipped.change.informational, true);
   // Once the file is truly gone, the line is promoted-source-removed with the undo change.
   await rm(locked);
