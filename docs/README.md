@@ -54,6 +54,6 @@ Plans describe their milestone, not proof that every planned feature shipped. Us
 - [Personal harness template](plans/2026-10-16-001-feat-personal-harness-template-plan.md)
 - [Organization identity routing](plans/2026-10-17-001-feat-organization-identity-routing-plan.md): planned, not implemented.
 - [devtwin next phase](plans/2026-10-25-001-feat-devtwin-next-phase-plan.md): lessons, hooks, setup, hubs, preferences, release radar and onboarding. Phases P0 to P5 are implemented. Its P6 moved to P9 of the promotion-phase plan.
-- [Promotion phase](plans/2026-10-27-001-feat-devtwin-promotion-phase-plan.md): tiers, consents, audit and undo, backups, delivery, promotion and the setup review. P6 is implemented; P7 to P9 remain.
+- [Promotion phase](plans/2026-10-27-001-feat-devtwin-promotion-phase-plan.md): tiers, consents, audit and undo, backups, delivery, promotion and the setup review. P6 to P9 are implemented. The real-agent scenarios and the colleague check wait for the owner.
 - [Skill-collection research](research/skill-collections.md): dated upstream observations, not a live compatibility guarantee.
 - Personal harness research: [context and memory](research/personal-harness/context-and-memory.md), [harness templates](research/personal-harness/harness-templates.md) and [starter skills](research/personal-harness/starter-skills.md).
