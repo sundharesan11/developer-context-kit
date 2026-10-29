@@ -12,6 +12,10 @@ export const COMMANDS = {
   help: { rootFree: true, load: async () => ({ options: {}, run: () => ({ commands: listCommands() }) }) },
   // U42: the offline demo, in a fresh pilot root of its own; it never reads or writes a real pilot.
   demo: { rootFree: true, rootOptions: false, interactive: true, load: async () => (await import("./demo/run.mjs")).demoCommand },
+  // U44: a pinned copy of the running package under <home>/.devtwin/kits, and the list of those copies. Neither reads
+  // a pilot; kit list reads a live config only to mark the pinned kit.
+  "kit install": { rootFree: true, rootOptions: false, load: async () => (await import("./kit/commands.mjs")).kitInstallCommand },
+  "kit list": { rootFree: true, rootOptions: false, load: async () => (await import("./kit/commands.mjs")).kitListCommand },
   "skill-sources catalog": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/commands.mjs")).catalogCommand },
   "skill-sources check": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/commands.mjs")).checkCommand },
   "skill-sources preview": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/acquisition-commands.mjs")).previewCommand },
