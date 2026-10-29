@@ -13,13 +13,13 @@ Repository instruction files are shared with everyone who can read the repositor
 
 ## Does it send my code or context anywhere?
 
-No. devtwin has no hosted service, and most commands make no network request at all. The exceptions are commands and jobs you turn on yourself. `stack check`, `stack digest` and the radar jobs contact only the hosts you approved. `skill-sources check`, `preview` and `stage` read public GitHub data. If you join an [organization hub](/docs/guides/organization-hub/), `hub sync` and the hub sync job talk to your organization's own Git remote over SSH. See [Network use](/docs/security/security-model/#network-use).
+No. devtwin has no hosted service, and most commands make no network request at all. The exceptions are commands and jobs you turn on yourself. `stack check`, `stack digest` and the radar jobs contact only the hosts you approved. `skill-sources check`, `preview` and `stage` read public GitHub data. If you join an [organization hub](/docs/guides/organization-hub/), `hub sync` and the hub sync job talk to your organization's own Git remote over SSH. Under a `repo-push` consent, a learning branch is pushed to that repository's remote after the hold. See [Network use](/docs/security/security-model/#network-use).
 
 Your agent is a different matter: whatever you paste into a session, including a brief, may go to that agent's model provider.
 
 ## Does it write to my repository?
 
-Never. Onboarding reads a few files and stores what it learns in your private store. The onboarding preview shows `"repoWrites": []` to prove it.
+Not to your working copy, index or current branch. Onboarding reads a few files and stores what it learns in your private store. The onboarding preview shows `"repoWrites": []` to prove it. The one write is a lesson you send to the repository: devtwin commits it on a new `devtwin/learning-<id>` branch and pushes it only under your `repo-push` consent. It never opens a pull request.
 
 ## Which agents does it work with?
 
@@ -39,7 +39,7 @@ macOS is the reference platform. The test suite also runs on Linux, but Linux is
 
 ## Does it remember things automatically?
 
-Partly. No record is written unless you, or an agent through a bundled skill, run a record or lesson command. An agent can save a lesson for the current project on its own, with no prompt. You review those writes afterwards with `activity` and the weekly notification, and reverse one with `undo`. A brief reaches a session only when you or a skill fetch it. With the [agent hook](/docs/guides/lessons-and-hooks/) installed, matching lesson lines arrive on their own while the agent works.
+Yes, for project knowledge. Agents save project lessons, constraints, facts, locations and handoffs on their own, with no prompt. A daily job imports new Claude memory and `docs/solutions` items as unreviewed project records; devtwin never writes memory. You review those writes afterwards with `activity` and the weekly notification, and reverse one with `undo`. Global preferences and lessons for every project wait for your weekly `activity review`. With the [agent hook](/docs/guides/lessons-and-hooks/) installed, each session starts with a short project summary, and matching lesson lines arrive while the agent works.
 
 ## Why does every command need `--pilot`?
 
@@ -55,11 +55,11 @@ You don't edit records in place. Write a successor with `record supersede`; the 
 
 ## Can my team share context?
 
-Not through a shared store: devtwin keeps one private store per machine, with no sync. Your team can share **lessons** through an [organization hub](/docs/guides/organization-hub/), a Git repository your organization owns. To pass project context on, export selected records as a [handoff packet](/docs/concepts/handoffs/) that anyone can read without devtwin. Team conventions belong in the repository's own instruction files.
+Not through a shared store: devtwin keeps one private store per machine, with no sync. Your team can share **lessons** through an [organization hub](/docs/guides/organization-hub/), a Git repository your organization owns, or as learning branches in the project repository. To pass project context on, export selected records as a [handoff packet](/docs/concepts/handoffs/) that anyone can read without devtwin. Team conventions belong in the repository's own instruction files.
 
 ## Do my lessons leave my machine?
 
-Only under a consent you gave. Proposals and `project` lessons stay on your machine. A lesson goes to a hub in two ways. First, `lesson accept --target hub` publishes it with no dialog, but only while you hold a `hub-publish` consent for that scope. You grant that consent once with `consent grant` and end it with `consent revoke`. Second, `lesson copy` in your own terminal shows the dialog with the exact text. "Working on" notes post under the consent you give at `hub join`, and you can stop them with `note revoke`.
+Only under a consent you gave. Proposals and `project` lessons stay on your machine. A lesson goes to a hub in two ways. First, `lesson accept --target hub` sends it with no dialog, but only while you hold a `hub-publish` consent for that scope. The lesson waits in the held queue first, 24 hours by default: `activity --held` shows it and `undo` cancels it. You grant that consent once with `consent grant` and end it with `consent revoke`. Second, `lesson copy` in your own terminal shows the dialog with the exact text. "Working on" notes post under the consent you give at `hub join`, and you can stop them with `note revoke`. A lesson for the repository goes on a local `devtwin/learning-<id>` branch, which leaves the machine only under a `repo-push` consent.
 
 ## What do my colleagues see?
 

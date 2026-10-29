@@ -7,7 +7,7 @@ import CliReadout from './CliReadout.astro';
     <div class="intro reveal">
       <div class="kicker">The CLI</div>
       <h2 class="h2" id="cmds-title" data-words>A small, sharp CLI.</h2>
-      <p>Every change is previewed first and written only when you pass <code>--apply</code>. Every command answers in one line of JSON, and agents call the same commands through the bundled <code>devtwin-*</code> skills.</p>
+      <p>Agents write project knowledge on their own, and every write is audited and undoable. Anything that reaches every session or leaves your machine waits for you. Every command answers in one line of JSON, and agents call the same commands through the bundled <code>devtwin-*</code> skills.</p>
     </div>
     <CliReadout />
     <div class="cmds reveal">
@@ -15,17 +15,21 @@ import CliReadout from './CliReadout.astro';
       <div class="cmdc"><code><span>›</span> context brief</code><p>The bounded brief for this project.</p></div>
       <div class="cmdc"><code><span>›</span> context resolve</code><p>Which scope, project and identity apply here.</p></div>
       <div class="cmdc"><code><span>›</span> record add</code><p>Capture a decision, fact or constraint.</p></div>
-      <div class="cmdc"><code><span>›</span> record propose</code><p>Suggest a record for review.</p></div>
+      <div class="cmdc"><code><span>›</span> activity</code><p>What devtwin learned this week, and what waits for you.</p></div>
       <div class="cmdc"><code><span>›</span> record supersede</code><p>Replace a record, keep the history.</p></div>
       <div class="cmdc"><code><span>›</span> lesson match</code><p>Lessons for the files in hand.</p></div>
-      <div class="cmdc"><code><span>›</span> lesson accept</code><p>Approve an agent's lesson, for you or your team.</p></div>
+      <div class="cmdc"><code><span>›</span> undo</code><p>Reverse an automatic write.</p></div>
+      <div class="cmdc"><code><span>›</span> lesson accept</code><p>Save a lesson for this project, every project or your team.</p></div>
       <div class="cmdc"><code><span>›</span> hub sync</code><p>Trade lessons and notes with your org's hub.</p></div>
+      <div class="cmdc"><code><span>›</span> handoff write</code><p>Leave the next step for the next session.</p></div>
       <div class="cmdc"><code><span>›</span> handoff export</code><p>Selected records as a Markdown packet.</p></div>
+      <div class="cmdc"><code><span>›</span> import run</code><p>Promote Claude memory and docs/solutions into records.</p></div>
       <div class="cmdc"><code><span>›</span> agents install</code><p>Put the skills and hooks into Claude Code and Codex.</p></div>
       <div class="cmdc"><code><span>›</span> setup</code><p>A guided setup, one step at a time.</p></div>
       <div class="cmdc"><code><span>›</span> profile apply</code><p>Set up your private personal profile.</p></div>
       <div class="cmdc"><code><span>›</span> skill template-seed</code><p>Turn a template into your own skill.</p></div>
       <div class="cmdc"><code><span>›</span> stack digest</code><p>Your weekly radar: vendor news and new tools for your stack.</p></div>
+      <div class="cmdc"><code><span>›</span> backup create</code><p>An encrypted backup of your store.</p></div>
       <div class="cmdc"><code><span>›</span> doctor</code><p>Check setup, boundaries and permissions.</p></div>
     </div>
     <div class="section-more reveal"><a class="p-more" href={DOCS.cli}>Full CLI reference <span aria-hidden="true">→</span></a></div>

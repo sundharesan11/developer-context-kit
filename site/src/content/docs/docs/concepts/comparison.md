@@ -16,9 +16,9 @@ There are three common places to keep context for a coding agent. They solve dif
 | | Repository instruction files | Built-in agent memory | devtwin |
 | --- | --- | --- | --- |
 | **Where it lives** | In the repository, under version control | Wherever the product keeps it: its service or its own config folders | A private store on your disk, outside every repository and the kit |
-| **Who can see it** | Everyone with access to the repository | You, within that product | You. Others only get a [handoff packet](/docs/concepts/handoffs/) you choose to send |
-| **How it reaches a session** | The agent loads it automatically | The product loads it automatically | You or a bundled skill fetch a [brief](/docs/concepts/briefs/) explicitly |
-| **How it is written** | Edited by hand and reviewed like code | Often captured automatically by the product | Previewed and applied by you; agent writes are proposals you publish |
+| **Who can see it** | Everyone with access to the repository | You, within that product | You. Others only get a [handoff packet](/docs/concepts/handoffs/) you choose to send, or lessons you send to a hub or repository under your consent |
+| **How it reaches a session** | The agent loads it automatically | The product loads it automatically | The hook adds a short summary at session start and lesson lines as the agent works; a skill fetches the full [brief](/docs/concepts/briefs/) |
+| **How it is written** | Edited by hand and reviewed like code | Often captured automatically by the product | Agents and daily jobs write project knowledge, audited and undoable; anything global or outbound asks you |
 | **Evidence and freshness** | None built in; it says what it says | Depends on the product | Every record can cite sources, and briefs flag records whose source files changed |
 | **History** | Git history | Depends on the product | Records are immutable; replacing one keeps the old one on disk |
 | **Across agents** | Only agents that read that file name | Tied to one product | Claude Code and Codex through the same CLI |
@@ -41,7 +41,7 @@ Many agent products can remember things between sessions. That is convenient: th
 
 The trade-offs follow from the same design. The memory belongs to one product, so switching agents means starting again. What gets remembered, and why, is up to the product rather than a step you review. And if you work for several organizations, keeping their context apart depends on how that product separates it.
 
-devtwin takes the opposite approach: nothing is remembered unless you, or an agent you approve, record it, and every write is a preview you apply. The cost is that it is explicit. Someone has to run the CLI, and a brief reaches the session only when you or a skill fetch it.
+devtwin works with it. A daily job reads Claude memory and promotes new items into scoped, source-linked project records. It never writes memory: memory captures, devtwin promotes. Agents also write project knowledge on their own. Every write is audited, counted in a weekly notification and reversible with `undo`. Anything that reaches every session or leaves the machine still asks you.
 
 ## devtwin
 
@@ -52,7 +52,7 @@ devtwin is built for one developer carrying private knowledge across sessions, a
 - Scopes keep one client's context out of another client's brief.
 - The same brief works for Claude Code and Codex.
 
-What it does not do: it does not capture anything automatically, does not verify that a record is true, and does not back up or sync your store. See [Limitations](/docs/security/limitations/).
+What it does not do: it does not verify that a record is true, does not write agent memory, and does not sync your store between machines. The daily backup is an encrypted archive on your own disk. See [Limitations](/docs/security/limitations/).
 
 ## Using them together
 
@@ -60,6 +60,6 @@ A setup that works well:
 
 1. Keep team conventions in `AGENTS.md` or `CLAUDE.md`, in the repository.
 2. Keep your private decisions, open questions and handoff notes in devtwin.
-3. Let your agent's built-in memory handle personal habits inside that one tool, if you like it.
+3. Let Claude memory capture as you work. devtwin promotes it into project records each day.
 
-At the start of a session, the agent reads the repository's instructions as usual, and you give it the devtwin brief for the project. Repository instructions and you still have the final say.
+At the start of a session, the agent reads the repository's instructions as usual, and the devtwin hook adds the project summary. Repository instructions and you still have the final say.
