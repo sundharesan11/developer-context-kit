@@ -16,6 +16,12 @@ test("public alpha onboarding documents only implemented CLI routes", async () =
     assert.ok(count > 0, file + " has executable CLI examples");
   }
 });
+test("every CLI route appears in backticks in the site CLI reference", async () => {
+  const { COMMANDS } = await import("../src/cli.mjs");
+  const ref = await readFile(join(import.meta.dirname, "..", "site/src/content/docs/docs/reference/cli.md"), "utf8");
+  const named = (route) => ["`" + route + "`", "`" + route + " ", " " + route + "`"].some((form) => ref.includes(form));
+  assert.deepEqual(Object.keys(COMMANDS).filter((route) => !named(route)), [], "document new routes in reference/cli.md");
+});
 test("public alpha license metadata matches the canonical Apache text", async () => {
   const root = join(import.meta.dirname, "..");
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
