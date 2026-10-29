@@ -246,11 +246,15 @@ const jobHubSync = {
   undo: "hub schedule --scope <scope> --off, through preview and apply, removes the job. Then notes and lesson updates stop until you run hub sync by hand.",
   plan: async (ctx) => (await hubCmd()).hubScheduleCommand.run({ scope: ctx.values.scope }, ctx),
   apply: async (ctx, fingerprint) => (await hubCmd()).hubScheduleCommand.run({ scope: ctx.values.scope, apply: true, "plan-fingerprint": fingerprint }, ctx),
-  done: (ctx) => hubBindingSync(ctx)?.jobs?.hubSync?.enabled === true
+  // Upgrade fix: an enabled job whose plist differs from what hub schedule would write now (after live set-kit) is
+  // outdated, not done; the batch then rewrites it.
+  done: async (ctx) => hubBindingSync(ctx)?.jobs?.hubSync?.enabled === true && (await scheduleJobs()).hubJobFileState(ctx.roots, ctx, ctx.values.scope) === "current",
+  outdated: async (ctx) => hubBindingSync(ctx)?.jobs?.hubSync?.enabled === true && (await scheduleJobs()).hubJobFileState(ctx.roots, ctx, ctx.values.scope) !== "current"
 };
 
 // U20: the radar, advisory and review jobs, through schedule plan and schedule apply (owner steps, like hub sync).
 const scheduleCmd = () => import("../schedule/commands.mjs");
+const scheduleJobs = () => import("../schedule/jobs.mjs");
 const jobEnabled = (ctx, job) => { try { return JSON.parse(readFileSync(join(ctx.roots.stateRoot, "schedule", "jobs.json"), "utf8")).jobs?.[job]?.enabled === true; } catch { return false; } };
 const stackApproved = (ctx) => existsSync(join(ctx.roots.stateRoot, "stack", "approval.json"));
 // A job whose plist is not an approved launchAgents path is skipped with the command that approves it.
@@ -262,7 +266,11 @@ const jobStep = (id, job, title, what, why, skip) => ({
   undo: "schedule off --job " + job + ", through preview and apply, unloads the job and removes its plist." + (job === "radar-weekly" ? " It turns off the advisory job too." : ""),
   plan: async (ctx) => (await scheduleCmd()).schedulePlanCommand.run({ job }, ctx),
   apply: async (ctx, fingerprint) => (await scheduleCmd()).scheduleApplyCommand.run({ job, "plan-fingerprint": fingerprint }, ctx),
-  done: (ctx) => jobEnabled(ctx, job)
+  // Upgrade fix: an enabled job is done only while its plist holds what schedule apply would write now. After live
+  // set-kit the kit path differs, so the step is outdated and the batch rewrites the plist. A missing plist is outdated
+  // too; a plist that is a link or not the owner's file throws PATH_UNSAFE and the step reports that problem.
+  done: async (ctx) => jobEnabled(ctx, job) && (await scheduleJobs()).jobFileState(ctx.roots, ctx, job) === "current",
+  outdated: async (ctx) => jobEnabled(ctx, job) && (await scheduleJobs()).jobFileState(ctx.roots, ctx, job) !== "current"
 });
 const jobRadar = jobStep("job-radar", "radar-weekly", "Scheduled job: weekly radar",
   "Installs a user LaunchAgent, devtwin.radar-weekly.plist, that writes one digest for each scope once a week and shows a short notification. The plist path must be in the launchAgents write class. Runs schedule apply.",

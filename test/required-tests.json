@@ -821,5 +821,10 @@
   "setup batch dialog lines are single lines, and a path with a control character is refused",
   "setup batch: a step that fails in its own apply has no audit entry, and an error that is not a devtwin error keeps done and not run",
   "setup batch: a failure after the last step is reported in derived.error and keeps the steps done",
-  "setup batch with job-hub-sync and consent-hub shows one dialog and no step dialog"
+  "setup batch with job-hub-sync and consent-hub shows one dialog and no step dialog",
+  "setup batch after live set-kit lists every enabled job as a rewrite line and one approval rewrites their plists for the new kit",
+  "setup batch lists an enabled job whose plist is missing and does not read a plist through a link",
+  "an enabled job of every kind is outdated when its plist differs from what schedule apply writes now: kit, node or a missing file",
+  "the plist state read does not follow a link",
+  "an enabled hub sync job whose plist names an old kit is outdated, listed for a rewrite and written again in one batch"
 ]

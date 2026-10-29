@@ -9,7 +9,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DevtwinError } from "../errors.mjs";
 import { assertWritable } from "../config/pilot.mjs";
-import { editOwnedFile } from "../storage/owned-file.mjs";
+import { editOwnedFile, readOwnedText } from "../storage/owned-file.mjs";
 import { info } from "../storage/fsx.mjs";
 
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -39,6 +39,14 @@ export function renderPlist({ label, programArguments, interval }) {
     "</plist>",
     ""
   ].join("\n");
+}
+// Upgrade fix: an enabled job's plist against what renderPlist writes now. "current" when the bytes match, "outdated"
+// when they differ (after live set-kit the kit path in ProgramArguments, the Node path, the pilot path or the
+// interval changed), "missing" when the file is absent. The read never follows a link: a link or another unsafe file
+// throws PATH_UNSAFE (readOwnedText), so a caller reports it instead of rewriting through it.
+export function plistState(path, content) {
+  const text = readOwnedText(path);
+  return text === null ? "missing" : text === content ? "current" : "outdated";
 }
 // The Node a job runs. Homebrew's process.execPath names a versioned folder (<prefix>/Cellar/<formula>/<version>/bin/node)
 // that brew upgrade removes, which would break every job. When execPath is in such a folder, a job uses the stable link

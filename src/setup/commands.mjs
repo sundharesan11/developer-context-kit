@@ -27,7 +27,10 @@ export async function describe(step, ctx) {
   if (step.available === true && !skip) {
     try { done = await step.done(ctx); } catch (error) { problem = toJson(error); }
   }
-  return { id: step.id, title: step.title, available: step.available, owner: step.owner === true, what: step.what, why: step.why, undo: step.undo, done, ...(skip ? { skipped: skip } : {}), ...(problem ? { problem } : {}) };
+  // A job step whose job is on but whose plist is not what it would write now (after live set-kit) says outdated.
+  let outdated = false;
+  if (!done && !problem && !skip && step.outdated) { try { outdated = await step.outdated(ctx); } catch (error) { problem = toJson(error); } }
+  return { id: step.id, title: step.title, available: step.available, owner: step.owner === true, what: step.what, why: step.why, undo: step.undo, done, ...(outdated ? { status: "outdated" } : {}), ...(skip ? { skipped: skip } : {}), ...(problem ? { problem } : {}) };
 }
 // The consent screen for one step: its header and the preview of the command it wraps. A preview that cannot be built
 // (a missing input, a gate) is reported as problem, so the what, why and undo always show.
@@ -59,7 +62,11 @@ export const setupStatusCommand = { options: setupOptions, async run(values, ctx
   const c = stepContext(values, ctx), steps = [];
   for (const step of STEPS) steps.push(await describe(step, c));
   const next = steps.find((s) => s.available === true && !s.done && !s.skipped)?.id ?? null;
-  return { steps, next };
+  // Every enabled job whose plist is outdated, with or without a setup step (import-daily, activity-weekly and
+  // learning-send have none). setup apply --all-pending rewrites them all.
+  let outdated;
+  try { outdated = await (await import("../schedule/jobs.mjs")).outdatedJobs(c.roots, c); } catch (error) { outdated = { problem: toJson(error) }; }
+  return { steps, next, outdatedJobs: outdated };
 } };
 export const setupPlanCommand = { options: setupOptions, async run(values, ctx) {
   if (isBatch(values) && values.step === undefined) return { preview: true, ...(await (await batch()).buildBatch(values, stepContext(values, ctx))).plan };
