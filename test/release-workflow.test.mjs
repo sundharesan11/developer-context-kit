@@ -42,15 +42,22 @@ test("release workflow triggers only on pushed v* tags", () => {
   assert.doesNotMatch(text, /workflow_dispatch|pull_request|workflow_run|schedule:|branches:|repository_dispatch/);
 });
 
-test("release workflow grants id-token write only to the publish job, which needs the gate", () => {
+test("release workflow grants id-token write only to the publish job, and the release job only contents write", () => {
   const text = workflow(), all = jobs(text);
-  assert.deepEqual(Object.keys(all), ["gate", "publish"]);
+  assert.deepEqual(Object.keys(all), ["gate", "publish", "release"]);
   assert.equal(block(text, "permissions"), "permissions:\n  contents: read");
   assert.equal([...text.matchAll(/id-token(?=:)/g)].length, 1);
-  assert.match(all.publish, /\n {4}permissions:\n {6}contents: write\n {6}id-token: write\n/);
+  // The value ends at the quote, so the credential scan reads this line as a permission, not a value.
+  assert.match(all.publish, new RegExp("\\n {4}permissions:\\n {6}contents: read\\n {6}id-token: write" + "\\n"));
   assert.doesNotMatch(all.gate, /permissions:|id-token|environment:/);
   assert.match(all.publish, /\n {4}needs: gate\n/);
   assert.match(all.publish, /\n {4}environment: npm-release\n/);
+  // The draft release runs after the publish, in its own job with no OIDC token and no environment.
+  assert.match(all.release, /\n {4}needs: \[gate, publish\]\n/);
+  assert.match(all.release, /\n {4}runs-on: ubuntu-24\.04\n/);
+  assert.match(all.release, /\n {4}permissions:\n {6}contents: write\n(?! {6})/);
+  assert.doesNotMatch(all.release, /id-token|environment:/);
+  assert.doesNotMatch(all.publish, /contents: write|gh release/);
   assert.doesNotMatch(text, /write-all|secrets\.|pull_request_target|self-hosted|continue-on-error|NODE_AUTH_TOKEN|NPM_TOKEN/);
 });
 
@@ -68,7 +75,7 @@ test("release gate checks the tag, runs every gate on macOS for both Node versio
   assert.equal(block(workflow(), "defaults"), "defaults:\n  run:\n    shell: bash");
 });
 
-test("release publish job pins npm exactly, never writes the default dist-tag and drafts the GitHub release", () => {
+test("release publish job pins npm exactly, never writes the default dist-tag and hands on its dist-tag", () => {
   const text = workflow(), { publish } = jobs(text);
   assert.doesNotMatch(text, /latest/i);
   const pin = /NPM_VERSION: '([^']+)'/.exec(publish);
@@ -83,10 +90,18 @@ test("release publish job pins npm exactly, never writes the default dist-tag an
   assert.match(publish, /npm publish "\$TARBALL" --provenance --access public --tag "\$DIST_TAG"/);
   assert.match(publish, /\*-\*\) DIST_TAG=alpha ;;\n\s+\*\) DIST_TAG=next ;;/);
   assert.match(publish, /"\$DIGEST" != "\$GATE_DIGEST"/, "the published tarball has the gate's digest");
-  assert.match(publish, /gh release create "\$TAG" --repo "\$GITHUB_REPOSITORY" --draft --verify-tag/);
-  assert.ok(publish.includes("GH_TOKEN: ${{ github.token }}"));
-  assert.match(publish, /SOURCE_COMMIT: \$\{\{ github\.sha \}\}/);
-  assert.ok(publish.indexOf("npm publish") < publish.indexOf("gh release create"));
+  assert.match(publish, /\n {6}dist-tag: \$\{\{ steps\.pack\.outputs\.dist-tag \}\}\n/, "the publish job hands its dist-tag to the release job");
+});
+
+test("release job drafts the GitHub release once, and skips with a notice when the release exists", () => {
+  const { release } = jobs(workflow());
+  assert.match(release, /gh release create "\$TAG" --repo "\$GITHUB_REPOSITORY" --draft --verify-tag/);
+  assert.ok(release.includes("GH_TOKEN: ${{ github.token }}"));
+  assert.ok(release.includes("DIST_TAG: ${{ needs.publish.outputs.dist-tag }}"));
+  assert.match(release, /SOURCE_COMMIT: \$\{\{ github\.sha \}\}/);
+  assert.match(release, /if gh release view "\$TAG" --repo "\$GITHUB_REPOSITORY" >\/dev\/null 2>&1; then\n\s+echo "::notice::/);
+  assert.ok(release.indexOf("gh release view") < release.indexOf("gh release create"));
+  assert.equal([...release.matchAll(/uses:/g)].length, 0, "the release job checks out nothing");
 });
 
 test("release workflow pins every action by full commit SHA and keeps credentials out of the checkout", () => {

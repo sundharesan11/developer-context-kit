@@ -2,7 +2,7 @@ name: Release
 
 # Publishes devtwin to npm with trusted publishing and provenance. Only a v* tag that the owner pushes starts it. The
 # publish job waits for the owner's approval in the npm-release environment. It writes the alpha or next dist-tag only;
-# the owner moves the default dist-tag by hand. See docs/RELEASING.md.
+# the owner moves the default dist-tag by hand. The release job then drafts the GitHub release. See docs/RELEASING.md.
 on:
   push:
     tags:
@@ -88,8 +88,10 @@ jobs:
     timeout-minutes: 15
     environment: npm-release
     permissions:
-      contents: write
+      contents: read
       id-token: write
+    outputs:
+      dist-tag: ${{ steps.pack.outputs.dist-tag }}
     steps:
       - name: Check out the tagged revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -142,6 +144,17 @@ jobs:
           TARBALL: ${{ steps.pack.outputs.tarball }}
           DIST_TAG: ${{ steps.pack.outputs.dist-tag }}
         run: npm publish "$TARBALL" --provenance --access public --tag "$DIST_TAG"
+
+  release:
+    name: Draft the GitHub release
+    # A separate job, so the OIDC token never shares a job with a write token. Run it again alone if it fails after
+    # the publish passed.
+    needs: [gate, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
       - name: Create a draft GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -150,8 +163,12 @@ jobs:
           DIGEST: ${{ needs.gate.outputs.digest }}
           KIT_ID: ${{ needs.gate.outputs.kit-id }}
           SOURCE_COMMIT: ${{ github.sha }}
-          DIST_TAG: ${{ steps.pack.outputs.dist-tag }}
+          DIST_TAG: ${{ needs.publish.outputs.dist-tag }}
         run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::notice::A release for $TAG exists; nothing to do"
+            exit 0
+          fi
           NOTES="$RUNNER_TEMP/release-notes.md"
           {
             echo "devtwin $VERSION, published to npm under the \`$DIST_TAG\` dist-tag with provenance."

@@ -2,7 +2,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DevtwinError } from "../errors.mjs";
-import { assertWritable, pilotDigest } from "../config/pilot.mjs";
+import { assertKit, assertWritable, pilotDigest } from "../config/pilot.mjs";
 import { sha256 } from "../storage/canonical.mjs";
 import { readPrivateJson, ensurePrivatePath, atomicReplace } from "../storage/fsx.mjs";
 import { kitId, kitIdentity, parseKitId } from "../kit/identity.mjs";
@@ -74,6 +74,16 @@ export async function receiptExpiry(stateRoot) {
     const at = Date.parse(receipt.verifiedAt);
     return Number.isFinite(at) && Number.isInteger(receipt.ttlSeconds) ? new Date(at + receipt.ttlSeconds * 1000) : null;
   } catch { return null; }
+}
+// U48: the fast path above reads only a package kit's manifest. Before a renewal extends the receipt, the running
+// package kit gets the full kit gate (files, digest, owner, modes, kits folder). Its folder sits in <home>/.devtwin/kits,
+// where hook verify checked it, so the home comes from the path. False when it fails; a Git kit has no extra check.
+export async function kitVerifies(stateRoot, kitRoot) {
+  try {
+    const kit = receiptKit(await readPrivateJson(receiptPath(stateRoot), 4096));
+    if (kit?.kind === "package") { const root = runningKit(kitRoot); assertKit(root, kit, { home: dirname(dirname(dirname(root))) }); }
+    return true;
+  } catch { return false; }
 }
 export async function renewReceipt(stateRoot, now) {
   const path = receiptPath(stateRoot), receipt = await readPrivateJson(path, 4096);

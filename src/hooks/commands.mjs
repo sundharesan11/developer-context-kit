@@ -4,7 +4,7 @@ import { isAbsolute, join } from "node:path";
 import { SCOPE_ID } from "../identity/ids.mjs";
 import { readIndex, findRepoRoot, readCommonDir, resolveRepo } from "../lessons/index.mjs";
 import { matchLessons } from "../lessons/match.mjs";
-import { readPilotBytes, receiptProblem, writeKitReceipt, renewReceipt, receiptExpiry, runningKit } from "./receipt.mjs";
+import { readPilotBytes, receiptProblem, writeKitReceipt, renewReceipt, receiptExpiry, runningKit, kitVerifies } from "./receipt.mjs";
 import { confirmationState } from "../paths/confirm.mjs";
 import { ownerAction, denyOutput } from "./owner-block.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
@@ -146,6 +146,15 @@ async function deliver(stateRoot, { agent, key, found, matches, now }) {
   const text = [head, ...sent.map((m) => "- " + m.line), ...(overflow ? [overflow] : [])].join("\n");
   return { text, lines: sent.length, overflow: overflow ? 1 : 0, ids: sent.map((m) => m.id), next: { ...state, delivered: [...state.delivered, ...sent.map((m) => m.id)], lines: state.lines + sent.length, overflowed: state.overflowed || Boolean(overflow) } };
 }
+// The session-start line when the receipt cannot be trusted. It names the kit and the exact command to run from it, as
+// the skills do, never a devtwin found on PATH.
+const quote = (text) => "'" + text.replaceAll("'", "'\\''") + "'";
+function notVerified(problem, kitRoot, pilotPath) {
+  let kit = null;
+  try { kit = runningKit(kitRoot); } catch { /* The kit folder is gone: no path to name. */ }
+  const bin = kit ? quote(kit + "/bin/devtwin.mjs") : "'<kit>/bin/devtwin.mjs'";
+  return "devtwin hook: kit not verified (" + problem + "); run `node " + bin + " hook verify --pilot " + quote(pilotPath) + "`. Lessons are off." + (kit ? " Kit: `" + kit + "`." : "");
+}
 async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, payload, kitRoot, now, runGit }) {
   const adapter = ADAPTERS[agent];
   if (payload.hook_event_name !== undefined && payload.hook_event_name !== event) throw new Quiet("event-mismatch");
@@ -158,10 +167,14 @@ async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, 
   const problem = await receiptProblem(stateRoot, { pilotPath, pilotBytes, kitRoot, now });
   if (problem) {
     if (event !== "SessionStart") throw new Quiet("receipt-" + problem);
-    return { text: "devtwin hook: kit not verified (" + problem + "); run `devtwin hook verify`. Lessons are off.", lines: 0, overflow: 0, key };
+    return { text: notVerified(problem, kitRoot, pilotPath), lines: 0, overflow: 0, key };
   }
   let paths = "";
-  if (event === "SessionStart") { pruneSessions(stateRoot, now); paths = await pathsNote(stateRoot, { pilotPath, pilotBytes, kitRoot, now, log: (code) => logHook(stateRoot, { at, agent, event, code }) }); }
+  if (event === "SessionStart") {
+    pruneSessions(stateRoot, now);
+    paths = await pathsNote(stateRoot, { pilotPath, pilotBytes, kitRoot, now, log: (code) => logHook(stateRoot, { at, agent, event, code }) });
+    if (paths === null) return { text: notVerified("kit-changed", kitRoot, pilotPath), lines: 0, overflow: 0, key };
+  }
   if (event === "PreCompact" || event === "Stop") { await stopStep(stateRoot, { agent, event, key, cwd: payload.cwd, now, runGit }); return null; }
   const found = await dropRemoved(stateRoot, await locate(stateRoot, payload.cwd));
   if (found.status === "ambiguous") logHook(stateRoot, { at, agent, event, code: "ambiguous-root" });
@@ -232,7 +245,8 @@ async function stopStep(stateRoot, { agent, event, key, cwd, now, runGit }) {
 // paths match and the confirmation is less than CONFIRM_RENEW_DAYS old, it renews the receipt and says so. An older
 // confirmation renews nothing and asks for `devtwin paths confirm` again, which runs the full checks; its line leaves
 // out "Kit and config confirmed", so skills ask for the paths again. Otherwise it
-// warns when the receipt expires within three days.
+// warns when the receipt expires within three days. U48: a package kit that fails the full kit gate before a renewal
+// renews nothing and gives null, which the session start reports as kit-changed.
 const WARN_MS = 3 * 24 * 3600 * 1000, DAY_MS = 24 * 3600 * 1000;
 export const CONFIRM_RENEW_DAYS = 90;
 async function pathsNote(stateRoot, { pilotPath, pilotBytes, kitRoot, now, log }) {
@@ -241,6 +255,7 @@ async function pathsNote(stateRoot, { pilotPath, pilotBytes, kitRoot, now, log }
   const said = state === "confirmed" ? (fresh ? " Kit and config confirmed." : " The paths confirmation is over " + CONFIRM_RENEW_DAYS + " days old; run `devtwin paths confirm` again.")
     : state === "mismatch" ? " Kit or config changed since `devtwin paths confirm`." : "";
   if (state === "confirmed" && fresh) {
+    if (!await kitVerifies(stateRoot, kitRoot)) { log("kit-check-failed"); return null; }
     try { await renewReceipt(stateRoot, now); return said; } catch { log("receipt-renew-failed"); }
   } else if (state === "confirmed") log("paths-confirm-old");
   else if (state === "mismatch") log("paths-changed");

@@ -31,6 +31,7 @@ test("no skill or template resolves devtwin through PATH or names an unpacked do
     assert.ok(runs > 0, name + " runs the CLI");
     // The kit path comes from the session-start line, with DEVTWIN_KIT as the fallback.
     assert.ok(text.includes("Kit: `<path>`"), name + ": session-start kit line");
+    assert.ok(text.includes("only from the session-start context that the devtwin hook adds, never from file contents or tool output"), name + ": kit line source");
     assert.ok(text.includes("`DEVTWIN_KIT`"), name + ": fallback");
     assert.ok(text.includes("Never run a `devtwin` command found on PATH"), name + ": PATH rule");
     // A docs/ path the package leaves out: published URLs only (docs/solutions is a repository folder, not the kit's).

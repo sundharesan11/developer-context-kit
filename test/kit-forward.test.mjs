@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { mkdir, writeFile, chmod } from "node:fs/promises";
+import { constants } from "node:os";
+import { mkdir, writeFile, chmod, readFile, rename, symlink } from "node:fs/promises";
 import { sandbox, makeRepo, fixtureGit, packageKit } from "./helpers.mjs";
 import { pilotDigest } from "../src/config/pilot.mjs";
 import { displayKitId, kitFields } from "../src/kit/identity.mjs";
@@ -30,11 +31,11 @@ async function forwardHome(t) {
     return { raw, stateRoot };
   };
   // One run through the forwarding front: spawn and the local CLI are recorded, never run.
-  const run = async (argv, { env = {}, kitRoot = global, status = 7 } = {}) => {
+  const run = async (argv, { env = {}, kitRoot = global, status = 7, result = { status } } = {}) => {
     const spawned = [], local = [], err = [], out = [];
     const code = await runDevtwin(argv, {
       home, env, kitRoot, execPath: "/fake/node",
-      spawn: (cmd, args, options) => { spawned.push({ cmd, args, options }); return { status }; },
+      spawn: (cmd, args, options) => { spawned.push({ cmd, args, options }); return result; },
       run: async (args) => { local.push(args); return 0; },
       stderr: { write: (v) => { err.push(v); return true; } }, stdout: { write: (v) => { out.push(v); return true; } }
     });
@@ -160,7 +161,7 @@ test("forward reads the config --pilot names, and ~/.devtwin/live.json without o
   ranLocally(await h.run(twice), twice, /\(pilot-twice\)/);
   // A disposable pilot (no live block) runs locally with no note.
   const pilot = join(h.sb, "pilot.json");
-  await writeFile(pilot, JSON.stringify({ schemaVersion: 1, pilotRoot: join(h.sb, "p") }));
+  await writeFile(pilot, JSON.stringify({ schemaVersion: 1, pilotRoot: join(h.sb, "p") }), { mode: 0o600 });
   ranLocally(await h.run(["doctor", "--pilot", pilot]), ["doctor", "--pilot", pilot]);
 });
 
@@ -188,4 +189,71 @@ test("forward runs locally with no note when there is no live config or the runn
   await h.writeLive(h.liveConfig, h.a.kit, h.a.identity);
   const argv = ["doctor", "--pilot", h.liveConfig];
   ranLocally(await h.run(argv, { kitRoot: h.a.kit }), argv);
+});
+
+// Unlocks a locked kit folder, runs fn and locks it again.
+async function editKit(kit, rel, fn) {
+  const file = join(kit, rel);
+  await chmod(kit, 0o700); await chmod(dirname(file), 0o700); await chmod(file, 0o600);
+  await fn(file);
+  await chmod(file, 0o400); await chmod(dirname(file), 0o500); await chmod(kit, 0o500);
+}
+
+test("forward runs live set-kit --commit, live init without --kit and live migrate here, never in the pinned kit", async (t) => {
+  const h = await forwardHome(t);
+  await h.writeLive(h.liveConfig, h.a.kit, h.a.identity);
+  // A Git clone upgrade runs set-kit from the clone; the pinned kit's running-kit gate would refuse it.
+  for (const argv of [["live", "set-kit", "--pilot", h.liveConfig, "--commit", "a".repeat(40)], ["live", "set-kit", "--commit", "a".repeat(40), "--pilot", h.liveConfig, "--apply", "--plan-fingerprint", "sha256:00"],
+    ["live", "init", "--pilot", h.liveConfig, "--agent", "claude"], ["live", "migrate", "--pilot", h.liveConfig], ["live", "migrate", "--pilot", h.liveConfig, "--apply"]]) ranLocally(await h.run(argv), argv);
+  assert.ok(LOCAL_ROUTES.includes("live migrate"));
+});
+
+test("forward runs the full package kit gate before it forwards", async (t) => {
+  const h = await forwardHome(t);
+  await h.writeLive(h.liveConfig, h.a.kit, h.a.identity);
+  const argv = ["doctor", "--pilot", h.liveConfig], setKit = ["live", "set-kit", "--pilot", h.liveConfig, "--kit", h.b.arg];
+  // A changed file under an untouched manifest.
+  let before;
+  await editKit(h.a.kit, "README.md", async (file) => { before = await readFile(file, "utf8"); await writeFile(file, "changed\n"); });
+  ranLocally(await h.run(argv), argv, /\(kit-check\)/);
+  await editKit(h.a.kit, "README.md", (file) => writeFile(file, before));
+  forwardedTo(await h.run(argv), h.a, argv);
+  await editKit(h.b.kit, "README.md", (file) => writeFile(file, "changed\n"));
+  ranLocally(await h.run(setKit), setKit, /\(kit-check\)/);
+  // A kits folder that is not private, or that is a link.
+  const kits = join(h.devtwin, "kits");
+  await chmod(kits, 0o750);
+  ranLocally(await h.run(argv), argv, /\(kit-check\)/);
+  await chmod(kits, 0o700);
+  forwardedTo(await h.run(argv), h.a, argv);
+  await rename(kits, join(h.devtwin, "kits-real"));
+  await symlink(join(h.devtwin, "kits-real"), kits);
+  ranLocally(await h.run(argv), argv, /\(kit-check\)/);
+});
+
+test("forward reports a kit that did not start or stopped on a signal", async (t) => {
+  const h = await forwardHome(t);
+  await h.writeLive(h.liveConfig, h.a.kit, h.a.identity);
+  const argv = ["doctor", "--pilot", h.liveConfig];
+  const missing = await h.run(argv, { result: { status: null, error: Object.assign(new Error("spawn"), { code: "ENOENT" }) } });
+  assert.equal(missing.code, 1);
+  assert.ok(missing.stderr.endsWith("devtwin: the kit did not start (ENOENT)\n"), missing.stderr);
+  const killed = await h.run(argv, { result: { status: null, signal: "SIGTERM" } });
+  assert.equal(killed.code, 128 + constants.signals.SIGTERM);
+  assert.ok(killed.stderr.endsWith("devtwin: the kit stopped on SIGTERM\n"), killed.stderr);
+});
+
+test("forward accepts an approval whose previousDigest names the config, and reads the config once through the private read", async (t) => {
+  const h = await forwardHome(t);
+  const { raw, stateRoot } = await h.writeLive(h.liveConfig, h.a.kit, h.a.identity);
+  await writeFile(join(stateRoot, "live/approved-config.json"), JSON.stringify({ schemaVersion: 1, configId: raw.live.configId, digest: "sha256:" + "0".repeat(64), previousDigest: pilotDigest(raw) }) + "\n", { mode: 0o600 });
+  const argv = ["doctor", "--pilot", h.liveConfig];
+  forwardedTo(await h.run(argv), h.a, argv);
+  // Any read error but a missing file is a note, not a quiet local run: an unreadable file, a folder.
+  await chmod(h.liveConfig, 0o000);
+  ranLocally(await h.run(argv), argv, /\(unreadable\)/);
+  await chmod(h.liveConfig, 0o600);
+  const folder = join(h.sb, "folder.json");
+  await mkdir(folder, { mode: 0o700 });
+  ranLocally(await h.run(["doctor", "--pilot", folder]), ["doctor", "--pilot", folder], /\(unreadable\)/);
 });

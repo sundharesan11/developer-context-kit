@@ -24,6 +24,11 @@ export function displayKitId(value) {
   const k = typeof value === "string" ? parseKitId(value) : checked(value);
   return k.kind === "git" ? "git:" + k.commit.slice(0, 12) : "npm:" + k.version + "+sha256:" + k.digest.slice(0, 12);
 }
+// A --kit value, <version>+<64 hex>, as a package identity; null for anything else.
+export function parseKitArg(text) {
+  const parts = typeof text === "string" ? text.split("+") : [];
+  return parts.length === 2 && VERSION.test(parts[0]) && DIGEST.test(parts[1]) ? { kind: "package", version: parts[0], digest: parts[1] } : null;
+}
 // The identity a live block (or a liveGate.kit) names: exactly one of { kitCommit } or { kitVersion, kitDigest }.
 export function kitIdentity(live) {
   const has = (key) => live?.[key] !== undefined;
