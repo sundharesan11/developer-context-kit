@@ -3,7 +3,8 @@ const PATTERNS = [
   ["private-key", /-----BEGIN [A-Z ]*PRIVATE KEY(?: BLOCK)?-----/g],
   ["authorization", /authorization\s*:\s*\S+/gi],
   ["bearer-token", /\bbearer\s+[A-Za-z0-9._~+/-]{20,}=*/gi],
-  ["credential-assignment", /\b[a-z_]*(?:token|secret|password|api[_-]?key|private[_-]?key|access[_-]?key|credential)\s*(?:["']\s*)?[:=]\s*\S{6,}/gi],
+  // A GitHub Actions `id-token: write` (or read, none) permission names no credential, so it is not one.
+  ["credential-assignment", /\b(?!(?<=\bid-)token\s*:\s*(?:read|write|none)\b)[a-z_]*(?:token|secret|password|api[_-]?key|private[_-]?key|access[_-]?key|credential)\s*(?:["']\s*)?[:=]\s*\S{6,}/gi],
   ["jwt", /\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g],
   ["github-token", /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{22,})\b/g],
   ["aws-key", /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g],

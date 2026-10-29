@@ -20,7 +20,9 @@ test("public alpha license metadata matches the canonical Apache text", async ()
   const root = join(import.meta.dirname, "..");
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
   assert.equal(pkg.license, "Apache-2.0");
-  assert.equal(pkg.private, true, "keep accidental npm publication blocked");
+  // U47: the release workflow publishes; the prepublishOnly guard blocks an accidental local publish.
+  assert.equal("private" in pkg, false);
+  assert.equal(pkg.scripts.prepublishOnly, "node scripts/publish-guard.mjs");
   assert.equal(pkg.scripts.test, "node scripts/run-tests.mjs");
   assert.equal(pkg.scripts["check:package"], "node scripts/check-package.mjs");
   const { createHash } = await import("node:crypto");
