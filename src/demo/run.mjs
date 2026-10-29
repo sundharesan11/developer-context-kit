@@ -23,9 +23,10 @@ import { createFakeProvider, fakeSecretResolver } from "../auth/fake-provider.mj
 import { proposeHubLearning } from "../hubs/propose.mjs";
 import { withPilotLock, scopeLockPath } from "../storage/lock.mjs";
 const KIT = resolve(import.meta.dirname, "../..");
-// Clone-only checks need a Git clone of the kit: package-allowlist runs scripts/check-package.mjs, and the live checks
-// pin the kit by its Git commit. From a package they report "skipped".
-export const CLONE_ONLY = Object.freeze(["package-allowlist", "live-init-preview-apply", "live-install-foreign-conflict-blocks-one-agent", "live-uninstall-from-receipts", "live-rollback-check-after-uninstall"]);
+// Clone-only checks need a Git clone of the kit: package-allowlist runs scripts/check-package.mjs, npm-install runs
+// scripts/pack-smoke.mjs (npm pack, an offline install and `devtwin demo` from that install), and the live checks pin the
+// kit by its Git commit. From a package they report "skipped", so the demo inside the pack smoke test does not recurse.
+export const CLONE_ONLY = Object.freeze(["package-allowlist", "npm-install", "live-init-preview-apply", "live-install-foreign-conflict-blocks-one-agent", "live-uninstall-from-receipts", "live-rollback-check-after-uninstall"]);
 export const DEFERRED = Object.freeze(["fresh-agent-smoke", "real-agent-scenarios"]);
 const canonical = (path) => { try { return typeof path === "string" && isAbsolute(path) && resolve(path) === path && realpathSync(path) === path; } catch { return false; } };
 // The line the caller prints: { ok, checks: [{ id, status }], report }, or { ok: false, error } before any fixture write.
@@ -248,6 +249,12 @@ export async function runDemo({ pilotRoot: rootArg, reportPath, forbidden = [], 
     return { template: "writing", renderDigest: seed.renderDigest, files: seed.layout };
   });
   await check("package-allowlist", async () => { const r = spawnSync(process.execPath, [join(kit, "scripts/check-package.mjs")], { cwd: kit, encoding: "utf8", env: { PATH: env.PATH } }); const out = JSON.parse(r.stdout); assert.equal(r.status, 0); assert.equal(out.pack, "run"); });
+  await check("npm-install", async () => {
+    const r = spawnSync(process.execPath, [join(kit, "scripts/pack-smoke.mjs")], { cwd: kit, encoding: "utf8", env: { PATH: env.PATH }, timeout: 900000, maxBuffer: 16 << 20 });
+    const out = JSON.parse(String(r.stdout).trim().split("\n").at(-1));
+    if (r.status !== 0 || out.ok !== true) throw new Error("pack smoke failed: " + String(out.error ?? r.status));
+    return { version: out.version.version, tarball: out.tarball, demoChecks: out.demo.checks, skipped: out.demo.skipped };
+  });
   // Live mode against a fake home inside the acceptance root. The CLI runs from a detached clone of the committed kit,
   // so the running kit is clean and pinned as on the owner's machine. Uncommitted changes are not exercised here.
   const liveRoot = join(await realpath(pilotRoot), "live"), liveHome = join(liveRoot, "home"), devtwinDir = join(liveHome, ".devtwin");
@@ -336,7 +343,7 @@ export async function runDemo({ pilotRoot: rootArg, reportPath, forbidden = [], 
   checks.push({ id: "fresh-agent-smoke", status: "deferred", detail: "needs real-home activation, P3" });
   // U23: the real-agent scenarios run in visible terminals on a disposable fixture (scripts/agent-scenarios), by the owner.
   checks.push({ id: "real-agent-scenarios", status: "deferred", detail: "owner runs scripts/agent-scenarios in visible terminals, U23" });
-  const required = ["onboard-acme-zero-diff", "onboard-globex-zero-diff", "scripts-hooks-fsmonitor-not-run", "resolve-exact", "wrong-scope-rejected", "symlink-cwd-rejected", "unconfirmed-worktree-rejected", "duplicate-binding-rejected", "source-change-stale-plan", "provenance-and-supersession", "handoff-claude-to-codex", "idempotent-retry", "reused-request-conflict", "stale-hash-rejected", "crash-recovery-onboard", "lock-busy-not-broken", "no-cross-scope-canary", "install-preview-apply-idempotent-conflict-uninstall", "real-home-refused", "fake-auth-wrong-actor", "hub-proposal-no-write", "doctor-readonly", "handoff-export-portable", "profile-plan-apply", "stack-watch-offline-fixtures", "profile-and-stack-stale-approval-refused", "skill-template-render-verify", "package-allowlist", "live-init-preview-apply", "live-install-foreign-conflict-blocks-one-agent", "live-uninstall-from-receipts", "live-rollback-check-after-uninstall", "fresh-agent-smoke", "real-agent-scenarios"];
+  const required = ["onboard-acme-zero-diff", "onboard-globex-zero-diff", "scripts-hooks-fsmonitor-not-run", "resolve-exact", "wrong-scope-rejected", "symlink-cwd-rejected", "unconfirmed-worktree-rejected", "duplicate-binding-rejected", "source-change-stale-plan", "provenance-and-supersession", "handoff-claude-to-codex", "idempotent-retry", "reused-request-conflict", "stale-hash-rejected", "crash-recovery-onboard", "lock-busy-not-broken", "no-cross-scope-canary", "install-preview-apply-idempotent-conflict-uninstall", "real-home-refused", "fake-auth-wrong-actor", "hub-proposal-no-write", "doctor-readonly", "handoff-export-portable", "profile-plan-apply", "stack-watch-offline-fixtures", "profile-and-stack-stale-approval-refused", "skill-template-render-verify", "package-allowlist", "npm-install", "live-init-preview-apply", "live-install-foreign-conflict-blocks-one-agent", "live-uninstall-from-receipts", "live-rollback-check-after-uninstall", "fresh-agent-smoke", "real-agent-scenarios"];
   const ids = new Set(checks.map((c) => c.id));
   const ok = required.every((id) => ids.has(id)) && checks.every((c) => c.status === "passed" || DEFERRED.includes(c.id) && c.status === "deferred" || !gitKit && CLONE_ONLY.includes(c.id) && c.status === "skipped");
   const report = { schemaVersion: 1, ok, pilotRoot, forbidden: pilotSpec.forbidden, checks };

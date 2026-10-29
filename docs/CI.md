@@ -17,7 +17,7 @@ A green job establishes synthetic behavior on that runner and commit. It does no
 
 ## Last verified run
 
-Last verified run: run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four jobs passed: 234 of 234 tests, and 24 acceptance checks passed with one `fresh-agent-smoke` deferred in every lane. The workflow then expected 24 passed checks; it now expects 32 (step 6). This result applies to `8f1133a` only. The Linux and Node 22.13.0 lanes passing does not make either a supported configuration.
+Last verified run: run 38154524118 on `main` at commit `8f1133a`, 2026-10-11. All four jobs passed: 234 of 234 tests, and 24 acceptance checks passed with one `fresh-agent-smoke` deferred in every lane. The workflow then expected 24 passed checks; it now expects 33 (step 6). This result applies to `8f1133a` only. The Linux and Node 22.13.0 lanes passing does not make either a supported configuration.
 
 Commit IDs from `6a90cbf` onward were rewritten on 2026-10-25 to remove a client name from the history. File contents at each tip are unchanged, and `8f1133a` keeps its ID. The live activation ran at `b95ff72` under its earlier ID.
 
@@ -30,7 +30,7 @@ A CI run for `b95ff72` is pending. The local run at `b95ff72` (macOS, Node 26.12
 3. Audit the exact source/package allowlist and the [writing rules](WRITING.md) before running tests.
 4. Run the full required-test suite.
 5. Create a fresh canonical pilot under the runner's temporary directory, outside the checkout.
-6. Run acceptance and verify 34 checks: 32 passed plus exactly two deferred, `fresh-agent-smoke` and `real-agent-scenarios`. The harness also checks the required IDs.
+6. Run acceptance and verify 35 checks: 33 passed plus exactly two deferred, `fresh-agent-smoke` and `real-agent-scenarios`. The harness also checks the required IDs.
 7. Check the whole committed tree for whitespace errors and require a clean checkout, including untracked files.
 
 The workflow's GitHub token has only `contents: read`. It uses no repository secrets, package-manager cache or artifact upload. It never runs untrusted pull-request code through `pull_request_target` or on a self-hosted runner. Source acquisition and live connectors are not exercised.

@@ -11,12 +11,11 @@ The idea is to clone the developer, not just the repository. A repository tells 
 
 ## Your first brief in five minutes
 
-You need Git and Node.js 22.13 or later. Clone the kit and check that it runs:
+You need Git and Node.js 22.13 or later. Install devtwin and run the offline demo:
 
 ```sh
-git clone https://github.com/sundharesan11/devtwin.git
-cd devtwin
-node bin/devtwin.mjs version
+npm i -g devtwin@alpha
+devtwin demo
 ```
 
 Then follow the [Quickstart](/docs/getting-started/quickstart/). It builds a throwaway repository in a temporary folder, onboards it and prints its brief: the short, source-linked summary you give an agent at the start of a session. If you just want to see the result, its [fast path](/docs/getting-started/quickstart/#fast-path) does everything in one paste.
@@ -63,19 +62,19 @@ See [How it works](/docs/concepts/how-it-works/) for the full picture and the th
 
 ## Your data stays on your disk
 
-The kit you clone is public code: the CLI, schemas, generic templates and tests. Everything you add, such as project records, your profile and drafts, lives in separate private folders outside that clone, with private file modes. Nothing is synchronized from your private store into the public kit, and nothing is sent to a hosted service. If you join an organization hub, a Git repository your organization hosts, only the lessons sent under your consent and short "working on" notes go to it.
+The kit you install is public code: the CLI, schemas, skills and generic templates. Everything you add, such as project records, your profile and drafts, lives in separate private folders outside the kit, with private file modes. Nothing is synchronized from your private store into the public kit, and nothing is sent to a hosted service. If you join an organization hub, a Git repository your organization hosts, only the lessons sent under your consent and short "working on" notes go to it.
 
 Onboarding never writes into the project repositories it reads. What devtwin learns goes into your private store. A lesson reaches a repository only under your `repo-push` consent, as a commit on a new `devtwin/learning-<id>` branch.
 
 :::note[Before you start]
-devtwin runs from a Git checkout with `node bin/devtwin.mjs`; it is not on npm yet. It needs Node.js 22.13 or later, and macOS is the reference platform. [Limitations](/docs/security/limitations/) lists what it does not do yet.
+devtwin installs from npm with `npm i -g devtwin@alpha`. It needs Node.js 22.13 or later, and macOS is the reference platform. [Limitations](/docs/security/limitations/) lists what it does not do yet.
 :::
 
 ## Where to go next
 
 <CardGrid>
 	<LinkCard title="Quickstart" description="Onboard a throwaway project and read your first brief." href="/docs/getting-started/quickstart/" />
-	<LinkCard title="Installation" description="Requirements, the self-check and a devtwin alias." href="/docs/getting-started/installation/" />
+	<LinkCard title="Installation" description="Requirements, the npm install, the demo and the Git clone path." href="/docs/getting-started/installation/" />
 	<LinkCard title="How devtwin compares" description="AGENTS.md and CLAUDE.md, built-in agent memory, and devtwin side by side." href="/docs/concepts/comparison/" />
 	<LinkCard title="Use it with coding agents" description="Install the bundled skills for Claude Code and Codex." href="/docs/guides/coding-agents/" />
 	<LinkCard title="Lessons and agent hooks" description="Deliver lessons to agents as they work, and review what they propose." href="/docs/guides/lessons-and-hooks/" />

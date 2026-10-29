@@ -134,15 +134,15 @@ Apply removes the lock only if it belongs to this machine, its owner process is 
 
 ## Make the skills find the kit
 
-The skills call the CLI as `node "$DEVTWIN_KIT/bin/devtwin.mjs"`. Set `DEVTWIN_KIT` to the absolute path of your kit checkout, for example in `~/.zshrc`:
+The skills call the CLI as `node '<kit>/bin/devtwin.mjs'`. They take `<kit>` from the hook's session-start line, ``Kit: `<path>` ``, which names the pinned kit. They never run a `devtwin` found on `PATH`. Only a session without that line falls back to `DEVTWIN_KIT`. To set the fallback, put the absolute path of your pinned kit in `~/.zshrc`:
 
 ```sh
-export DEVTWIN_KIT="$HOME/.devtwin/kit"
+export DEVTWIN_KIT='<kit path>'
 ```
 
 Open a new terminal and check it with `printenv DEVTWIN_KIT`. Agents started from the Dock or Finder may not read your shell profile; ask the agent to run `printenv DEVTWIN_KIT`, and if it prints nothing, start the agent from a terminal.
 
-Before the first CLI call in a session, each skill asks you to confirm the kit path and the pilot path, unless the hook's session-start line says "Kit and config confirmed". Run [`paths confirm`](/docs/guides/lessons-and-hooks/#confirm-the-kit-and-config-paths) once to stop the question. It also warns if the installed skill came from a different kit commit than the one at `DEVTWIN_KIT`.
+Before the first CLI call in a session, each skill asks you to confirm the kit path and the pilot path, unless the hook's session-start line says "Kit and config confirmed". Run [`paths confirm`](/docs/guides/lessons-and-hooks/#confirm-the-kit-and-config-paths) once to stop the question. It also warns if the installed skill came from a different kit commit than the one at the kit path.
 
 ## Using the brief in a session
 

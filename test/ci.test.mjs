@@ -44,8 +44,8 @@ test("CI evaluates both Node versions without claiming Linux support and checks 
     assert.ok(text.includes(value), value);
   }
   assert.ok(text.indexOf("run: npm run check:package") < text.indexOf("run: npm test"));
-  assert.match(text, /report\.checks\.length, 34/);
-  assert.match(text, /status === 'passed'\)\.length, 32/);
+  assert.match(text, /report\.checks\.length, 35/);
+  assert.match(text, /status === 'passed'\)\.length, 33/);
 });
 
 test("acceptance forbidden path overlapping the pilot fails preflight without fixture writes", async (t) => {
@@ -78,9 +78,9 @@ test("acceptance records every extra forbidden path in its report", async (t) =>
   assert.equal(r.status, 0);
   const saved = JSON.parse(await readFile(report, "utf8"));
   assert.equal(saved.ok, true);
-  assert.equal(saved.checks.length, 34);
+  assert.equal(saved.checks.length, 35);
   assert.deepEqual(saved.checks.filter((check) => check.status !== "passed").map(({ id, status }) => ({ id, status })), [{ id: "fresh-agent-smoke", status: "deferred" }, { id: "real-agent-scenarios", status: "deferred" }]);
-  for (const id of ["live-init-preview-apply", "live-install-foreign-conflict-blocks-one-agent", "live-uninstall-from-receipts", "live-rollback-check-after-uninstall",
+  for (const id of ["npm-install", "live-init-preview-apply", "live-install-foreign-conflict-blocks-one-agent", "live-uninstall-from-receipts", "live-rollback-check-after-uninstall",
     "profile-plan-apply", "profile-and-stack-stale-approval-refused", "stack-watch-offline-fixtures", "skill-template-render-verify"]) {
     assert.equal(saved.checks.find((check) => check.id === id)?.status, "passed", id);
   }

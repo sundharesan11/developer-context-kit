@@ -9,10 +9,9 @@ This walkthrough takes about ten minutes. You create a tiny fictional repository
 
 ## Fast path
 
-To see a brief before learning the steps, paste this into a terminal **from your kit checkout**. It doesn't need the alias. It builds the same demo as the steps below, but it applies the onboarding plan without showing it to you. That is fine for a throwaway demo; for a real repository, always read the plan first.
+To see a brief before learning the steps, [install devtwin](/docs/getting-started/installation/) and paste this into a terminal. It builds the same demo as the steps below, but it applies the onboarding plan without showing it to you. That is fine for a throwaway demo; for a real repository, always read the plan first.
 
 ```sh
-KIT="$(pwd -P)"
 DEMO="$(mktemp -d /tmp/devtwin-demo.XXXXXX)" && DEMO="$(cd "$DEMO" && pwd -P)"
 mkdir -p -m 700 "$DEMO/inputs" "$DEMO/repos/atlas"
 git -C "$DEMO/repos/atlas" init -q -b main
@@ -25,15 +24,15 @@ printf '{"schemaVersion":1,"pilotRoot":"%s","configRoot":"%s/config","dataRoot":
 chmod 600 "$DEMO/pilot.json"
 PILOT="$DEMO/pilot.json"; REPO="$DEMO/repos/atlas"
 
-node "$KIT/bin/devtwin.mjs" init --pilot "$PILOT" --apply
-node "$KIT/bin/devtwin.mjs" scope add --pilot "$PILOT" --scope example --apply
-FP="$(node "$KIT/bin/devtwin.mjs" project onboard --pilot "$PILOT" --scope example \
+devtwin init --pilot "$PILOT" --apply
+devtwin scope add --pilot "$PILOT" --scope example --apply
+FP="$(devtwin project onboard --pilot "$PILOT" --scope example \
   --project example.atlas --repo "$REPO" --request-id req_demo_onboard_01 --accept all |
   node -e 'let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>console.log(JSON.parse(s).result.fingerprint))')"
-node "$KIT/bin/devtwin.mjs" project onboard --pilot "$PILOT" --scope example \
+devtwin project onboard --pilot "$PILOT" --scope example \
   --project example.atlas --repo "$REPO" --request-id req_demo_onboard_01 --accept all \
   --apply --plan-fingerprint "$FP"
-node "$KIT/bin/devtwin.mjs" context brief --pilot "$PILOT" --scope example --cwd "$REPO"
+devtwin context brief --pilot "$PILOT" --scope example --cwd "$REPO"
 echo "Demo folder: $DEMO"
 ```
 
@@ -41,7 +40,7 @@ The last JSON line is the brief. Step 6 below explains what is in it. When you a
 
 ## Step by step
 
-Before you start, [install devtwin](/docs/getting-started/installation/) and set up the `devtwin` alias. Run every block below in the same terminal, in order.
+Before you start, [install devtwin](/docs/getting-started/installation/). Run every block below in the same terminal, in order.
 
 <Steps>
 

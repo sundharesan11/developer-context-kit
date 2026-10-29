@@ -3,15 +3,16 @@ title: CLI reference
 description: Every devtwin command, grouped by task, with its flags, what it writes and an example.
 ---
 
-Run devtwin from a checkout of the kit:
+Install devtwin from npm and run it as `devtwin`:
 
 ```sh
-node bin/devtwin.mjs <command> [flags]
+npm i -g devtwin@alpha
+devtwin <command> [flags]
 ```
 
-The examples below use the `devtwin` alias from [Installation](/docs/getting-started/installation/#3-add-a-devtwin-alias). Without it, run `node bin/devtwin.mjs` from the checkout. Live-mode commands run from the pinned kit clone, so their examples spell out `node "$KIT/bin/devtwin.mjs"`.
+From a Git clone, run `node bin/devtwin.mjs` in place of `devtwin`; see [Installation](/docs/getting-started/installation/). Live-mode commands run from the pinned kit, so their examples spell out `node "$KIT/bin/devtwin.mjs"`. At the terminal, the global `devtwin` runs live commands in the pinned kit too.
 
-devtwin is not published to npm yet. It has no third-party runtime dependencies and needs Node.js 22.13 or later. macOS is the reference platform.
+devtwin has no third-party runtime dependencies and needs Node.js 22.13 or later. macOS is the reference platform.
 
 ## Conventions
 
@@ -95,9 +96,46 @@ devtwin help
 Prints the kit name and version. No pilot needed.
 
 ```sh
-devtwin version
-# {"ok":true,"command":"version","result":{"name":"devtwin","version":"0.0.0-local"}}
+devtwin --version
+# {"ok":true,"command":"version","result":{"name":"devtwin","version":"0.1.0-alpha.1"}}
 ```
+
+A Git clone adds its `commit`.
+
+### `demo`
+
+Runs the offline demo in a fresh private temporary folder: synthetic repositories, a disposable pilot and fake agent homes. No pilot needed, and no network. From the npm package, the checks that need a Git clone are `skipped`.
+
+| Flag | |
+| --- | --- |
+| `--pilot-root <path>` | Optional. A path that does not exist yet. |
+| `--report <path>` | Optional. A report file that does not exist yet. |
+
+```sh
+devtwin demo
+```
+
+### `kit install`
+
+Copies the installed package into a locked kit folder, `~/.devtwin/kits/<version>-<digest prefix>/`, and checks the copy against its digest. Preview without `--apply`. `~/.devtwin` must exist and be private. It refuses to run from a Git clone. The devtwin hook denies `--apply` from an agent shell.
+
+| Flag | |
+| --- | --- |
+| `--apply` | Copy. |
+
+```sh
+devtwin kit install
+```
+
+The result gives `kitRoot`, `version`, `digest`, `kitId` and the next command, `devtwin live set-kit --kit <version>+<digest>`. Compare the digest with the GitHub release before you pin the kit.
+
+### `kit list`
+
+Lists the kit folders with their `kitId`, `ok` or `bad`, and which one the live config pins. Read-only.
+
+| Flag | |
+| --- | --- |
+| `--pilot <file>` | Optional. The live config; defaults to `~/.devtwin/live.json`. |
 
 ### `doctor`
 
@@ -159,7 +197,7 @@ devtwin locks release --pilot "$PILOT" --lock install
 
 ## Live config
 
-These commands manage `~/.devtwin/live.json`. They must run from the kit clone the live config names (for `live set-kit`, the new clone). `--pilot` must be an absolute path. See [Live mode](/docs/guides/live-mode/).
+These commands manage `~/.devtwin/live.json`. They must run from the kit the live config names (for `live set-kit`, the new kit). The global `devtwin` runs them there for you. `--pilot` must be an absolute path. See [Live mode](/docs/guides/live-mode/).
 
 ### `live init`
 
@@ -170,6 +208,7 @@ Creates the live config and the private store next to it.
 | `--pilot <file>` | Required. Path of the new live config, inside an existing private 0700 folder. |
 | `--agent <claude\|codex>` | Required, repeatable. |
 | `--repo <path>` | Repository to allow. Repeatable. |
+| `--kit <version>+<digest>` | Optional. The package kit to run from; the global `devtwin` runs the command in that kit folder. |
 | `--apply --plan-fingerprint <fp>` | Write. |
 
 ```sh
@@ -188,12 +227,13 @@ Adds one repository to the live config.
 
 ### `live set-kit`
 
-Moves the live config to a new kit clone and commit. Run it from the new clone.
+Moves the live config to another kit: a Git clone at a commit, or a package kit folder. Run it from the new kit; with `--kit`, the global `devtwin` does that for you. The apply shows the owner dialog "Change the kit devtwin runs" with both kit IDs. Then run one setup batch. See the [upgrade guide](https://github.com/sundharesan11/devtwin/blob/main/docs/UPGRADING.md).
 
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
-| `--commit <sha>` | Required. 40 or 64 hex characters. |
+| `--commit <sha>` | A Git kit. 40 or 64 hex characters. |
+| `--kit <version>+<digest>` | A package kit, with its full 64-hex digest. Give exactly one of `--commit` and `--kit`. |
 | `--apply --plan-fingerprint <fp>` | Write. |
 
 ### `live migrate`

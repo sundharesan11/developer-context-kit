@@ -13,7 +13,7 @@ devtwin is an early local tool, not yet a packaged release. The order below favo
 - Agent proposals that you review and publish.
 - Private, selected-record handoff packets.
 - Bundled skills for Claude Code and Codex, with journaled install, uninstall, recovery and rollback check.
-- Live mode: a private store under `~/.devtwin`, a pinned kit clone and your real skill folders.
+- Live mode: a private store under `~/.devtwin`, a pinned kit (a package kit folder or a Git clone) and your real skill folders.
 - Personal profile, `devtwin-setup` skill and skill templates.
 - Stack watch with approved hosts and dated Markdown or HTML digests.
 - The [release radar](/docs/guides/stack-watch/#the-radar): ranked agent tools, approaches and adjacent tech, try-it guides, and weekly radar, hourly advisory and monthly review jobs.

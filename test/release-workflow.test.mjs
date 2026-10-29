@@ -106,7 +106,7 @@ test("package metadata allows publishing from the release workflow only", () => 
   assert.deepEqual(p.repository, { type: "git", url: "git+https://github.com/sundharesan11/devtwin.git" });
   assert.deepEqual(p.publishConfig, { access: "public", provenance: true });
   assert.equal(p.scripts.prepublishOnly, "node scripts/publish-guard.mjs");
-  assert.equal(p.homepage, "https://github.com/sundharesan11/devtwin#readme");
+  assert.equal(p.homepage, "https://sundharesan11.github.io/devtwin/");
   assert.deepEqual(p.bugs, { url: "https://github.com/sundharesan11/devtwin/issues" });
 });
 

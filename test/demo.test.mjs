@@ -20,7 +20,7 @@ test("devtwin demo passes from the Git clone with every check run", async (t) =>
   assert.equal(r.json.command, "demo");
   assert.equal(r.json.result.ok, true);
   for (const [id, status] of Object.entries(statuses(r.json.result.checks))) assert.equal(status, DEFERRED.includes(id) ? "deferred" : "passed", id);
-  assert.equal(r.json.result.checks.length, 34);
+  assert.equal(r.json.result.checks.length, 35);
   assert.equal(JSON.parse(await readFile(report, "utf8")).ok, true);
 });
 
@@ -37,7 +37,7 @@ test("devtwin demo from a copy of the runtime set skips only the clone-only chec
   const r = devtwin(kit, ["demo", "--pilot-root", join(parent, "pilot"), "--report", join(parent, "report.json")]);
   assert.equal(r.status, 0, JSON.stringify(r.json));
   assert.equal(r.json.result.ok, true);
-  assert.ok(CLONE_ONLY.includes("package-allowlist"));
+  assert.ok(CLONE_ONLY.includes("package-allowlist") && CLONE_ONLY.includes("npm-install"));
   for (const [id, status] of Object.entries(statuses(r.json.result.checks))) {
     assert.equal(status, CLONE_ONLY.includes(id) ? "skipped" : DEFERRED.includes(id) ? "deferred" : "passed", id);
   }

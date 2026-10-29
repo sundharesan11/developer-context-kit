@@ -30,7 +30,7 @@ The fence controls what **this CLI** writes. It does not limit what your agent h
 
 - In each named skill folder, devtwin writes only `devtwin-*` entries. It never creates, removes or changes the mode of the folder or its parents, and never touches a foreign, symlinked, edited or unowned entry. A conflict blocks only that agent.
 - An entry is removable only when its receipt matches a completed journal in this store for the same config ID.
-- Live commands run only from the kit clone the config names, clean and detached at its commit, with your real home.
+- Live commands run only from the kit the config names, with your real home: a Git clone clean and detached at its commit, or a locked package kit folder that matches its version and digest.
 - The rollback check compares a skill folder with the inventory taken before an install. It restores nothing.
 - Onboarding copies some repository text into the store, protected by mode 0700 and disk encryption only. Backups are encrypted, but see [Backups](#backups) for what that protects.
 

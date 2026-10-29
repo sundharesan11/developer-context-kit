@@ -34,7 +34,7 @@ git diff --check
 
 ### End-to-end acceptance run
 
-The acceptance harness builds synthetic repositories, isolated roots and fake agent homes, then exercises onboarding, records, handoffs, installs, the personal profile, the stack watch (against offline fixtures), templates and packaging. It makes no network requests.
+The acceptance harness builds synthetic repositories, isolated roots and fake agent homes, then exercises onboarding, records, handoffs, installs, the personal profile, the stack watch (against offline fixtures), templates, packaging and an offline npm install of the packed kit (`npm-install`). It makes no network requests.
 
 ```sh
 ACCEPTANCE_PARENT="$(mktemp -d /tmp/devtwin-acceptance.XXXXXX)"

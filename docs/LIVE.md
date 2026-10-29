@@ -6,19 +6,21 @@ Live mode is implemented. The owner ran steps 1 to 15 and 17 on one machine on 2
 
 ## What live mode changes
 
-A live config is a pilot file with a `live` block. It names the config ID, the home, one skill folder per agent, the kit path and the kit commit. Everything private lives under `~/.devtwin` at mode 0700:
+A live config is a pilot file with a `live` block. It names the config ID, the home, one skill folder per agent, the kit path and the kit identity. A Git kit has a commit. A package kit has a version and a SHA-256 digest of its files. Everything private lives under `~/.devtwin` at mode 0700:
 
 ```text
 ~/.devtwin/            0700, created by the owner
   live.json           the live config
-  kit/                a separate clone of the kit, detached at a reviewed commit
+  kits/               package kits, one locked folder per version and digest
+  kit/                or a separate clone of the kit, detached at a reviewed commit
   store/              the private store (pilotRoot)
     config/ data/ state/ inputs/
 ```
 
 - Outside the store, live mode writes only `devtwin-*` entries directly inside `~/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) and `~/.agents/skills`, plus the exact paths of an approved write class (see [Live-mode exceptions](#live-mode-exceptions)). It never creates, removes or changes the mode of a skill folder or its parents.
 - Codex skills go to `~/.agents/skills`. Nothing is written to `~/.codex/skills`. `CODEX_HOME` does not change the target; the preview warns with `CODEX_HOME_IGNORED` when it is set.
-- Live commands run only from the kit the live config names. That clone must be clean and detached at the live config's commit. Otherwise every live command fails with `GATE_REQUIRED`.
+- Live commands run only from the kit the live config names. A clone must be clean and detached at the live config's commit. A package kit folder must match its manifest, version and digest, and be locked and owned by you. Otherwise every live command fails with `GATE_REQUIRED`.
+- Hooks, jobs and agent-invoked skills run the pinned kit's own `bin/devtwin.mjs`. They never run npm's global folder, so a later `npm i -g` changes nothing until you pin a new kit.
 - The home is the process home. A run with a different `$HOME` is refused.
 - The live config changes only through `live init`, `live add-repo`, `live set-kit` and `live migrate` ([Migrating from devctx](MIGRATING.md)). Each one records the approved config digest in `store/state/live/approved-config.json`. A live config that differs from the approved one is refused.
 - Listed repositories are read-only. Onboarding never writes to them.
@@ -115,10 +117,12 @@ node "$KIT/bin/devtwin.mjs" live write-classes --pilot "$LIVE_CONFIG" --hook-tar
 Set these in the shell you use for the run. Replace each placeholder and keep the single quotes.
 
 ```sh
-KIT="$HOME/.devtwin/kit"
+KIT='<kit path>'
 LIVE_CONFIG="$HOME/.devtwin/live.json"
 REPO='<absolute real path of the repository>'
 ```
+
+`<kit path>` is the `kitRoot` that `devtwin kit install` prints in step 5, such as `~/.devtwin/kits/0.1.0-alpha.1-<digest prefix>`. For a Git clone, it is `$HOME/.devtwin/kit`.
 
 `<scope>` is the scope name, `<project>` a project ID that starts with the scope, such as `example.atlas`, and `<actor>` an actor reference such as `email:you@example.com`. Do not write real client names or account identifiers into this repository, issues or public notes.
 
@@ -161,26 +165,51 @@ ls -ld ~/.devtwin
 
 The folder must be owned by you, mode `drwx------`, and outside any Git worktree. `live init` refuses a folder that is not private. It never creates or changes it.
 
-## 5. Clone the kit and pin it
+## 5. Install the kit
 
-Clone the kit and check out the reviewed merged commit, detached:
+Live mode runs from a kit that you pin. Install the package and copy it into a locked kit folder. Contributors can pin a Git clone instead; see [Pin a Git clone](#pin-a-git-clone).
 
 ```sh
-git clone '<kit repository URL>' "$KIT"
-git -C "$KIT" checkout --detach '<merged commit>'
-git -C "$KIT" status --porcelain
-git -C "$KIT" rev-parse HEAD
+npm i -g devtwin@alpha
+devtwin kit install
 ```
 
-`status` must print nothing. Do not install packages or create files in the clone: an untracked file makes it dirty, and live commands then refuse.
+The plan writes nothing. It shows the target folder (`kitRoot`), the `version`, the `digest` and the `kitId`, `npm:<version>+sha256:<digest>`. Compare the digest with the kit digest in the [GitHub release](https://github.com/sundharesan11/devtwin/releases) for that version. A different digest means that the installed package is not the published one. Stop.
+
+When the digests match, copy the kit:
+
+```sh
+devtwin kit install --apply
+devtwin kit list
+```
+
+- `kit install --apply` copies the package into `~/.devtwin/kits/<version>-<digest prefix>/`. Folders are mode 0500 and files 0400, and the copy is checked against its digest. `~/.devtwin` must exist and be private, as in step 4. The command creates only `~/.devtwin/kits`.
+- No owner dialog is shown, because nothing runs from the new folder yet. The devtwin hook denies `kit install --apply` from an agent shell.
+- `kit list` shows each kit folder, its `kitId`, `ok` or `bad`, and the pinned one.
+- The result names the next command, `devtwin live set-kit --kit <version>+<digest>`. On a first activation you do not need it: step 7 pins the kit with `live init --kit`.
+
+Set `KIT` to the printed `kitRoot`.
+
+### Pin a Git clone
+
+Contributors can pin a clone. Clone the kit and check out the reviewed merged commit, detached:
+
+```sh
+git clone '<kit repository URL>' "$HOME/.devtwin/kit"
+git -C "$HOME/.devtwin/kit" checkout --detach '<merged commit>'
+git -C "$HOME/.devtwin/kit" status --porcelain
+git -C "$HOME/.devtwin/kit" rev-parse HEAD
+```
+
+`status` must print nothing. Do not install packages or create files in the clone: an untracked file makes it dirty, and live commands then refuse. Set `KIT="$HOME/.devtwin/kit"`, and leave out `--kit` in step 7.
 
 ## 6. Before snapshot
 
-Take the repository snapshot with the clone's script. Write it to a new private temporary folder:
+Take the repository snapshot with the snapshot script, `scripts/repo-snapshot.mjs`. The script is in the Git repository, not in the package. With a Git kit, set `TOOLS="$KIT"`. With a package kit, clone the repository outside `~/.devtwin` at the release tag `v<version>`, and set `TOOLS` to that clone. Write the snapshot to a new private temporary folder:
 
 ```sh
 SNAP="$(mktemp -d)"
-node "$KIT/scripts/repo-snapshot.mjs" --repo "$REPO" --out "$SNAP/before.json"
+node "$TOOLS/scripts/repo-snapshot.mjs" --repo "$REPO" --out "$SNAP/before.json"
 ls -l "$SNAP/before.json"
 ```
 
@@ -188,17 +217,21 @@ The file is created at mode 0600. The snapshot hashes tracked and untracked file
 
 ## 7. Live init
 
-Preview the live config. This writes nothing.
+Preview the live config. This writes nothing. With a package kit, `--kit` names the kit from step 5, and the global `devtwin` command runs `live init` in that kit folder:
 
 ```sh
-node "$KIT/bin/devtwin.mjs" live init --pilot "$LIVE_CONFIG" --agent claude --agent codex --repo "$REPO"
+devtwin live init --pilot "$LIVE_CONFIG" --agent claude --agent codex --repo "$REPO" --kit '<version>+<digest>'
 ```
 
-Review `config` (home, skill folders, kit path and commit, repositories), `layout` and `warnings`. `KIT_NOT_SIBLING` means the kit is not at `~/.devtwin/kit`. Apply only the fingerprint the owner approved:
+With a Git clone, run `node "$KIT/bin/devtwin.mjs" live init` with the same flags and no `--kit`.
+
+Review `config` (home, skill folders, kit path and identity, repositories), `layout` and `warnings`. `KIT_NOT_SIBLING` means the kit is neither in `~/.devtwin/kits` nor at `~/.devtwin/kit`. Apply only the fingerprint the owner approved:
 
 ```sh
-node "$KIT/bin/devtwin.mjs" live init --pilot "$LIVE_CONFIG" --agent claude --agent codex --repo "$REPO" --apply --plan-fingerprint '<fingerprint>'
+devtwin live init --pilot "$LIVE_CONFIG" --agent claude --agent codex --repo "$REPO" --kit '<version>+<digest>' --apply --plan-fingerprint '<fingerprint>'
 ```
+
+The next steps run `node "$KIT/bin/devtwin.mjs"`, which works for both kinds of kit. At the terminal, `devtwin` with the same arguments runs in the pinned kit too; see [How the global command forwards](#how-the-global-command-forwards).
 
 Apply creates the store folders, records the approved digest and writes `live.json`. It draws a random config ID once.
 
@@ -247,8 +280,8 @@ Onboarding copies some repository text, such as scanned facts and commands, into
 ## 12. Snapshot after onboarding
 
 ```sh
-node "$KIT/scripts/repo-snapshot.mjs" --repo "$REPO" --out ~/.devtwin/store/state/evidence/after-onboard.json
-node "$KIT/scripts/repo-snapshot.mjs" --compare ~/.devtwin/store/state/evidence/before.json ~/.devtwin/store/state/evidence/after-onboard.json
+node "$TOOLS/scripts/repo-snapshot.mjs" --repo "$REPO" --out ~/.devtwin/store/state/evidence/after-onboard.json
+node "$TOOLS/scripts/repo-snapshot.mjs" --compare ~/.devtwin/store/state/evidence/before.json ~/.devtwin/store/state/evidence/after-onboard.json
 ```
 
 `identical: true` is the expected result. Otherwise the output lists each path that changed. The owner judges each one.
@@ -277,7 +310,7 @@ Approve 12 setup changes
 7. Install skills in ~/.agents/skills: devtwin-onboard, devtwin-resume, devtwin-record, devtwin-capture
 8. Install job review-monthly (monthly) at ~/Library/LaunchAgents/devtwin.review-monthly.plist
 9. Install job backup-daily (daily) at ~/Library/LaunchAgents/devtwin.backup-daily.plist
-10. Confirm kit ~/.devtwin/kit at <commit> and config ~/.devtwin/live.json
+10. Confirm kit ~/.devtwin/kits/<kit folder> at <kit ID> and config ~/.devtwin/live.json
 11. Add devtwin hook entries to ~/.claude/settings.json: SessionStart, UserPromptSubmit, PreToolUse, PreCompact, Stop
 12. Add devtwin hook entries to ~/.codex/hooks.json: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PreCompact, Stop. Then trust them in Codex with /hooks
 ```
@@ -319,7 +352,7 @@ node "$KIT/bin/devtwin.mjs" agents install --hooks --pilot "$LIVE_CONFIG" --agen
 
 - The preview lists each entry it adds or removes in `changes`, with the exact JSON. `create` makes a file that does not exist, `update` edits one, `installed` is already current and `blocked` means the file is not approved or its folder is missing.
 - Claude Code gets entries in `settings.json` for `SessionStart`, `UserPromptSubmit`, `PreToolUse` (matcher `Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep|Bash`) `PreCompact` and `Stop`. Codex gets entries in `~/.codex/hooks.json` for `SessionStart`, `UserPromptSubmit`, `PreToolUse` (matcher `^(apply_patch|Bash)$`), `PostToolUse` (matcher `^Bash$`), `PreCompact` and `Stop`. An install made before the `Stop` entry existed shows it as `missing` until you run the install again.
-- Each entry runs `node "<kit>/bin/devtwin.mjs" hook --event <event> --agent <agent> --pilot "<live config>"` with a 10-second timeout. The line names the kit clone and the live config only. A new kit commit in the same clone keeps every line byte-identical. An upgrade to another clone changes the lines, and install shows them as `update`.
+- Each entry runs `node "<kit>/bin/devtwin.mjs" hook --event <event> --agent <agent> --pilot "<live config>"` with a 10-second timeout. The line names the kit folder and the live config only. A new kit commit checked out in the same clone keeps every line byte-identical. A package kit has a new folder for each version, so a package upgrade changes the lines, as does a move to another clone. Install shows the changed lines as `update`.
 - An entry is devtwin's only when a completed hook install of this live config wrote it. devtwin never changes another entry, also when it looks like a devtwin entry. An exact copy that devtwin did not write is `conflict` with `foreign-entry`. A devtwin entry that you edited is `conflict` with `modified`. A conflict blocks that agent's file. Fix it by hand, then preview again.
 - Apply writes a backup of each file, an inventory and a journal under `store/state/runs/<run_id>/`, as a skill install does. `agents recover` and `agents rollback-check --run-id '<run_id>'` read them. Install also refreshes the kit receipt that the hook trusts.
 - Codex runs a new or changed hook only after you trust it. Open Codex, run `/hooks`, and trust each devtwin entry. `agents status` repeats this note.
@@ -336,9 +369,9 @@ node "$KIT/bin/devtwin.mjs" paths confirm --pilot "$LIVE_CONFIG"
 node "$KIT/bin/devtwin.mjs" paths confirm --pilot "$LIVE_CONFIG" --apply --plan-fingerprint '<fingerprint>'
 ```
 
-- The apply shows the owner dialog with both paths. It writes `store/state/confirmed-paths.json`: the real paths of the kit and the live config, the kit's `.git/HEAD` (and the commit of the branch it names) and the SHA-256 of the config. The setup step `paths-confirm` runs the same command.
+- The apply shows the owner dialog with both paths. It writes `store/state/confirmed-paths.json`: the real paths of the kit and the live config, the SHA-256 of the config and the kit's identity. For a Git kit, that is its `.git/HEAD` and the commit of the branch it names. For a package kit, it is the `kitId` from the kit's manifest. The setup step `paths-confirm` runs the same command.
 - This is an owner action. The devtwin hook denies `paths confirm --apply` from an agent shell.
-- At each session start, the hook compares these values with small file reads, with no Git process and no lock. While they match, the line ends with "Kit and config confirmed." and the hook moves the receipt's `verifiedAt` to now. You do not need to run `hook verify` each week.
+- At each session start, the hook compares these values with small file reads, with no Git process and no lock. The line names the pinned kit as ``Kit: `<path>` ``, and the skills run the CLI from that path. While the values match, the line ends with "Kit and config confirmed." and the hook moves the receipt's `verifiedAt` to now. You do not need to run `hook verify` each week.
 - A kit upgrade or a config change ends the confirmation. The line then says that the kit or the config changed, and skills ask for the paths again. Run `paths confirm` again after you check the new paths.
 - `paths check --pilot "$LIVE_CONFIG"` is read-only. It reports `match` or `mismatch` for each value.
 - The receipt lasts 30 days. When it is not renewed and expires within three days, the session-start line says so. Run `hook verify`, or confirm the paths.
@@ -380,17 +413,19 @@ node "$KIT/bin/devtwin.mjs" schedule apply --pilot "$LIVE_CONFIG" --job radar-we
 
 `--launch-agent` replaces the whole `launchAgents` class, so also list the hub sync plist when you use one. Repeat `schedule plan` and `schedule apply` for `advisory-hourly` and `review-monthly`. Each apply shows the owner dialog, and the devtwin hook denies `schedule apply` and `schedule off --apply` from an agent shell. See [Schedules](HARNESS.md#schedules) for what each job does and how to turn it off.
 
-## 14. Export DEVTWIN_KIT
+## 14. The kit path for skills
 
-The skills find the kit through `DEVTWIN_KIT`. Ask the owner before editing the shell profile. Then add one line, for example to `~/.zshrc`:
+The skills take the kit path from the session-start line of the devtwin hook, ``Kit: `<path>` ``. They run `node '<kit>/bin/devtwin.mjs'` from that path, and never a `devtwin` command found on `PATH`. With the hooks from step 13 installed, you do not need a shell variable.
+
+`DEVTWIN_KIT` is the fallback for a session that has no such line, for example an agent without the hook. To set it, ask the owner before editing the shell profile. Then add one line, for example to `~/.zshrc`, with the kit path from step 5:
 
 ```sh
-export DEVTWIN_KIT="$HOME/.devtwin/kit"
+export DEVTWIN_KIT='<kit path>'
 ```
 
-Open a new terminal and check it with `printenv DEVTWIN_KIT`. The kit writes agent settings files only through `agents install --hooks` and `agents uninstall --hooks`.
+Open a new terminal and check it with `printenv DEVTWIN_KIT`. The variable names one kit folder, so change it with each `live set-kit`. The kit writes agent settings files only through `agents install --hooks` and `agents uninstall --hooks`.
 
-Agents started from the Dock, Finder or another GUI launcher may not read the shell profile. Check from inside such a session: ask the agent to run `printenv DEVTWIN_KIT`. If it prints nothing, start that agent from a terminal instead. The skills refuse to run without the variable.
+Agents started from the Dock, Finder or another GUI launcher may not read the shell profile. Without the session-start line and without the variable, the skills stop and ask for the kit path.
 
 ## 15. Fresh-session checks
 
@@ -414,10 +449,13 @@ Claude, with read tools and only the exact shell commands the checks need. Never
 
 Pipe the prompt on stdin. `--allowedTools` takes several values, so a prompt placed after it is read as another tool rule. Then `claude -p` fails with "Input must be provided either through stdin or as a prompt argument".
 
-A session can run the CLI through the kit's absolute real path instead of the literal `"$DEVTWIN_KIT"` form. The list therefore names both forms of exactly the two read-only commands. Replace `<kit real path>` with the output of `realpath "$KIT"`.
+The skills run the CLI as `node '<kit>/bin/devtwin.mjs'`, with the kit's real path from the session-start line. They check a Git kit's commit with `git -C '<kit>' rev-parse HEAD`. A session without that line falls back to the literal `"$DEVTWIN_KIT"` form. The list therefore names both forms of exactly these read-only commands. Replace `<kit real path>` with the output of `realpath "$KIT"`.
 
 ```sh
-printf '%s\n' '<prompt>' | claude -p --setting-sources user --allowedTools 'Read,Glob,Grep,Bash(printenv DEVTWIN_KIT),Bash(realpath:*),Bash(git -C "$DEVTWIN_KIT" rev-parse HEAD),Bash(node "$DEVTWIN_KIT/bin/devtwin.mjs" context resolve:*),Bash(node "$DEVTWIN_KIT/bin/devtwin.mjs" context brief:*),Bash(node <kit real path>/bin/devtwin.mjs context resolve:*),Bash(node <kit real path>/bin/devtwin.mjs context brief:*)'
+K='<kit real path>'
+ALLOWED="Read,Glob,Grep,Bash(printenv DEVTWIN_KIT),Bash(realpath:*),Bash(git -C '$K' rev-parse HEAD),Bash(node '$K/bin/devtwin.mjs' context resolve:*),Bash(node '$K/bin/devtwin.mjs' context brief:*),Bash(node $K/bin/devtwin.mjs context resolve:*),Bash(node $K/bin/devtwin.mjs context brief:*)"
+ALLOWED="$ALLOWED"',Bash(git -C "$DEVTWIN_KIT" rev-parse HEAD),Bash(node "$DEVTWIN_KIT/bin/devtwin.mjs" context resolve:*),Bash(node "$DEVTWIN_KIT/bin/devtwin.mjs" context brief:*)'
+printf '%s\n' '<prompt>' | claude -p --setting-sources user --allowedTools "$ALLOWED"
 ```
 
 If a listed command is still refused because the skill wrote it differently, record the refusal, compare the command with the list, and rerun with that one exact command added. Do not add a broader rule.
@@ -428,7 +466,7 @@ Codex, in its read-only sandbox:
 codex exec --sandbox read-only --skip-git-repo-check '<prompt>'
 ```
 
-Pass when each session lists `devtwin-onboard`, `devtwin-record` and `devtwin-resume`, runs `context resolve` through `DEVTWIN_KIT`, and names the onboarded project. A kit-commit warning means the installed skills came from another commit; stop and find out why. Save the transcripts under `~/.devtwin/store/state/evidence/`.
+Pass when each session lists `devtwin-onboard`, `devtwin-record` and `devtwin-resume`, runs `context resolve` from the pinned kit path, and names the onboarded project. A session without the hook line uses `DEVTWIN_KIT` instead. A kit-commit warning means the installed skills came from another commit than the one at `<kit>`; stop and find out why. A package kit has no commit in the receipt, so the skills skip that check. Save the transcripts under `~/.devtwin/store/state/evidence/`.
 
 ## 16. Interactive sessions
 
@@ -454,9 +492,15 @@ Then reinstall with a fresh preview and approval (step 13), and repeat a fresh-s
 
 ## Upgrading the kit
 
+For a package kit, follow [Upgrading](UPGRADING.md): install the new release, `kit install`, `live set-kit --kit`, then one setup batch. A rollback is `live set-kit` to an earlier kit folder, then one batch. The same guide moves a Git-clone setup to a package kit.
+
+`live set-kit` takes `--commit <sha>` for a Git kit or `--kit <version>+<digest>` for a package kit, never both. It runs from the new kit. Its apply shows the owner dialog "Change the kit devtwin runs". The dialog names the old and new kit IDs and folders. For a package kit, it also asks you to compare the digest with the one in the GitHub release for that version. The devtwin hook denies `live set-kit --apply` from an agent shell.
+
+### Upgrade a Git clone
+
 Upgrade side by side. The old clone stays usable until the new one is proven.
 
-1. Clone the new reviewed commit next to the old one, for example at `~/.devtwin/kit-next`, detached and clean, as in step 5.
+1. Clone the new reviewed commit next to the old one, for example at `~/.devtwin/kit-next`, detached and clean, as in [Pin a Git clone](#pin-a-git-clone).
 2. From the new clone, preview and apply the kit change:
 
    ```sh
@@ -464,7 +508,7 @@ Upgrade side by side. The old clone stays usable until the new one is proven.
    node ~/.devtwin/kit-next/bin/devtwin.mjs live set-kit --pilot "$LIVE_CONFIG" --commit '<new commit>' --apply --plan-fingerprint '<fingerprint>'
    ```
 
-   The apply also rebuilds the lesson index and the session summaries of every scope with the new kit, so the hook finds your bound projects at once.
+   The apply shows the owner dialog. It also rebuilds the lesson index and the session summaries of every scope with the new kit, so the hook finds your bound projects at once.
 
 3. From now on every live command runs from the new clone. Update the skills and the hooks, rewrite the scheduled job files and confirm the new paths behind one owner dialog:
 
@@ -474,14 +518,43 @@ Upgrade side by side. The old clone stays usable until the new one is proven.
    ```
 
    The dialog lists the changed skills as `Update skills in ...`, the hook files as `Replace devtwin hook entries in ...`, each job that is on as `Rewrite job <job> at ~/Library/LaunchAgents/devtwin.<job>.plist for kit <path>` and the new kit path to confirm. A job file still names the old clone and the Node path of that time. A job that is on keeps running the old kit until this batch writes its file again. Every job that is on is in the list: the radar, advisory, review, backup, activity, import, send and hub sync jobs, and a job whose file is missing. `schedule status` shows each one as `outdated` (or `missing`) before the batch and `current` after it. Or run the steps one at a time: preview `agents install` for each agent (changed skills show `update`), `agents install --hooks`, then `schedule apply --job <job>` (or `hub schedule --scope <scope>`) for each job that is on, then `paths confirm`. Each one asks on its own.
-4. Point `DEVTWIN_KIT` at the new clone, with the owner's approval.
+4. If you set `DEVTWIN_KIT`, point it at the new clone, with the owner's approval.
 5. If you ran the steps one at a time, run `paths confirm` from the new clone last, preview then apply. The new kit path ends the old confirmation.
 
-Installs stay owned across a kit change, because receipts bind to the config ID, not to the kit. The kit commit in a receipt is provenance. The bundled skills warn when it differs from the commit at `DEVTWIN_KIT`.
+Installs stay owned across a kit change, because receipts bind to the config ID, not to the kit. The kit commit in a receipt is provenance. The bundled skills warn when it differs from the commit at `<kit>`, the path from the session-start line.
 
 The live config records each clone's path. Do not move or rename a clone after `live set-kit`. To go back, run `live set-kit` from the old clone with its commit. Remove an old clone by hand only when nothing points at it.
 
 To add another repository, use `live add-repo --pilot "$LIVE_CONFIG" --repo '<repo>'`, preview then apply, and run step 2 on it first.
+
+## How the global command forwards
+
+The global `devtwin` command from `npm i -g` is for a person at the terminal. Hooks, jobs and skills never use it: they run the pinned kit's `bin/devtwin.mjs` directly.
+
+When you run a live command, such as `devtwin agents status --pilot "$LIVE_CONFIG"`, the global command runs it in the pinned kit. It forwards when all of these are true:
+
+- The live config exists. It is the file that `--pilot` names, or `~/.devtwin/live.json` without `--pilot`.
+- The config matches the approved digest in the store.
+- The pinned kit is a Git clone at its commit, or a package kit folder in `~/.devtwin/kits` whose manifest names its version and digest.
+
+Forwarding runs the same Node with the kit's `bin/devtwin.mjs` and the same arguments, with no shell. It writes `devtwin: running kit <kit ID>` on stderr. The kit then runs all its own gates.
+
+When the global command does not forward, it writes `devtwin: not forwarding to <kit> (<reason>); running this kit` on stderr. The reason is one of these:
+
+| Reason | Meaning |
+| --- | --- |
+| `missing` | The pinned kit folder does not exist. |
+| `outside-kits` | A package kit is not directly in `~/.devtwin/kits`. |
+| `kit-check` | The kit's manifest or Git commit does not match the live config. |
+| `unapproved` | The live config differs from the approved one. |
+| `unreadable` | The live config cannot be read. |
+| `pilot-twice` | The command gives `--pilot` more than once. |
+
+The command then runs in the global install, where the live gates refuse it with `GATE_REQUIRED`. Without a live config, for example with a disposable pilot, the command runs in the global install with no note.
+
+- `live set-kit --kit` and `live init --kit` forward to the kit that `--kit` names in `~/.devtwin/kits`, because they must run from that kit.
+- These commands always run in the global install: `--version`, `version`, `help`, `demo`, `kit install`, `kit list`, `skill-sources catalog`, `skill-sources check`, `skill-sources preview`, `skill template-list` and `hook`.
+- A forwarded command does not forward again. If the kit itself would forward, it refuses with `GATE_REQUIRED` and the reason `second-hop`.
 
 ## Recovering an interrupted install
 
