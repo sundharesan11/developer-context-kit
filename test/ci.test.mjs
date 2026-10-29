@@ -25,7 +25,8 @@ test("CI uses read-only pinned actions without privileged triggers or persistent
   assert.equal([...text.matchAll(/^\s*permissions:/gm)].length, 1, "no job-level permission override");
   assert.match(text, /persist-credentials: false/);
   assert.match(text, /package-manager-cache: false/);
-  assert.match(text, /timeout-minutes: 20/);
+  // The full suite takes over 20 minutes on hosted macOS runners.
+  assert.match(text, /timeout-minutes: 45/);
   assert.match(text, /cancel-in-progress: true/);
   const uses = [...text.matchAll(/uses: ([^\s]+)/g)].map(match => match[1]);
   assert.equal(uses.length, 2);
