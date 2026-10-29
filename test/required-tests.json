@@ -867,6 +867,7 @@
   "an interrupted kit install leaves only a temp folder, which the next run removes without following links",
   "kit install --apply holds an install lock: a fresh lock refuses a second run and keeps its temp folder, a stale one is replaced",
   "kit install refuses a source that changed while it was copied and leaves no kit or temp folder",
+  "kit install moves the kit folder while it is still writable by its owner, and locks it after the move",
   "kit install refuses a tampered folder that appears at the target while it copies, and leaves it untouched",
   "kit install records a 40-hex gitHead from package.json as the manifest sourceCommit, and null for any other value",
   "an installed kit passes the live config kit gate",
