@@ -813,5 +813,13 @@
   "a consent never used for 30 days is suggested, and accepting it revokes that consent through consent revoke",
   "a learning branch left local for more than 14 days is an informational line; accepting it records the decision only",
   "two declined proposals on one topic give a preference-declined line",
-  "review apply is always ask: the hook denies review apply --apply from an agent shell, and its previews stay open"
+  "review apply is always ask: the hook denies review apply --apply from an agent shell, and its previews stay open",
+  "owner block denies batch and apply flags that shell expansion builds, and allows only one non-owner setup step",
+  "the job node path is the link of the same prefix and formula, never another install",
+  "job and hub sync plists use the stable node path; hook lines run plain node",
+  "setup batch excludes only the step whose write-class path cannot be approved, and batches the rest",
+  "setup batch dialog lines are single lines, and a path with a control character is refused",
+  "setup batch: a step that fails in its own apply has no audit entry, and an error that is not a devtwin error keeps done and not run",
+  "setup batch: a failure after the last step is reported in derived.error and keeps the steps done",
+  "setup batch with job-hub-sync and consent-hub shows one dialog and no step dialog"
 ]

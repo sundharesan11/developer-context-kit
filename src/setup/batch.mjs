@@ -12,8 +12,11 @@
 // and the hooks last. Later steps are planned against the config the first change will write, so their fingerprints
 // hold after it runs. A consent shows its full rules in the batch dialog; when the dialog cannot hold them whole, the
 // consent leaves the batch (excluded) instead of being cut. Steps that need no owner approval are not batched, and
-// hub-join keeps its own dialog. Each step run gets one audit entry (kind "setup-batch", target the step) with the
-// batch ID. The batch is always ask: the hook denies setup apply --steps and --all-pending from agent shells.
+// hub-join keeps its own dialog. A step whose write-class paths cannot be approved (a symlinked settings file, a
+// path with a control character) leaves the batch with a reason; the other steps batch as usual. Each step that ran
+// gets one audit entry (kind "setup-batch", target the step) with the batch ID, written after the step succeeded, so
+// the log never shows a step the result does not list as done. The batch is always ask: the hook allows setup apply
+// from agent shells only for one --step that is not an owner step.
 import { randomBytes } from "node:crypto";
 import { dirname } from "node:path";
 import { DevtwinError, toJson } from "../errors.mjs";
@@ -21,6 +24,7 @@ import { loadPilot, rootsFromPilot } from "../config/pilot.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { digest } from "../storage/canonical.mjs";
 import { requireOwnerApproval, fitsDialog, issueBatchGrant, revokeBatchGrant, BATCH_GRANT } from "../owner/dialog.mjs";
+import { UNSAFE_PATH_CHARS } from "../config/roots.mjs";
 import { stepById } from "./steps.mjs";
 
 // The apply order. A step's phase never changes with the selection. hook-verify is not an owner step: it is in a batch
@@ -52,6 +56,10 @@ function selection(values) {
 }
 const home = (ctx) => ctx.pilot.live?.home ?? ctx.home;
 const tilde = (ctx, path) => typeof path === "string" && home(ctx) && path.startsWith(home(ctx) + "/") ? "~" + path.slice(home(ctx).length) : path;
+// Review fix: every dialog line is one line. A control, format or line-separator character in a path or a name is
+// shown as \u{...}, so no value can start a line of its own in the dialog.
+const UNSAFE_GLOBAL = new RegExp(UNSAFE_PATH_CHARS.source, "gu");
+export const oneLine = (text) => String(text).replace(UNSAFE_GLOBAL, (ch) => "\\u{" + ch.codePointAt(0).toString(16) + "}");
 const every = (seconds) => ({ 600: "every 10 minutes", 3600: "hourly", 86400: "daily", 604800: "weekly", 2592000: "monthly" })[seconds] ?? "every " + seconds + " seconds";
 
 // The write-class paths the steps need that the config does not approve yet, in step order, and the new classes.
@@ -69,6 +77,16 @@ function configChange(steps, ctx) {
 }
 const writeClassValues = (ctx, set) => ({ pilot: ctx.values.pilot, ...Object.fromEntries(CLASSES.filter(([cls]) => set[cls]).map(([cls, flag]) => [flag, set[cls]])) });
 const writeClasses = async () => (await import("../config/commands.mjs")).liveWriteClassesCommand;
+// Review fix: why a step's write-class paths cannot be approved, or null. Each step is checked alone, against the
+// config as it is, with the same validation the config change runs, so one bad path excludes only its own step.
+async function needsProblem(step, ctx) {
+  const { set, added } = configChange([step], ctx);
+  if (added.some((a) => UNSAFE_PATH_CHARS.test(a.path))) return "DEVTWIN_PATH_UNSAFE";
+  if (!Object.keys(set).length) return null;
+  try { await project(ctx, set); return null; }
+  catch (error) { return error instanceof DevtwinError ? error.code : "DEVTWIN_INTERNAL"; }
+}
+const needsExcluded = (code) => ({ code, reason: "a path it needs cannot be approved in the live config: " + code });
 // The context the later steps are planned in: the config the change will write and its exact bytes.
 async function project(ctx, set) {
   if (!Object.keys(set).length) return { pctx: ctx, preview: null };
@@ -117,8 +135,8 @@ const bodyFor = (items) => {
   const out = ["Approve runs each change below in this order. Deny changes nothing.", ""];
   let n = 0;
   for (const item of items) for (const [i, line] of item.lines.entries()) {
-    out.push(++n + ". " + line);
-    if (i === item.lines.length - 1) for (const text of item.text ?? []) out.push("    " + text);
+    out.push(++n + ". " + oneLine(line));
+    if (i === item.lines.length - 1) for (const text of item.text ?? []) out.push("    " + oneLine(text));
   }
   return { body: out.join("\n"), count: n };
 };
@@ -151,15 +169,21 @@ export async function buildBatch(values, ctx) {
     else excluded.push({ id, reason: step.available === true ? NO_APPROVAL : "it is " + step.available });
   }
   // Config steps are read against the config now; once their change is in the batch they are its first item.
-  const configSteps = [];
+  const configSteps = [], others = [];
   for (const step of chosen.filter((s) => s.config)) {
     const state = await stateOf(step, ctx);
-    if (state.skipped) skipped.push({ id: step.id, reason: state.skipped });
-    else if (state.excluded) excluded.push({ id: step.id, reason: state.excluded });
+    if (state.skipped) { skipped.push({ id: step.id, reason: state.skipped }); continue; }
+    if (state.excluded) { excluded.push({ id: step.id, reason: state.excluded }); continue; }
+    const problem = await needsProblem(step, ctx);
+    if (problem) excluded.push({ id: step.id, ...needsExcluded(problem) });
     else configSteps.push(step);
   }
+  for (const step of chosen.filter((s) => !s.config)) {
+    const problem = await needsProblem(step, ctx);
+    if (problem) excluded.push({ id: step.id, ...needsExcluded(problem) });
+    else others.push(step);
+  }
   // Two passes: the steps that still apply under a config with every need approved, then the config they need.
-  const others = chosen.filter((s) => !s.config);
   const first = (await project(ctx, configChange([...configSteps, ...others], ctx).set)).pctx;
   for (const step of others) {
     const state = await stateOf(step, first);
@@ -211,23 +235,35 @@ export async function applyBatch(values, ctx) {
   await requireOwnerApproval(ctx, plan.dialog);
   const batch = "batch_" + randomBytes(8).toString("hex"), done = [];
   const { appendEntry } = await import("../audit/log.mjs");
+  // Every stop is a DevtwinError that names the batch, the step, the steps done and the steps not run. An error that
+  // is not a DevtwinError keeps its message under error and becomes INTERNAL.
+  const stop = (item, i, error, extra = {}) => new DevtwinError(error instanceof DevtwinError ? error.code : "INTERNAL", "The setup batch stopped at step " + item.id,
+    { batch, failed: item.id, error: toJson(error), done: done.map((d) => d.id), notRun: items.slice(i + 1).map((x) => x.id), ...extra });
   let c = ctx;
   for (const [i, item] of items.entries()) {
+    let result;
     try {
       c = await reload(c);
       if ((await item.replan(c))?.fingerprint !== item.fingerprint) throw new DevtwinError("STALE_VERSION", "This step changed after the batch was planned", { step: item.id });
-      const entry = await appendEntry(c.roots, { kind: "setup-batch", tier: "always-ask", route: "setup apply", target: item.id, itemIds: [batch], actor: "human",
-        requestId: "req_sbt" + digest({ batch, step: item.id }).slice(7, 31) }, { now: c.now });
       const grant = issueBatchGrant({ batchFingerprint: plan.fingerprint, step: item.id, stepFingerprint: item.fingerprint });
-      let result;
       try { result = await item.apply({ ...c, [BATCH_GRANT]: grant }, item.fingerprint); } finally { revokeBatchGrant(grant); }
-      done.push({ id: item.id, audit: entry.id, result });
+    } catch (error) { throw stop(item, i, error); }
+    // The audit entry follows the step, so the log names only steps that ran. A step that ran but could not be logged
+    // is listed as done, and the batch stops there.
+    let entry;
+    try {
+      entry = await appendEntry(c.roots, { kind: "setup-batch", tier: "always-ask", route: "setup apply", target: item.id, itemIds: [batch], actor: "human",
+        requestId: "req_sbt" + digest({ batch, step: item.id }).slice(7, 31) }, { now: c.now });
     } catch (error) {
-      if (!(error instanceof DevtwinError)) throw error;
-      throw new DevtwinError(error.code, "The setup batch stopped at step " + item.id, { batch, failed: item.id, error: toJson(error), done: done.map((d) => d.id), notRun: items.slice(i + 1).map((x) => x.id) });
+      done.push({ id: item.id, audit: null, result });
+      throw stop(item, i, error, { stage: "audit" });
     }
+    done.push({ id: item.id, audit: entry.id, result });
   }
-  // Upgrade fix: the derived state follows every batch, so the hook finds bound projects at once.
-  const derived = await (await import("../lessons/index.mjs")).rebuildDerived((await reload(c)).roots);
+  // Upgrade fix: the derived state follows every batch, so the hook finds bound projects at once. Every step already
+  // ran, so a failure here is reported in derived.error and the result still lists them.
+  let derived;
+  try { derived = await (await import("../lessons/index.mjs")).rebuildDerived((await reload(c)).roots); }
+  catch (error) { derived = { error: toJson(error) }; }
   return { applied: true, batch, done, notRun: [], excluded: plan.excluded, skipped: plan.skipped, derived };
 }

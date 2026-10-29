@@ -40,23 +40,25 @@ export function renderPlist({ label, programArguments, interval }) {
     ""
   ].join("\n");
 }
-// The Node a job runs. Homebrew's process.execPath names a versioned folder (<prefix>/Cellar/node/<version>/bin/node)
-// that brew upgrade node removes, which would break every job. When execPath is in such a folder, a job uses the
-// stable shim instead: <prefix>/bin/node first, then /opt/homebrew/bin/node and /usr/local/bin/node, the first whose
-// real path is a file named node. Otherwise it keeps execPath. The hook lines in the agent settings run plain "node"
-// from PATH, which an upgrade does not break either. ctx.nodeLookup ({ execPath, shims, realpath, isFile }) is the seam.
-export const NODE_SHIMS = Object.freeze(["/opt/homebrew/bin/node", "/usr/local/bin/node"]);
-const CELLAR = /^(\/.+)\/Cellar\/node(?:@[0-9]+)?\/[^/]+\/bin\/node$/;
+// The Node a job runs. Homebrew's process.execPath names a versioned folder (<prefix>/Cellar/<formula>/<version>/bin/node)
+// that brew upgrade removes, which would break every job. When execPath is in such a folder, a job uses the stable link
+// of the same prefix and the same formula instead: <prefix>/bin/node for the formula node, <prefix>/opt/node@NN/bin/node
+// for node@NN. The link is used only when its real path is a file <prefix>/Cellar/<formula>/<version>/bin/node, so a link
+// that leads to another install, another formula or another prefix is never used. Otherwise the job keeps execPath. The
+// hook lines in the agent settings run plain "node" from PATH, which an upgrade does not break either.
+// ctx.nodeLookup ({ execPath, realpath, isFile }) is the seam.
+const CELLAR = /^(\/.+)\/Cellar\/(node(?:@[0-9]+)?)\/[^/]+\/bin\/node$/;
 const isFileAt = (path) => { try { return statSync(path).isFile(); } catch { return false; } };
-export function stableNodePath({ execPath = process.execPath, shims = NODE_SHIMS, realpath = realpathSync, isFile = isFileAt } = {}) {
-  const prefix = CELLAR.exec(execPath)?.[1];
-  if (!prefix) return execPath;
-  for (const shim of [...new Set([prefix + "/bin/node", ...shims])]) {
-    try {
-      const real = realpath(shim);
-      if (basename(real) === "node" && isFile(real)) return shim;
-    } catch { /* No shim here. */ }
-  }
+export function stableNodePath({ execPath = process.execPath, realpath = realpathSync, isFile = isFileAt } = {}) {
+  const match = CELLAR.exec(execPath);
+  if (!match) return execPath;
+  const [, prefix, formula] = match;
+  const link = formula === "node" ? prefix + "/bin/node" : prefix + "/opt/" + formula + "/bin/node";
+  try {
+    const real = realpath(link);
+    const target = CELLAR.exec(real);
+    if (target && target[1] === prefix && target[2] === formula && isFile(real)) return link;
+  } catch { /* No link here. */ }
   return execPath;
 }
 export const jobNodePath = (ctx) => stableNodePath(ctx?.nodeLookup ?? {});

@@ -41,22 +41,35 @@ export const OWNER_ACTIONS = Object.freeze([
   // U30 (KTD29): where a project's lessons go in its repository; a change voids the repository's consent.
   { words: ["project", "set"], apply: true }
 ].map((action) => Object.freeze({ ...action, words: Object.freeze(action.words) })));
-// U9: setup steps whose apply runs an owner action above (src/setup/steps.mjs marks them owner: true). "setup apply"
-// naming one of them is denied, and so is the "setup" terminal loop, which can apply them. setup status, setup plan
-// and setup apply for any other step stay allowed.
+// U9: setup steps whose apply runs an owner action above (src/setup/steps.mjs marks them owner: true). setup apply is
+// an allowlist: from an agent shell it is allowed only with exactly one --step <id> whose id is not listed here, and
+// with neither --steps nor --all-pending. Anything else that names setup apply is denied, and so is the "setup"
+// terminal loop, which can apply owner steps. setup status and setup plan stay allowed.
 export const OWNER_SETUP_STEPS = Object.freeze(["skills-claude", "skills-codex", "write-classes-hooks", "hooks-claude", "hooks-codex", "hub-join", "job-hub-sync", "job-radar", "job-advisories", "job-review-reminder", "consent-repo", "consent-hub", "paths-confirm", "backup-folder", "job-backup"]);
 // U9 (one approval): the flags that make setup apply a batch of owner steps (src/setup/batch.mjs). Its preview is
 // setup plan with the same flags, so every setup apply that names one is denied, with or without --apply.
 export const SETUP_BATCH_FLAGS = Object.freeze(["--steps", "--all-pending"]);
 const SETUP_READS = ["status", "plan", "apply"];
+const STEP_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// The one step a setup apply names, or null when it names none, several, a list or a batch flag.
+function singleStep(words) {
+  if (words.some((word) => SETUP_BATCH_FLAGS.some((flag) => word === flag || word.startsWith(flag + "=")))) return null;
+  const ids = [];
+  words.forEach((word, i) => {
+    if (word === "--step") ids.push(words[i + 1]);
+    else if (word.startsWith("--step=")) ids.push(word.slice("--step=".length));
+  });
+  return ids.length === 1 && STEP_ID.test(ids[0] ?? "") ? ids[0] : null;
+}
 function setupAction(words) {
   if (!words.includes("setup")) return null;
   if (words.includes("apply")) {
-    if (SETUP_BATCH_FLAGS.some((flag) => words.includes(flag))) return "setup apply --steps";
+    if (SETUP_BATCH_FLAGS.some((flag) => words.some((word) => word === flag || word.startsWith(flag + "=")))) return "setup apply --steps";
     // A step list such as "hooks-claude,job-radar" is one word; each name in it counts.
-    const names = words.flatMap((word) => word.split(","));
-    const step = OWNER_SETUP_STEPS.find((id) => names.includes(id));
-    return step ? "setup apply --step " + step : null;
+    const names = words.flatMap((word) => word.split(/[,=]/));
+    const owner = OWNER_SETUP_STEPS.find((id) => names.includes(id));
+    if (owner) return "setup apply --step " + owner;
+    return singleStep(words) ? null : "setup apply";
   }
   return SETUP_READS.some((word) => words.includes(word)) ? null : "setup";
 }
@@ -71,6 +84,8 @@ function commandText(input) {
 // turned into spaces, because the shell joins "--ap""ply" into --apply. "A=accept" gives "a" and "accept", so a value
 // set in a variable still counts.
 const wordsOf = (text) => text.toLowerCase().replace(/\\\n/g, " ").replace(/["'`\\]/g, "").split(/[\s;|&()<>{}$=]+/).filter(Boolean);
+// Shell expansions that can hide or build words: ${...}, $'...', $"...", $(...) and backticks.
+const HIDING = /\$\{|\$'|\$"|\$\(|`/;
 // The owner action a payload's shell command runs, or null. Only shell tools are checked.
 export function ownerAction(agent, payload) {
   if (!["claude", "codex"].includes(agent) || !SHELL_TOOLS.has(payload?.tool_name)) return null;
@@ -79,7 +94,14 @@ export function ownerAction(agent, payload) {
   const words = wordsOf(text), apply = words.includes("--apply");
   // Every route word anywhere, adjacent or not: a wrapper such as xargs or a variable can split the route.
   const found = OWNER_ACTIONS.find(({ words: route, apply: needsApply }) => (!needsApply || apply) && route.every((word) => words.includes(word)));
-  return found ? found.words.join(" ") + (found.apply ? " --apply" : "") : setupAction(words);
+  if (found) return found.words.join(" ") + (found.apply ? " --apply" : "");
+  const setup = setupAction(words);
+  if (setup) return setup;
+  // Review fix: shell expansion can build a word the match above never sees ("--ap${X}ply", $'--all-pe\x6eding').
+  // When the text names an owner route (all its words, or its first word with --apply) or setup, any such expansion
+  // denies, previews included.
+  if (HIDING.test(text) && (words.includes("setup") || OWNER_ACTIONS.some(({ words: route }) => route.every((word) => words.includes(word)) || (apply && words.includes(route[0]))))) return "shell expansion near an owner action";
+  return null;
 }
 // Both agents read the same PreToolUse deny shape.
 export const denyOutput = () => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: DENY_REASON } });

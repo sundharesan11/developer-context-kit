@@ -64,7 +64,9 @@ node bin/devtwin.mjs setup apply --pilot "$PILOT_FILE" --all-pending --backup-ta
 - Before each step, the batch previews it again. A step that changed after your approval stops the batch with `STALE_VERSION`. The error lists the steps in `done` and `notRun`.
 - A consent shows its full rules in the dialog. When the rules do not fit with the other lines, the consent leaves the batch. Nothing is cut.
 - `hub-join`, `live set-kit`, `instructions apply` and `backup key export` keep their own dialog. Steps that need no approval, such as `profile`, are not in a batch.
-- Each step that runs adds one audit entry with the batch ID. The hook denies `setup apply --steps` and `setup apply --all-pending` from agent shells.
+- A step whose write-class path cannot be approved, such as a settings file that is a symlink, leaves the batch with a reason and a `code`. The other steps stay in the batch.
+- Each step that runs adds one audit entry with the batch ID, after the step succeeded. If a step fails, the error lists `done` and `notRun`. An unexpected error has the code `DEVTWIN_INTERNAL`. If the lesson index rebuild after the last step fails, the result still lists every step in `done` and reports the failure in `derived.error`.
+- From an agent shell, the hook allows `setup apply` only with one `--step` that is not an owner step. It denies `setup apply --steps` and `setup apply --all-pending`. It also denies a command that names devtwin and `setup` or an owner action when the text holds a shell expansion such as `${`, `$(`, `$'`, `$"` or a backtick.
 
 A hook install, `live set-kit` and each batch rebuild the lesson index and the session summaries of every scope. So a store that an older kit wrote works with the hook at once.
 
@@ -265,7 +267,7 @@ node bin/devtwin.mjs schedule off --pilot "$PILOT_FILE" --job radar-weekly --app
 ```
 
 - `schedule plan` writes nothing. It shows the LaunchAgent path, the command it runs and the off switch. The plist must be an approved `launchAgents` path named `devtwin.<job>.plist`.
-- The command starts with a Node path that stays the same when Homebrew upgrades Node. When Node runs from a versioned `Cellar/node/<version>` folder, the plist names the Homebrew link, such as `/opt/homebrew/bin/node`, if that link leads to Node. Otherwise it names the Node that ran the command.
+- The command starts with a Node path that stays the same when Homebrew upgrades Node. When Node runs from a versioned `<prefix>/Cellar/<formula>/<version>` folder, the plist names the Homebrew link of the same prefix and formula: `<prefix>/bin/node` for `node`, `<prefix>/opt/node@NN/bin/node` for `node@NN`. It uses the link only if the link leads to a Node in `<prefix>/Cellar/<formula>/`. A link to another prefix, formula or install is never used. Otherwise the plist names the Node that ran the command.
 - `schedule apply` shows the owner dialog, writes the plist and loads it. The radar and advisory jobs need a stack approval first, and the advisory job needs the radar job on and the `advisories` group in the approval.
 - `schedule off` unloads the job and removes its plist. Turning off the radar also turns off the advisory job.
 - `schedule status` reports, for each job, whether it is on, installed and loaded, and its last run. It makes no request.

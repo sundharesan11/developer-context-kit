@@ -164,3 +164,36 @@ test("owner block denies a Codex shell payload and keeps lesson delivery decisio
   assert.match(edit.json.hookSpecificOutput.additionalContext, /Migrations before seeds/);
   assert.doesNotMatch(edit.out, /permissionDecision|"decision"/);
 });
+
+test("owner block denies batch and apply flags that shell expansion builds, and allows only one non-owner setup step", async (t) => {
+  const p = await makePilot(t);
+  const denied = [
+    // Review repros: the expanded flag is not a word the match sees.
+    "devtwin setup apply --pilot /x/live.json --all-pend${X}ing --apply --plan-fingerprint sha256:00",
+    "devtwin setup apply --pilot /x/live.json $'--all-pe\\x6eding' --apply --plan-fingerprint sha256:00",
+    "devtwin setup apply --pilot /x/live.json --step profile --all-pend${X}ing --apply",
+    "devtwin setup apply --pilot /x/live.json --ste${X}ps hooks-claude",
+    `${KIT} live write-classes --pilot /x/live.json --hook-target /h/.claude/settings.json --ap\${X}ply --plan-fingerprint sha256:00`,
+    "devtwin live write-classes --pilot /x/live.json --ap$'p'ly",
+    "devtwin live write-classes --pilot /x/live.json --ap$\"p\"ly",
+    "devtwin lesson co$(printf p)y --pilot /x/live.json --id rec_1 --apply",
+    "devtwin setup apply --pilot /x/live.json --step `printf profile`",
+    // setup apply is an allowlist: one --step that is not an owner step, and nothing else.
+    "devtwin setup apply --pilot /x/live.json --plan-fingerprint sha256:00",
+    "devtwin setup apply --pilot /x/live.json --step profile --step sandbox --plan-fingerprint sha256:00",
+    "devtwin setup apply --pilot /x/live.json --step=profile --step=hooks-claude",
+    "devtwin setup apply --pilot /x/live.json --step profile --steps=job-radar"
+  ];
+  for (const command of denied) {
+    assert.ok(ownerAction("claude", claudeBash(p.reposDir, command)), command);
+    assert.ok(isDeny(await hook(p.path, "claude", claudeBash(p.reposDir, command))), command);
+  }
+  for (const command of [
+    `${KIT} setup apply --pilot '/x/live.json' --step profile --plan-fingerprint 'sha256:00'`,
+    "devtwin setup apply --pilot /x/live.json --step=sandbox --repo /r",
+    "devtwin setup plan --pilot /x/live.json --all-pending",
+    `${KIT} live write-classes --pilot '/x/live.json' --hook-target '/h/.claude/settings.json'`,
+    // An expansion in a command that names no owner route stays allowed.
+    "devtwin lesson match --pilot /x/live.json --scope example --path \"$(pwd)/db/a.sql\""
+  ]) assert.equal(ownerAction("claude", claudeBash(p.reposDir, command)), null, command);
+});

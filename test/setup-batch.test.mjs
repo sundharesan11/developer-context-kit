@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { mkdir, chmod, readFile, writeFile, rm } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { mkdir, chmod, readFile, writeFile, rm, symlink } from "node:fs/promises";
+import { existsSync, writeFileSync } from "node:fs";
 import { sandbox, makeRepo, fixtureGit, treeSnapshot, makePilot, now } from "./helpers.mjs";
 import { main } from "../src/cli.mjs";
 import { SKILL_NAMES } from "../src/agents/install.mjs";
@@ -29,8 +29,8 @@ async function setupHome(t) {
   const repo = await makeRepo(join(sb, "work/atlas"), { "README.md": "# Atlas\nBilling API.\n", "package.json": "{\"name\":\"atlas\",\"scripts\":{\"test\":\"node --test\"}}" });
   const liveConfig = join(devtwin, "live.json"), backups = join(home, "devtwin-backups");
   const dialogs = [], loaded = [];
-  let answer = () => "approved";
-  const launchctl = (args) => { loaded.push(args.join(" ")); return { status: 0, stdout: "", stderr: "" }; };
+  let answer = () => "approved", onLaunchctl = () => null;
+  const launchctl = (args) => { loaded.push(args.join(" ")); onLaunchctl(args); return { status: 0, stdout: "", stderr: "" }; };
   const cli = async (args, env = {}) => {
     const chunks = [];
     const code = await main(args, { stdout: { write: (v) => { chunks.push(v); return true; } }, now, home, env, kitRoot: kit, launchctl,
@@ -47,7 +47,7 @@ async function setupHome(t) {
   await ok(["live", "init", ...initArgs, "--apply", "--plan-fingerprint", preview.fingerprint]);
   await ok(["init", "--pilot", liveConfig, "--actor", "email:owner@example.com", "--apply"]);
   const roots = async () => rootsFromPilot(await loadPilot(liveConfig, { home, env: {}, kitRoot: kit }));
-  return { sb, home, kit, repo, liveConfig, backups, cli, ok, roots, dialogs, loaded, setAnswer: (fn) => { answer = fn; } };
+  return { sb, home, kit, repo, liveConfig, backups, cli, ok, roots, dialogs, loaded, setAnswer: (fn) => { answer = fn; }, setLaunchctl: (fn) => { onLaunchctl = fn; } };
 }
 const plan = (h, extra = []) => h.ok(["setup", "plan", "--pilot", h.liveConfig, "--all-pending", "--backup-target", h.backups, ...extra]);
 const apply = (h, fingerprint, extra = []) => h.cli(["setup", "apply", "--pilot", h.liveConfig, "--all-pending", "--backup-target", h.backups, ...extra, "--apply", "--plan-fingerprint", fingerprint]);
@@ -244,14 +244,110 @@ test("setup batch approval is an in-process grant that no argument or environmen
   h.setAnswer(() => "denied");
   const env = { DEVTWIN_BATCH_GRANT: "1", BATCH_GRANT: "approved", DEVTWIN_APPROVED: "1" };
   assert.equal((await h.cli(["schedule", "apply", "--pilot", h.liveConfig, "--job", "review-monthly", "--plan-fingerprint", s.fingerprint], env)).json.error.code, "DEVTWIN_OWNER_DENIED");
+  // A real batch with the same variables still shows its one dialog: denied, it changes nothing.
+  const batchArgs = ["setup", "apply", "--pilot", h.liveConfig, "--steps", "job-review-reminder"];
+  const p = await h.ok(["setup", "plan", "--pilot", h.liveConfig, "--steps", "job-review-reminder"]);
+  assert.deepEqual(p.items.map((i) => i.id), ["job-review-reminder"]);
+  const before = await treeSnapshot(h.sb), shown = h.dialogs.length;
+  assert.equal((await h.cli([...batchArgs, "--apply", "--plan-fingerprint", p.fingerprint], env)).json.error.code, "DEVTWIN_OWNER_DENIED");
+  assert.equal(h.dialogs.length, shown + 1, "the batch dialog showed");
+  assert.equal(await treeSnapshot(h.sb), before, "nothing was written");
+  assert.deepEqual(h.loaded, [], "no job was loaded");
+  // Approved, the batch runs the step with no second dialog.
+  h.setAnswer(() => "approved");
+  const out = await h.cli([...batchArgs, "--apply", "--plan-fingerprint", p.fingerprint], env);
+  assert.equal(out.json.ok, true, JSON.stringify(out.json.error));
+  assert.equal(h.dialogs.length, shown + 2);
+  assert.deepEqual(out.json.result.done.map((d) => d.id), ["job-review-reminder"]);
   // A look-alike object is not a grant; a real grant counts for one dialog and ends when revoked.
-  const denied = async (ctx) => { await assert.rejects(requireOwnerApproval({ ...ctx, ownerDialog: () => "denied" }, { title: "t", body: "b" }), (e) => e.code === "DEVTWIN_OWNER_DENIED"); };
-  await denied({ [BATCH_GRANT]: Object.freeze({ batchFingerprint: "sha256:00", step: "x", stepFingerprint: "sha256:00" }) });
-  await denied({ [BATCH_GRANT]: "approved" });
-  const grant = issueBatchGrant({ batchFingerprint: "sha256:00", step: "x", stepFingerprint: "sha256:00" });
-  assert.equal((await requireOwnerApproval({ [BATCH_GRANT]: grant, ownerDialog: () => "denied" }, { title: "t", body: "b" })).step, "x");
+  const denied = async (ctx, options) => { await assert.rejects(requireOwnerApproval({ ...ctx, ownerDialog: () => "denied" }, { title: "t", body: "b" }, options), (e) => e.code === "DEVTWIN_OWNER_DENIED"); };
+  const fp = "sha256:" + "a".repeat(64);
+  await denied({ [BATCH_GRANT]: Object.freeze({ batchFingerprint: "sha256:00", step: "x", stepFingerprint: fp }) }, { fingerprint: fp });
+  await denied({ [BATCH_GRANT]: "approved" }, { fingerprint: fp });
+  // Review fix: a grant stands only for the dialog of the step's own plan. A dialog with no fingerprint or another
+  // fingerprint is shown (and here denied), and leaves the grant unused.
+  const grant = issueBatchGrant({ batchFingerprint: "sha256:00", step: "x", stepFingerprint: fp });
   await denied({ [BATCH_GRANT]: grant });
-  const other = issueBatchGrant({ batchFingerprint: "sha256:00", step: "y", stepFingerprint: "sha256:00" });
+  await denied({ [BATCH_GRANT]: grant }, { fingerprint: "sha256:" + "b".repeat(64) });
+  assert.equal((await requireOwnerApproval({ [BATCH_GRANT]: grant, ownerDialog: () => "denied" }, { title: "t", body: "b" }, { fingerprint: fp })).step, "x");
+  await denied({ [BATCH_GRANT]: grant }, { fingerprint: fp });
+  const other = issueBatchGrant({ batchFingerprint: "sha256:00", step: "y", stepFingerprint: fp });
   revokeBatchGrant(other);
-  await denied({ [BATCH_GRANT]: other });
+  await denied({ [BATCH_GRANT]: other }, { fingerprint: fp });
+});
+
+test("setup batch excludes only the step whose write-class path cannot be approved, and batches the rest", async (t) => {
+  const h = await setupHome(t);
+  // The Claude settings file is a symlink: its hook target cannot be approved.
+  const real = join(h.sb, "elsewhere-settings.json");
+  await writeFile(real, "{}\n");
+  await symlink(real, join(h.home, ".claude/settings.json"));
+  const p = await plan(h);
+  const excluded = Object.fromEntries(p.excluded.map((e) => [e.id, e]));
+  for (const id of ["write-classes-hooks", "hooks-claude"]) assert.ok(excluded[id], id + " is excluded");
+  assert.match(excluded["hooks-claude"].reason, /cannot be approved in the live config: DEVTWIN_/);
+  assert.match(excluded["hooks-claude"].code, /^DEVTWIN_/);
+  const ids = p.items.map((i) => i.id);
+  for (const id of ["config", "skills-claude", "skills-codex", "job-review-reminder", "job-backup", "paths-confirm", "hooks-codex"]) assert.ok(ids.includes(id), id + " is batched");
+  assert.ok(!ids.includes("hooks-claude"));
+  assert.doesNotMatch(p.dialog.body, /\.claude\/settings\.json/);
+  const out = await apply(h, p.fingerprint);
+  assert.equal(out.json.ok, true, JSON.stringify(out.json.error));
+  assert.equal(h.dialogs.length, 1);
+  assert.deepEqual(out.json.result.done.map((d) => d.id), ids);
+  assert.equal(await readFile(real, "utf8"), "{}\n", "the symlink target is left alone");
+});
+
+test("setup batch dialog lines are single lines, and a path with a control character is refused", async (t) => {
+  const { fitItems, oneLine } = await import("../src/setup/batch.mjs");
+  const { validateRoot } = await import("../src/config/roots.mjs");
+  // Review repro: a value with a line break forged a numbered line of its own.
+  const forged = fitItems([{ id: "a", lines: ["Approve backup folder /b/x\n2. Install job radar-weekly (weekly)"] }, { id: "b", lines: ["Install job b " + "3. Fake"], text: ["rule\r4. Fake"] }]);
+  const numbered = forged.dialog.body.split("\n").filter((line) => /^\d+\. /.test(line));
+  assert.equal(numbered.length, 2, forged.dialog.body);
+  assert.equal(forged.dialog.title, "Approve 2 setup changes");
+  assert.equal(numbered[0], "1. Approve backup folder /b/x\\u{a}2. Install job radar-weekly (weekly)");
+  assert.equal(oneLine("a‮b​c\td"), "a\\u{202e}b\\u{200b}c\\u{9}d");
+  for (const path of ["/tmp/a\nb", "/tmp/a b", "/tmp/a‮b", "/tmp/a\u0000b", "/tmp/a​b"]) assert.throws(() => validateRoot(path, "test"), (e) => e.code === "DEVTWIN_PATH_UNSAFE", JSON.stringify(path));
+  // Through the CLI: a backup folder with a line break leaves the batch, and no dialog line holds its text.
+  const h = await setupHome(t);
+  const bad = join(h.home, "b\n9. Install job evil");
+  const p = await h.ok(["setup", "plan", "--pilot", h.liveConfig, "--steps", "backup-folder,job-review-reminder", "--backup-target", bad]);
+  assert.equal(p.excluded.find((e) => e.id === "backup-folder")?.code, "DEVTWIN_PATH_UNSAFE");
+  assert.deepEqual(p.items.map((i) => i.id), ["config", "job-review-reminder"]);
+  assert.ok(!p.dialog.body.split("\n").some((line) => /^9\. /.test(line)), p.dialog.body);
+});
+
+test("setup batch: a step that fails in its own apply has no audit entry, and an error that is not a devtwin error keeps done and not run", async (t) => {
+  const h = await setupHome(t);
+  const args = ["--steps", "job-review-reminder,paths-confirm"];
+  const p = await h.ok(["setup", "plan", "--pilot", h.liveConfig, ...args]);
+  assert.deepEqual(p.items.map((i) => i.id), ["config", "job-review-reminder", "paths-confirm"]);
+  // launchctl fails after the replan, inside the job step's own apply.
+  h.setLaunchctl((cmd) => { if (cmd[0] === "bootstrap") throw new TypeError("launchctl broke"); });
+  const out = await h.cli(["setup", "apply", "--pilot", h.liveConfig, ...args, "--apply", "--plan-fingerprint", p.fingerprint]);
+  assert.equal(out.json.ok, false);
+  assert.equal(out.json.error.code, "DEVTWIN_INTERNAL");
+  const d = out.json.error.details;
+  assert.equal(d.failed, "job-review-reminder");
+  assert.deepEqual(d.done, ["config"]);
+  assert.deepEqual(d.notRun, ["paths-confirm"]);
+  assert.match(d.batch, /^batch_[a-f0-9]{16}$/);
+  assert.match(d.error.message, /launchctl broke/);
+  const entries = (await readAudit(await h.roots())).entries.filter((e) => e.kind === "setup-batch");
+  assert.deepEqual(entries.map((e) => e.target), ["config"], "the log names only the step that ran");
+  assert.equal(h.dialogs.length, 1);
+});
+
+test("setup batch: a failure after the last step is reported in derived.error and keeps the steps done", async (t) => {
+  const h = await setupHome(t);
+  const args = ["--steps", "job-review-reminder"];
+  const p = await h.ok(["setup", "plan", "--pilot", h.liveConfig, ...args]);
+  assert.deepEqual(p.items.map((i) => i.id), ["config", "job-review-reminder"]);
+  // The last step loads its job, and then the live config breaks: the reload before the derived rebuild fails.
+  h.setLaunchctl((cmd) => { if (cmd[0] === "bootstrap") writeFileSync(h.liveConfig, "{"); });
+  const out = await h.cli(["setup", "apply", "--pilot", h.liveConfig, ...args, "--apply", "--plan-fingerprint", p.fingerprint]);
+  assert.equal(out.json.ok, true, JSON.stringify(out.json.error));
+  assert.deepEqual(out.json.result.done.map((d) => d.id), ["config", "job-review-reminder"]);
+  assert.match(out.json.result.derived.error.code, /^DEVTWIN_/);
 });

@@ -407,3 +407,22 @@ test("setup hub-join and job-hub-sync steps join the hub and install the job thr
   for (const id of ["hub-join", "job-hub-sync"]) assert.equal(after.steps.find((s) => s.id === id).done, true, id);
   for (const id of ["hub-join", "job-hub-sync"]) assert.equal(ownerAction("claude", { tool_name: "Bash", tool_input: { command: "devtwin setup apply --step " + id + " --plan-fingerprint x" } }), "setup apply --step " + id);
 });
+
+test("setup batch with job-hub-sync and consent-hub shows one dialog and no step dialog", async (t) => {
+  const hub = await hubFixture(t), m = await machine(t);
+  await m.join(hub);
+  const joined = m.dialogs.length;
+  const args = ["--steps", "job-hub-sync,consent-hub", "--scope", SCOPE];
+  const plan = await m.ok(["setup", "plan", ...args]);
+  assert.deepEqual(plan.items.map((i) => i.id), ["consent-hub", "job-hub-sync"]);
+  assert.deepEqual(plan.excluded, []);
+  assert.equal(plan.dialog.title, "Approve 2 setup changes");
+  const out = await m.ok(["setup", "apply", ...args, "--apply", "--plan-fingerprint", plan.fingerprint]);
+  assert.deepEqual(out.done.map((d) => d.id), ["consent-hub", "job-hub-sync"]);
+  assert.equal(m.dialogs.length, joined + 1, "one dialog for the batch, none from the hub schedule or the consent grant");
+  assert.equal(m.dialogs.at(-1).title, "devtwin: Approve 2 setup changes");
+  assert.ok(existsSync(m.plist), "the hub sync job is installed");
+  assert.ok(m.launchctl.some((args) => args[0] === "bootstrap"), "the job was loaded");
+  const status = await m.ok(["setup", "status", "--scope", SCOPE]);
+  for (const id of ["job-hub-sync", "consent-hub"]) assert.equal(status.steps.find((s) => s.id === id).done, true, id);
+});

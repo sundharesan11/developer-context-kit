@@ -81,7 +81,7 @@ export const grantDialog = (plan) => ({ title: plan.consent.kind === "repo-push"
 export async function applyGrant(roots, input, { fingerprint, now = () => new Date(), ctx = {} } = {}) {
   const plan = await planGrant(roots, input);
   assertFingerprint(plan, fingerprint);
-  await requireOwnerApproval(ctx, grantDialog(plan));
+  await requireOwnerApproval(ctx, grantDialog(plan), { fingerprint: plan.fingerprint });
   return withConsentLock(roots, "consent-grant", async () => {
     const current = await readConsent(roots, plan.consent.kind, plan.consent.target);
     if (JSON.stringify(current) !== JSON.stringify(plan.current)) throw new DevtwinError("STALE_VERSION", "Consent changed");

@@ -62,7 +62,9 @@ const approvalMode = (ctx) => (ctx?.pilot ?? ctx?.roots?.pilot)?.approval === "d
 // One approval for a setup batch (src/setup/batch.mjs). After the owner approved the batch dialog, the batch runs each
 // step with a grant under ctx[BATCH_GRANT]. A grant is an object that only issueBatchGrant makes and that this module
 // remembers, so no argument or environment variable can stand for one. It is bound to the batch fingerprint, the step
-// and the step's fingerprint, stands for one dialog only, and is revoked when the step ends.
+// and the step's plan fingerprint, and is revoked when the step ends. It stands for one dialog only: the dialog of the
+// plan whose fingerprint the caller passes to requireOwnerApproval, which must equal the grant's step fingerprint.
+// A dialog with no fingerprint or another fingerprint is shown as usual (fail safe), and the grant stays unused.
 export const BATCH_GRANT = Symbol("devtwin.batchGrant");
 const GRANTS = new WeakMap();
 export function issueBatchGrant({ batchFingerprint, step, stepFingerprint }) {
@@ -71,17 +73,19 @@ export function issueBatchGrant({ batchFingerprint, step, stepFingerprint }) {
   return grant;
 }
 export const revokeBatchGrant = (grant) => { GRANTS.delete(grant); };
-function useBatchGrant(ctx) {
+function useBatchGrant(ctx, fingerprint) {
   const grant = ctx?.[BATCH_GRANT], state = grant ? GRANTS.get(grant) : undefined;
   if (!state || state.uses > 0) return null;
+  if (typeof fingerprint !== "string" || !fingerprint || fingerprint !== grant.stepFingerprint) return null;
   state.uses++;
   return grant;
 }
 // Shows the dialog and throws OWNER_DENIED unless the owner clicked Approve. Call it before the first write.
 // In mode dialog-or-tty with no GUI session, the owner answers on the terminal instead (src/owner/tty.mjs).
-export async function requireOwnerApproval(ctx, content) {
+// fingerprint: the fingerprint of the plan this dialog approves; only a batch grant for that same plan stands for it.
+export async function requireOwnerApproval(ctx, content, { fingerprint } = {}) {
   const shown = dialogText(content);
-  const grant = useBatchGrant(ctx);
+  const grant = useBatchGrant(ctx, fingerprint);
   if (grant) return { approved: true, title: shown.title, batch: grant.batchFingerprint, step: grant.step };
   const tty = approvalMode(ctx) === "dialog-or-tty" && !hasGuiSession(ctx);
   // An injected dialog gets the cleaned text; osascriptDialog cleans the raw content itself.
