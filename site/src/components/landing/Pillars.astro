@@ -33,7 +33,7 @@ const lines = (tree: string) =>
     <div class="intro reveal">
       <div class="kicker">What devtwin is</div>
       <h2 class="h2" id="pillars-title" data-words>A second you, <span class="soft">in every session.</span></h2>
-      <p>Agents read your code. They don't know why the queue moved to SQS, which test command actually works, what must never change, or where you stopped yesterday. You do. devtwin writes that down once, with sources, and hands it to every session that follows.</p>
+      <p>Agents read your code, but they don't know why the queue moved to SQS, which test command actually works, what must never change, or where you stopped yesterday. devtwin writes that down once, with sources, and every later session starts with it.</p>
     </div>
 
     <!-- Pillar 1 -->
@@ -41,12 +41,12 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>01</span> Project context</div>
         <h3 id="p1">Context that carries over, with receipts.</h3>
-        <p>Decisions, facts, constraints, commands, unknowns and handoffs live as records outside the repo. Agents write them as they work. Every record points at where it came from, lands in an audit log you can undo, and is superseded, never silently overwritten.</p>
+        <p>Decisions, facts, constraints, commands, unknowns and handoffs live as records outside the repo. Agents write them as they work. Each record points to its source and goes into an audit log, so you can undo it. Changing a record adds a new version linked to the old one.</p>
         <ul class="ticks">
-          <li><span><b>Source-linked.</b> A file, a commit, an issue or a URL. Files are hashed, so drift shows.</span></li>
-          <li><span><b>Audited, undoable.</b> <code>activity</code> shows what agents wrote this week; <code>undo</code> reverses one write.</span></li>
-          <li><span><b>Memory, promoted.</b> A daily job turns Claude memory and <code>docs/solutions</code> into project records.</span></li>
-          <li><span><b>History kept.</b> <code>record supersede</code> links old to new.</span></li>
+          <li><span>Records link to a file, commit, issue or URL. Files are hashed, so you can see when they drift.</span></li>
+          <li><span><code>activity</code> shows what agents wrote this week, and <code>undo</code> reverses a write.</span></li>
+          <li><span>A daily job turns Claude memory and <code>docs/solutions</code> into project records.</span></li>
+          <li><span><code>record supersede</code> keeps the old version and links it to the new one.</span></li>
         </ul>
         <a class="p-more" href={DOCS.records}>How records work <span aria-hidden="true">→</span></a>
       </div>
@@ -84,8 +84,8 @@ const lines = (tree: string) =>
     <article class="pillar flip" id="agents" aria-labelledby="p2">
       <div class="p-copy reveal">
         <div class="p-num"><span>02</span> Every agent</div>
-        <h3 id="p2">Claude Code today. Codex tomorrow. Same brief.</h3>
-        <p>At session start the agent gets a short summary: the "ask before" rules, the top constraints, where things live and the next step from the last handoff. The full brief, cited to its sources, is one skill away. Switch tools mid-week and nothing is lost: Claude Code and Codex read the same context.</p>
+        <h3 id="p2">Claude Code and Codex read the same brief.</h3>
+        <p>At session start the agent gets a short summary: the "ask before" rules, the top constraints, where things live and the next step from the last handoff. The full brief, with its sources, is one skill away. If you switch tools mid-week, the other agent starts from the same context.</p>
         <ul class="ticks">
           <li><span><code>devtwin-resume</code> loads the brief into the session.</span></li>
           <li><span><code>devtwin-record</code> captures a decision as you make it.</span></li>
@@ -137,10 +137,10 @@ const lines = (tree: string) =>
         <h3 id="p3">The lesson arrives when the agent opens the file.</h3>
         <p>A lesson is one "do" or "don't" with a reason, tied to paths, packages or topics. When an agent reads or edits matching code, or runs a matching command like <code>git push</code>, the devtwin hook adds a short index line to the session. Join your org's hub and your colleagues' lessons arrive the same way.</p>
         <ul class="ticks">
-          <li><span><b>Just in time.</b> At most four short lines per session. The full lesson loads only when the agent asks.</span></li>
-          <li><span><b>Agents learn, you steer.</b> Agents save project lessons on their own. A lesson for every project waits for your weekly <code>activity review</code>.</span></li>
-          <li><span><b>Shared on your terms.</b> One consent per hub or repo. Each lesson waits 24 hours in a held queue, and you can cancel it there.</span></li>
-          <li><span><b>See overlap early.</b> "Working on" notes tell a colleague's agent that you are changing the same area.</span></li>
+          <li><span>At most four short lines per session. The full lesson loads only when the agent asks for it.</span></li>
+          <li><span>Agents save project lessons on their own. A lesson meant for every project waits for your weekly <code>activity review</code>.</span></li>
+          <li><span>Sharing needs one consent per hub or repo. Each shared lesson waits 24 hours in a held queue, where you can cancel it.</span></li>
+          <li><span>"Working on" notes tell a colleague's agent that you are changing the same area.</span></li>
         </ul>
         <a class="p-more" href={DOCS.lessons}>How lessons reach your agents <span aria-hidden="true">→</span></a>
       </div>
@@ -175,11 +175,11 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>04</span> Accounts</div>
         <h3 id="p4">The right account, in every org.</h3>
-        <p>Work for two companies? Each one is its own scope, with its own projects and its own records. Identity routing binds each scope to its own GitHub and Slack account, so the project, not whatever you happen to be logged into, decides who the agent acts as.</p>
+        <p>Work for two companies? Each one is its own scope, with its own projects and its own records. Identity routing binds each scope to its own GitHub and Slack account, so the project decides which account the agent acts as.</p>
         <ul class="ticks">
-          <li><span><b>Scoped by repo.</b> <code>context resolve</code> maps the working tree to its scope and project.</span></li>
-          <li><span><b>Verified, or refused.</b> The live identity must match the binding. A mismatch is refused.</span></li>
-          <li><span><b>Kept apart.</b> Credentials never live in records or briefs.</span></li>
+          <li><span><code>context resolve</code> maps the working tree to its scope and project.</span></li>
+          <li><span>The account you're logged into must match the binding, or the action is refused.</span></li>
+          <li><span>Credentials never go into records or briefs.</span></li>
         </ul>
         <a class="p-more" href={DOCS.identityRouting}>Route identities per org <span aria-hidden="true">→</span></a>
       </div>
@@ -214,14 +214,14 @@ const lines = (tree: string) =>
     <article class="pillar" id="harness" aria-labelledby="p5">
       <div class="p-copy reveal">
         <div class="p-num"><span>05</span> Your harness</div>
-        <h3 id="p5">Make it yours. Then make more.</h3>
-        <p>devtwin is also a template for your own harness. Set up a small private profile and turn generic skill templates into private skills of your own. The kit ships the patterns; your profile supplies the taste.</p>
+        <h3 id="p5">Build your own skills on it.</h3>
+        <p>devtwin is also a template for your own harness. Set up a small private profile, then turn the generic skill templates into private skills that follow it.</p>
         <ul class="ticks">
-          <li><span><b>Weekly radar.</b> Releases that touch what you build, plus new agent tools and ideas, ranked by your interests.</span></li>
-          <li><span><b>Slack updates.</b> Drafts in your voice, saved for you to send.</span></li>
-          <li><span><b>Writing style.</b> Your rules, applied by every agent.</span></li>
-          <li><span><b>Model retirements.</b> The radar flags models before their vendor retires them.</span></li>
-          <li><span><b>Monthly setup review.</b> <code>review plan</code> finds stale lessons and consents you never used.</span></li>
+          <li><span>A weekly radar of releases that touch what you build, plus new agent tools, ranked by your interests.</span></li>
+          <li><span>Slack update drafts in your voice, saved for you to send.</span></li>
+          <li><span>Your writing rules, applied by every agent.</span></li>
+          <li><span>A warning before a vendor retires a model you use.</span></li>
+          <li><span>A monthly <code>review plan</code> that finds stale lessons and consents you never used.</span></li>
         </ul>
         <a class="p-more" href={DOCS.personalHarness}>Build your personal harness <span aria-hidden="true">→</span></a>
       </div>
@@ -267,13 +267,13 @@ const lines = (tree: string) =>
     <article class="pillar flip" id="disk" aria-labelledby="p6">
       <div class="p-copy reveal">
         <div class="p-num"><span>06</span> Local-first</div>
-        <h3 id="p6">Yours. On your disk.</h3>
-        <p>The public kit and your private data live in separate places. Records, profiles and exports stay on your machine in 0700 folders and 0600 files. Onboarding only ever reads your repos. Nothing leaves your machine without your consent: lessons for your hub or repo wait in a held queue first, and "working on" notes are short.</p>
+        <h3 id="p6">Your data stays on your disk.</h3>
+        <p>The public kit and your private data live in separate places. Records, profiles and exports stay on your machine in 0700 folders and 0600 files. Onboarding only ever reads your repos. Nothing leaves your machine without your consent. Lessons for your hub or repo wait in a held queue first, and "working on" notes are kept short.</p>
         <ul class="ticks">
-          <li><span><b>Public kit, private data.</b> Update the kit without touching your context.</span></li>
-          <li><span><b>No account, no server.</b> Plain files you can read, back up and diff. A hub is a Git repo your org already hosts.</span></li>
-          <li><span><b>Daily encrypted backup.</b> One archive a day, kept for 14 days, restored into a new folder.</span></li>
-          <li><span><b><code>devtwin doctor</code></b> checks roots, locks and bound repos for you.</span></li>
+          <li><span>You can update the kit without touching your context.</span></li>
+          <li><span>There's no account or server. Everything is plain files you can read, back up and diff, and a hub is a Git repo your org already hosts.</span></li>
+          <li><span>An encrypted backup runs daily and is kept for 14 days. Restores go into a new folder.</span></li>
+          <li><span><code>devtwin doctor</code> checks roots, locks and bound repos for you.</span></li>
         </ul>
         <a class="p-more" href={DOCS.whereDataLives}>Where your data lives <span aria-hidden="true">→</span></a>
       </div>
