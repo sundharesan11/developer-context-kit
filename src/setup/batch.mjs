@@ -28,6 +28,7 @@ import { dirname } from "node:path";
 import { DevtwinError, toJson } from "../errors.mjs";
 import { loadPilot, rootsFromPilot } from "../config/pilot.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
+import { displayKitId } from "../kit/identity.mjs";
 import { digest } from "../storage/canonical.mjs";
 import { requireOwnerApproval, fitsDialog, issueBatchGrant, revokeBatchGrant, BATCH_GRANT } from "../owner/dialog.mjs";
 import { UNSAFE_PATH_CHARS } from "../config/roots.mjs";
@@ -129,7 +130,7 @@ async function linesFor(step, preview, ctx) {
   if (step.id === "job-hub-sync") return { lines: [preview.installed ? rewriteLine(ctx, "hub-sync for scope " + preview.scope, preview.plist, preview.programArguments) : "Install job hub-sync for scope " + preview.scope + " (" + every(preview.interval) + ") at " + t(preview.plist)] };
   if (step.job) return { lines: preview.actions.map((a) => a.enabled ? rewriteLine(ctx, a.job, a.plist, a.programArguments) : "Install job " + a.job + " (" + every(a.interval) + ") at " + t(a.plist)) };
   if (step.id === "hook-verify") return { lines: ["Write the kit receipt that the hook trusts at " + t(preview.receipt)] };
-  if (step.id === "paths-confirm") return { lines: ["Confirm kit " + t(preview.kitRoot) + " at " + (preview.kitRef ?? preview.kitHead) + " and config " + t(preview.pilotPath)] };
+  if (step.id === "paths-confirm") return { lines: ["Confirm kit " + t(preview.kitRoot) + " at " + (preview.kitRef ?? preview.kitHead ?? displayKitId(preview.kitId)) + " and config " + t(preview.pilotPath)] };
   if (LONG_TEXT.has(step.id)) {
     const { grantDialog } = await import("../consent/commands.mjs");
     const text = grantDialog(preview);

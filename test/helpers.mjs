@@ -1,4 +1,4 @@
-import { mkdtemp, realpath, rm, mkdir, writeFile, readdir, lstat, readFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, mkdir, writeFile, readdir, lstat, readFile, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, dirname } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -57,8 +57,16 @@ export async function stageSourceFixture(t, {p, version = 1, sourceId = "humaniz
 function assertFixtureBody(body) { if (!body) throw new Error("Unexpected fixture request"); }
 export async function sandbox(t) {
   const dir = await realpath(await mkdtemp(join(tmpdir(), "devtwin-t-")));
-  t.after(() => rm(dir, { recursive: true, force: true }));
+  t.after(() => rm(dir, { recursive: true, force: true }).catch(async () => { await writable(dir); await rm(dir, { recursive: true, force: true }); }));
   return dir;
+}
+// A read-only kit folder (KTD4) cannot be removed until its folders are writable again. The failed rm may still be
+// removing other entries, so a vanished entry is skipped.
+async function writable(dir) {
+  try {
+    await chmod(dir, 0o700);
+    for (const entry of await readdir(dir, { withFileTypes: true })) if (entry.isDirectory()) await writable(join(dir, entry.name));
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
 }
 export async function runCli(args, { env = {}, home = tmpdir(), kitRoot, templateRoot, ownerDialog } = {}) {
   const chunks = [];

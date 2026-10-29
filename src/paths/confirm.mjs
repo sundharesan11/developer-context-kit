@@ -4,6 +4,8 @@
 // no lock. While they match, the session-start line says "Kit and config confirmed." and skills skip the path question.
 // confirm is always ask: a forged confirmation would make skills stop asking, so the hook denies its --apply from agent
 // shells and the apply shows the owner dialog. check is read-only.
+// U43: a package kit has no Git HEAD; its confirmation records the kitId from its manifest instead, in schema 2. A Git
+// kit still writes schema 1 with kitHead and kitRef, so confirmations made before U43 keep matching.
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { DevtwinError } from "../errors.mjs";
@@ -12,8 +14,11 @@ import { sha256 } from "../storage/canonical.mjs";
 import { readPrivateJson, atomicReplace, ensurePrivatePath } from "../storage/fsx.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { readPilotBytes, runningKit } from "../hooks/receipt.mjs";
+import { kitId } from "../kit/identity.mjs";
+import { readManifest } from "../kit/manifest.mjs";
 
-export const FIELDS = Object.freeze(["kitRoot", "kitHead", "kitRef", "pilotPath", "pilotSha256"]);
+// The recorded fields by confirmed-paths.json schema version: 1 for a Git kit, 2 for a package kit.
+export const FIELDS = Object.freeze({ 1: Object.freeze(["kitRoot", "kitHead", "kitRef", "pilotPath", "pilotSha256"]), 2: Object.freeze(["kitRoot", "kitId", "pilotPath", "pilotSha256"]) });
 export const confirmedPath = (stateRoot) => join(stateRoot, "confirmed-paths.json");
 const REF = /^ref: (refs\/[A-Za-z0-9._/-]{1,200})$/;
 const small = (path) => {
@@ -46,20 +51,30 @@ export function readKitHead(kit) {
   const line = packed.split("\n").find((l) => l.endsWith(" " + ref));
   return { kitHead: head, kitRef: line ? line.split(" ")[0] : null };
 }
+// A kit with a .git entry is read as Git; any other kit must have a manifest (the fast read, as the hook does).
+function readKit(kit) {
+  let git = true;
+  try { lstatSync(join(kit, ".git")); } catch (error) { if (error.code !== "ENOENT") throw error; git = false; }
+  if (git) return readKitHead(kit);
+  const m = readManifest(kit);
+  return { kitId: kitId({ kind: "package", version: m.version, digest: m.digest }) };
+}
+const schemaOf = (values) => Object.hasOwn(values, "kitId") ? 2 : 1;
 // The values as they are now. Any read problem throws.
 export function currentPaths({ pilotPath, pilotBytes, kitRoot }) {
   const kit = runningKit(kitRoot), real = realpathSync(pilotPath);
-  return { kitRoot: kit, ...readKitHead(kit), pilotPath: real, pilotSha256: sha256(pilotBytes ?? readPilotBytes(real)) };
+  return { kitRoot: kit, ...readKit(kit), pilotPath: real, pilotSha256: sha256(pilotBytes ?? readPilotBytes(real)) };
 }
 // { state: "confirmed" | "missing" | "invalid" | "mismatch", fields?, confirmedAt? }. Never throws.
 export async function confirmationState(stateRoot, { pilotPath, pilotBytes, kitRoot }) {
   let saved;
   try { saved = await readPrivateJson(confirmedPath(stateRoot), 4096); }
   catch (error) { return { state: error.code === "ENOENT" ? "missing" : "invalid" }; }
-  if (saved?.schemaVersion !== 1 || typeof saved.confirmedAt !== "string" || FIELDS.some((key) => !Object.hasOwn(saved, key))) return { state: "invalid" };
+  const keys = Object.hasOwn(FIELDS, saved?.schemaVersion) ? FIELDS[saved.schemaVersion] : null;
+  if (!keys || typeof saved.confirmedAt !== "string" || keys.some((key) => !Object.hasOwn(saved, key))) return { state: "invalid" };
   let now;
   try { now = currentPaths({ pilotPath, pilotBytes, kitRoot }); } catch { now = {}; }
-  const fields = Object.fromEntries(FIELDS.map((key) => [key, now[key] !== undefined && now[key] === saved[key] ? "match" : "mismatch"]));
+  const fields = Object.fromEntries(keys.map((key) => [key, now[key] !== undefined && now[key] === saved[key] ? "match" : "mismatch"]));
   return { state: Object.values(fields).every((v) => v === "match") ? "confirmed" : "mismatch", fields, confirmedAt: saved.confirmedAt };
 }
 
@@ -76,7 +91,7 @@ export function planConfirm(ctx) {
   return finalizePlan({ kind: "paths-confirm", file: confirmedPath(ctx.roots.stateRoot), ...values });
 }
 const dialogFor = (plan) => ({ title: "Confirm the kit and config paths",
-  body: "Agents stop asking for these paths while they stay the same.\n\nKit: " + plan.kitRoot + "\nKit HEAD: " + (plan.kitRef ?? plan.kitHead) + "\nConfig: " + plan.pilotPath });
+  body: "Agents stop asking for these paths while they stay the same.\n\nKit: " + plan.kitRoot + (plan.kitId ? "\nKit ID: " + plan.kitId : "\nKit HEAD: " + (plan.kitRef ?? plan.kitHead)) + "\nConfig: " + plan.pilotPath });
 export async function applyConfirm(ctx, fingerprint) {
   ctx = { ...ctx, projection: undefined };
   const plan = planConfirm(ctx);
@@ -86,7 +101,8 @@ export async function applyConfirm(ctx, fingerprint) {
   assertFingerprint(planConfirm(ctx), fingerprint);
   assertWritable(ctx.roots, [plan.file]);
   ensurePrivatePath(ctx.roots.stateRoot);
-  const record = { schemaVersion: 1, ...Object.fromEntries(FIELDS.map((key) => [key, plan[key]])), confirmedAt: ctx.now().toISOString() };
+  const schemaVersion = schemaOf(plan);
+  const record = { schemaVersion, ...Object.fromEntries(FIELDS[schemaVersion].map((key) => [key, plan[key]])), confirmedAt: ctx.now().toISOString() };
   await atomicReplace(plan.file, JSON.stringify(record) + "\n");
   return { applied: true, ...record, file: plan.file };
 }

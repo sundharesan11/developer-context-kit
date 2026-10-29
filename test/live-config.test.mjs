@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { mkdir, writeFile, rm, symlink, chmod } from "node:fs/promises";
+import { mkdir, writeFile, readFile, readdir, rm, symlink, chmod } from "node:fs/promises";
 import { sandbox, makeRepo, fixtureGit } from "./helpers.mjs";
 import { loadPilot, rootsFromPilot, assertWritable, recordApprovedDigest, pilotDigest } from "../src/config/pilot.mjs";
 import { ensureRoots } from "../src/config/roots.mjs";
 import { toJson } from "../src/errors.mjs";
+import { writeManifest } from "../src/kit/manifest.mjs";
+import { kitId } from "../src/kit/identity.mjs";
+import { writeKitReceipt, receiptProblem, readPilotBytes } from "../src/hooks/receipt.mjs";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const refused = (field, code = "DEVTWIN_GATE_REQUIRED") => (e) => e.code === code && (field === undefined || e.details.field === field);
 async function pinnedKit(dir, files = { "README.md": "kit\n" }) {
@@ -231,4 +234,43 @@ test("live kit tolerates stray files outside its code paths and refuses untracke
   await assert.rejects(loadPilot(path, f.context), dirty);
   await fixtureGit(f.kit, ["checkout", "-q", "--", "docs/x.md"]);
   assert.ok(await loadPilot(path, f.context));
+});
+// U43: a package kit as `kit install` (U44) leaves it: under <home>/.devtwin/kits, folders 0500, files 0400.
+async function packageKit(home, version = "0.1.0-alpha.1") {
+  const kits = join(home, ".devtwin/kits"), kit = join(kits, "kit-" + version);
+  for (const [rel, text] of [["package.json", JSON.stringify({ name: "devtwin", version })], ["bin/devtwin.mjs", "#!/usr/bin/env node\n"], ["src/a.mjs", "export {};\n"]]) {
+    await mkdir(dirname(join(kit, rel)), { recursive: true, mode: 0o700 });
+    await writeFile(join(kit, rel), text);
+  }
+  await chmod(kits, 0o700);
+  await chmod(join(kit, "bin/devtwin.mjs"), 0o755);
+  const manifest = await writeManifest(kit, { sourceCommit: null });
+  const lock = async (dir) => { for (const e of await readdir(dir, { withFileTypes: true })) { if (e.isDirectory()) await lock(join(dir, e.name)); else await chmod(join(dir, e.name), e.name === "devtwin.mjs" ? 0o500 : 0o400); } await chmod(dir, 0o500); };
+  await lock(kit);
+  return { kit, version, digest: manifest.digest };
+}
+test("live config holds exactly one kit form: kitCommit, or kitVersion with a full kitDigest", async (t) => {
+  const f = await liveFixture(t);
+  const pkg = { kitVersion: "0.1.0-alpha.1", kitDigest: "d".repeat(64) };
+  for (const live of [{ ...pkg }, { kitDigest: pkg.kitDigest }, { kitCommit: undefined }, { kitCommit: undefined, kitVersion: pkg.kitVersion }, { kitCommit: undefined, kitDigest: pkg.kitDigest }, { kitCommit: undefined, ...pkg, kitDigest: "d".repeat(12) }, { kitCommit: undefined, ...pkg, kitDigest: "sha256:" + "d".repeat(64) }, { kitCommit: undefined, ...pkg, kitVersion: "1.0" }, { kitCommit: undefined, ...pkg, kitVersion: "1.0.0+build" }]) {
+    await assert.rejects(loadPilot(await f.write({}, live), f.context), refused("live"), JSON.stringify(live));
+  }
+});
+test("live package kit under the kits folder validates, gets a kitId receipt and fails after a changed byte", async (t) => {
+  const f = await liveFixture(t);
+  const pkg = await packageKit(f.home), context = { ...f.context, kitRoot: pkg.kit };
+  const path = await f.approved({}, { kitRoot: pkg.kit, kitCommit: undefined, kitVersion: pkg.version, kitDigest: pkg.digest }, context);
+  const pilot = await loadPilot(path, context);
+  assert.equal(pilot.live.kitDigest, pkg.digest);
+  assert.equal(pilot.live.kitCommit, undefined);
+  const receipt = await writeKitReceipt(rootsFromPilot(pilot), { pilotPath: path, kitRoot: pkg.kit });
+  assert.equal(receipt.schemaVersion, 2);
+  assert.equal(receipt.kitId, kitId({ kind: "package", version: pkg.version, digest: pkg.digest }));
+  assert.equal(await receiptProblem(pilot.stateRoot, { pilotPath: path, pilotBytes: readPilotBytes(path), kitRoot: pkg.kit, now: new Date() }), null);
+  await assert.rejects(loadPilot(path, f.context), (e) => refused("live.kitRoot")(e) && e.details.reason === "running-kit");
+  const file = join(pkg.kit, "src/a.mjs");
+  await chmod(file, 0o600);
+  await writeFile(file, (await readFile(file, "utf8")) + " ");
+  await chmod(file, 0o400);
+  await assert.rejects(loadPilot(path, context), (e) => refused("live.kitRoot")(e) && e.details.reason === "digest");
 });

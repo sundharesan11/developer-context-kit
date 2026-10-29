@@ -39,6 +39,7 @@ Live mode ([Live activation](LIVE.md)) relaxes the fence for exactly the paths a
 - In a skill folder the installer writes only `devtwin-*` entries. It never creates, removes or chmods the folder or its parents, and never touches a foreign, symlinked, edited or unowned entry. A conflict blocks only that agent.
 - An entry is removable only when its receipt matches a completed journal in this store for the same config ID.
 - Live commands run only from the kit the live config names, clean and detached at its commit. The home is the process home, and a different home is refused.
+- A package kit sits directly in `~/.devtwin/kits/`. The gate recomputes its digest and requires its files to be exactly those in `KIT-MANIFEST.json`, with no link. Every entry must be the user's and writable by no one else, and `~/.devtwin` and `~/.devtwin/kits` must have no group or other bits. These modes stop accidents, not a compromised account: same-user code can chmod the folder, rewrite the files and the manifest, and edit the live config to match.
 - The approved config digest in the store catches accidental edits to `live.json`. It does not stop deliberate same-user tampering: the same user can rewrite the live config and the digest together.
 - The rollback check compares a skill folder with the inventory taken before an install run. It fails on `devtwin-*` differences and lists foreign changes for the owner. It restores nothing.
 - Cursor also reads `~/.agents/skills` and sees the installed skills. The skills keep every confirmation for any caller.

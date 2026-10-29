@@ -3,16 +3,19 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { digest } from "../storage/canonical.mjs";
-import { isWithin, overlaps, info, readPrivateJson, ensurePrivatePath, atomicReplace } from "../storage/fsx.mjs";
+import { isWithin, overlaps, info, readPrivateJson, ensurePrivatePath, atomicReplace, checkNode } from "../storage/fsx.mjs";
 import { gitQuery } from "../identity/git.mjs";
 import { validateRoot, deepestExisting } from "./roots.mjs";
 import { DevtwinError } from "../errors.mjs";
 import { LEGACY_SKILL_PREFIX, LEGACY_DEFAULT_ROOTS } from "./legacy.mjs";
+import { kitIdentity, kitsFolder } from "../kit/identity.mjs";
+import { verifyKit } from "../kit/manifest.mjs";
 // The running kit. Tests inject context.kitRoot; production derives it from this file.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const members = ["configRoot", "dataRoot", "stateRoot", "inputsRoot"];
 const keys = ["schemaVersion", "pilotRoot", ...members, "agentHomes", "repos", "forbidden", "live", "writeClasses", "exceptions", "approval"];
-const liveKeys = ["configId", "home", "skillDirs", "kitRoot", "kitCommit"];
+// U43 (KTD2): a Git kit has kitCommit; a package kit has kitVersion and kitDigest instead.
+const liveKeys = ["configId", "home", "skillDirs", "kitRoot", "kitCommit", "kitVersion", "kitDigest"];
 // Skill folders sit inside these protected homes; only the exact named folder is carved out, never the home.
 const SKILL_PARENTS = ["real-claude-home", "real-agents-home", "CLAUDE_CONFIG_DIR"];
 // Write classes are the reviewed fence exceptions outside the store. Each lists exact paths; the folder classes
@@ -125,7 +128,7 @@ function validateLive(pilot, context) {
   const live = pilot.live;
   if (!isObject(live) || Object.keys(live).some((key) => !liveKeys.includes(key))) fail("live");
   if (typeof live.configId !== "string" || !/^[a-z0-9][a-z0-9_-]{7,63}$/.test(live.configId)) fail("live");
-  if (typeof live.kitCommit !== "string" || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(live.kitCommit)) fail("live");
+  try { kitIdentity(live); } catch { fail("live"); }
   if (typeof live.home !== "string" || typeof live.kitRoot !== "string") fail("live");
   if (!isObject(live.skillDirs) || !Object.keys(live.skillDirs).length) fail("live.skillDirs");
   if (pilot.agentHomes.length) fail("agentHomes");
@@ -183,7 +186,12 @@ function validate(pilot, context, allowInternal = false) {
 const KIT_CODE = ["bin", "src", "skills", "scripts", "schemas", "catalog", "package.json"];
 // Live Git checks run through the read-only, no-optional-locks gitQuery.
 const inWorktree = (path) => !gitQuery(deepestExisting(path), ["rev-parse", "--git-dir"], { notRepo: true }).notRepo;
-export function assertKit(kitRoot, kitCommit) {
+// U43: kit is the identity, or a commit for a Git kit. options.home is the live home; options.lstat is a test seam
+// for the package owner checks, and the CLI never sets it.
+export function assertKit(kitRoot, kit, options = {}) {
+  const identity = typeof kit === "string" ? { kind: "git", commit: kit } : kit;
+  if (identity?.kind === "package") return assertPackageKit(kitRoot, identity, options);
+  const kitCommit = identity?.commit;
   const top = gitQuery(kitRoot, ["rev-parse", "--show-toplevel"], { notRepo: true });
   if (top.notRepo || comparable(realpathSync(top.stdout.trim())) !== comparable(kitRoot)) gate("live.kitRoot", "not-top-level");
   const gitDir = realpathSync(gitQuery(kitRoot, ["rev-parse", "--absolute-git-dir"]).stdout.trim());
@@ -196,14 +204,37 @@ export function assertKit(kitRoot, kitCommit) {
   if (gitQuery(kitRoot, ["symbolic-ref", "--quiet", "HEAD"], { allow: [0, 1] }).status !== 1) gate("live.kitCommit", "attached");
   if (gitQuery(kitRoot, ["rev-parse", "--verify", "HEAD"]).stdout.trim() !== kitCommit) gate("live.kitCommit", "commit");
 }
+// U43 (KTD3, KTD4): a package kit sits directly in <home>/.devtwin/kits, and both folders are the owner's with no group or
+// other bits. Every entry in the kit is the owner's and writable by no one else; kit install also clears the owner's
+// write bits (folders 0500, files 0400, bin/devtwin.mjs 0500), but the gate does not require those exact modes: the
+// digest and the listing catch any change they would have stopped. The same user can still chmod and rewrite it.
+function assertPackageKit(kitRoot, { version, digest }, { home = homedir(), lstat }) {
+  const kits = kitsFolder(home), stat = lstat ?? ((path) => info(path));
+  if (comparable(dirname(kitRoot)) !== comparable(kits)) gate("live.kitRoot", "outside-kits");
+  for (const path of [dirname(kits), kits]) {
+    try { checkNode(stat(path), path, { directory: true }); } catch { gate("live.kitRoot", "kits-folder"); }
+  }
+  const uid = process.getuid();
+  const check = (path, node) => {
+    if (node.uid !== uid) gate("live.kitRoot", "owner");
+    if (node.mode & 0o022) gate("live.kitRoot", "writable");
+  };
+  let manifest;
+  try { ({ manifest } = verifyKit(kitRoot, { lstat, check, field: "live.kitRoot" })); }
+  catch (error) { if (error.code === "DEVTWIN_GATE_REQUIRED") throw error; gate("live.kitRoot", "unreadable"); }
+  if (manifest.version !== version) gate("live.kitVersion", "version");
+  if (manifest.digest !== digest) gate("live.kitDigest", "digest");
+}
 // context.liveGate.kit is the hook for a kit-change command: it runs from the new kit, which must match
-// the requested { kitRoot, kitCommit } instead of the live config's. The CLI never sets it from arguments.
+// the requested { kitRoot, kitCommit } (or { kitRoot, kitVersion, kitDigest }) instead of the live config's. The CLI never sets it from arguments.
 function assertRunningKit(pilot, context) {
   const expected = context.liveGate?.kit ?? pilot.live;
   let running;
   try { running = comparable(realpathSync(context.kitRoot ?? KIT)); } catch { gate("live.kitRoot", "running-kit"); }
   if (typeof expected.kitRoot !== "string" || running !== comparable(expected.kitRoot)) gate("live.kitRoot", "running-kit");
-  assertKit(expected.kitRoot, expected.kitCommit);
+  let identity;
+  try { identity = kitIdentity(expected); } catch { gate("live.kitRoot", "running-kit"); }
+  assertKit(expected.kitRoot, identity, { home: pilot.live.home, lstat: context.kitLstat });
 }
 export const approvedDigestPath = (pilot) => join(pilot.stateRoot, "live", "approved-config.json");
 export async function readApprovedDigest(pilot) {

@@ -5,9 +5,13 @@ import { DevtwinError } from "../errors.mjs";
 import { assertWritable, pilotDigest } from "../config/pilot.mjs";
 import { sha256 } from "../storage/canonical.mjs";
 import { readPrivateJson, ensurePrivatePath, atomicReplace } from "../storage/fsx.mjs";
+import { kitId, kitIdentity, parseKitId } from "../kit/identity.mjs";
+import { readManifest } from "../kit/manifest.mjs";
 // U7: the kit-verification receipt (KTD6). `hook verify` writes it after the full pilot load, which in live mode
 // includes the kit checks. The hook trusts it in place of that load, so a hook call runs no Git and no fence check.
-// Shape: { schemaVersion: 1, pilotPath, pilotSha256, kitRoot, kitCommit, verifiedAt, ttlSeconds }.
+// Shape: { schemaVersion: 2, pilotPath, pilotSha256, kitRoot, kitId, kitCommit, verifiedAt, ttlSeconds }. U43: kitId is
+// git:<sha> or npm:<version>+sha256:<digest> (src/kit/identity.mjs), null for a disposable pilot; kitCommit is the Git
+// commit or null, kept for readers of schema 1. A schema 1 receipt (kitCommit only, from a Git kit) still reads.
 // pilotSha256 is the SHA-256 of the pilot file bytes, so any edit to the config makes the receipt stale.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 // U27 (KTD35): 30 days by default; the session start renews it while the confirmed paths match (renewReceipt).
@@ -29,27 +33,36 @@ export async function writeKitReceipt(roots, { pilotPath, kitRoot, now = new Dat
   const path = receiptPath(roots.stateRoot);
   assertWritable(roots, [dirname(path), path]);
   ensurePrivatePath(roots.stateRoot, ["hooks"]);
-  const receipt = { schemaVersion: 1, pilotPath: real, pilotSha256: sha256(bytes), kitRoot: runningKit(kitRoot), kitCommit: pilot.live?.kitCommit ?? null, verifiedAt: now.toISOString(), ttlSeconds };
+  const receipt = { schemaVersion: 2, pilotPath: real, pilotSha256: sha256(bytes), kitRoot: runningKit(kitRoot), kitId: pilot.live ? kitId(kitIdentity(pilot.live)) : null, kitCommit: pilot.live?.kitCommit ?? null, verifiedAt: now.toISOString(), ttlSeconds };
   await atomicReplace(path, JSON.stringify(receipt) + "\n");
   return { path, ...receipt };
+}
+// The kit a receipt names, or null for none. Schema 1 holds only kitCommit; schema 2 holds a full kitId.
+function receiptKit(receipt) {
+  if (receipt?.schemaVersion === 1) return receipt.kitCommit === null ? null : { kind: "git", commit: receipt.kitCommit };
+  if (receipt?.schemaVersion === 2) return receipt.kitId === null ? null : parseKitId(receipt.kitId);
+  throw new DevtwinError("INTEGRITY", "Receipt schema unknown");
 }
 // The reason the receipt is not usable, or null when it is. Any read problem is a reason, never a throw.
 export async function receiptProblem(stateRoot, { pilotPath, pilotBytes, kitRoot, now }) {
   let receipt;
   try { receipt = await readPrivateJson(receiptPath(stateRoot), 4096); }
   catch (error) { return error.code === "ENOENT" ? "missing" : "invalid"; }
-  if (receipt?.schemaVersion !== 1 || typeof receipt.verifiedAt !== "string" || !Number.isInteger(receipt.ttlSeconds) || receipt.ttlSeconds < 1 || receipt.ttlSeconds > MAX_TTL_SECONDS) return "invalid";
+  let kit;
+  try { kit = receiptKit(receipt); } catch { return "invalid"; }
+  if (typeof receipt.verifiedAt !== "string" || !Number.isInteger(receipt.ttlSeconds) || receipt.ttlSeconds < 1 || receipt.ttlSeconds > MAX_TTL_SECONDS) return "invalid";
   if (receipt.pilotPath !== pilotPath || receipt.pilotSha256 !== sha256(pilotBytes)) return "pilot-changed";
   const at = Date.parse(receipt.verifiedAt), age = now.getTime() - at;
   if (!Number.isFinite(at) || age < -SKEW_MS || age > receipt.ttlSeconds * 1000) return "expired";
-  let kit;
-  try { kit = runningKit(kitRoot); } catch { return "kit-changed"; }
-  if (receipt.kitRoot !== kit) return "kit-changed";
-  // A live kit runs detached at its commit, so .git/HEAD holds the commit itself. One small read, no Git process.
-  if (receipt.kitCommit !== null) {
-    try { if (readFileSync(join(kit, ".git", "HEAD"), "utf8").trim() !== receipt.kitCommit) return "kit-changed"; }
-    catch { return "kit-changed"; }
-  }
+  let root;
+  try { root = runningKit(kitRoot); } catch { return "kit-changed"; }
+  if (receipt.kitRoot !== root) return "kit-changed";
+  // A live Git kit runs detached at its commit, so .git/HEAD holds the commit itself; a package kit's manifest holds its
+  // version and digest. One small read, no Git process and no digest: `hook verify` did the full check.
+  try {
+    if (kit?.kind === "git" && readFileSync(join(root, ".git", "HEAD"), "utf8").trim() !== kit.commit) return "kit-changed";
+    if (kit?.kind === "package") { const m = readManifest(root); if (m.version !== kit.version || m.digest !== kit.digest) return "kit-changed"; }
+  } catch { return "kit-changed"; }
   return null;
 }
 // U27 (KTD35): the session start's renewal. It runs only after receiptProblem found the receipt usable and the confirmed
