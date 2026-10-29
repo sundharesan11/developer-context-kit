@@ -83,7 +83,9 @@ test("live init refuses missing or stale fingerprints, unknown agents and a runn
   failed(await h.cli(["live", "init", "--pilot", "relative/live.json", "--agent", "claude"]), "DEVTWIN_GATE_REQUIRED", "pilot");
   assert.equal((await h.cli(["live", "init", "--pilot", h.liveConfig, "--pilot", h.liveConfig, "--agent", "claude"])).json.error.code, "DEVTWIN_USAGE");
   assert.equal((await h.cli(["live", "init", "--pilot", h.liveConfig, "--config-root", h.store, "--agent", "claude"])).json.error.code, "DEVTWIN_USAGE");
-  failed(await h.cli(["live", "init", "--pilot", h.liveConfig, "--agent", "claude"], REPO_ROOT), "DEVTWIN_GATE_REQUIRED");
+  // A kit on a branch is not pinned. A fresh repo, so the result does not depend on how CI checked this repo out.
+  const attached = await makeRepo(join(dirname(h.home), "attached-kit"), { "README.md": "kit\n" });
+  failed(await h.cli(["live", "init", "--pilot", h.liveConfig, "--agent", "claude"], attached), "DEVTWIN_GATE_REQUIRED");
   assert.equal(await treeSnapshot(h.home), before);
   await mkdir(join(h.kit, "src"));
   await writeFile(join(h.kit, "src/dirty.mjs"), "x");
