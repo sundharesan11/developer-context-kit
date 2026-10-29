@@ -6,7 +6,7 @@ devtwin is pre-release: see the [roadmap](docs/ROADMAP.md) for what is built and
 
 ## Development setup
 
-Use a reviewed checkout and the prerequisites in [Getting started](docs/GETTING-STARTED.md). There are no third-party runtime dependencies or install steps.
+Contributors work from a Git clone. Users install the npm package with `npm i -g devtwin@alpha`; see [Getting started](docs/GETTING-STARTED.md) for both paths and the prerequisites. There are no third-party runtime dependencies or install steps in a clone.
 
 From the repository root:
 
@@ -31,7 +31,7 @@ node scripts/acceptance.mjs \
   --report "$ACCEPTANCE_PARENT/report.json"
 ```
 
-Expected: 32 passed checks and one explicitly deferred fresh-agent smoke check. This is not evidence of real-agent discovery or production readiness.
+Expected: 33 passed checks, and two deferred checks, `fresh-agent-smoke` and `real-agent-scenarios`. The `npm-install` check runs `scripts/pack-smoke.mjs`: it packs the kit, installs the tarball offline into a temporary folder and runs `devtwin demo` from that install. This is not evidence of real-agent discovery or production readiness.
 
 ## Keep changes reviewable
 

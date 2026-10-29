@@ -1,8 +1,8 @@
 # Public-alpha release checklist
 
-Documentation and a license do not make this a finished product. The current release candidate is a disposable pilot. This checklist separates a public source preview from a daily-use release.
+Documentation and a license do not make this a finished product. devtwin is an alpha: the npm release goes to the `alpha` dist-tag, and daily use still has open items. This checklist separates a public source preview, an npm release and a daily-use release.
 
-Nothing here authorizes changing repository visibility, pushing branches, publishing a package or sending private context.
+Nothing here authorizes changing repository visibility, pushing branches or tags, publishing a package, moving a dist-tag or sending private context. Each of those is a separate owner approval. Only the [release workflow](#package-release) publishes, after the owner pushes a tag and approves the `npm-release` environment.
 
 ## Before making the repository public
 
@@ -66,10 +66,11 @@ Do not claim “works with every agent,” “automatically remembers everything
 
 Items follow the [roadmap](ROADMAP.md) order.
 
-- [ ] Private-state backup/restore and upgrade compatibility.
+- [x] Private-state backup and restore. Daily encrypted backups and the owner-run restore are implemented; see [Backup and restore](LIVE.md#backup-and-restore).
+- [ ] Upgrade compatibility. [Upgrading](UPGRADING.md) documents the package upgrade and rollback; the roadmap still lists upgrade compatibility as open.
 - [x] Controlled real-project and real-home activation with reviewed targets and rollback. The owner's first [live activation](LIVE.md) passed on 2026-10-25 at `b95ff72`.
 - [ ] Fresh Claude and Codex sessions finding and using the intended skills. Fresh non-interactive sessions passed on 2026-10-25; interactive sessions remain.
-- [ ] Session start and end hooks that carry context into and out of a session.
+- [ ] Session start and end hooks that carry context into and out of a session. Partly implemented: the agent hook gives the session summary and lessons, and the stop stub asks for a handoff. The resume and handoff adapters remain.
 - [ ] Reviewed selective migration from an existing personal setup.
 - [ ] Recovery tests for interrupted writes and documented operator actions.
 - [ ] Separate compatibility evidence for each additional agent host.
@@ -136,4 +137,4 @@ The release workflow never runs this command.
 
 ### Compare the kit digest
 
-The draft release lists the kit ID, `npm:<version>+sha256:<digest>`. `devtwin kit install` prints the same digest for the installed package. The set-kit dialog shows it too. Compare them before you approve the dialog. A different digest means that the installed package is not the published tarball.
+The draft release lists the kit ID, `npm:<version>+sha256:<digest>`. `devtwin kit install` prints the same digest for the installed package. The set-kit dialog shows it too. Compare them before you approve the dialog. A different digest means that the installed package is not the published tarball. [Upgrading](UPGRADING.md) gives the owner's steps.

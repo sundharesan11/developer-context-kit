@@ -20,6 +20,7 @@
   "package audit refuses generated handoff packets even when allowlisted",
   "handoff docs describe private selected export and unexecuted commands",
   "version prints JSON and exits 0",
+  "version of a package kit adds its digest prefix",
   "--version is the version command",
   "unknown command or flag exits 2",
   "digest ignores key order; non-finite rejected",

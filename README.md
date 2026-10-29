@@ -39,7 +39,20 @@ More in [Architecture](https://github.com/sundharesan11/devtwin/blob/main/docs/A
 
 ## Quick start
 
-You need Node.js 22.13 or later and Git. There is nothing to install: devtwin has no third-party dependencies.
+You need Node.js 22.13 or later. devtwin has no third-party dependencies.
+
+```sh
+npm i -g devtwin@alpha
+devtwin demo
+```
+
+The demo builds synthetic repositories, a disposable pilot and fake agent homes in a fresh temporary folder. It checks onboarding, records, briefs, handoffs, installs and the personal harness end to end, with no network. Expect `"ok": true`. The checks that need a Git clone of the kit show `skipped`, and `fresh-agent-smoke` and `real-agent-scenarios` show `deferred`, because they need a real agent. The demo never touches your real agent homes or accounts.
+
+Every command prints one line of JSON, `{"ok": true, ...}` or `{"ok": false, "error": {...}}`. Run `devtwin help` for the command list.
+
+### From a Git clone
+
+Contributors run devtwin from a clone. You also need Git.
 
 ```sh
 git clone https://github.com/sundharesan11/devtwin.git
@@ -47,13 +60,7 @@ cd devtwin
 node bin/devtwin.mjs help
 ```
 
-Every command prints one line of JSON, `{"ok": true, ...}` or `{"ok": false, "error": {...}}`. To call it from anywhere, add an alias with the checkout's absolute path to your shell profile:
-
-```sh
-alias devtwin="node $HOME/code/devtwin/bin/devtwin.mjs"
-```
-
-Then run the offline demo. It builds synthetic repositories, a disposable pilot and fake agent homes in a fresh temporary folder, and checks onboarding, records, briefs, handoffs, installs and the personal harness end to end:
+From a clone, the acceptance harness runs every check. That includes the package audit, the live-mode checks and `npm-install`, which packs the kit, installs the tarball offline and runs the demo from that install:
 
 ```sh
 DEMO_PARENT="$(mktemp -d /tmp/devtwin-demo.XXXXXX)"
@@ -63,13 +70,14 @@ node scripts/acceptance.mjs \
   --report "$DEMO_PARENT/acceptance.json"
 ```
 
-Expect `"ok": true`, with 32 checks `passed`, and `fresh-agent-smoke` and `real-agent-scenarios` `deferred` (they need a real agent). The demo never touches your real agent homes or accounts.
+Expect `"ok": true`, with 33 checks `passed`, and `fresh-agent-smoke` and `real-agent-scenarios` `deferred`.
 
 Next steps:
 
 - [Getting started](https://github.com/sundharesan11/devtwin/blob/main/docs/GETTING-STARTED.md): the demo in detail, with troubleshooting.
 - [Guided onboarding](https://github.com/sundharesan11/devtwin/blob/main/docs/ONBOARDING.md): preview, approve, brief and record on a synthetic project, step by step.
 - [Live activation](https://github.com/sundharesan11/devtwin/blob/main/docs/LIVE.md): run devtwin on your own machine against real repositories and agent skill folders.
+- [Upgrading](https://github.com/sundharesan11/devtwin/blob/main/docs/UPGRADING.md): move live mode to a new release, or roll back to an earlier kit.
 - [Migrating from devctx](https://github.com/sundharesan11/devtwin/blob/main/docs/MIGRATING.md): `devtwin live migrate` moves a setup made under the old name.
 - [Organization hub](https://github.com/sundharesan11/devtwin/blob/main/docs/HUB.md): join a hub, share lessons and post "working on" notes.
 
@@ -87,8 +95,8 @@ devtwin complements repository instruction files rather than replacing them: rep
 
 ## Status and requirements
 
-- **Status.** devtwin is a local package candidate at version `0.0.0-local`. Live mode is implemented, and its first activation on a real machine passed, including fresh non-interactive Claude Code and Codex sessions that found the skills and read the brief. Lessons, the agent hook, the setup wizard, the organization hub, preferences and output templates are implemented and tested against local fixtures. They are not yet activated on a real machine or tested on a real hub host. The tiers, standing consents, the audit log with `activity` and `undo`, and daily encrypted backups are implemented. So are the session summary, command lessons, locations and the stop stub. The daily import, the held queue, repository write-back, the weekly review, model retirements and the monthly setup review are implemented too. These are tested against synthetic fixtures and local bare repositories. The real-agent scenario kit is ready; its runs with real agents have not been done yet. Organization identity routing is on the [roadmap](https://github.com/sundharesan11/devtwin/blob/main/docs/ROADMAP.md); known gaps are in [Limitations](https://github.com/sundharesan11/devtwin/blob/main/docs/LIMITATIONS.md).
-- **Install.** Run devtwin from a checkout. A global `devtwin` command is NOT currently installed by cloning; use the alias above. The npm name `devtwin` is reserved with a placeholder package; the CLI is not published to npm yet, and `package.json` stays `"private": true` to prevent accidental publication.
+- **Status.** devtwin is an alpha. The first npm release is `0.1.0-alpha.1`, under the `alpha` dist-tag. Live mode is implemented, and its first activation on a real machine passed, including fresh non-interactive Claude Code and Codex sessions that found the skills and read the brief. Lessons, the agent hook, the setup wizard, the organization hub, preferences and output templates are implemented and tested against local fixtures. They are not yet activated on a real machine or tested on a real hub host. The tiers, standing consents, the audit log with `activity` and `undo`, and daily encrypted backups are implemented. So are the session summary, command lessons, locations and the stop stub. The daily import, the held queue, repository write-back, the weekly review, model retirements and the monthly setup review are implemented too. These are tested against synthetic fixtures and local bare repositories. The real-agent scenario kit is ready; its runs with real agents have not been done yet. Organization identity routing is on the [roadmap](https://github.com/sundharesan11/devtwin/blob/main/docs/ROADMAP.md); known gaps are in [Limitations](https://github.com/sundharesan11/devtwin/blob/main/docs/LIMITATIONS.md).
+- **Install.** `npm i -g devtwin@alpha` installs the global `devtwin` command. Until `latest` moves, `npm i devtwin` without `@alpha` installs a deprecated placeholder, so always name the dist-tag. Live mode runs from a pinned copy of the kit under `~/.devtwin/kits/`, never from npm's global folder. A later `npm i -g` changes nothing until you pin the new kit; see [Upgrading](https://github.com/sundharesan11/devtwin/blob/main/docs/UPGRADING.md). A Git clone stays a supported install for contributors.
 - **Requirements.** Node.js `>=22.13.0` and Git. macOS is the reference platform. CI also runs on Ubuntu, but Linux support is not claimed yet. Windows is unsupported.
 - **Safety.** Every stateful command needs an explicit pilot file: a disposable pilot for evaluation, or a live config for one real machine. There is no automatic private-to-public synchronization. An organization hub receives only the lessons accepted under your `hub-publish` consent or copied by you, and the "working on" notes you consent to. A repository receives a learning branch only under your `repo-push` consent, after the hold. The pilot fence is not a sandbox: it limits this CLI, not your agent or other processes. Read the [security model](https://github.com/sundharesan11/devtwin/blob/main/docs/SECURITY-MODEL.md) before using private data.
 

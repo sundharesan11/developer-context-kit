@@ -29,7 +29,7 @@ try {
   if (shown.ok !== true || shown.result.version !== version || "commit" in shown.result) throw new Error("version mismatch");
   const demo = lastJson(run("demo", bin, ["demo", "--pilot-root", join(temp, "pilot"), "--report", join(temp, "report.json")], env));
   const skipped = demo.result.checks.filter((c) => c.status === "skipped").map((c) => c.id);
-  if (demo.ok !== true || !skipped.includes("package-allowlist")) throw new Error("demo did not pass from the package");
+  if (demo.ok !== true || !skipped.includes("package-allowlist") || !skipped.includes("npm-install")) throw new Error("demo did not pass from the package");
   out = { ok: true, version: shown.result, tarball: tarball.split("/").at(-1), steps, demo: { checks: demo.result.checks.length, skipped } };
   rmSync(temp, { recursive: true, force: true });
 } catch (error) {

@@ -2,8 +2,9 @@
 export const GITHUB_URL = 'https://github.com/sundharesan11/devtwin';
 export const DEEPWIKI_URL = 'https://deepwiki.com/sundharesan11/devtwin';
 
-// devtwin is not on npm yet: you clone the kit and run bin/devtwin.mjs with Node.
-export const INSTALL_CMD = `git clone ${GITHUB_URL}`;
+// The install command on the landing page; `devtwin demo` follows it in the install band.
+export const INSTALL_CMD = 'npm i -g devtwin@alpha';
+export const DEMO_CMD = 'devtwin demo';
 
 // Prefix a root-relative path with the configured base (e.g. /devtwin on GitHub Pages).
 export const withBase = (path: string) => import.meta.env.BASE_URL.replace(/\/+$/, '') + path;

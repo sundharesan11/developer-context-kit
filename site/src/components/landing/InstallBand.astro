@@ -1,20 +1,21 @@
 ---
-import { DOCS, INSTALL_CMD } from '../../site';
+import { DOCS, INSTALL_CMD, DEMO_CMD } from '../../site';
 ---
 <section class="band" aria-labelledby="install-title">
   <div class="wrap reveal">
     <div class="kicker" style="justify-content:center">Get started</div>
-    <h2 class="h2" id="install-title" data-words>Clone it. Run it.</h2>
-    <p class="band-sub">One Node CLI, zero dependencies. Clone the kit and run it with Node 22.13 or later.</p>
+    <h2 class="h2" id="install-title" data-words>Install it. Run it.</h2>
+    <p class="band-sub">One Node CLI, zero dependencies. Install it from npm and run the offline demo, with Node 22.13 or later.</p>
     <div class="band-cmd">
       <span class="install-line"><span class="p" aria-hidden="true">$ </span>{INSTALL_CMD}</span>
       <button class="copy" type="button" data-copy={INSTALL_CMD}>Copy</button>
     </div>
     <div class="steps">
-      <span><b>01</b>devtwin init</span>
-      <span><b>02</b>devtwin project onboard</span>
-      <span><b>03</b>devtwin agents install</span>
-      <span><b>04</b>open your agent → /devtwin-resume</span>
+      <span><b>01</b>{DEMO_CMD}</span>
+      <span><b>02</b>devtwin kit install</span>
+      <span><b>03</b>devtwin live init</span>
+      <span><b>04</b>devtwin setup</span>
+      <span><b>05</b>open your agent → /devtwin-resume</span>
     </div>
     <div class="band-links">
       <a class="btn btn-primary" href={DOCS.installation}>Get started <span aria-hidden="true">→</span></a>

@@ -214,7 +214,7 @@ The bundled catalog `catalog/stack-sources.json` maps item names (and aliases su
 
 | Variable | Read by | Effect |
 | --- | --- | --- |
-| `DEVTWIN_KIT` | Bundled skills | Absolute path of the kit checkout. The skills refuse to run without it. The CLI does not use it to find the kit; `agents status` and `live migrate` only check it to report a leftover legacy variable. |
+| `DEVTWIN_KIT` | Bundled skills | Absolute path of the pinned kit. A fallback only: the skills take the kit path from the hook's session-start line, and use the variable when a session has no such line. The CLI does not use it to find the kit; `agents status` and `live migrate` only check it to report a leftover legacy variable. |
 | `DEVCTX_KIT` | Bundled skills, CLI notes | Legacy name, read for one transition. The skills fall back to it only when `DEVTWIN_KIT` is unset. `agents status` and `live migrate` add a `LEGACY_KIT_ENV` note while it is set. See [Migrate from devctx](/docs/guides/migrate-from-devctx/). |
 | `CLAUDE_CONFIG_DIR` | CLI | If set, Claude's skill folder is `$CLAUDE_CONFIG_DIR/skills`, and the directory is protected. |
 | `CODEX_HOME` | CLI | Protected. It does not change where Codex skills are installed; live previews warn `CODEX_HOME_IGNORED`. |

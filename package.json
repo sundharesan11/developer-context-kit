@@ -1,8 +1,19 @@
 {
   "name": "devtwin",
   "version": "0.1.0-alpha.1",
+  "description": "Project context, decisions and handoffs for Claude Code and Codex, kept private and delivered to every new coding-agent session.",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "agents",
+    "coding-agents",
+    "context",
+    "handoff",
+    "developer-tools",
+    "cli"
+  ],
   "license": "Apache-2.0",
-  "homepage": "https://github.com/sundharesan11/devtwin#readme",
+  "homepage": "https://sundharesan11.github.io/devtwin/",
   "bugs": {
     "url": "https://github.com/sundharesan11/devtwin/issues"
   },

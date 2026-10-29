@@ -2,7 +2,7 @@
 
 This folder holds devtwin's repository guides and maintainer contracts. For task-oriented user docs (quickstart, concepts, guides, CLI and error reference), use the documentation site at **[sundharesan11.github.io/devtwin/docs](https://sundharesan11.github.io/devtwin/docs/)**; its source is in `site/src/content/docs/docs/`. To ask questions about the code, use [DeepWiki](https://deepwiki.com/sundharesan11/devtwin).
 
-Start with a disposable synthetic project. Move to the [live activation runbook](LIVE.md) only after the demo.
+Install devtwin with `npm i -g devtwin@alpha` and start with `devtwin demo`, a disposable synthetic project. Move to the [live activation runbook](LIVE.md) only after the demo.
 
 ## First use
 
@@ -14,6 +14,7 @@ Start with a disposable synthetic project. Move to the [live activation runbook]
 | What does devtwin do on its own, and when does it ask me? | [Tiers](SECURITY-MODEL.md#tiers) and [Activity and undo](HARNESS.md#activity-and-undo) |
 | Where does each part fit? | [Architecture](ARCHITECTURE.md) |
 | How do I activate it on my machine? | [Live activation](LIVE.md) |
+| How do I upgrade to a new release, or roll back? | [Upgrading](UPGRADING.md) |
 | I set it up under the old devctx name. How do I move? | [Migrating from devctx](MIGRATING.md) |
 | How do I set up my personal profile, skill templates and announcement watch? | [Personal harness](HARNESS.md) |
 | How do I turn on the weekly radar, advisory alerts and the review reminder? | [The radar](HARNESS.md#the-radar) and [Schedules](HARNESS.md#schedules) |
@@ -38,7 +39,8 @@ Start with a disposable synthetic project. Move to the [live activation runbook]
 - [Continuous integration](CI.md): job matrix, trust boundaries and run interpretation.
 - [Writing rules](WRITING.md): the STE-based rule subset, its check and the allowlist policy.
 - [Security reporting](../SECURITY.md): private vulnerability reporting.
-- [Release checklist](RELEASING.md): publication gates and evidence.
+- [Release checklist](RELEASING.md): publication gates, the npm release workflow and evidence.
+- [Changelog](../CHANGELOG.md): what changed in each release.
 - [Apache-2.0 license](../LICENSE) and [NOTICE](../NOTICE): toolkit terms and attribution.
 
 ## Design history
