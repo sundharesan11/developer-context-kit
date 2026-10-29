@@ -35,9 +35,10 @@ export const liveAddRepoCommand = {
   }
 };
 export const liveSetKitCommand = {
-  options: { ...liveOptions, commit: { type: "string" } },
+  // U45: --commit <sha> pins a Git kit, --kit <version>+<digest> a package kit; the apply shows the owner dialog.
+  options: { ...liveOptions, commit: { type: "string" }, kit: { type: "string" } },
   async run(values, ctx) {
-    const input = liveInput(values, { commit: values.commit });
+    const input = liveInput(values, { commit: values.commit, kit: values.kit });
     return values.apply ? (await live()).applyLiveSetKit(input, ctx) : (await live()).planLiveSetKit(input, ctx);
   }
 };

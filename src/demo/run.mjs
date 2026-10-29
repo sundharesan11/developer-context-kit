@@ -312,7 +312,9 @@ export async function runDemo({ pilotRoot: rootArg, reportPath, forbidden = [], 
     gitOut(bareKit, ["rm", "-r", "-q", "skills"]); gitOut(bareKit, ["commit", "-q", "-m", "acceptance: drop bundled skills"]);
     const bareCommit = gitOut(bareKit, ["rev-parse", "--verify", "HEAD"]), setKit = ["live", "set-kit", "--pilot", liveConfig, "--commit", bareCommit];
     assert.equal(existsSync(join(bareKit, "skills")), false);
-    liveCli([...setKit, "--apply", "--plan-fingerprint", liveCli(setKit, bareKit).fingerprint], bareKit);
+    // set-kit shows an owner dialog (KTD5), so it runs in this process with the dialog answered here, never on screen.
+    const kitCtx = { home: liveHome, env: { PATH: env.PATH, HOME: liveHome }, kitRoot: bareKit, ownerDialog: async () => "approved" };
+    await cli([...setKit, "--apply", "--plan-fingerprint", (await cli(setKit, kitCtx)).fingerprint], kitCtx);
     const foreignBytes = await readFile(liveForeign), parts = ["agents", "uninstall", "--pilot", liveConfig, "--agent", "claude", "--agent", "codex"];
     const plan = liveCli(parts, bareKit), removed = plan.actions.filter((a) => a.status === "remove");
     assert.ok(plan.actions.filter((a) => a.agent === "claude").every((a) => a.status === "remove"));

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile, readFile, readdir, chmod, lstat, rename, cp, symlink, rm } from "node:fs/promises";
-import { sandbox, makeRepo, fixtureGit, runCli } from "./helpers.mjs";
+import { sandbox, makeRepo, fixtureGit, runCli, packageKit } from "./helpers.mjs";
 import { loadPilot, readApprovedDigest } from "../src/config/pilot.mjs";
 import { applyLiveMigrate, previewLiveMigrate } from "../src/config/migrate.mjs";
 import { canonicalJson, sha256 } from "../src/storage/canonical.mjs";
@@ -262,6 +262,35 @@ test("live migrate finishes a run that stopped after the store was renamed into 
   const done = await applyLiveMigrate(h.input({ fingerprint: again.fingerprint }), h.ctx);
   assert.equal(done.applied, true);
   await loadPilot(h.newConfig, h.ctx);
+});
+
+test("live migrate from a legacy folder works from a package kit installed under the new folder's kits", async (t) => {
+  const h = await legacyHome(t);
+  const pkg = await packageKit(h.home, join(h.sb, "global/devtwin"), { files: kitFiles(SKILL_NAMES) });
+  // From the Git kit, the kits folder is an entry the new folder may not hold.
+  assert.deepEqual(failed(await h.cli(migrateArgs(h)), "DEVTWIN_CONFLICT").details.entries, ["kits"]);
+  await rm(h.newKit.kit, { recursive: true, force: true });
+  const cli = (args) => runCli(args, { home: h.home, env: {}, kitRoot: pkg.kit });
+  const preview = h.ok(await cli(migrateArgs(h)));
+  assert.equal(preview.status, "migrate");
+  assert.deepEqual(preview.warnings, [], "a package kit under <new folder>/kits is no KIT_NOT_SIBLING");
+  const live = preview.config.live;
+  assert.deepEqual([live.kitRoot, live.kitVersion, live.kitDigest, Object.hasOwn(live, "kitCommit")], [pkg.kit, pkg.version, pkg.digest, false]);
+  assert.deepEqual([preview.to.kitRoot, preview.to.kitVersion, preview.to.kitDigest, preview.to.kitId, Object.hasOwn(preview.to, "kitCommit")], [pkg.kit, pkg.version, pkg.digest, pkg.kitId, false]);
+  const applied = h.ok(await cli([...migrateArgs(h), "--apply", "--plan-fingerprint", preview.fingerprint]));
+  assert.equal(applied.configId, h.configId);
+  assert.deepEqual((await readdir(h.newDir)).sort(), ["kits", "live.json", "store"]);
+  const receipt = JSON.parse(await readFile(join(h.newDir, "store/state/live/migration.json"), "utf8"));
+  assert.deepEqual(receipt.to, { config: h.newConfig, root: h.newDir, digest: applied.digest, kitRoot: pkg.kit, kitVersion: pkg.version, kitDigest: pkg.digest, kitId: pkg.kitId });
+  const written = JSON.parse(await readFile(h.newConfig, "utf8")).live;
+  assert.deepEqual([written.kitVersion, written.kitDigest, Object.hasOwn(written, "kitCommit")], [pkg.version, pkg.digest, false]);
+  h.ok(await cli(["doctor", "--pilot", h.newConfig]));
+  // agents install from the package kit replaces the owned legacy entries; the receipts name the package kit.
+  const plan = h.ok(await cli(["agents", "install", "--pilot", h.newConfig, "--agent", "claude"]));
+  h.ok(await cli(["agents", "install", "--pilot", h.newConfig, "--agent", "claude", "--apply", "--plan-fingerprint", plan.fingerprint, "--run-id", "run_pkgmigrate01"]));
+  const owned = JSON.parse(await readFile(join(h.dirs.claude, SKILL_NAMES[0], ".devtwin-owned.json"), "utf8"));
+  assert.deepEqual([owned.schemaVersion, owned.kitId, owned.kitCommit], [3, pkg.kitId, null]);
+  assert.equal(h.ok(await cli(migrateArgs(h))).status, "migrated");
 });
 
 test("DEVTWIN_KIT wins over the legacy DEVCTX_KIT, which is read for one transition and reported as deprecated", async (t) => {

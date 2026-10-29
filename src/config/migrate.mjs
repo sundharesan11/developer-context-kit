@@ -3,12 +3,12 @@ import { basename, dirname, join, sep } from "node:path";
 import { randomBytes } from "node:crypto";
 import { DevtwinError } from "../errors.mjs";
 import { loadPilot, checkLiveConfig, rootsFromPilot } from "./pilot.mjs";
-import { KEYS, configPath, configText, runningKit, assertConfigDir, storeLayout } from "./live.mjs";
+import { KEYS, configPath, configText, runningKit, runningIdentity, kitWarnings, withKit, assertConfigDir, storeLayout } from "./live.mjs";
 import { info, overlaps, isWithin, readPrivateBytes, writeNewFile, fsyncDir } from "../storage/fsx.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { sha256, digest, canonicalJson } from "../storage/canonical.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
-import { gitQuery } from "../identity/git.mjs";
+import { kitFields, kitId } from "../kit/identity.mjs";
 import { incompleteInstallRuns } from "../agents/install.mjs";
 import { envNotes, KIT_ENV, LEGACY_KIT_ENV } from "./legacy.mjs";
 // live migrate copies a live setup made under the former devctx name (by default ~/.devctx) to a new live config folder
@@ -94,9 +94,9 @@ async function inspect(input, ctx, { held = [] } = {}) {
   if (overlaps(realFrom, realTo)) gate("from", "overlap");
   const kitRoot = runningKit(ctx);
   if (isWithin(kitRoot, realFrom)) gate("live.kitRoot", "inside-legacy-root");
-  const head = gitQuery(kitRoot, ["rev-parse", "--verify", "HEAD"], { notRepo: true });
-  if (head.notRepo) gate("live.kitRoot", "not-top-level");
-  const kitCommit = head.stdout.trim(), notes = envNotes(ctx.env ?? process.env);
+  // U45: a Git clone or a package kit; kit holds its live config fields (kitCommit, or kitVersion and kitDigest).
+  const identity = runningIdentity(kitRoot), kit = kitFields(identity), notes = envNotes(ctx.env ?? process.env);
+  const packageHere = identity.kind === "package" && dirname(kitRoot) === join(toDir, "kits");
   // Already migrated: report it, write nothing. Later live config changes to the new config do not matter here.
   if (info(to)) {
     const receipt = await readJsonMaybe(join(toStore, ...RECEIPT)), current = await readJsonMaybe(to);
@@ -106,17 +106,17 @@ async function inspect(input, ctx, { held = [] } = {}) {
     return { plan, notes, next: nextSteps({ to, toDir, fromDir, kitRoot: current.live.kitRoot, agents }) };
   }
   // The legacy config must load under the new code with its approval intact. The running kit stands in for its kit.
-  const legacy = await loadPilot(from, { home: ctx.home, env: ctx.env, kitRoot: ctx.kitRoot, liveGate: { kit: { kitRoot, kitCommit } } });
+  const legacy = await loadPilot(from, { home: ctx.home, env: ctx.env, kitRoot: ctx.kitRoot, liveGate: { kit: { kitRoot, ...kit } } });
   if (!legacy.live) gate("from", "not-live");
   const layout = storeLayout(fromDir);
   if (Object.entries(layout).some(([key, path]) => legacy[key] !== path)) gate("from", "layout");
   // The new config: every path into the legacy folder moves to the new folder, and the kit is the running kit.
   const raw = Object.fromEntries(KEYS.map((key) => [key, legacy[key]]));
   const fields = legacyPointers({ ...raw, live: { ...raw.live, kitRoot: null } }, fromDir);
-  const config = { ...rewritePaths(raw, fromDir, toDir), live: { ...rewritePaths(raw.live, fromDir, toDir), kitRoot, kitCommit } };
+  const config = { ...rewritePaths(raw, fromDir, toDir), live: withKit(rewritePaths(raw.live, fromDir, toDir), kitRoot, identity) };
   const next = checkLiveConfig(config, to, { home: ctx.home, env: ctx.env, kitRoot: ctx.kitRoot });
   const configId = legacy.live.configId, agents = Object.keys(legacy.live.skillDirs).sort();
-  const warnings = [...next.warnings, ...(kitRoot === join(toDir, "kit") ? [] : [{ code: "KIT_NOT_SIBLING" }])];
+  const warnings = [...next.warnings, ...kitWarnings(kitRoot, identity, toDir, ctx.home)];
   // A consistent legacy store: no held lock and no interrupted install.
   const lockDir = join(legacy.stateRoot, "locks"), heldRel = new Set(held.map((path) => "state/locks/" + basename(path)));
   const locks = info(lockDir) ? readdirSync(lockDir).filter((name) => !heldRel.has("state/locks/" + name)).sort() : [];
@@ -141,7 +141,7 @@ async function inspect(input, ctx, { held = [] } = {}) {
   if (references.length) warnings.push({ code: "LEGACY_PATH_REFERENCE", files: references });
   const manifest = digest(rows);
   overrides.set(relOf(APPROVAL), Buffer.from(JSON.stringify({ schemaVersion: 1, configId, digest: next.digest }) + "\n"));
-  const receipt = { schemaVersion: 1, kind: "live-migration", configId, from: { config: from, root: fromDir, digest: legacy.digest }, to: { config: to, root: toDir, digest: next.digest, kitRoot, kitCommit }, manifest };
+  const receipt = { schemaVersion: 1, kind: "live-migration", configId, from: { config: from, root: fromDir, digest: legacy.digest }, to: { config: to, root: toDir, digest: next.digest, kitRoot, ...kit, kitId: kitId(identity) }, manifest };
   overrides.set(relOf(RECEIPT), Buffer.from(canonicalJson(receipt) + "\n"));
   // The exact tree the new store must hold.
   const expected = new Map(rows.map((row) => [row.path, overrides.has(row.path) ? { ...row, size: overrides.get(row.path).length, sha256: sha256(overrides.get(row.path)) } : row]));
@@ -154,7 +154,7 @@ async function inspect(input, ctx, { held = [] } = {}) {
     if (canonicalJson(found) !== canonicalJson(receipt)) conflict("The new store was copied from a different legacy state", { field: "pilotRoot", remedy: "inspect " + toStore + ", move it aside by hand, then preview again" });
     status = "finish";
   } else {
-    const allowed = new Set([STAGING, ...(dirname(kitRoot) === toDir ? [basename(kitRoot)] : [])]);
+    const allowed = new Set([STAGING, ...(dirname(kitRoot) === toDir ? [basename(kitRoot)] : []), ...(packageHere ? ["kits"] : [])]);
     const extra = readdirSync(toDir).filter((name) => !allowed.has(name)).sort();
     if (extra.length) conflict("The new live config folder is not empty", { field: "configDir", entries: extra });
     if (info(staging)) partial = { path: staging, ...(await partialState(staging, expected)) };
@@ -162,7 +162,7 @@ async function inspect(input, ctx, { held = [] } = {}) {
   const plan = finalizePlan({
     kind: "live-migrate", status,
     from: { config: from, root: fromDir, configId, digest: legacy.digest, pilotRoot: legacy.pilotRoot },
-    to: { config: to, root: toDir, pilotRoot: config.pilotRoot, digest: next.digest, kitRoot, kitCommit },
+    to: { config: to, root: toDir, pilotRoot: config.pilotRoot, digest: next.digest, kitRoot, ...kit, kitId: kitId(identity) },
     config, rewrites,
     store: { dirs: rows.filter((r) => r.type === "dir").length, files: rows.filter((r) => r.type === "file").length, bytes: rows.reduce((n, r) => n + (r.size ?? 0), 0), manifest },
     partial, leftBehind: readdirSync(fromDir).filter((name) => name !== "store" && name !== basename(from)).sort(), warnings
