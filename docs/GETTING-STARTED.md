@@ -64,7 +64,7 @@ No files are added to the project by onboarding. Private context is stored outsi
 
 You can inspect briefs, exercise the [skill builder](SKILL-BUILDER.md) and review a [private handoff export](HANDOFF.md). Do not point a disposable pilot at a real client checkout or edit the guards to reach your normal agent homes. Real use goes through a live config instead; see [Live activation](LIVE.md).
 
-Live mode is implemented, and [Live activation](LIVE.md) is its runbook. Its first activation on one real machine passed on 2026-10-25, including fresh non-interactive Claude and Codex discovery; interactive sessions remain. Backup and restore, session hooks and selective migration from an existing personal setup remain [roadmap work](ROADMAP.md). A live setup made under the old devctx name moves with [Migrating from devctx](MIGRATING.md). A globally installed skill from another setup is not evidence that it uses this kit.
+Live mode is implemented, and [Live activation](LIVE.md) is its runbook. Its first activation on one real machine passed on 2026-10-25, including fresh non-interactive Claude and Codex discovery; interactive sessions remain. Daily encrypted backups with restore, and the session hooks, are implemented. Selective migration from an existing personal setup remains [roadmap work](ROADMAP.md). A live setup made under the old devctx name moves with [Migrating from devctx](MIGRATING.md). A globally installed skill from another setup is not evidence that it uses this kit.
 
 The kit does not delete demo directories. Temporary directories can disappear after a reboot or system cleanup. Keep only synthetic data in them. Inspect the exact directory before manually disposing of it.
 
@@ -102,9 +102,13 @@ Give `setup apply` the same flags as the plan that you approved, and that plan's
 | `profile` | Writes your personal profile (`profile apply`). |
 | `starter-preferences` | Stores the starter preferences that you select (`--starter <id>`) in the personal store. |
 | `scope`, `first-project` | Adds a scope and onboards one repository (`scope add`, `project onboard`). |
+| `hub-join`, `job-hub-sync` | Joins an organization hub and turns on its sync job. Optional. |
+| `consent-hub`, `consent-repo` | Grants the one-time consent that lets agents and jobs send lessons to the hub, or push learning branches to one repository. Each item still waits in the held queue, 24 hours by default. Owner steps. |
 | `sandbox` | Recommends agent sandbox settings and a container setup for `--repo`. It writes no agent setting. Accepted recommendations (`--recommendation <id>`) become personal preferences. |
 
 The starter templates step shows as "not available yet". The scheduled radar, advisory and review steps are skipped until you approve their plist paths with `live write-classes --launch-agent`. Without a hub, devtwin runs in solo mode.
+
+After setup, devtwin works in the background. Agents write project lessons, constraints, facts, locations and handoffs on their own, as `observed` records. `activity` lists what it did, and `undo` reverses one write. The daily import, the daily backup and the weekly activity notification are scheduled jobs that you turn on with `schedule plan` and `schedule apply`; see [Schedules](HARNESS.md#schedules).
 
 The skill, hook and write class steps are owner actions. The devtwin hook denies their `setup apply` from an agent shell, so the agent shows you the plan and you run the apply in your own terminal.
 

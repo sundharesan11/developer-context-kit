@@ -11,6 +11,7 @@ Start with a disposable synthetic project. Move to the [live activation runbook]
 | What is devtwin, and why use it? | [Project overview](../README.md) |
 | How do I run a safe demo? | [Getting started](GETTING-STARTED.md) |
 | How do preview, approval and context work? | [Guided onboarding](ONBOARDING.md) |
+| What does devtwin do on its own, and when does it ask me? | [Tiers](SECURITY-MODEL.md#tiers) and [Activity and undo](HARNESS.md#activity-and-undo) |
 | Where does each part fit? | [Architecture](ARCHITECTURE.md) |
 | How do I activate it on my machine? | [Live activation](LIVE.md) |
 | I set it up under the old devctx name. How do I move? | [Migrating from devctx](MIGRATING.md) |
@@ -24,7 +25,7 @@ Start with a disposable synthetic project. Move to the [live activation runbook]
 - [Storage](STORAGE.md): roots, immutable records, journals and failure recovery.
 - [Handoff export](HANDOFF.md): selected private Markdown packets and disclosure limits.
 - [Agent protocol](AGENT-PROTOCOL.md): task context, proposals and advisory boundaries.
-- [Personal harness](HARNESS.md): personal profile, skill templates, announcement watch, the radar and its schedules, drafts and what each sends.
+- [Personal harness](HARNESS.md): personal profile, skill templates, announcement watch, the radar and its schedules, drafts and what each sends. It also covers the session summary, activity and undo, the weekly review, the setup review, the daily import and backups.
 - [Organization hub](HUB.md): hub join, sync and leave, the hub sync job, identity and the trust model.
 - [Skill builder](SKILL-BUILDER.md): requirements, approvals, drafts and disposable installation.
 - [Skill sources](SKILL-SOURCES.md): catalog, acquisition, provenance and installation limits.
