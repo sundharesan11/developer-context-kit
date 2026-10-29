@@ -14,6 +14,7 @@ import { publishToHub, enqueueOutbox, listOutbox } from "../src/hubs/git-write.m
 import { dialogArgv, dialogText, osascriptDialog, DIALOG_SCRIPT } from "../src/owner/dialog.mjs";
 import { ownerAction, OWNER_ACTIONS } from "../src/hooks/owner-block.mjs";
 import { RELEASABLE_LOCKS } from "../src/storage/lock.mjs";
+import { stableNodePath } from "../src/schedule/launchd.mjs";
 
 const SCOPE = "example";
 const HOUR = 3600 * 1000;
@@ -367,7 +368,7 @@ test("hub two fixture machines exchange a lesson and a note through one bare rep
   const job = async (m, clock) => {
     const program = /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/.exec(await readFile(m.plist, "utf8"))[1];
     const args = [...program.matchAll(/<string>([^<]*)<\/string>/g)].map((x) => x[1]), chunks = [];
-    assert.equal(args[0], process.execPath);
+    assert.equal(args[0], stableNodePath(), "the job runs a stable Node path");
     assert.match(args[1], /bin\/devtwin\.mjs$/);
     await main(args.slice(2), { ...m.options(clock), stdout: { write: (v) => { chunks.push(v); return true; } } });
     const out = JSON.parse(chunks.join(""));

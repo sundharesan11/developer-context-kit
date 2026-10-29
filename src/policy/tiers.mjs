@@ -23,7 +23,9 @@ const RECORD_WRITE = { observed: A, proposed: A, confirmed: DIALOG, disputed: DI
 // setup apply has the tier of the step it applies; the owner steps run an always-ask action.
 const SETUP_STEPS = { "live-folder": R, "skills-claude": ASK, "skills-codex": ASK, "write-classes-hooks": ASK, "hooks-claude": ASK, "hooks-codex": ASK,
   "hook-verify": A, "paths-confirm": ASK, profile: A, "starter-preferences": A, "starter-templates": R, scope: A, "first-project": A, "hub-join": ASK, "job-hub-sync": ASK,
-  "job-radar": ASK, "job-advisories": ASK, "job-review-reminder": ASK, "consent-repo": ASK, "consent-hub": ASK, sandbox: A };
+  "job-radar": ASK, "job-advisories": ASK, "job-review-reminder": ASK, "consent-repo": ASK, "consent-hub": ASK, "backup-folder": ASK, "job-backup": ASK, sandbox: A,
+  // U9 (one approval): setup apply --steps or --all-pending runs several owner steps after one owner dialog.
+  batch: ASK };
 const TABLE = {
   version: R, help: R,
   // The skill-source and skill-builder routes keep their own recorded approval chain (content-approve, local-approve).

@@ -12,7 +12,7 @@ import { withPilotLock } from "../storage/lock.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { requireOwnerApproval } from "../owner/dialog.mjs";
 import { configuredScopes } from "../records/isolation.mjs";
-import { launchAgentPath, renderPlist, installJob, removeJob, launchctlOf, domain } from "./launchd.mjs";
+import { launchAgentPath, renderPlist, installJob, removeJob, launchctlOf, domain, jobNodePath } from "./launchd.mjs";
 import { notify } from "./notify.mjs";
 
 const DAY = 86400;
@@ -72,7 +72,7 @@ async function writeReceipt(roots, job, value) {
 }
 export function jobArguments(ctx, pilotPath, job) {
   const kit = ctx.pilot?.live?.kitRoot ?? ctx.kitRoot ?? KIT;
-  return [process.execPath, join(kit, "bin/devtwin.mjs"), "schedule", "run", "--pilot", resolve(pilotPath), "--job", job];
+  return [jobNodePath(ctx), join(kit, "bin/devtwin.mjs"), "schedule", "run", "--pilot", resolve(pilotPath), "--job", job];
 }
 
 // Install needs what the job reads: a stack approval for the radar and advisory jobs (with the advisories group for

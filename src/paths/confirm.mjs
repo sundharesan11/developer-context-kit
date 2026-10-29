@@ -67,15 +67,18 @@ const pilotFile = (ctx) => {
   if (typeof ctx.pilot?.path !== "string") throw new DevtwinError("INVALID_INPUT", "Pilot path required", { field: "pilot" });
   return realpathSync(ctx.pilot.path);
 };
+// ctx.projection.pilotBytes: the config a setup batch will write before this step (src/setup/batch.mjs). Only a plan
+// reads it; the apply always hashes the file on disk.
 export function planConfirm(ctx) {
   let values;
-  try { values = currentPaths({ pilotPath: pilotFile(ctx), kitRoot: ctx.kitRoot }); }
+  try { values = currentPaths({ pilotPath: pilotFile(ctx), pilotBytes: ctx.projection?.pilotBytes, kitRoot: ctx.kitRoot }); }
   catch (error) { if (error instanceof DevtwinError) throw error; throw new DevtwinError("GATE_REQUIRED", "Kit HEAD unreadable", { field: "kitRoot" }); }
   return finalizePlan({ kind: "paths-confirm", file: confirmedPath(ctx.roots.stateRoot), ...values });
 }
 const dialogFor = (plan) => ({ title: "Confirm the kit and config paths",
   body: "Agents stop asking for these paths while they stay the same.\n\nKit: " + plan.kitRoot + "\nKit HEAD: " + (plan.kitRef ?? plan.kitHead) + "\nConfig: " + plan.pilotPath });
 export async function applyConfirm(ctx, fingerprint) {
+  ctx = { ...ctx, projection: undefined };
   const plan = planConfirm(ctx);
   assertFingerprint(plan, fingerprint);
   await (await import("../owner/dialog.mjs")).requireOwnerApproval(ctx, dialogFor(plan));
@@ -89,7 +92,7 @@ export async function applyConfirm(ctx, fingerprint) {
 }
 export async function checkPaths(ctx) {
   const pilotPath = pilotFile(ctx);
-  return { file: confirmedPath(ctx.roots.stateRoot), ...(await confirmationState(ctx.roots.stateRoot, { pilotPath, kitRoot: ctx.kitRoot })) };
+  return { file: confirmedPath(ctx.roots.stateRoot), ...(await confirmationState(ctx.roots.stateRoot, { pilotPath, pilotBytes: ctx.projection?.pilotBytes, kitRoot: ctx.kitRoot })) };
 }
 const options = { apply: { type: "boolean" }, "plan-fingerprint": { type: "string" } };
 export const pathsConfirmCommand = { options, run: (values, ctx) => values.apply ? applyConfirm(ctx, values["plan-fingerprint"]) : { preview: true, ...planConfirm(ctx) } };

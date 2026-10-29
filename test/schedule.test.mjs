@@ -12,7 +12,9 @@ import { planProfile, applyProfile } from "../src/profile/store.mjs";
 import { ensurePrivatePath } from "../src/storage/fsx.mjs";
 import { ownerAction } from "../src/hooks/owner-block.mjs";
 import { osascriptArgs, notificationText } from "../src/schedule/notify.mjs";
-import { receiptPath } from "../src/schedule/jobs.mjs";
+import { receiptPath, jobArguments } from "../src/schedule/jobs.mjs";
+import { stableNodePath, hubSyncArguments } from "../src/schedule/launchd.mjs";
+import { hookCommand } from "../src/agents/hooks-install.mjs";
 import { appendEntry } from "../src/audit/log.mjs";
 import { createFetcher } from "../src/stack/fetch.mjs";
 
@@ -286,4 +288,21 @@ test("the runs of one job share one request budget and one answer for each sourc
   assert.deepEqual(await codes(make()), ["DEVTWIN_UPSTREAM_UNAVAILABLE", "ok", "DEVTWIN_CALL_LIMIT"]);
   assert.deepEqual(await codes(make()), ["DEVTWIN_UPSTREAM_UNAVAILABLE", "ok", "DEVTWIN_CALL_LIMIT"], "the second scope adds no request");
   assert.equal(log.length, 2);
+});
+
+test("job plists pin the stable Homebrew node shim, not the versioned Cellar path", () => {
+  const cellar = "/opt/homebrew/Cellar/node/26.1.0/bin/node", real = { "/opt/homebrew/bin/node": cellar, "/usr/local/bin/node": "/usr/local/Cellar/node/24.0.0/bin/node" };
+  const lookup = (over = {}) => ({ execPath: cellar, realpath: (path) => { if (!real[path]) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); return real[path]; }, isFile: () => true, ...over });
+  assert.equal(stableNodePath(lookup()), "/opt/homebrew/bin/node", "the shim of the same prefix");
+  assert.equal(stableNodePath(lookup({ execPath: "/usr/local/Cellar/node@22/22.9.0/bin/node" })), "/usr/local/bin/node");
+  assert.equal(stableNodePath(lookup({ execPath: "/opt/nvm/versions/node/v24.0.0/bin/node" })), "/opt/nvm/versions/node/v24.0.0/bin/node", "not a Cellar path: execPath stays");
+  assert.equal(stableNodePath(lookup({ realpath: () => { throw new Error("ENOENT"); } })), cellar, "no shim: execPath stays");
+  assert.equal(stableNodePath(lookup({ realpath: () => "/opt/homebrew/bin/python3" })), cellar, "a shim that is not node is not used");
+  assert.equal(stableNodePath(lookup({ isFile: () => false })), cellar, "a shim whose target is not a file is not used");
+  // The radar, review and backup jobs and the hub sync job all use it; the hook lines run plain node from PATH.
+  const ctx = { kitRoot: "/k", nodeLookup: lookup(), pilot: { path: "/c/live.json" } };
+  assert.equal(jobArguments(ctx, "/c/live.json", "backup-daily")[0], "/opt/homebrew/bin/node");
+  assert.equal(hubSyncArguments(ctx, "example")[0], "/opt/homebrew/bin/node");
+  assert.equal(jobArguments({ ...ctx, nodeLookup: lookup({ execPath: "/usr/bin/node" }) }, "/c/live.json", "backup-daily")[0], "/usr/bin/node");
+  assert.match(hookCommand({ kitRoot: "/k", pilotPath: "/c/live.json", event: "stop", agent: "claude" }), /^node "/);
 });

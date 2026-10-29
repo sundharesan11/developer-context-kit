@@ -59,10 +59,30 @@ export function osascriptDialog(content, { platform = process.platform, env = pr
 }
 // U26 (KTD34): the approval mode of the loaded live config; "dialog" when the key is absent.
 const approvalMode = (ctx) => (ctx?.pilot ?? ctx?.roots?.pilot)?.approval === "dialog-or-tty" ? "dialog-or-tty" : "dialog";
+// One approval for a setup batch (src/setup/batch.mjs). After the owner approved the batch dialog, the batch runs each
+// step with a grant under ctx[BATCH_GRANT]. A grant is an object that only issueBatchGrant makes and that this module
+// remembers, so no argument or environment variable can stand for one. It is bound to the batch fingerprint, the step
+// and the step's fingerprint, stands for one dialog only, and is revoked when the step ends.
+export const BATCH_GRANT = Symbol("devtwin.batchGrant");
+const GRANTS = new WeakMap();
+export function issueBatchGrant({ batchFingerprint, step, stepFingerprint }) {
+  const grant = Object.freeze({ batchFingerprint, step, stepFingerprint });
+  GRANTS.set(grant, { uses: 0 });
+  return grant;
+}
+export const revokeBatchGrant = (grant) => { GRANTS.delete(grant); };
+function useBatchGrant(ctx) {
+  const grant = ctx?.[BATCH_GRANT], state = grant ? GRANTS.get(grant) : undefined;
+  if (!state || state.uses > 0) return null;
+  state.uses++;
+  return grant;
+}
 // Shows the dialog and throws OWNER_DENIED unless the owner clicked Approve. Call it before the first write.
 // In mode dialog-or-tty with no GUI session, the owner answers on the terminal instead (src/owner/tty.mjs).
 export async function requireOwnerApproval(ctx, content) {
   const shown = dialogText(content);
+  const grant = useBatchGrant(ctx);
+  if (grant) return { approved: true, title: shown.title, batch: grant.batchFingerprint, step: grant.step };
   const tty = approvalMode(ctx) === "dialog-or-tty" && !hasGuiSession(ctx);
   // An injected dialog gets the cleaned text; osascriptDialog cleans the raw content itself.
   const show = tty ? () => ttyApproval(shown, ctx) : typeof ctx?.ownerDialog === "function" ? () => ctx.ownerDialog(shown) : () => osascriptDialog(content, { env: ctx?.env ?? process.env });

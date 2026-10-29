@@ -141,7 +141,7 @@ export DEVTWIN_KIT="$HOME/.devtwin/kit"
 
 Open a new terminal and check `printenv DEVTWIN_KIT`. devtwin edits agent settings files only through `agents install --hooks` and `agents uninstall --hooks`, after you approve them as write classes.
 
-To turn on lesson delivery and the owner-action block, follow [Turn on the hooks in live mode](/docs/guides/lessons-and-hooks/#turn-on-the-hooks-in-live-mode). Then run [`paths confirm`](/docs/guides/lessons-and-hooks/#confirm-the-kit-and-config-paths) once, so that the skills stop asking for the kit and config paths and the hook keeps its receipt current. To run these steps one at a time with a what, why and undo for each, use the [setup wizard](/docs/guides/setup-wizard/). To share lessons with colleagues, see [Organization hub](/docs/guides/organization-hub/).
+To turn on lesson delivery and the owner-action block, follow [Turn on the hooks in live mode](/docs/guides/lessons-and-hooks/#turn-on-the-hooks-in-live-mode). Then run [`paths confirm`](/docs/guides/lessons-and-hooks/#confirm-the-kit-and-config-paths) once, so that the skills stop asking for the kit and config paths and the hook keeps its receipt current. To approve the skills, the hooks, the paths confirmation, the backup folder and the scheduled jobs with one owner dialog, run the [setup batch](/docs/guides/setup-wizard/#approve-the-owner-steps-at-once) (`setup plan --all-pending`, then `setup apply --all-pending --apply`). To run these steps one at a time with a what, why and undo for each, use the [setup wizard](/docs/guides/setup-wizard/). To share lessons with colleagues, see [Organization hub](/docs/guides/organization-hub/).
 
 ## 10. Try it in a fresh session
 
@@ -253,9 +253,18 @@ Upgrade side by side, so the old clone keeps working until the new one is proven
    node ~/.devtwin/kit-next/bin/devtwin.mjs live set-kit --pilot "$LIVE_CONFIG" --commit '<new commit>' --apply --plan-fingerprint '<fingerprint>'
    ```
 
-3. From now on run every live command from the new clone. Preview `agents install` for each agent; changed skills show `update`.
+   The apply also rebuilds the lesson index and session summaries of every scope, so the hook finds your bound projects at once.
+
+3. From now on run every live command from the new clone. Update the skills and the hooks and confirm the new paths with one owner dialog:
+
+   ```sh
+   node ~/.devtwin/kit-next/bin/devtwin.mjs setup plan --pilot "$LIVE_CONFIG" --all-pending
+   node ~/.devtwin/kit-next/bin/devtwin.mjs setup apply --pilot "$LIVE_CONFIG" --all-pending --apply --plan-fingerprint '<fingerprint>'
+   ```
+
+   Or run the steps one at a time: preview `agents install` for each agent (changed skills show `update`), then `agents install --hooks` and `paths confirm`. Each one asks on its own.
 4. Point `DEVTWIN_KIT` at the new clone.
-5. Run `paths confirm` from the new clone, preview first. The new kit path ends the old confirmation.
+5. If you ran the steps one at a time, run `paths confirm` from the new clone last, preview first. The new kit path ends the old confirmation.
 
 Installed skills stay owned across a kit change. Don't move or rename a clone after `live set-kit`. To go back, run `live set-kit` from the old clone with its commit.
 

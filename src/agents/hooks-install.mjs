@@ -12,7 +12,7 @@ import { withPilotLock } from "../storage/lock.mjs";
 import { RUN_ID } from "../storage/runs.mjs";
 import { editOwnedFile, readOwnedText, replaceOwnedEntries } from "../storage/owned-file.mjs";
 import { writeKitReceipt, receiptPath, receiptProblem, readPilotBytes } from "../hooks/receipt.mjs";
-import { readIndex } from "../lessons/index.mjs";
+import { readIndex, rebuildDerived } from "../lessons/index.mjs";
 import { SCOPE_ID } from "../identity/ids.mjs";
 // U8: devtwin's hook entries in the agent settings files (KTD6, KTD7, KTD9). The only files are the approved
 // hookTargets: <claudeDir>/settings.json and ~/.codex/hooks.json. Both use the same shape:
@@ -205,7 +205,7 @@ export async function applyHooks(roots, pilot, input, { fingerprint, runId, now 
   if (typeof runId !== "string" || !RUN_ID.test(runId)) throw new DevtwinError("INVALID_ID", "Invalid run ID");
   assertFingerprint(await planHooks(pilot, input), fingerprint);
   const runDir = join(roots.stateRoot, "runs", runId), journalPath = join(runDir, "journal.json"), inventoryPath = join(runDir, "inventory.json");
-  return withPilotLock(roots, lockPath(roots), { kind: "hook-install", runId }, async () => {
+  const result = await withPilotLock(roots, lockPath(roots), { kind: "hook-install", runId }, async () => {
     const { incompleteInstallRuns } = await import("./install.mjs");
     if ((await incompleteInstallRuns(pilot)).length) throw new DevtwinError("RECOVERY_REQUIRED", "Incomplete installer journal");
     const plan = await planHooks(pilot, input);
@@ -243,6 +243,9 @@ export async function applyHooks(roots, pilot, input, { fingerprint, runId, now 
     const receipt = plan.mode === "install" ? await writeKitReceipt(roots, { pilotPath: pilot.path, kitRoot: input.kitRoot, now }) : null;
     return { applied: intended.length > 0, runId: intended.length ? runId : null, actions: plan.actions, receipt: receipt ? receipt.path : null, notes: plan.notes };
   }, { destinations: [runDir] });
+  // Upgrade fix: the hook finds a bound project through the lesson index, so an install rebuilds every scope's index
+  // and session summaries after the lock is released. An upgraded install then works at once (src/lessons/index.mjs).
+  return result.receipt ? { ...result, derived: await rebuildDerived(roots) } : result;
 }
 // Recovery of one started, unfinished entry, from the file's hash against the journal's before and after hashes.
 export function hookRecoveryFor(entry) {

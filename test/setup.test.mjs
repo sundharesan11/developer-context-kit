@@ -93,7 +93,7 @@ test("setup runs every available step on a fixture home and reaches a working br
   }
   const after = await h.ok(["setup", "status", "--pilot", h.liveConfig, ...h.inputs]);
   // In solo mode (no --hub-remote) the hub steps are skipped, not done.
-  for (const step of after.steps) assert.equal(step.done || /^(?:solo mode|no hub joined|no --push-repo|launch agent not approved)/.test(step.skipped ?? ""), step.available === true, step.id);
+  for (const step of after.steps) assert.equal(step.done || /^(?:solo mode|no hub joined|no --push-repo|no --backup-target|launch agent not approved)/.test(step.skipped ?? ""), step.available === true, step.id);
   const brief = await h.ok(["context", "brief", "--pilot", h.liveConfig, "--scope", "example", "--cwd", h.repo]);
   assert.equal(brief.project, "example.atlas");
   assert.ok(brief.records.length > 0, "the brief holds the onboarded records");
@@ -138,7 +138,7 @@ test("setup re-run shows completed steps as done and changes nothing", async (t)
   const again = await drive(h);
   assert.equal(again.code, 0, again.text);
   assert.deepEqual(again.asked, []);
-  for (const id of available()) assert.match(again.text, new RegExp("\\[" + id + "\\][^\\n]*\\n[^\\n]*(?:done|Skipped: (?:solo mode|no hub joined|no --push-repo|launch agent not approved))", "m"), id);
+  for (const id of available()) assert.match(again.text, new RegExp("\\[" + id + "\\][^\\n]*\\n[^\\n]*(?:done|Skipped: (?:solo mode|no hub joined|no --push-repo|no --backup-target|launch agent not approved))", "m"), id);
   assert.equal(await treeSnapshot(h.home), before);
   const status = await h.ok(["setup", "status", "--pilot", h.liveConfig, ...h.inputs]);
   assert.deepEqual(status.steps.filter((s) => s.available === true && !s.done && !s.skipped).map((s) => s.id), []);

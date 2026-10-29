@@ -192,10 +192,24 @@ const preview = async (promise) => ({ preview: true, ...(await promise) });
 export const planLiveAddRepo = (input, ctx) => preview(planChange("live-add-repo", input, ctx, addRepo(input.repo)).then((r) => r.plan));
 export const applyLiveAddRepo = (input, ctx, options) => applyChange("live-add-repo", input, ctx, addRepo(input.repo), undefined, options);
 export const planLiveSetKit = (input, ctx) => preview(planChange("live-set-kit", input, ctx, ...setKit(input, ctx)).then((r) => r.plan));
-export const applyLiveSetKit = (input, ctx, options) => applyChange("live-set-kit", input, ctx, ...setKit(input, ctx), options);
+// Upgrade fix: after the kit change, the new kit rebuilds the derived state (lesson indexes and session summaries), so
+// a store that an older kit wrote works with the hook at once.
+export async function applyLiveSetKit(input, ctx, options) {
+  const result = await applyChange("live-set-kit", input, ctx, ...setKit(input, ctx), options);
+  let derived;
+  try { derived = await (await import("../lessons/index.mjs")).rebuildDerived(rootsFromPilot(await loadPilot(result.config, gateContext(ctx)))); }
+  catch (error) { derived = [{ scope: null, problem: error.code ?? "DEVTWIN_INTERNAL" }]; }
+  return { ...result, derived };
+}
 export const previewLiveInit = (input, ctx) => ({ preview: true, ...planLiveInit(input, ctx) });
 export const planLiveSetWriteClasses = (input, ctx) => preview(planChange("live-set-write-classes", input, ctx, setWriteClasses(input.writeClasses)).then((r) => r.plan));
 export const applyLiveSetWriteClasses = (input, ctx, options) => applyChange("live-set-write-classes", input, ctx, setWriteClasses(input.writeClasses), undefined, options);
+// U9 (one approval): the config a write-classes edit would give, and the exact bytes its apply writes, with nothing
+// written. A setup batch plans the steps after the config change against them (src/setup/batch.mjs).
+export async function projectLiveEditWriteClasses(input, ctx) {
+  const { next, plan } = await planChange("live-set-write-classes", input, ctx, editWriteClasses(input));
+  return { plan: { preview: true, ...plan }, pilot: next, bytes: Buffer.from(configText(rawOf(next))) };
+}
 export const planLiveEditWriteClasses = (input, ctx) => preview(planChange("live-set-write-classes", input, ctx, editWriteClasses(input)).then((r) => r.plan));
 export const applyLiveEditWriteClasses = (input, ctx, options) => applyChange("live-set-write-classes", input, ctx, editWriteClasses(input), undefined, options);
 export const planLiveStackWatch = (input, ctx) => preview(planChange("live-stack-watch", input, ctx, setStackWatch(input)).then((r) => r.plan));
