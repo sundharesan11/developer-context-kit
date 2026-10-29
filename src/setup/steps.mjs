@@ -53,12 +53,16 @@ function skillsStep(agent) {
 }
 
 // The hook settings files of the agents in the live config.
-function hookTargetsFor(ctx) {
+export function hookTargetsFor(ctx) {
   const dirs = agentDirsFor({ home: ctx.pilot.live.home, env: ctx.env ?? process.env });
   return AGENTS.filter((agent) => Object.hasOwn(ctx.pilot.live.skillDirs, agent)).map((agent) => join(dirs[agent], HOOK_FILES[agent]));
 }
+// U9 (one approval): needs(ctx) names the write-class paths a step needs approved in the live config. A setup batch
+// (src/setup/batch.mjs) merges them into one live write-classes change that runs before every other step.
+const launchAgentFor = (ctx, label) => join(ctx.pilot.live.home, "Library/LaunchAgents", label + ".plist");
 const writeClassesHooks = {
-  id: "write-classes-hooks", title: "Approve the hook settings files", available: true, owner: true,
+  id: "write-classes-hooks", title: "Approve the hook settings files", available: true, owner: true, config: true,
+  needs: (ctx) => ctx.pilot.live ? { hookTargets: hookTargetsFor(ctx) } : {},
   skip: (ctx) => ctx.pilot.live ? null : "a disposable pilot lists its hook targets in the pilot file",
   what: "Adds the agent hook settings files (~/.claude/settings.json and ~/.codex/hooks.json) to the hookTargets write class of the live config. Runs live write-classes --hook-target for each file. Other classes stay as they are.",
   why: "devtwin edits an agent settings file only when you approved that exact path in the live config. The hook steps need this approval.",
@@ -79,6 +83,7 @@ function hooksStep(agent) {
   const file = agent === "claude" ? "~/.claude/settings.json" : "~/.codex/hooks.json";
   return {
     id: "hooks-" + agent, title: "Hooks for " + agent, available: true, owner: true, skip: agentSkip(agent),
+    needs: (ctx) => ctx.pilot.live ? { hookTargets: hookTargetsFor(ctx).filter((path) => path.endsWith("/" + HOOK_FILES[agent])) } : {},
     what: "Adds devtwin's hook entries to " + file + ". Runs agents install --hooks --agent " + agent + ". Other entries in the file stay." + (agent === "codex" ? " " + CODEX_TRUST_NOTE.message : ""),
     why: "The hook gives the agent matching lessons at the moment it touches an area, and denies owner-only devtwin commands from agent shells.",
     undo: "agents uninstall --hooks --agent " + agent + " removes only devtwin's entries. A backup of the file is kept in the run folder.",
@@ -91,7 +96,7 @@ function hooksStep(agent) {
 // hook verify has no preview of its own; this plan names the one file it writes, so its apply still needs a fingerprint.
 const receiptPlan = (ctx) => finalizePlan({ kind: "setup-hook-verify", receipt: receiptPath(ctx.pilot.stateRoot), pilotPath: pilotPathOf(ctx) });
 async function receiptState(ctx) {
-  try { return (await receiptProblem(ctx.pilot.stateRoot, { pilotPath: pilotPathOf(ctx), pilotBytes: readPilotBytes(pilotPathOf(ctx)), kitRoot: ctx.kitRoot, now: ctx.now() })) ?? "ok"; }
+  try { return (await receiptProblem(ctx.pilot.stateRoot, { pilotPath: pilotPathOf(ctx), pilotBytes: ctx.projection?.pilotBytes ?? readPilotBytes(pilotPathOf(ctx)), kitRoot: ctx.kitRoot, now: ctx.now() })) ?? "ok"; }
   catch { return "invalid"; }
 }
 const hookVerify = {
@@ -235,6 +240,7 @@ const hubJoin = {
 const jobHubSync = {
   id: "job-hub-sync", title: "Scheduled job: hub sync", available: true, owner: true,
   skip: (ctx) => hubBindingSync(ctx) ? null : "no hub joined for this scope",
+  needs: (ctx) => ctx.pilot.live && hubBindingSync(ctx) ? { launchAgents: [launchAgentFor(ctx, "devtwin.hub-sync." + ctx.values.scope)] } : {},
   what: "Installs a user LaunchAgent, devtwin.hub-sync.<scope>.plist, that runs hub sync every 10 minutes: fetch the hub, push the outbox, rebuild the lesson index. The plist path must be in the launchAgents write class. Runs hub schedule.",
   why: "Keeps the hub clone current and posts queued notes and lessons, with its own consent and off switch.",
   undo: "hub schedule --scope <scope> --off, through preview and apply, removes the job. Then notes and lesson updates stop until you run hub sync by hand.",
@@ -250,7 +256,8 @@ const stackApproved = (ctx) => existsSync(join(ctx.roots.stateRoot, "stack", "ap
 // A job whose plist is not an approved launchAgents path is skipped with the command that approves it.
 const plistApproved = (ctx, job) => (ctx.roots.pilot?.writeClasses?.launchAgents ?? []).some((path) => path.endsWith("/devtwin." + job + ".plist"));
 const jobStep = (id, job, title, what, why, skip) => ({
-  id, title, available: true, owner: true, what, why,
+  id, title, available: true, owner: true, what, why, job,
+  needs: (ctx) => ctx.pilot.live ? { launchAgents: [launchAgentFor(ctx, "devtwin." + job)] } : {},
   skip: (ctx) => plistApproved(ctx, job) ? skip(ctx) : "launch agent not approved; run live write-classes --launch-agent ~/Library/LaunchAgents/devtwin." + job + ".plist",
   undo: "schedule off --job " + job + ", through preview and apply, unloads the job and removes its plist." + (job === "radar-weekly" ? " It turns off the advisory job too." : ""),
   plan: async (ctx) => (await scheduleCmd()).schedulePlanCommand.run({ job }, ctx),
@@ -268,6 +275,26 @@ const jobAdvisories = jobStep("job-advisories", "advisory-hourly", "Scheduled jo
 const jobReview = jobStep("job-review-reminder", "review-monthly", "Scheduled job: monthly review reminder",
   "Installs devtwin.review-monthly.plist, which shows a monthly reminder with a count of waiting preference and lesson proposals. It makes no request. Runs schedule apply.",
   "Reminds you to review what devtwin keeps and does.", () => null);
+
+// U24 (KTD33): the daily backup. The folder step approves --backup-target as a backupTargets folder in the live config;
+// the job step installs the backup-daily job, which writes there.
+const backupTargets = (ctx) => (ctx.roots?.pilot ?? ctx.pilot)?.writeClasses?.backupTargets ?? [];
+const backupFolders = (ctx) => [...new Set([...backupTargets(ctx), ...list(ctx.values["backup-target"])])];
+const backupFolder = {
+  id: "backup-folder", title: "Approve the backup folder", available: true, owner: true, config: true,
+  skip: (ctx) => !ctx.pilot.live ? "a disposable pilot lists its backup folders in the pilot file" : ctx.values["backup-target"] || backupTargets(ctx).length ? null : "no --backup-target given",
+  needs: (ctx) => ctx.pilot.live && ctx.values["backup-target"] ? { backupTargets: list(ctx.values["backup-target"]) } : {},
+  what: "Adds the folder you name with --backup-target to the backupTargets write class of the live config. Runs live write-classes --backup-target. Folders approved before stay.",
+  why: "The daily backup and backup create write encrypted archives of the store only into an approved folder, such as one a cloud drive saves.",
+  undo: "live write-classes with the other folders, or --clear backupTargets, through preview and apply, removes the approval. Archives already written stay.",
+  plan: async (ctx) => (await import("../config/commands.mjs")).liveWriteClassesCommand.run({ pilot: ctx.values.pilot, "backup-target": backupFolders(ctx) }, ctx),
+  apply: async (ctx, fingerprint) => (await import("../config/commands.mjs")).liveWriteClassesCommand.run({ pilot: ctx.values.pilot, "backup-target": backupFolders(ctx), apply: true, "plan-fingerprint": fingerprint }, ctx),
+  done: (ctx) => ctx.values["backup-target"] ? list(ctx.values["backup-target"]).every((path) => backupTargets(ctx).includes(path)) : backupTargets(ctx).length > 0
+};
+const jobBackup = jobStep("job-backup", "backup-daily", "Scheduled job: daily backup",
+  "Installs devtwin.backup-daily.plist, which writes one encrypted backup of the store a day into the first approved backup folder and keeps the newest 14. Runs schedule apply.",
+  "A lost or damaged store can be restored from the newest archive.",
+  (ctx) => backupTargets(ctx).length ? null : "no backup folder approved; run the backup-folder step");
 
 // U36 (KTD39): the standing consents, through consent grant (owner steps: the apply shows the owner dialog and the hook
 // denies it from agent shells). --push-repo names the repository; --hold-hours sets the hold time (default 24).
@@ -322,6 +349,8 @@ export const STEPS = Object.freeze([
   jobRadar,
   jobAdvisories,
   jobReview,
+  backupFolder,
+  jobBackup,
   sandbox
 ].map((step) => Object.freeze(step)));
 export const OWNER_STEPS = Object.freeze(STEPS.filter((step) => step.owner === true).map((step) => step.id));

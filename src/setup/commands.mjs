@@ -1,5 +1,7 @@
 // U9: setup status | plan --step <id> | apply --step <id> --plan-fingerprint <f>. Each route reads the step data in
 // steps.mjs; plan and apply delegate to the step's own preview and apply, so no setup logic is repeated here.
+// U9 (one approval): plan and apply with --steps <id,...> or --all-pending run a batch of owner steps behind one owner
+// dialog (src/setup/batch.mjs); apply then takes --apply and the batch fingerprint.
 import { DevtwinError, toJson } from "../errors.mjs";
 import { STEPS, stepById } from "./steps.mjs";
 
@@ -14,7 +16,8 @@ export const setupOptions = {
   actor: { type: "string", multiple: true }, accept: { type: "string" }, "request-id": { type: "string" }, "keep-previous": { type: "boolean" },
   recommendation: { type: "string", multiple: true },
   "hub-remote": { type: "string" }, "hub-handle": { type: "string" }, "hub-email": { type: "string" }, "ssh-command": { type: "string" }, "hub-root": { type: "string" },
-  "push-repo": { type: "string" }, "hold-hours": { type: "string" }
+  "push-repo": { type: "string" }, "hold-hours": { type: "string" }, "backup-target": { type: "string", multiple: true },
+  steps: { type: "string", multiple: true }, "all-pending": { type: "boolean" }
 };
 export const stepContext = (values, ctx) => ({ ...ctx, values });
 // A step's header: the consent text and its state. done and skip never write; a failed check reads as not done.
@@ -45,8 +48,11 @@ export async function applyStep(step, ctx, fingerprint) {
   if (!fingerprint) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");
   return { step: { id: step.id, title: step.title }, result: await step.apply(ctx, fingerprint) };
 }
+const batch = () => import("./batch.mjs");
+const isBatch = (values) => values["all-pending"] === true || values.steps !== undefined;
 const requireStep = (values) => {
   if (typeof values.step !== "string") throw new DevtwinError("INVALID_INPUT", "Setup step required", { field: "step" });
+  if (isBatch(values)) throw new DevtwinError("INVALID_INPUT", "Give --step for one step, or --steps or --all-pending for a batch", { field: "step" });
   return stepById(values.step);
 };
 export const setupStatusCommand = { options: setupOptions, async run(values, ctx) {
@@ -55,5 +61,11 @@ export const setupStatusCommand = { options: setupOptions, async run(values, ctx
   const next = steps.find((s) => s.available === true && !s.done && !s.skipped)?.id ?? null;
   return { steps, next };
 } };
-export const setupPlanCommand = { options: setupOptions, run: (values, ctx) => planStep(requireStep(values), stepContext(values, ctx)) };
-export const setupApplyCommand = { options: { ...setupOptions, "plan-fingerprint": { type: "string" } }, run: (values, ctx) => applyStep(requireStep(values), stepContext(values, ctx), values["plan-fingerprint"]) };
+export const setupPlanCommand = { options: setupOptions, async run(values, ctx) {
+  if (isBatch(values) && values.step === undefined) return { preview: true, ...(await (await batch()).buildBatch(values, stepContext(values, ctx))).plan };
+  return planStep(requireStep(values), stepContext(values, ctx));
+} };
+export const setupApplyCommand = { options: { ...setupOptions, "plan-fingerprint": { type: "string" }, apply: { type: "boolean" } }, async run(values, ctx) {
+  if (isBatch(values) && values.step === undefined) return (await batch()).applyBatch(values, stepContext(values, ctx));
+  return applyStep(requireStep(values), stepContext(values, ctx), values["plan-fingerprint"]);
+} };

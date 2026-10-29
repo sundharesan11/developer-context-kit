@@ -71,7 +71,7 @@ export async function planGrant(roots, input) {
   return finalizePlan({ kind: "consent-grant", consent: { kind, target, holdHours, ruleDigest: ruleDigestFor(kind, holdHours, params), rules: consentRules(kind, holdHours, params), ...(kind === "repo-push" ? { remoteUrl } : {}) }, hub,
     current: await readConsent(roots, kind, target), destination: { root: "stateRoot", path: "consents/" + kind } });
 }
-const grantDialog = (plan) => ({ title: plan.consent.kind === "repo-push" ? "Allow learning-branch pushes to a repository" : "Allow lessons to go to an organization hub", body: [
+export const grantDialog = (plan) => ({ title: plan.consent.kind === "repo-push" ? "Allow learning-branch pushes to a repository" : "Allow lessons to go to an organization hub", body: [
   targetLine(plan), "", "Agents and scheduled jobs may " + ACTION[plan.consent.kind],
   "Each item waits " + plan.consent.holdHours + " hours in the held queue before it is sent. A notification names it when it is held, devtwin activity --held shows its text, and devtwin undo cancels it.",
   ...repoLines(plan.consent.rules),

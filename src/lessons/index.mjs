@@ -9,7 +9,7 @@ import { readTombstoneMemory } from "../hubs/published.mjs";
 import { readPrivateJson, ensurePrivatePath, atomicReplace, info } from "../storage/fsx.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { canonicalJson, digest } from "../storage/canonical.mjs";
-import { assertScopeId, ACTOR_REF } from "../identity/ids.mjs";
+import { assertScopeId, ACTOR_REF, SCOPE_ID } from "../identity/ids.mjs";
 import { readSnapshot } from "../records/store.mjs";
 import { readOrgSnapshot, readPersonalSnapshot } from "../records/personal.mjs";
 import { isDelivered } from "../records/schema.mjs";
@@ -138,6 +138,25 @@ export async function rebuildIndex(roots, scope, options = {}) {
   const { refreshSummaries } = await import("../context/summary.mjs");
   await refreshSummaries(roots, scope);
   return result;
+}
+// Upgrade fix: rebuilds the derived state (each scope's lesson index and its session summaries) for every scope in
+// the config and every bound scope. Without an index the hook reads a bound project as unbound, so a hook install,
+// live set-kit and a setup batch call this: an install that comes from a kit with no index, or with an older one,
+// works at once. Like the index itself, this is devtwin's own cache: no preview, no audit entry. A scope that fails is
+// reported with its error code and the other scopes still run; nothing here fails the caller.
+export async function rebuildDerived(roots) {
+  try {
+    const { configuredScopes } = await import("../records/isolation.mjs");
+    let bound = [];
+    try { bound = (await readRegistry(roots)).value.bindings.map((b) => b.scope); } catch { /* No project is bound yet. */ }
+    const scopes = [...new Set([...await configuredScopes(roots), ...bound])].filter((scope) => typeof scope === "string" && SCOPE_ID.test(scope)).sort();
+    const out = [];
+    for (const scope of scopes) {
+      try { const index = await rebuildIndex(roots, scope); out.push({ scope, written: index.written }); }
+      catch (error) { out.push({ scope, problem: error.code ?? "DEVTWIN_INTERNAL" }); }
+    }
+    return out;
+  } catch (error) { return [{ scope: null, problem: error.code ?? "DEVTWIN_INTERNAL" }]; }
 }
 // The stored index, or null when none is built. A changed or damaged file fails with INTEGRITY.
 export async function readIndex(roots, scope) {

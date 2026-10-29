@@ -154,7 +154,8 @@ The live config key `approval` is `dialog` by default. `dialog-or-tty` is an opt
 
 `setup status`, `setup plan --step <id>` and `setup apply --step <id>` (and the `devtwin setup` terminal loop) add no write location. Each step wraps an existing command and its preview, and its apply needs the fingerprint of that preview.
 
-- The steps that run an owner action are `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex` and `paths-confirm`. The devtwin hook denies `setup apply` for these steps from an agent shell, and denies the `devtwin setup` terminal loop.
+- The steps that run an owner action are `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex`, `paths-confirm`, `backup-folder`, the hub and consent steps and the scheduled job steps. The devtwin hook denies `setup apply` for these steps from an agent shell, and denies the `devtwin setup` terminal loop.
+- A setup batch (`setup apply --steps` or `--all-pending`) runs several owner steps after one owner dialog that lists every change. The hook denies it from agent shells. The batch passes each step an in-process grant in place of that step's dialog. The grant is bound to the batch fingerprint, the step and the step's fingerprint, stands for one dialog and ends with the step. No argument or environment variable can stand for one. A step whose preview changed after the approval stops the batch with `STALE_VERSION`.
 - The terminal loop refuses to run without a terminal. A terminal prompt protects against accidents. It is not proof that the owner is present.
 - The `sandbox` step reads the project scan and writes no agent setting. Env example files are read only when the source reader allows them, and only their key names are kept. Accepted recommendations become personal preference records in the store.
 

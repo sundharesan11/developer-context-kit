@@ -693,14 +693,19 @@ Lists every step with `id`, `title`, `available`, `owner`, `what`, `why`, `undo`
 
 ### `setup plan` / `setup apply`
 
-`setup plan --step <id>` shows the preview of one step and its fingerprint. `setup apply --step <id> --plan-fingerprint <fp>` applies it. `setup apply` is **Owner** for the steps `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex`, `paths-confirm`, `hub-join`, `job-hub-sync`, `consent-hub`, `consent-repo`, `job-radar`, `job-advisories` and `job-review-reminder`.
+`setup plan --step <id>` shows the preview of one step and its fingerprint. `setup apply --step <id> --plan-fingerprint <fp>` applies it. `setup apply` is **Owner** for the steps `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex`, `paths-confirm`, `hub-join`, `job-hub-sync`, `consent-hub`, `consent-repo`, `job-radar`, `job-advisories`, `job-review-reminder`, `backup-folder` and `job-backup`.
+
+`setup plan --all-pending` or `--steps <id,id,...>` plans a batch of owner steps behind one owner dialog. It returns `items` (each step's `id`, dialog `lines`, `preview` and `fingerprint`), `dialog`, `excluded` with reasons, `skipped`, `separate` and the batch `fingerprint`. `setup apply` with the same flags, `--apply` and `--plan-fingerprint <fp>` shows the dialog once, then runs each step through its own apply. The order is the config change, skills, consents, jobs, `paths-confirm`, then hooks. A step that changed after the preview stops the batch with `DEVTWIN_STALE_VERSION`; its `details` list `done` and `notRun`. The batch apply is **Owner**: the hook denies `setup apply --steps` and `setup apply --all-pending` from an agent shell. See [Approve the owner steps at once](/docs/guides/setup-wizard/#approve-the-owner-steps-at-once).
 
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
-| `--step <id>` | Required. A step ID from `setup status`. |
+| `--step <id>` | One step ID from `setup status`. |
+| `--steps <id,id,...>` | A batch of the named owner steps. Repeatable. |
+| `--all-pending` | A batch of every owner step that is available, not done and not skipped. |
+| `--apply` | `setup apply` for a batch. Without it, the apply shows the preview. |
 | `--plan-fingerprint <fp>` | `setup apply` only. Required. |
-| Step flags | `--home`, `--run-id`, `--work`, `--preference`, `--stack-current`, `--stack-known`, `--writing`, `--seed-from-init`, `--proposed-by`, `--starter`, `--scope`, `--display-name`, `--project`, `--repo`, `--doc`, `--expect-remote`, `--environment`, `--actor`, `--accept`, `--request-id`, `--keep-previous`, `--recommendation`, `--hub-remote`, `--hub-handle`, `--hub-email`, `--ssh-command`, `--hub-root`, `--push-repo`, `--hold-hours`. Each step reads only its own. See [Setup flags](/docs/guides/setup-wizard/#setup-flags). |
+| Step flags | `--home`, `--run-id`, `--work`, `--preference`, `--stack-current`, `--stack-known`, `--writing`, `--seed-from-init`, `--proposed-by`, `--starter`, `--scope`, `--display-name`, `--project`, `--repo`, `--doc`, `--expect-remote`, `--environment`, `--actor`, `--accept`, `--request-id`, `--keep-previous`, `--recommendation`, `--hub-remote`, `--hub-handle`, `--hub-email`, `--ssh-command`, `--hub-root`, `--push-repo`, `--hold-hours`, `--backup-target`. Each step reads only its own. See [Setup flags](/docs/guides/setup-wizard/#setup-flags). |
 
 ## Lessons
 

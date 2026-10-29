@@ -1,6 +1,6 @@
 # Live activation runbook
 
-This runbook turns on live mode on one machine. Live mode runs the kit against a real private store and the real Claude and Codex skill folders. It onboards one real repository, read-only. Follow the steps in order. Every write is a separate owner approval.
+This runbook turns on live mode on one machine. Live mode runs the kit against a real private store and the real Claude and Codex skill folders. It onboards one real repository, read-only. Follow the steps in order. Every write needs an owner approval. From step 13, one setup batch puts many writes behind one owner dialog.
 
 Live mode is implemented. The owner ran steps 1 to 15 and 17 on one machine on 2026-10-25 at kit commit `b95ff72`, and they passed. They covered live init, store init, scope add and read-only onboarding of one real client repository, with identical snapshots before and after onboarding. They covered bundled install for Claude and Codex (three skills each, no conflicts). Fresh `claude -p` and `codex exec` sessions from a neutral folder listed the bundled skills (then named `devctx-*`), resolved the project and read the brief with an identical brief hash. Uninstall, `rollback-check` `ok` and reinstall also passed. Step 16 (interactive sessions) is still the owner's to run, and step 14's kit export is not yet in the shell profile. That activation predates the rename to devtwin; a setup made under the old name moves with [Migrating from devctx](MIGRATING.md). See the [roadmap](ROADMAP.md).
 
@@ -255,6 +255,44 @@ node "$KIT/scripts/repo-snapshot.mjs" --compare ~/.devtwin/store/state/evidence/
 
 ## 13. Install the skills, one agent at a time
 
+### One approval for this step and the next ones
+
+The skills, the hook settings files, the hooks, the paths confirmation, the backup folder and the scheduled jobs can all run behind one owner dialog. Preview the batch, review it, then apply it in your own terminal:
+
+```sh
+node "$KIT/bin/devtwin.mjs" setup plan --pilot "$LIVE_CONFIG" --all-pending --backup-target "$HOME/devtwin-backups"
+node "$KIT/bin/devtwin.mjs" setup apply --pilot "$LIVE_CONFIG" --all-pending --backup-target "$HOME/devtwin-backups" --apply --plan-fingerprint '<fingerprint>'
+```
+
+The dialog lists each change on its own line, in the order the changes run. On a first setup it looks like this:
+
+```text
+Approve 12 setup changes
+1. Approve hook settings file ~/.claude/settings.json
+2. Approve hook settings file ~/.codex/hooks.json
+3. Approve backup folder ~/devtwin-backups
+4. Approve launch agent ~/Library/LaunchAgents/devtwin.review-monthly.plist
+5. Approve launch agent ~/Library/LaunchAgents/devtwin.backup-daily.plist
+6. Install skills in ~/.claude/skills: devtwin-onboard, devtwin-resume, devtwin-record, devtwin-capture
+7. Install skills in ~/.agents/skills: devtwin-onboard, devtwin-resume, devtwin-record, devtwin-capture
+8. Install job review-monthly (monthly) at ~/Library/LaunchAgents/devtwin.review-monthly.plist
+9. Install job backup-daily (daily) at ~/Library/LaunchAgents/devtwin.backup-daily.plist
+10. Confirm kit ~/.devtwin/kit at <commit> and config ~/.devtwin/live.json
+11. Add devtwin hook entries to ~/.claude/settings.json: SessionStart, UserPromptSubmit, PreToolUse, PreCompact, Stop
+12. Add devtwin hook entries to ~/.codex/hooks.json: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PreCompact, Stop. Then trust them in Codex with /hooks
+```
+
+- `--all-pending` selects every owner setup step that is available, not done and not skipped. `--steps <id,id,...>` selects only the steps you name. Leave out `--backup-target` to skip the backup steps.
+- The config change runs first and adds to the approved classes. It keeps every path you approved before, so you do not list the earlier plists again. `paths confirm` runs after it, and the hooks run last.
+- The radar jobs join the batch only after the stack approval in [Turn on the radar](#turn-on-the-radar). The advisory job needs the radar job on, so it joins a later batch.
+- If a step changed after your approval, the batch stops with `DEVTWIN_STALE_VERSION`. The error lists `done` and `notRun`. Preview again for the rest.
+- `instructions apply` and `backup key export` keep their own dialog. So does `hub join`.
+- The hook denies `setup apply --all-pending` and `setup apply --steps` from an agent shell.
+
+The per-step commands below stay as the alternative. Each one asks on its own.
+
+### One agent at a time
+
 Preview, review, then apply after approval. Repeat for `codex`.
 
 ```sh
@@ -425,9 +463,18 @@ Upgrade side by side. The old clone stays usable until the new one is proven.
    node ~/.devtwin/kit-next/bin/devtwin.mjs live set-kit --pilot "$LIVE_CONFIG" --commit '<new commit>' --apply --plan-fingerprint '<fingerprint>'
    ```
 
-3. From now on every live command runs from the new clone. Preview `agents install` for each agent; changed skills show `update`. Apply after approval.
+   The apply also rebuilds the lesson index and the session summaries of every scope with the new kit, so the hook finds your bound projects at once.
+
+3. From now on every live command runs from the new clone. Update the skills and the hooks and confirm the new paths behind one owner dialog:
+
+   ```sh
+   node ~/.devtwin/kit-next/bin/devtwin.mjs setup plan --pilot "$LIVE_CONFIG" --all-pending
+   node ~/.devtwin/kit-next/bin/devtwin.mjs setup apply --pilot "$LIVE_CONFIG" --all-pending --apply --plan-fingerprint '<fingerprint>'
+   ```
+
+   The dialog lists the changed skills as `Update skills in ...`, the hook files as `Replace devtwin hook entries in ...` and the new kit path to confirm. Or run the steps one at a time: preview `agents install` for each agent (changed skills show `update`), `agents install --hooks`, then `paths confirm`. Each one asks on its own.
 4. Point `DEVTWIN_KIT` at the new clone, with the owner's approval.
-5. Run `paths confirm` from the new clone, preview then apply. The new kit path ends the old confirmation.
+5. If you ran the steps one at a time, run `paths confirm` from the new clone last, preview then apply. The new kit path ends the old confirmation.
 
 Installs stay owned across a kit change, because receipts bind to the config ID, not to the kit. The kit commit in a receipt is provenance. The bundled skills warn when it differs from the commit at `DEVTWIN_KIT`.
 
@@ -507,7 +554,7 @@ node "$KIT/bin/devtwin.mjs" schedule plan --pilot "$LIVE_CONFIG" --job backup-da
 node "$KIT/bin/devtwin.mjs" schedule apply --pilot "$LIVE_CONFIG" --job backup-daily --plan-fingerprint '<fingerprint>'
 ```
 
-The `--launch-agent` flag replaces the whole `launchAgents` list, so give every plist that you approved before as well. Then export the key once, in your own terminal and outside any agent session:
+The `--launch-agent` flag replaces the whole `launchAgents` list, so give every plist that you approved before as well. The setup batch in [step 13](#one-approval-for-this-step-and-the-next-ones) does the same with one dialog: `--backup-target` adds the `backup-folder` and `job-backup` steps, and it keeps the plists you approved before. Then export the key once, in your own terminal and outside any agent session:
 
 ```sh
 node "$KIT/bin/devtwin.mjs" backup key export --pilot "$LIVE_CONFIG"

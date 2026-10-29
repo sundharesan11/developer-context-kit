@@ -4,7 +4,7 @@
 // ctx.launchctl(args) -> { status } is the seam for launchctl; tests always inject it.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { lstatSync, unlinkSync } from "node:fs";
+import { lstatSync, realpathSync, statSync, unlinkSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DevtwinError } from "../errors.mjs";
@@ -40,10 +40,30 @@ export function renderPlist({ label, programArguments, interval }) {
     ""
   ].join("\n");
 }
+// The Node a job runs. Homebrew's process.execPath names a versioned folder (<prefix>/Cellar/node/<version>/bin/node)
+// that brew upgrade node removes, which would break every job. When execPath is in such a folder, a job uses the
+// stable shim instead: <prefix>/bin/node first, then /opt/homebrew/bin/node and /usr/local/bin/node, the first whose
+// real path is a file named node. Otherwise it keeps execPath. The hook lines in the agent settings run plain "node"
+// from PATH, which an upgrade does not break either. ctx.nodeLookup ({ execPath, shims, realpath, isFile }) is the seam.
+export const NODE_SHIMS = Object.freeze(["/opt/homebrew/bin/node", "/usr/local/bin/node"]);
+const CELLAR = /^(\/.+)\/Cellar\/node(?:@[0-9]+)?\/[^/]+\/bin\/node$/;
+const isFileAt = (path) => { try { return statSync(path).isFile(); } catch { return false; } };
+export function stableNodePath({ execPath = process.execPath, shims = NODE_SHIMS, realpath = realpathSync, isFile = isFileAt } = {}) {
+  const prefix = CELLAR.exec(execPath)?.[1];
+  if (!prefix) return execPath;
+  for (const shim of [...new Set([prefix + "/bin/node", ...shims])]) {
+    try {
+      const real = realpath(shim);
+      if (basename(real) === "node" && isFile(real)) return shim;
+    } catch { /* No shim here. */ }
+  }
+  return execPath;
+}
+export const jobNodePath = (ctx) => stableNodePath(ctx?.nodeLookup ?? {});
 // The hub sync job command: the running kit's CLI with the live config, the scope and --job.
 export function hubSyncArguments(ctx, scope) {
   const kit = ctx.pilot?.live?.kitRoot ?? ctx.kitRoot ?? KIT;
-  return [process.execPath, join(kit, "bin/devtwin.mjs"), "hub", "sync", "--pilot", resolve(ctx.pilot.path), "--scope", scope, "--job"];
+  return [jobNodePath(ctx), join(kit, "bin/devtwin.mjs"), "hub", "sync", "--pilot", resolve(ctx.pilot.path), "--scope", scope, "--job"];
 }
 export function defaultLaunchctl(args) {
   if (process.platform !== "darwin") return { status: 1, stdout: "", stderr: "launchctl unavailable" };

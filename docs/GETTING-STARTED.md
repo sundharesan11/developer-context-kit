@@ -110,7 +110,7 @@ The starter templates step shows as "not available yet". The scheduled radar, ad
 
 After setup, devtwin works in the background. Agents write project lessons, constraints, facts, locations and handoffs on their own, as `observed` records. `activity` lists what it did, and `undo` reverses one write. The daily import, the daily backup and the weekly activity notification are scheduled jobs that you turn on with `schedule plan` and `schedule apply`; see [Schedules](HARNESS.md#schedules).
 
-The skill, hook and write class steps are owner actions. The devtwin hook denies their `setup apply` from an agent shell, so the agent shows you the plan and you run the apply in your own terminal.
+The skill, hook and write class steps are owner actions. The devtwin hook denies their `setup apply` from an agent shell, so the agent shows you the plan and you run the apply in your own terminal. `setup plan --all-pending` puts all the owner steps in one batch, and `setup apply --all-pending --apply` asks once for all of them. See [One approval for the owner steps](HARNESS.md#one-approval-for-the-owner-steps).
 
 ## If something fails
 

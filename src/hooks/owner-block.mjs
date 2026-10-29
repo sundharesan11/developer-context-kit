@@ -44,12 +44,18 @@ export const OWNER_ACTIONS = Object.freeze([
 // U9: setup steps whose apply runs an owner action above (src/setup/steps.mjs marks them owner: true). "setup apply"
 // naming one of them is denied, and so is the "setup" terminal loop, which can apply them. setup status, setup plan
 // and setup apply for any other step stay allowed.
-export const OWNER_SETUP_STEPS = Object.freeze(["skills-claude", "skills-codex", "write-classes-hooks", "hooks-claude", "hooks-codex", "hub-join", "job-hub-sync", "job-radar", "job-advisories", "job-review-reminder", "consent-repo", "consent-hub", "paths-confirm"]);
+export const OWNER_SETUP_STEPS = Object.freeze(["skills-claude", "skills-codex", "write-classes-hooks", "hooks-claude", "hooks-codex", "hub-join", "job-hub-sync", "job-radar", "job-advisories", "job-review-reminder", "consent-repo", "consent-hub", "paths-confirm", "backup-folder", "job-backup"]);
+// U9 (one approval): the flags that make setup apply a batch of owner steps (src/setup/batch.mjs). Its preview is
+// setup plan with the same flags, so every setup apply that names one is denied, with or without --apply.
+export const SETUP_BATCH_FLAGS = Object.freeze(["--steps", "--all-pending"]);
 const SETUP_READS = ["status", "plan", "apply"];
 function setupAction(words) {
   if (!words.includes("setup")) return null;
   if (words.includes("apply")) {
-    const step = OWNER_SETUP_STEPS.find((id) => words.includes(id));
+    if (SETUP_BATCH_FLAGS.some((flag) => words.includes(flag))) return "setup apply --steps";
+    // A step list such as "hooks-claude,job-radar" is one word; each name in it counts.
+    const names = words.flatMap((word) => word.split(","));
+    const step = OWNER_SETUP_STEPS.find((id) => names.includes(id));
     return step ? "setup apply --step " + step : null;
   }
   return SETUP_READS.some((word) => words.includes(word)) ? null : "setup";

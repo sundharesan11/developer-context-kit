@@ -14,7 +14,7 @@ Conduct first-run setup through the setup steps. `setup status` lists the steps.
 
 To read project context, use `devtwin-resume`. To onboard a repository with the full candidate review, use `devtwin-onboard`.
 
-Some steps run an owner action: `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex` and `paths-confirm`. The hook denies owner-only devtwin commands from agent shells, including `setup apply` for these steps; never try to work around it. For these steps, show the plan and give the user the exact `setup apply` command to run in their own terminal.
+Some steps run an owner action: `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex`, `paths-confirm`, `backup-folder`, the hub and consent steps and the scheduled job steps (`setup status` marks them `owner: true`). The hook denies owner-only devtwin commands from agent shells, including `setup apply` for these steps and every `setup apply --steps` or `--all-pending`; never try to work around it. Propose the owner steps as one batch, as step 5 shows, and tell the user it is one dialog for all of them. Give the user the exact `setup apply` command to run in their own terminal.
 
 ## Preconditions
 
@@ -62,12 +62,27 @@ The current profile, its free text, stack suggestions and the records they cite 
    node "$DEVTWIN_KIT/bin/devtwin.mjs" setup apply --pilot '<pilot.json>' --step '<id>' --plan-fingerprint '<fingerprint>'
    ```
 
+   For the owner steps, preview them together as one batch instead. Ask the user first whether they want daily backups, and into which folder; pass it as `--backup-target '<folder>'`, or leave the flag out. To choose steps, pass `--steps '<id>,<id>'` instead of `--all-pending`.
+
+   ```sh
+   node "$DEVTWIN_KIT/bin/devtwin.mjs" setup plan --pilot '<pilot.json>' --all-pending --backup-target '<folder>'
+   ```
+
+   Show the user `dialog.title` and every line of `dialog.body`, then `excluded` and `skipped` with their reasons. Tell the user that the apply shows one owner dialog with these lines, that Approve runs every line in this order, and that no step asks again. Give the user this command to run in their own terminal, with the same flags and the plan's `fingerprint`:
+
+   ```sh
+   node "$DEVTWIN_KIT/bin/devtwin.mjs" setup apply --pilot '<pilot.json>' --all-pending --backup-target '<folder>' --apply --plan-fingerprint '<fingerprint>'
+   ```
+
+   Steps in `excluded` keep their own command: give the user `setup apply --step '<id>'` for each one, after its own preview.
+
 6. Inputs per step:
 
    - `skills-claude`, `skills-codex`, `hooks-claude`, `hooks-codex`: no input. After a Codex hook install, tell the user to open Codex, run `/hooks` and trust each devtwin entry.
    - `write-classes-hooks`: no input. It approves the two hook settings files in the live config.
    - `hook-verify`: no input. It writes the kit receipt in the store.
    - `paths-confirm`: no input. It records the kit and config paths, so skills stop asking for them. This is an owner step.
+   - `backup-folder`: `--backup-target '<folder>'`, a folder inside the home and outside `~/.devtwin`. `job-backup` then installs the daily backup job. Both are owner steps.
    - `profile`: the answers to the profile questions below.
    - `starter-preferences`: show `offered` and each record in the preview. Pass `--starter '<id>'` once for each preference the user selects. With no `--starter`, all of them are selected.
    - `scope`: `--scope '<scope>'`, and `--display-name '<name>'` if the user gives one.
@@ -137,6 +152,8 @@ The current profile, its free text, stack suggestions and the records they cite 
 - `setup status`: `steps[]` with `id`, `title`, `available`, `owner`, `what`, `why`, `undo`, `done` and an optional `skipped` or `problem`, and `next`.
 - `setup plan`: `step`, `preview` (the output of the command the step runs), `fingerprint`, and `problem` when the preview could not be built.
 - `setup apply`: `step` and `result` (the output of the command the step runs).
+- `setup plan --all-pending` or `--steps`: `items` (each step's `id`, `lines`, `preview` and `fingerprint`), `dialog`, `excluded`, `skipped`, `separate` and the batch `fingerprint`. The user's apply returns `done`, one entry for each step with its audit entry.
+- `STALE_VERSION` from a batch: a step changed after the user approved. `details.done` ran, `details.notRun` did not. Preview the batch again and show it.
 - `UNAVAILABLE`: the step is not available yet. Go on to the next step.
 - `PLAN_MISMATCH`: the flags differ from the approved plan, or the state changed. Preview again, show it, and ask again.
 - `STALE_VERSION`: the profile changed since the preview. Preview again, show it, and ask again.
@@ -151,7 +168,7 @@ The current profile, its free text, stack suggestions and the records they cite 
 - Stop and ask if `DEVTWIN_KIT` or the pilot path fails any precondition.
 - Stop without creating anything if the pilot file is missing or `init` has not run.
 - Never run `init`, `live init`, `live add-repo`, `live set-kit` or `live write-classes`. Creating a pilot or changing the live config is the user's decision.
-- Never run `setup apply` for an owner step, and never run the `devtwin setup` terminal loop. Give the command to the user.
+- Never run `setup apply` for an owner step or a batch (`--steps` or `--all-pending`), and never run the `devtwin setup` terminal loop. Give the command to the user.
 - Never run `setup apply` without explicit approval from the user in the session for the plan you showed last.
 - Never scan, open or read a repository to suggest a stack. Use only `profile suggest-stack`.
 - Never ask more than five questions, and never store credentials or secrets in the profile.

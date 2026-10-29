@@ -23,8 +23,8 @@ test("tier table has one line for every CLI route and no other", () => {
     if (line.targets) for (const target of Object.keys(line.targets)) assert.equal(tierOf({ route, target }), line.targets[target].tier, route + " " + target);
     else assert.equal(tierOf({ route }), line.tier, route);
   }
-  // setup apply maps every setup step, and lesson accept every lesson target.
-  assert.deepEqual(Object.keys(TIER_TABLE["setup apply"].targets).sort(), STEPS.map((s) => s.id).sort());
+  // setup apply maps every setup step and the one-approval batch, and lesson accept every lesson target.
+  assert.deepEqual(Object.keys(TIER_TABLE["setup apply"].targets).sort(), [...STEPS.map((s) => s.id), "batch"].sort());
   assert.deepEqual(Object.keys(TIER_TABLE["lesson accept"].targets).sort(), [...TARGETS].sort());
   assert.equal(tierOf({ route: "lesson accept", target: "project" }), "automatic");
   assert.equal(tierOf({ route: "lesson accept", target: "hub" }), "consented");
@@ -65,7 +65,7 @@ test("always-ask routes in the tier table are exactly the owner-block actions an
   assert.deepEqual(targetsWithTier("record supersede", "always-ask"), ["confirmed", "disputed", "replaces-confirmed", "replaces-disputed"]);
   assert.ok(ask.includes("setup") && ask.includes("setup apply"));
   assert.ok(!ask.includes("lesson accept"), "lesson accept left the owner-only list");
-  assert.deepEqual(targetsWithTier("setup apply", "always-ask"), [...OWNER_SETUP_STEPS].sort());
+  assert.deepEqual(targetsWithTier("setup apply", "always-ask"), [...OWNER_SETUP_STEPS, "batch"].sort(), "the owner steps and the one-approval batch");
   assert.deepEqual([...OWNER_SETUP_STEPS].sort(), [...OWNER_STEPS].sort());
   for (const route of ask) assert.equal(COMMANDS[route] !== undefined, true, route);
 });

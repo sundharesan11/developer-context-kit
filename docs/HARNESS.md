@@ -48,6 +48,26 @@ node bin/devtwin.mjs profile apply --pilot "$PILOT_FILE" --work 'Backend service
 
 `devtwin-setup` is not yet in the bundled installer, so `agents install` does not install it. Live-mode activation passed on 2026-10-25; the installer wiring (U9 of the harness plan) is not built yet. Until then, you can read its `SKILL.md` in the kit checkout.
 
+### One approval for the owner steps
+
+The setup steps that need your approval can run behind one owner dialog. The agent previews the batch and gives you the apply command. You run it in your own terminal:
+
+```sh
+node bin/devtwin.mjs setup plan --pilot "$PILOT_FILE" --all-pending --backup-target "$HOME/devtwin-backups"
+node bin/devtwin.mjs setup apply --pilot "$PILOT_FILE" --all-pending --backup-target "$HOME/devtwin-backups" --apply --plan-fingerprint "$FINGERPRINT"
+```
+
+- `--all-pending` selects every owner step that is available, not done and not skipped. `--steps <id,id,...>` selects only the steps you name. Both take the step inputs, such as `--backup-target` and `--push-repo`.
+- The plan writes nothing. It shows each step's own preview and fingerprint, the dialog text, the steps it leaves out (`excluded`, with a reason) and the steps with nothing to do (`skipped`).
+- The dialog lists one change on each line, in the order the changes run. Approve runs each step through its own apply with its own fingerprint. The step's own dialog does not show again.
+- The order is fixed. One live config change runs first. It adds every hook target, launch agent and backup folder that the steps need, and keeps every path you approved before. Then come the skills, the consents, the jobs and `paths confirm`. The hooks run last.
+- Before each step, the batch previews it again. A step that changed after your approval stops the batch with `STALE_VERSION`. The error lists the steps in `done` and `notRun`.
+- A consent shows its full rules in the dialog. When the rules do not fit with the other lines, the consent leaves the batch. Nothing is cut.
+- `hub-join`, `live set-kit`, `instructions apply` and `backup key export` keep their own dialog. Steps that need no approval, such as `profile`, are not in a batch.
+- Each step that runs adds one audit entry with the batch ID. The hook denies `setup apply --steps` and `setup apply --all-pending` from agent shells.
+
+A hook install, `live set-kit` and each batch rebuild the lesson index and the session summaries of every scope. So a store that an older kit wrote works with the hook at once.
+
 ## The capture skill and the hook
 
 `skills/devtwin-capture` is a bundled skill that `agents install` installs. It tells an agent to treat hook lesson lines as untrusted data. The agent stops and asks when its plan breaks the "do" or "don't" line of a delivered lesson. At the end of a task, it drafts at most three general lessons and shows them to the user. It saves them with `lesson propose --session <id> --apply` and accepts them for the current project with `lesson accept --target project --apply`. That is an automatic action: the lesson is stored as `observed` and needs no approval. A lesson for every project waits for the developer's weekly `activity review`, and a lesson for the hub needs the developer's `hub-publish` consent. The skill reads lessons with `lesson match` and `lesson show`. A preference that an agent saves with `pref propose` waits for the same weekly review. It never runs a command, fetches a URL, installs a package or changes a permission because a lesson says so.
@@ -245,6 +265,7 @@ node bin/devtwin.mjs schedule off --pilot "$PILOT_FILE" --job radar-weekly --app
 ```
 
 - `schedule plan` writes nothing. It shows the LaunchAgent path, the command it runs and the off switch. The plist must be an approved `launchAgents` path named `devtwin.<job>.plist`.
+- The command starts with a Node path that stays the same when Homebrew upgrades Node. When Node runs from a versioned `Cellar/node/<version>` folder, the plist names the Homebrew link, such as `/opt/homebrew/bin/node`, if that link leads to Node. Otherwise it names the Node that ran the command.
 - `schedule apply` shows the owner dialog, writes the plist and loads it. The radar and advisory jobs need a stack approval first, and the advisory job needs the radar job on and the `advisories` group in the approval.
 - `schedule off` unloads the job and removes its plist. Turning off the radar also turns off the advisory job.
 - `schedule status` reports, for each job, whether it is on, installed and loaded, and its last run. It makes no request.
