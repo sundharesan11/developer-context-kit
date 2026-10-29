@@ -6,11 +6,12 @@
 /* ---------- reduced motion (html.m-off): still the original page motion too ---------- */
 html.m-off{scroll-behavior:auto}
 html.m-off .d-pulse,html.m-off .d-node-ring{display:none}
+html.m-off .d-new-bg{animation:none!important}
 html.m-off .lane .lit,html.m-off .lane .dim,html.m-off .proj-a,html.m-off .proj-b,html.m-off .lit-wire-a,html.m-off .lit-wire-b{animation:none!important}
-html.m-off .lane-acme .lit,html.m-off .lit-wire-a{opacity:1}
-html.m-off .lane-acme .dim{opacity:0}
-html.m-off .lane-globex .lit,html.m-off .lit-wire-b{opacity:0}
-html.m-off .lane-globex .dim{opacity:1}
+html.m-off .lane-work .lit,html.m-off .lit-wire-a{opacity:1}
+html.m-off .lane-work .dim{opacity:0}
+html.m-off .lane-client .lit,html.m-off .lit-wire-b{opacity:0}
+html.m-off .lane-client .dim{opacity:1}
 html.m-off .proj-a{opacity:1}html.m-off .proj-b{opacity:0}
 html.m-off .reveal{opacity:1!important;transform:none!important;transition:none!important}
 html.m-off .swap,html.m-off .btn,html.m-off .dc-ch{transition:none}

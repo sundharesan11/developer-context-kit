@@ -19,8 +19,8 @@ const dataTree = `<span class="d">~/.devtwin/</span>  <span class="muted">0700</
 └─ store/
    ├─ config/  <span class="muted">scopes, profile</span>
    ├─ data/scopes/
-   │  ├─ acme/
-   │  └─ globex/
+   │  ├─ work/
+   │  └─ client/
    ├─ data/personal/  <span class="muted">lessons, preferences</span>
    ├─ data/exports/
    └─ state/`;
@@ -33,26 +33,25 @@ const lines = (tree: string) =>
     <div class="intro reveal">
       <div class="kicker">What devtwin is</div>
       <h2 class="h2" id="pillars-title" data-words>A second you, <span class="soft">in every session.</span></h2>
-      <p>Agents read your code, but they don't know why the queue moved to SQS, which test command actually works, what must never change, or where you stopped yesterday. devtwin writes that down once, with sources, and every later session starts with it.</p>
+      <p>Stop explaining yourself to every new session. Your agents start already knowing how you work, so you spend your time on the hard parts, not on correcting the same mistakes.</p>
     </div>
 
     <!-- Pillar 1 -->
     <article class="pillar" id="context" aria-labelledby="p1">
       <div class="p-copy reveal">
         <div class="p-num"><span>01</span> Project context</div>
-        <h3 id="p1">Context that carries over, with receipts.</h3>
-        <p>Decisions, facts, constraints, commands, unknowns and handoffs live as records outside the repo. Agents write them as they work. Each record points to its source and goes into an audit log, so you can undo it. Changing a record adds a new version linked to the old one.</p>
+        <h3 id="p1">Never brief an agent from scratch again.</h3>
+        <p>Agents record decisions, constraints and handoffs as they work. Each one cites its source, and you can undo any of them.</p>
         <ul class="ticks">
-          <li><span>Records link to a file, commit, issue or URL. Files are hashed, so you can see when they drift.</span></li>
-          <li><span><code>activity</code> shows what agents wrote this week, and <code>undo</code> reverses a write.</span></li>
-          <li><span>A daily job turns Claude memory and <code>docs/solutions</code> into project records.</span></li>
-          <li><span><code>record supersede</code> keeps the old version and links it to the new one.</span></li>
+          <li><span>Linked to a file, commit, issue or URL.</span></li>
+          <li><span><code>activity</code> shows what changed this week. <code>undo</code> reverses it.</span></li>
+          <li><span>Claude memory and <code>docs/solutions</code> become records every day.</span></li>
         </ul>
         <a class="p-more" href={DOCS.records}>How records work <span aria-hidden="true">→</span></a>
       </div>
       <div class="frame reveal">
         <div class="frame-in">
-          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">Activity · acme.atlas</span><span class="right"><span class="pill acc">3 this week</span></span></div>
+          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">Activity · work.billing</span><span class="right"><span class="pill acc">3 this week</span></span></div>
           <div class="review">
             <div class="queue" role="list" aria-label="Records learned this week">
               <h4>Learned</h4>
@@ -61,13 +60,13 @@ const lines = (tree: string) =>
               <span class="q-item" role="listitem">Who owns the v1 webhook?<small>unknown · from memory</small></span>
             </div>
             <div class="rec">
-              <div class="rec-top"><span class="pill acc">decision</span><span class="pill">observed</span><span class="pill">acme.atlas</span></div>
+              <div class="rec-top"><span class="pill acc">decision</span><span class="pill">observed</span><span class="pill">work.billing</span></div>
               <h4>Use cursor pagination for /tasks</h4>
               <p>Offset paging skipped rows under concurrent inserts. Cursor on <span class="mono" style="font-size:12.5px;color:#c9d0de">(created_at, id)</span>; page size capped at 100.</p>
               <div class="srcs">
                 <div class="src-row"><span class="k">file</span><span class="v">src/api/tasks.ts</span><span class="h">sha 3e1f…</span></div>
                 <div class="src-row"><span class="k">commit</span><span class="v">9f2c1ab · switch list to cursor</span><span class="h">main</span></div>
-                <div class="src-row"><span class="k">issue</span><span class="v">ATLAS-148 · duplicate tasks on page 2</span><span class="h">open</span></div>
+                <div class="src-row"><span class="k">issue</span><span class="v">BILL-148 · duplicate tasks on page 2</span><span class="h">open</span></div>
               </div>
               <div class="supers">supersedes <s>rec_7a2f… · “offset paging is fine for v1”</s></div>
               <div class="rec-act">
@@ -84,14 +83,12 @@ const lines = (tree: string) =>
     <article class="pillar flip" id="agents" aria-labelledby="p2">
       <div class="p-copy reveal">
         <div class="p-num"><span>02</span> Every agent</div>
-        <h3 id="p2">Claude Code and Codex read the same brief.</h3>
-        <p>At session start the agent gets a short summary: the "ask before" rules, the top constraints, where things live and the next step from the last handoff. The full brief, with its sources, is one skill away. If you switch tools mid-week, the other agent starts from the same context.</p>
+        <h3 id="p2">Switch agents without starting over.</h3>
+        <p>Every session starts with your rules, your top constraints and your last handoff. Switch tools and nothing is lost.</p>
         <ul class="ticks">
-          <li><span><code>devtwin-resume</code> loads the brief into the session.</span></li>
+          <li><span><code>devtwin-resume</code> loads the brief.</span></li>
           <li><span><code>devtwin-record</code> captures a decision as you make it.</span></li>
-          <li><span><code>devtwin-onboard</code> scans a repo into cited context.</span></li>
           <li><span><code>handoff write</code> leaves the next step for the next session.</span></li>
-          <li><span><code>handoff export</code> writes a clean Markdown packet for a person.</span></li>
         </ul>
         <a class="p-more" href={DOCS.codingAgents}>Set up your coding agents <span aria-hidden="true">→</span></a>
       </div>
@@ -107,13 +104,13 @@ const lines = (tree: string) =>
               <span class="pill ok">brief loaded</span>
             </div>
             <div class="brief">
-              <div class="brief-h"><span><b>acme.atlas</b> <span class="muted">· brief · 2026-10-24</span></span><span class="muted">14 records · 3.1 KB</span></div>
+              <div class="brief-h"><span><b>work.billing</b> <span class="muted">· brief · 2026-10-24</span></span><span class="muted">14 records · 3.1 KB</span></div>
               <div class="bsec"><h4>Decisions</h4>
-                <div class="brow"><span class="dot"></span><span>Cursor pagination for /tasks</span><span class="src">ATLAS-148 · 9f2c1ab</span></div>
+                <div class="brow"><span class="dot"></span><span>Cursor pagination for /tasks</span><span class="src">BILL-148 · 9f2c1ab</span></div>
                 <div class="brow"><span class="dot"></span><span>Jobs go through SQS, not Redis streams</span><span class="src">ADR-0007</span></div>
               </div>
               <div class="bsec"><h4>Constraints</h4>
-                <div class="brow"><span class="dot"></span><span>Workers never write to billing tables</span><span class="src">ATLAS-212</span></div>
+                <div class="brow"><span class="dot"></span><span>Workers never write to billing tables</span><span class="src">BILL-212</span></div>
               </div>
               <div class="bsec"><h4>Commands</h4>
                 <div class="brow"><span class="dot c"></span><span>npm test -- --runInBand</span><span class="src">package.json</span></div>
@@ -134,19 +131,18 @@ const lines = (tree: string) =>
     <article class="pillar" id="lessons" aria-labelledby="p3">
       <div class="p-copy reveal">
         <div class="p-num"><span>03</span> Team lessons</div>
-        <h3 id="p3">The lesson arrives when the agent opens the file.</h3>
-        <p>A lesson is one "do" or "don't" with a reason, tied to paths, packages or topics. When an agent reads or edits matching code, or runs a matching command like <code>git push</code>, the devtwin hook adds a short index line to the session. Join your org's hub and your colleagues' lessons arrive the same way.</p>
+        <h3 id="p3">Learn a lesson once. Your whole team keeps it.</h3>
+        <p>A lesson is a do or don't with a reason. When an agent touches matching code, the lesson shows up, including your team's.</p>
         <ul class="ticks">
-          <li><span>At most four short lines per session. The full lesson loads only when the agent asks for it.</span></li>
-          <li><span>Agents save project lessons on their own. A lesson meant for every project waits for your weekly <code>activity review</code>.</span></li>
-          <li><span>Sharing needs one consent per hub or repo. Each shared lesson waits 24 hours in a held queue, where you can cancel it.</span></li>
-          <li><span>"Working on" notes tell a colleague's agent that you are changing the same area.</span></li>
+          <li><span>At most four short lines per session.</span></li>
+          <li><span>Lessons for every project wait for your weekly review.</span></li>
+          <li><span>Shared lessons wait 24 hours, so you can cancel them.</span></li>
         </ul>
         <a class="p-more" href={DOCS.lessons}>How lessons reach your agents <span aria-hidden="true">→</span></a>
       </div>
       <div class="frame reveal">
         <div class="frame-in">
-          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">Claude Code · acme.atlas</span><span class="right"><span class="pill acc">hook live</span></span></div>
+          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">Claude Code · work.billing</span><span class="right"><span class="pill acc">hook live</span></span></div>
           <div class="f-body">
             <div class="agent-line">
               <span class="cmd"><span class="p">›</span> Edit src/billing/client/retry.ts</span>
@@ -162,7 +158,7 @@ const lines = (tree: string) =>
                 <div class="brow"><span class="dot q"></span><span>priya on fix/billing-timeouts touching src/billing</span><span class="src">until Thu</span></div>
               </div>
               <div class="bsec"><h4>Session end</h4>
-                <div class="brow"><span class="dot c"></span><span>1 lesson saved for acme.atlas · undoable</span><span class="src">activity</span></div>
+                <div class="brow"><span class="dot c"></span><span>1 lesson saved for work.billing · undoable</span><span class="src">activity</span></div>
               </div>
             </div>
           </div>
@@ -174,11 +170,10 @@ const lines = (tree: string) =>
     <article class="pillar flip" id="accounts" aria-labelledby="p4">
       <div class="p-copy reveal">
         <div class="p-num"><span>04</span> Accounts</div>
-        <h3 id="p4">The right account, in every org.</h3>
-        <p>Work for two companies? Each one is its own scope, with its own projects and its own records. Identity routing binds each scope to its own GitHub and Slack account, so the project decides which account the agent acts as.</p>
+        <h3 id="p4">Never push as the wrong account again.</h3>
+        <p>Each org you work for gets its own scope and its own accounts, from GitHub and Slack to your issue tracker and cloud. The project decides which account the agent uses.</p>
         <ul class="ticks">
-          <li><span><code>context resolve</code> maps the working tree to its scope and project.</span></li>
-          <li><span>The account you're logged into must match the binding, or the action is refused.</span></li>
+          <li><span>A mismatched account is refused.</span></li>
           <li><span>Credentials never go into records or briefs.</span></li>
         </ul>
         <a class="p-more" href={DOCS.identityRouting}>Route identities per org <span aria-hidden="true">→</span></a>
@@ -186,25 +181,35 @@ const lines = (tree: string) =>
       <div class="frame reveal">
         <div class="frame-in">
           <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">devtwin · identity</span><span class="right"><span class="pill" id="acct-pill">resolved</span></span></div>
-          <div class="acct" data-scope="acme" id="acct">
+          <div class="acct" data-scope="work" id="acct">
             <div class="scope-switch" role="group" aria-label="Active scope">
-              <button type="button" aria-pressed="true" data-scope="acme"><i aria-hidden="true"></i>acme</button>
-              <button type="button" aria-pressed="false" data-scope="globex" class="gx"><i aria-hidden="true"></i>globex</button>
+              <button type="button" aria-pressed="true" data-scope="work"><i aria-hidden="true"></i>work</button>
+              <button type="button" aria-pressed="false" data-scope="client" class="gx"><i aria-hidden="true"></i>client</button>
             </div>
-            <p class="cwd swap" id="acct-cwd">cwd <b>~/work/acme/atlas</b> → scope <b>acme</b></p>
+            <p class="cwd swap" id="acct-cwd">cwd <b>~/work/billing-service</b> → scope <b>work</b></p>
             <div class="ids swap" id="acct-ids" aria-live="polite">
               <div class="idrow">
                 <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 16 16"><path fill="#edf0f7" d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></span>
-                <span class="who" data-gh>@sam-acme<small>GitHub · acme-corp</small></span>
+                <span class="who" data-gh>@sam-work<small>GitHub · work</small></span>
                 <span class="pill ok">active</span>
               </div>
               <div class="idrow">
                 <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#edf0f7" stroke-width="2" stroke-linecap="round"><path d="M9 3v8M15 13v8M3 15h8M13 9h8"/><path d="M9 3a2 2 0 1 1 2 2H9M15 21a2 2 0 1 1-2-2h2M3 15a2 2 0 1 1 2-2v2M21 9a2 2 0 1 1-2 2V9"/></svg></span>
-                <span class="who" data-sl>Sam R.<small>Slack · acme.slack.com</small></span>
+                <span class="who" data-sl>Sam R.<small>Slack · work.slack.com</small></span>
+                <span class="pill ok">active</span>
+              </div>
+              <div class="idrow">
+                <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#edf0f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></span>
+                <span class="who" data-ln>sam-work<small>Linear · work</small></span>
+                <span class="pill ok">active</span>
+              </div>
+              <div class="idrow">
+                <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#edf0f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 9.5 4.25 4.25 0 0 0 7 18Z"/></svg></span>
+                <span class="who" data-cl>work-prod<small>AWS · deploy role</small></span>
                 <span class="pill ok">active</span>
               </div>
             </div>
-            <div class="refuse" id="acct-refuse"><b>✕ refused</b> push to <span id="r-repo">acme-corp/atlas</span> as <span id="r-who">@sam-gx</span><br><span class="muted">scope acme is bound to @sam-acme</span></div>
+            <div class="refuse" id="acct-refuse"><b>✕ refused</b> push to <span id="r-repo">work/billing-service</span> as <span id="r-who">@sam-client</span><br><span class="muted">scope work is bound to @sam-work</span></div>
           </div>
         </div>
       </div>
@@ -214,14 +219,12 @@ const lines = (tree: string) =>
     <article class="pillar" id="harness" aria-labelledby="p5">
       <div class="p-copy reveal">
         <div class="p-num"><span>05</span> Your harness</div>
-        <h3 id="p5">Build your own skills on it.</h3>
-        <p>devtwin is also a template for your own harness. Set up a small private profile, then turn the generic skill templates into private skills that follow it.</p>
+        <h3 id="p5">Make your agents work your way.</h3>
+        <p>Write down your taste once in a small private profile, and turn the skill templates into skills that follow it.</p>
         <ul class="ticks">
-          <li><span>A weekly radar of releases that touch what you build, plus new agent tools, ranked by your interests.</span></li>
-          <li><span>Slack update drafts in your voice, saved for you to send.</span></li>
+          <li><span>A weekly radar for the tools you build with.</span></li>
+          <li><span>Slack update drafts in your voice.</span></li>
           <li><span>Your writing rules, applied by every agent.</span></li>
-          <li><span>A warning before a vendor retires a model you use.</span></li>
-          <li><span>A monthly <code>review plan</code> that finds stale lessons and consents you never used.</span></li>
         </ul>
         <a class="p-more" href={DOCS.personalHarness}>Build your personal harness <span aria-hidden="true">→</span></a>
       </div>
@@ -254,8 +257,8 @@ const lines = (tree: string) =>
             </div>
           </div>
           <div class="digest">
-            <div class="cmd"><span class="p">$</span> devtwin stack digest --scope acme</div>
-            <div><span class="acc">●</span> New Claude model release <span class="muted">· project acme.atlas</span></div>
+            <div class="cmd"><span class="p">$</span> devtwin stack digest --scope work</div>
+            <div><span class="acc">●</span> New Claude model release <span class="muted">· project work.billing</span></div>
             <div><span class="acc">●</span> Auth provider SDK major release <span class="muted">· your stack</span></div>
             <div class="muted">previously reported, not repeated: 31</div>
           </div>
@@ -267,13 +270,12 @@ const lines = (tree: string) =>
     <article class="pillar flip" id="disk" aria-labelledby="p6">
       <div class="p-copy reveal">
         <div class="p-num"><span>06</span> Local-first</div>
-        <h3 id="p6">Your data stays on your disk.</h3>
-        <p>The public kit and your private data live in separate places. Records, profiles and exports stay on your machine in 0700 folders and 0600 files. Onboarding only ever reads your repos. Nothing leaves your machine without your consent. Lessons for your hub or repo wait in a held queue first, and "working on" notes are kept short.</p>
+        <h3 id="p6">Keep all of it on your own machine.</h3>
+        <p>Records and profiles stay on your machine in private folders. Nothing leaves without your consent.</p>
         <ul class="ticks">
-          <li><span>You can update the kit without touching your context.</span></li>
-          <li><span>There's no account or server. Everything is plain files you can read, back up and diff, and a hub is a Git repo your org already hosts.</span></li>
-          <li><span>An encrypted backup runs daily and is kept for 14 days. Restores go into a new folder.</span></li>
-          <li><span><code>devtwin doctor</code> checks roots, locks and bound repos for you.</span></li>
+          <li><span>No account and no server, only plain files.</span></li>
+          <li><span>An encrypted backup every day, kept for 14 days.</span></li>
+          <li><span><code>devtwin doctor</code> checks it all.</span></li>
         </ul>
         <a class="p-more" href={DOCS.whereDataLives}>Where your data lives <span aria-hidden="true">→</span></a>
       </div>
