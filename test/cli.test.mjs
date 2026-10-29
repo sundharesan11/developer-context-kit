@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { chmod, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { runCli } from "./helpers.mjs";
+import { runCli, sandbox, packageKit } from "./helpers.mjs";
 const root = join(import.meta.dirname, "..");
 test("version prints JSON and exits 0", async () => {
   const { code, json } = await runCli(["version"]);
@@ -13,6 +14,15 @@ test("version prints JSON and exits 0", async () => {
   const commit = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8", env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: "1" } }).trim();
   assert.deepEqual(json, { ok: true, command: "version", result: { name: "devtwin", version, commit } });
   assert.equal(version, "0.1.0-alpha.1");
+});
+test("version of a package kit adds its digest prefix", async (t) => {
+  const sb = await sandbox(t), home = join(sb, "home");
+  await mkdir(join(home, ".devtwin"), { recursive: true });
+  await chmod(join(home, ".devtwin"), 0o700);
+  const kit = await packageKit(home, join(sb, "src"));
+  const { code, json } = await runCli(["version"], { kitRoot: kit.kit });
+  assert.equal(code, 0);
+  assert.deepEqual(json.result, { name: "devtwin", version: kit.version, digest: kit.digest.slice(0, 12) });
 });
 test("--version is the version command", async () => {
   const { code, json } = await runCli(["--version"]);

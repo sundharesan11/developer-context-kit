@@ -21,7 +21,10 @@ export function gitCommit(root) {
     return OID.test(line ?? "") ? line : null;
   } catch { return null; }
 }
-export function kitVersion(root = KIT) {
+// A package kit adds the first 12 hex of its manifest digest instead; the manifest is read, not verified.
+export async function kitVersion(root = KIT) {
   const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")), commit = gitCommit(root);
-  return commit ? { name: "devtwin", version, commit } : { name: "devtwin", version };
+  if (commit) return { name: "devtwin", version, commit };
+  try { return { name: "devtwin", version, digest: (await import("./manifest.mjs")).readManifest(root).digest.slice(0, 12) }; }
+  catch { return { name: "devtwin", version }; }
 }
