@@ -217,6 +217,18 @@ test("kit install refuses a source that changed while it was copied and leaves n
   assert.deepEqual(await readdir(f.kits), []);
 });
 
+test("kit install moves the kit folder while it is still writable by its owner, and locks it after the move", async (t) => {
+  // macOS needs write permission on a folder to rename it (its .. entry changes), so a 0500 folder cannot move.
+  const f = await fixture(t);
+  const { applyKitInstall } = await import("../src/kit/install.mjs");
+  let atMove = null;
+  const faults = { beforeRename: (temp) => { atMove = { root: mode(temp), inner: mode(join(temp, "src")), file: mode(join(temp, "src/a.mjs")) }; } };
+  const done = await applyKitInstall({ home: f.home, kitRoot: f.src, faults });
+  assert.equal(done.status, "installed");
+  assert.deepEqual(atMove, { root: 0o700, inner: 0o500, file: 0o400 });
+  assert.equal(mode(f.kit), 0o500);
+  assert.doesNotThrow(() => assertKit(f.kit, f.identity, { home: f.home }));
+});
 test("kit install refuses a tampered folder that appears at the target while it copies, and leaves it untouched", async (t) => {
   const f = await fixture(t);
   const { applyKitInstall } = await import("../src/kit/install.mjs");

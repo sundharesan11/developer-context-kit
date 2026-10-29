@@ -38,13 +38,14 @@ function takeLock(kits) {
 }
 const corrupt = (kitRoot, error) => new DevtwinError("KIT_CORRUPT", "Kit folder present but does not verify", { kitRoot, reason: error.details?.reason ?? null });
 // The KTD4 lock: files 0400, an executable file (only bin/devtwin.mjs in a release) 0500, folders 0500 deepest-first.
-function lockTree(path) {
+// The top folder is locked by the caller after it moves: macOS refuses to rename a folder its owner cannot write.
+function lockTree(path, { top = true } = {}) {
   for (const entry of readdirSync(path, { withFileTypes: true })) {
     const child = join(path, entry.name);
     if (entry.isDirectory()) lockTree(child);
     else chmodSync(child, info(child).mode & 0o100 ? 0o500 : 0o400);
   }
-  chmodSync(path, 0o500);
+  if (top) chmodSync(path, 0o500);
 }
 // Removes a tree through no link: a link is unlinked, never followed. Folders get their owner write bits back first.
 function removeTree(path) {
@@ -94,7 +95,7 @@ function present(target, identity, home) {
   return true;
 }
 export const planKitInstall = (ctx = {}) => prepare(ctx).plan;
-// ctx.faults.beforeCopy is a test seam: it runs after the plan, before the first copy.
+// ctx.faults are test seams: beforeCopy runs after the plan, before the first copy; beforeRename gets the staged folder.
 export async function applyKitInstall(ctx = {}) {
   const { plan, source, kits, identity, sourceCommit } = prepare(ctx), home = ctx.home ?? homedir();
   if (plan.status === "present") return plan;
@@ -113,15 +114,17 @@ async function install({ plan, source, kits, identity, sourceCommit, home, fault
     // The folder name comes from the plan's digest, so a source that changed while it was copied is refused.
     if (manifest.digest !== identity.digest || manifest.version !== identity.version) throw new DevtwinError("INTEGRITY", "Kit changed while it was copied", { field: "kitRoot" });
     verifyKit(temp);
-    lockTree(temp);
+    lockTree(temp, { top: false });
     // Another install may have finished first: keep its folder when it verifies, refuse it when it does not.
     if (present(plan.kitRoot, identity, home)) { removeTree(temp); return { ...plan, status: "present" }; }
+    if (faults.beforeRename) faults.beforeRename(temp);
     renameSync(temp, plan.kitRoot);
   } catch (error) {
     try { removeTree(temp); } catch { /* The original error matters more. */ }
     if (error.code === "ENOTEMPTY" || error.code === "EEXIST") throw corrupt(plan.kitRoot, error);
     throw error;
   }
+  chmodSync(plan.kitRoot, 0o500);
   fsyncDir(kits);
   try { assertKit(plan.kitRoot, identity, { home }); } catch (error) { throw corrupt(plan.kitRoot, error); }
   return { ...plan, applied: true, status: "installed" };
