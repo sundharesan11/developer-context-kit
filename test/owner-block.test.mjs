@@ -46,7 +46,9 @@ const OWNER_COMMANDS = [
   `${KIT} live init --pilot '/x/live.json' --agent claude --apply`,
   `${KIT} backup key export --pilot '/x/live.json' --apply --plan-fingerprint 'sha256:00'`,
   `${KIT} backup restore --pilot '/x/live.json' --from /b/a.dtb --to /b/r --apply --plan-fingerprint 'sha256:00'`,
-  `${KIT} activity review --pilot '/x/live.json' --apply --plan-fingerprint 'sha256:00'`
+  `${KIT} activity review --pilot '/x/live.json' --apply --plan-fingerprint 'sha256:00'`,
+  // U44 (KTD5): staging a package kit. A human runs it through the global command, so it is named without DEVTWIN_KIT too.
+  `${KIT} kit install --apply`, "devtwin kit install --apply"
 ];
 const WRAPPED = [
   "script -q /dev/null devtwin lesson copy --id rec_1 --apply",
@@ -89,6 +91,8 @@ const ALLOWED = [
   `${KIT} hub join --pilot '/x/live.json' --scope example --remote ssh://git.example.com/hub.git`,
   `${KIT} record propose --pilot '/x/live.json' --scope example --apply`,
   `${KIT} profile apply --pilot '/x/live.json' --plan-fingerprint 'sha256:00'`,
+  // U44: the kit install plan and the kit list stay open.
+  "devtwin kit install", "devtwin kit list --pilot /x/live.json",
   "git status",
   "rg -n 'lesson accept' docs/",
   "npm test"
@@ -108,7 +112,7 @@ test("owner block denies devtwin owner-only actions run directly from an agent s
     assert.match(out.permissionDecisionReason, /Ask your developer to run it themselves/);
     assert.doesNotMatch(result.out, /additionalContext/);
   }
-  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["activity review", "agents install", "agents uninstall", "backup key export", "backup restore", "consent grant", "consent revoke", "hub join", "hub leave", "hub schedule", "instructions apply", "lesson copy", "lesson notices", "live add-repo", "live approval", "live init", "live migrate", "live set-kit", "live stack-watch", "live write-classes", "note consent", "note revoke", "paths confirm", "pref accept", "pref retire", "project set", "published delete", "record publish", "review apply", "schedule apply", "schedule off", "undo"]);
+  assert.deepEqual(OWNER_ACTIONS.map((a) => a.words.join(" ")).sort(), ["activity review", "agents install", "agents uninstall", "backup key export", "backup restore", "consent grant", "consent revoke", "hub join", "hub leave", "hub schedule", "instructions apply", "kit install", "lesson copy", "lesson notices", "live add-repo", "live approval", "live init", "live migrate", "live set-kit", "live stack-watch", "live write-classes", "note consent", "note revoke", "paths confirm", "pref accept", "pref retire", "project set", "published delete", "record publish", "review apply", "schedule apply", "schedule off", "undo"]);
 });
 
 test("owner block denies owner-only actions through terminal wrappers", async (t) => {

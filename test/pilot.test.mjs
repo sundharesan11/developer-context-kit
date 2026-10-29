@@ -68,9 +68,9 @@ test("disposable pilot digest and fence are unchanged by the optional live block
   await assert.rejects(loadPilot(nullLive, { home: p.fakeHome, kitRoot: "/nonexistent-kit", env: {} }), (e) => e.code === "DEVTWIN_GATE_REQUIRED" && e.details.field === "live");
   await assert.rejects(Promise.resolve().then(() => assertWritable(p.roots, [join(p.agentHomes[0], ".claude/skills/devtwin-x")], { targetHome: join(p.agentHomes[0], ".claude/skills") })), (e) => e.code === "DEVTWIN_GATE_REQUIRED" && e.details.field === "targetHome");
 });
-test("CLI: only version, help, demo and skill source reads are root-free; every other route requires --pilot", async () => {
+test("CLI: only version, help, demo, the kit routes and skill source reads are root-free; every other route requires --pilot", async () => {
   const routes = listCommands();
-  assert.deepEqual(routes.filter((r) => isRootFree(r)).sort(), ["demo", "help", "skill template-list", "skill-sources catalog", "skill-sources check", "skill-sources preview", "version"]);
+  assert.deepEqual(routes.filter((r) => isRootFree(r)).sort(), ["demo", "help", "kit install", "kit list", "skill template-list", "skill-sources catalog", "skill-sources check", "skill-sources preview", "version"]);
   for (const route of routes.filter((r) => !isRootFree(r))) {
     const { code, json } = await runCli(route.split(" "));
     assert.equal(code, 1, route);

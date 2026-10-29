@@ -39,7 +39,9 @@ export const OWNER_ACTIONS = Object.freeze([
   // U27 (KTD35): recording the confirmed kit and config paths. U26 (KTD34): the owner-answer mode.
   { words: ["paths", "confirm"], apply: true }, { words: ["live", "approval"], apply: true },
   // U30 (KTD29): where a project's lessons go in its repository; a change voids the repository's consent.
-  { words: ["project", "set"], apply: true }
+  { words: ["project", "set"], apply: true },
+  // U44 (KTD5): staging a package kit under ~/.devtwin/kits. Its plan stays open.
+  { words: ["kit", "install"], apply: true }
 ].map((action) => Object.freeze({ ...action, words: Object.freeze(action.words) })));
 // U9: setup steps whose apply runs an owner action above (src/setup/steps.mjs marks them owner: true). setup apply is
 // an allowlist: from an agent shell it is allowed only with exactly one --step <id> whose id is not listed here, and

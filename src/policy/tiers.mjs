@@ -29,6 +29,9 @@ const SETUP_STEPS = { "live-folder": R, "skills-claude": ASK, "skills-codex": AS
 const TABLE = {
   // demo writes only inside the fresh pilot root it is given or makes.
   version: R, help: R, demo: R,
+  // U44 (KTD5): kit install --apply stages a kit that nothing runs until live set-kit, so it has no owner dialog; the
+  // hook still denies it from agent shells, so an agent cannot stage kits on its own. Its plan and kit list only read.
+  "kit install": ASK, "kit list": R,
   // The skill-source and skill-builder routes keep their own recorded approval chain (content-approve, local-approve).
   "skill-sources catalog": R, "skill-sources check": R, "skill-sources preview": R, "skill-sources stage": A, "skill-sources inspect": R,
   "skill-sources package-review": A, "skill-sources content-approve": A, "skill-sources local-plan": R, "skill-sources local-approve": A,
