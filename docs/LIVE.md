@@ -466,14 +466,14 @@ Upgrade side by side. The old clone stays usable until the new one is proven.
 
    The apply also rebuilds the lesson index and the session summaries of every scope with the new kit, so the hook finds your bound projects at once.
 
-3. From now on every live command runs from the new clone. Update the skills and the hooks and confirm the new paths behind one owner dialog:
+3. From now on every live command runs from the new clone. Update the skills and the hooks, rewrite the scheduled job files and confirm the new paths behind one owner dialog:
 
    ```sh
    node ~/.devtwin/kit-next/bin/devtwin.mjs setup plan --pilot "$LIVE_CONFIG" --all-pending
    node ~/.devtwin/kit-next/bin/devtwin.mjs setup apply --pilot "$LIVE_CONFIG" --all-pending --apply --plan-fingerprint '<fingerprint>'
    ```
 
-   The dialog lists the changed skills as `Update skills in ...`, the hook files as `Replace devtwin hook entries in ...` and the new kit path to confirm. Or run the steps one at a time: preview `agents install` for each agent (changed skills show `update`), `agents install --hooks`, then `paths confirm`. Each one asks on its own.
+   The dialog lists the changed skills as `Update skills in ...`, the hook files as `Replace devtwin hook entries in ...`, each job that is on as `Rewrite job <job> at ~/Library/LaunchAgents/devtwin.<job>.plist for kit <path>` and the new kit path to confirm. A job file still names the old clone and the Node path of that time. A job that is on keeps running the old kit until this batch writes its file again. Every job that is on is in the list: the radar, advisory, review, backup, activity, import, send and hub sync jobs, and a job whose file is missing. `schedule status` shows each one as `outdated` (or `missing`) before the batch and `current` after it. Or run the steps one at a time: preview `agents install` for each agent (changed skills show `update`), `agents install --hooks`, then `schedule apply --job <job>` (or `hub schedule --scope <scope>`) for each job that is on, then `paths confirm`. Each one asks on its own.
 4. Point `DEVTWIN_KIT` at the new clone, with the owner's approval.
 5. If you ran the steps one at a time, run `paths confirm` from the new clone last, preview then apply. The new kit path ends the old confirmation.
 

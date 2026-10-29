@@ -17,6 +17,12 @@
 // gets one audit entry (kind "setup-batch", target the step) with the batch ID, written after the step succeeded, so
 // the log never shows a step the result does not list as done. The batch is always ask: the hook allows setup apply
 // from agent shells only for one --step that is not an owner step.
+//
+// Upgrade fix: after live set-kit, a job that is on still runs the old kit until its plist is written again. A job
+// whose plist differs from what its schedule apply would write now (or is missing) is outdated: its job step is not
+// done, and its batch line says "Rewrite job ...". Jobs with no setup step (import-daily, activity-weekly,
+// learning-send, and the hub sync job of a scope other than --scope) join an --all-pending batch generically as
+// job-rewrite-<job> items, through the same schedule plan and apply, after the job steps.
 import { randomBytes } from "node:crypto";
 import { dirname } from "node:path";
 import { DevtwinError, toJson } from "../errors.mjs";
@@ -120,8 +126,8 @@ async function linesFor(step, preview, ctx) {
     const replaces = action.changes.some((c) => c.op === "remove");
     return { lines: [(replaces ? "Replace devtwin hook entries in " : "Add devtwin hook entries to ") + t(action.path) + ": " + events.join(", ") + (action.agent === "codex" ? ". Then trust them in Codex with /hooks" : "")] };
   }
-  if (step.id === "job-hub-sync") return { lines: ["Install job hub-sync for scope " + preview.scope + " (" + every(preview.interval) + ") at " + t(preview.plist)] };
-  if (step.job) return { lines: preview.actions.map((a) => "Install job " + a.job + " (" + every(a.interval) + ") at " + t(a.plist)) };
+  if (step.id === "job-hub-sync") return { lines: [preview.installed ? rewriteLine(ctx, "hub-sync for scope " + preview.scope, preview.plist, preview.programArguments) : "Install job hub-sync for scope " + preview.scope + " (" + every(preview.interval) + ") at " + t(preview.plist)] };
+  if (step.job) return { lines: preview.actions.map((a) => a.enabled ? rewriteLine(ctx, a.job, a.plist, a.programArguments) : "Install job " + a.job + " (" + every(a.interval) + ") at " + t(a.plist)) };
   if (step.id === "hook-verify") return { lines: ["Write the kit receipt that the hook trusts at " + t(preview.receipt)] };
   if (step.id === "paths-confirm") return { lines: ["Confirm kit " + t(preview.kitRoot) + " at " + (preview.kitRef ?? preview.kitHead) + " and config " + t(preview.pilotPath)] };
   if (LONG_TEXT.has(step.id)) {
@@ -130,6 +136,31 @@ async function linesFor(step, preview, ctx) {
     return { lines: ["Grant consent " + preview.consent.kind + " for " + t(preview.consent.target) + ": " + text.title + "."], text: text.body.split("\n") };
   }
   return { excluded: "this step has no batch line yet; run setup apply --step " + step.id };
+}
+// The kit a job command runs: programArguments[1] is <kit>/bin/devtwin.mjs.
+const rewriteLine = (ctx, name, plist, args) => "Rewrite job " + name + " at " + tilde(ctx, plist) + " for kit " + tilde(ctx, dirname(dirname(args[1])));
+const STEP_JOBS = ["job-radar", "job-advisories", "job-review-reminder", "job-backup"];
+// The outdated jobs no step in this batch covers, as batch items: every schedule job with no setup step, and the hub
+// sync job of each joined scope other than the one --scope names (job-hub-sync covers that one).
+async function rewriteItems(ctx) {
+  const { outdatedJobs } = await import("../schedule/jobs.mjs");
+  const stepped = new Set(STEP_JOBS.map((id) => stepById(id).job)), items = [], excluded = [];
+  for (const o of await outdatedJobs(ctx.roots, ctx)) {
+    if (o.job === "hub-sync" ? o.scope === ctx.values.scope : stepped.has(o.job)) continue;
+    const id = "job-rewrite-" + o.job + (o.scope ? "-" + o.scope : "");
+    if (o.state === "unsafe") { excluded.push({ id, reason: "its plist cannot be read safely; check " + tilde(ctx, o.plist ?? o.label + ".plist") }); continue; }
+    const hub = o.job === "hub-sync";
+    const plan = hub ? async (c) => (await import("../hubs/commands.mjs")).hubScheduleCommand.run({ scope: o.scope }, c)
+      : async (c) => (await import("../schedule/commands.mjs")).schedulePlanCommand.run({ job: o.job }, c);
+    const run = hub ? async (c, fingerprint) => (await import("../hubs/commands.mjs")).hubScheduleCommand.run({ scope: o.scope, apply: true, "plan-fingerprint": fingerprint }, c)
+      : async (c, fingerprint) => (await import("../schedule/commands.mjs")).scheduleApplyCommand.run({ job: o.job, "plan-fingerprint": fingerprint }, c);
+    let preview;
+    try { preview = await plan(ctx); }
+    catch (error) { excluded.push({ id, reason: "it cannot be planned: " + toJson(error).code + " " + toJson(error).message }); continue; }
+    const lines = hub ? [rewriteLine(ctx, "hub-sync for scope " + o.scope, preview.plist, preview.programArguments)] : preview.actions.map((a) => rewriteLine(ctx, a.job, a.plist, a.programArguments));
+    items.push({ id, preview, fingerprint: preview.fingerprint, lines, replan: plan, apply: run });
+  }
+  return { items, excluded };
 }
 const bodyFor = (items) => {
   const out = ["Approve runs each change below in this order. Deny changes nothing.", ""];
@@ -209,6 +240,11 @@ export async function buildBatch(values, ctx) {
     if (shown.excluded) { excluded.push({ id: step.id, reason: shown.excluded }); continue; }
     items.push({ id: step.id, preview, fingerprint: preview.fingerprint, lines: shown.lines, ...(shown.text ? { text: shown.text } : {}),
       replan: (c) => step.plan(c), apply: (c, fingerprint) => step.apply(c, fingerprint) });
+  }
+  if (values["all-pending"] === true) {
+    const extra = await rewriteItems(pctx), at = items.findIndex((x) => ["paths-confirm", "hooks-claude", "hooks-codex", "hook-verify"].includes(x.id));
+    items.splice(at === -1 ? items.length : at, 0, ...extra.items);
+    excluded.push(...extra.excluded);
   }
   if (items.some((x) => x.id.startsWith("hooks-")) && items.some((x) => x.id === "hook-verify")) {
     items.splice(items.findIndex((x) => x.id === "hook-verify"), 1);

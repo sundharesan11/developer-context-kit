@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { mkdir, chmod, readFile, writeFile, rm, symlink } from "node:fs/promises";
+import { mkdir, chmod, readFile, writeFile, rm, symlink, lstat } from "node:fs/promises";
 import { existsSync, writeFileSync } from "node:fs";
 import { sandbox, makeRepo, fixtureGit, treeSnapshot, makePilot, now } from "./helpers.mjs";
 import { main } from "../src/cli.mjs";
@@ -29,11 +29,11 @@ async function setupHome(t) {
   const repo = await makeRepo(join(sb, "work/atlas"), { "README.md": "# Atlas\nBilling API.\n", "package.json": "{\"name\":\"atlas\",\"scripts\":{\"test\":\"node --test\"}}" });
   const liveConfig = join(devtwin, "live.json"), backups = join(home, "devtwin-backups");
   const dialogs = [], loaded = [];
-  let answer = () => "approved", onLaunchctl = () => null;
+  let answer = () => "approved", onLaunchctl = () => null, kitNow = kit;
   const launchctl = (args) => { loaded.push(args.join(" ")); onLaunchctl(args); return { status: 0, stdout: "", stderr: "" }; };
   const cli = async (args, env = {}) => {
     const chunks = [];
-    const code = await main(args, { stdout: { write: (v) => { chunks.push(v); return true; } }, now, home, env, kitRoot: kit, launchctl,
+    const code = await main(args, { stdout: { write: (v) => { chunks.push(v); return true; } }, now, home, env, kitRoot: kitNow, launchctl,
       ownerDialog: async (content) => { dialogs.push(content); return answer(content); } });
     return { code, json: JSON.parse(chunks.join("")) };
   };
@@ -46,8 +46,14 @@ async function setupHome(t) {
   const preview = await ok(["live", "init", ...initArgs]);
   await ok(["live", "init", ...initArgs, "--apply", "--plan-fingerprint", preview.fingerprint]);
   await ok(["init", "--pilot", liveConfig, "--actor", "email:owner@example.com", "--apply"]);
-  const roots = async () => rootsFromPilot(await loadPilot(liveConfig, { home, env: {}, kitRoot: kit }));
-  return { sb, home, kit, repo, liveConfig, backups, cli, ok, roots, dialogs, loaded, setAnswer: (fn) => { answer = fn; }, setLaunchctl: (fn) => { onLaunchctl = fn; } };
+  const roots = async () => rootsFromPilot(await loadPilot(liveConfig, { home, env: {}, kitRoot: kitNow }));
+  // A second pinned clone, as an upgrade makes; useKit runs the CLI from it, as the owner does for live set-kit.
+  const nextKit = async (name = "kit-next") => {
+    const next = await makeRepo(join(devtwin, name), { ...kitFiles, "README.md": "kit next\n" });
+    await fixtureGit(next, ["checkout", "-q", "--detach"]);
+    return { kit: next, commit: (await fixtureGit(next, ["rev-parse", "HEAD"])).trim() };
+  };
+  return { sb, home, kit, repo, liveConfig, backups, cli, ok, roots, dialogs, loaded, nextKit, useKit: (path) => { kitNow = path; }, setAnswer: (fn) => { answer = fn; }, setLaunchctl: (fn) => { onLaunchctl = fn; } };
 }
 const plan = (h, extra = []) => h.ok(["setup", "plan", "--pilot", h.liveConfig, "--all-pending", "--backup-target", h.backups, ...extra]);
 const apply = (h, fingerprint, extra = []) => h.cli(["setup", "apply", "--pilot", h.liveConfig, "--all-pending", "--backup-target", h.backups, ...extra, "--apply", "--plan-fingerprint", fingerprint]);
@@ -350,4 +356,96 @@ test("setup batch: a failure after the last step is reported in derived.error an
   assert.equal(out.json.ok, true, JSON.stringify(out.json.error));
   assert.deepEqual(out.json.result.done.map((d) => d.id), ["config", "job-review-reminder"]);
   assert.match(out.json.result.derived.error.code, /^DEVTWIN_/);
+});
+
+// Upgrade fix: after live set-kit, a job that is on keeps the old kit in its plist until the plist is written again.
+const AGENTS_DIR = "Library/LaunchAgents";
+const rewriteLines = (p) => p.items.flatMap((i) => i.lines).filter((line) => line.startsWith("Rewrite job "));
+async function enableActivityJob(h) {
+  const plist = join(h.home, AGENTS_DIR, "devtwin.activity-weekly.plist");
+  const pre = await h.ok(["live", "write-classes", "--pilot", h.liveConfig, "--launch-agent", plist]);
+  await h.ok(["live", "write-classes", "--pilot", h.liveConfig, "--launch-agent", plist, "--apply", "--plan-fingerprint", pre.fingerprint]);
+  const job = await h.ok(["schedule", "plan", "--pilot", h.liveConfig, "--job", "activity-weekly"]);
+  await h.ok(["schedule", "apply", "--pilot", h.liveConfig, "--job", "activity-weekly", "--plan-fingerprint", job.fingerprint]);
+  return plist;
+}
+
+test("setup batch after live set-kit lists every enabled job as a rewrite line and one approval rewrites their plists for the new kit", async (t) => {
+  const h = await setupHome(t);
+  // activity-weekly has no setup step; review-monthly and backup-daily come from the first batch.
+  const activity = await enableActivityJob(h);
+  const first = await plan(h);
+  assert.equal((await apply(h, first.fingerprint)).json.ok, true);
+  const plists = ["review-monthly", "backup-daily", "activity-weekly"].map((job) => join(h.home, AGENTS_DIR, "devtwin." + job + ".plist"));
+  assert.equal(plists[2], activity);
+  const settled = await plan(h);
+  assert.deepEqual(rewriteLines(settled), [], "an up-to-date enabled job is not listed");
+  assert.ok(!settled.items.some((i) => i.id.startsWith("job-")), JSON.stringify(settled.items.map((i) => i.id)));
+  // live set-kit from the new clone, as docs/LIVE.md describes.
+  const next = await h.nextKit();
+  h.useKit(next.kit);
+  const kitPlan = await h.ok(["live", "set-kit", "--pilot", h.liveConfig, "--commit", next.commit]);
+  await h.ok(["live", "set-kit", "--pilot", h.liveConfig, "--commit", next.commit, "--apply", "--plan-fingerprint", kitPlan.fingerprint]);
+  // schedule status and setup status report the outdated jobs.
+  const sched = await h.ok(["schedule", "status", "--pilot", h.liveConfig]);
+  for (const job of ["review-monthly", "backup-daily", "activity-weekly"]) {
+    const row = sched.jobs.find((j) => j.job === job);
+    assert.deepEqual([row.enabled, row.plistState, row.outdated], [true, "outdated", true], job);
+  }
+  assert.deepEqual(sched.outdated.map((o) => o.job).sort(), ["activity-weekly", "backup-daily", "review-monthly"]);
+  const status = await h.ok(["setup", "status", "--pilot", h.liveConfig, "--backup-target", h.backups]);
+  for (const id of ["job-review-reminder", "job-backup"]) {
+    const step = status.steps.find((s) => s.id === id);
+    assert.deepEqual([step.done, step.status], [false, "outdated"], id);
+  }
+  assert.ok(status.outdatedJobs.some((o) => o.job === "activity-weekly" && o.state === "outdated"));
+  const p = await plan(h);
+  if (DUMP) console.log(p.dialog.body);
+  const kitShown = "~/.devtwin/kit-next";
+  assert.deepEqual(rewriteLines(p), ["review-monthly", "backup-daily", "activity-weekly"].map((job) => "Rewrite job " + job + " at ~/" + AGENTS_DIR + "/devtwin." + job + ".plist for kit " + kitShown));
+  assert.ok(["job-review-reminder", "job-backup", "job-rewrite-activity-weekly"].every((id) => p.items.some((i) => i.id === id)));
+  const ids = p.items.map((i) => i.id);
+  assert.ok(ids.indexOf("job-rewrite-activity-weekly") < ids.indexOf("paths-confirm"), "the rewrites run before paths confirm");
+  const dialogs = h.dialogs.length;
+  const out = await apply(h, p.fingerprint);
+  assert.equal(out.json.ok, true, JSON.stringify(out.json.error));
+  assert.equal(h.dialogs.length, dialogs + 1, "one approval for the whole batch");
+  for (const path of plists) {
+    const xml = await readFile(path, "utf8");
+    assert.ok(xml.includes("<string>" + join(next.kit, "bin/devtwin.mjs") + "</string>"), path);
+    assert.ok(!xml.includes(join(h.kit, "bin/devtwin.mjs")), path);
+  }
+  const after = await h.ok(["schedule", "status", "--pilot", h.liveConfig]);
+  assert.deepEqual(after.outdated, []);
+  assert.ok(after.jobs.filter((j) => j.enabled).every((j) => j.plistState === "current" && !j.outdated));
+  assert.deepEqual(rewriteLines(await plan(h)), [], "nothing is left to rewrite");
+});
+
+test("setup batch lists an enabled job whose plist is missing and does not read a plist through a link", async (t) => {
+  const h = await setupHome(t);
+  const first = await plan(h);
+  assert.equal((await apply(h, first.fingerprint)).json.ok, true);
+  const review = join(h.home, AGENTS_DIR, "devtwin.review-monthly.plist"), backup = join(h.home, AGENTS_DIR, "devtwin.backup-daily.plist");
+  // A missing plist for an enabled job is outdated; the current one is not listed.
+  const kept = await readFile(review, "utf8");
+  await rm(review);
+  const sched = await h.ok(["schedule", "status", "--pilot", h.liveConfig]);
+  assert.deepEqual(sched.outdated.map((o) => [o.job, o.state]), [["review-monthly", "missing"]]);
+  assert.equal(sched.jobs.find((j) => j.job === "backup-daily").plistState, "current");
+  const p = await plan(h);
+  assert.deepEqual(rewriteLines(p), ["Rewrite job review-monthly at ~/" + AGENTS_DIR + "/devtwin.review-monthly.plist for kit ~/.devtwin/kit"]);
+  assert.ok(p.skipped.some((s) => s.id === "job-backup" && s.reason === "done"));
+  const out = await apply(h, p.fingerprint);
+  assert.equal(out.json.ok, true, JSON.stringify(out.json.error));
+  assert.equal(await readFile(review, "utf8"), kept, "the plist is written again with the same bytes");
+  assert.equal((await h.ok(["schedule", "status", "--pilot", h.liveConfig])).jobs.find((j) => j.job === "review-monthly").plistState, "current");
+  // A plist that is a link is never read or written through: the live config refuses to load, and the target stays.
+  const elsewhere = join(h.sb, "elsewhere.plist"), bytes = await readFile(backup, "utf8");
+  await writeFile(elsewhere, bytes);
+  await rm(backup);
+  await symlink(elsewhere, backup);
+  const refused = await h.cli(["setup", "plan", "--pilot", h.liveConfig, "--all-pending", "--backup-target", h.backups]);
+  assert.equal(refused.json.error.code, "DEVTWIN_GATE_REQUIRED");
+  assert.equal(await readFile(elsewhere, "utf8"), bytes, "the link target is left alone");
+  assert.ok((await lstat(backup)).isSymbolicLink(), "the link is not replaced");
 });

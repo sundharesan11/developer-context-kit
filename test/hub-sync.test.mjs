@@ -426,3 +426,36 @@ test("setup batch with job-hub-sync and consent-hub shows one dialog and no step
   const status = await m.ok(["setup", "status", "--scope", SCOPE]);
   for (const id of ["job-hub-sync", "consent-hub"]) assert.equal(status.steps.find((s) => s.id === id).done, true, id);
 });
+
+test("an enabled hub sync job whose plist names an old kit is outdated, listed for a rewrite and written again in one batch", async (t) => {
+  const hub = await hubFixture(t), m = await machine(t);
+  await m.join(hub);
+  const plan = await m.ok(["hub", "schedule", "--scope", SCOPE]);
+  await m.ok(["hub", "schedule", "--scope", SCOPE, "--apply", "--plan-fingerprint", plan.fingerprint]);
+  const fresh = await readFile(m.plist, "utf8"), cli = plan.programArguments[1];
+  assert.deepEqual((await m.ok(["schedule", "status"])).hubSync.map((j) => [j.scope, j.enabled, j.plistState, j.outdated]), [[SCOPE, true, "current", false]]);
+  // The plist an older kit wrote, as after live set-kit.
+  await writeFile(m.plist, fresh.replaceAll(cli, "/old/kit/bin/devtwin.mjs"), { mode: 0o600 });
+  const sched = await m.ok(["schedule", "status"]);
+  assert.deepEqual(sched.hubSync.map((j) => [j.plistState, j.outdated]), [["outdated", true]]);
+  assert.deepEqual(sched.outdated.map((o) => [o.job, o.scope, o.state]), [["hub-sync", SCOPE, "outdated"]]);
+  const status = await m.ok(["setup", "status", "--scope", SCOPE]);
+  const step = status.steps.find((s) => s.id === "job-hub-sync");
+  assert.deepEqual([step.done, step.status], [false, "outdated"]);
+  // Without --scope, --all-pending lists the job generically; with --scope, the job-hub-sync step covers it.
+  const all = await m.ok(["setup", "plan", "--all-pending"]);
+  const generic = all.items.find((i) => i.id === "job-rewrite-hub-sync-" + SCOPE);
+  assert.ok(generic, JSON.stringify(all.items.map((i) => i.id)));
+  assert.match(generic.lines[0], /^Rewrite job hub-sync for scope example at .*devtwin\.hub-sync\.example\.plist for kit /);
+  const scoped = await m.ok(["setup", "plan", "--all-pending", "--scope", SCOPE]);
+  assert.ok(!scoped.items.some((i) => i.id.startsWith("job-rewrite-hub-sync")));
+  const args = ["--steps", "job-hub-sync", "--scope", SCOPE];
+  const batch = await m.ok(["setup", "plan", ...args]);
+  assert.deepEqual(batch.items.map((i) => i.id), ["job-hub-sync"]);
+  assert.match(batch.items[0].lines[0], /^Rewrite job hub-sync for scope example at /);
+  const dialogs = m.dialogs.length;
+  await m.ok(["setup", "apply", ...args, "--apply", "--plan-fingerprint", batch.fingerprint]);
+  assert.equal(m.dialogs.length, dialogs + 1, "one dialog");
+  assert.equal(await readFile(m.plist, "utf8"), fresh, "the plist names the running kit again");
+  assert.deepEqual((await m.ok(["schedule", "status"])).outdated, []);
+});

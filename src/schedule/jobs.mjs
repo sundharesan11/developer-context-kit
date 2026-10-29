@@ -12,7 +12,7 @@ import { withPilotLock } from "../storage/lock.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { requireOwnerApproval } from "../owner/dialog.mjs";
 import { configuredScopes } from "../records/isolation.mjs";
-import { launchAgentPath, renderPlist, installJob, removeJob, launchctlOf, domain, jobNodePath } from "./launchd.mjs";
+import { launchAgentPath, renderPlist, installJob, removeJob, launchctlOf, domain, jobNodePath, plistState, hubSyncLabel, hubSyncArguments, HUB_SYNC_INTERVAL } from "./launchd.mjs";
 import { notify } from "./notify.mjs";
 
 const DAY = 86400;
@@ -75,6 +75,36 @@ export function jobArguments(ctx, pilotPath, job) {
   return [jobNodePath(ctx), join(kit, "bin/devtwin.mjs"), "schedule", "run", "--pilot", resolve(pilotPath), "--job", job];
 }
 
+// Upgrade fix: the state of a job's installed plist against the bytes schedule apply would write now ("current",
+// "outdated" or "missing"; see plistState). A job that is on but not "current" is outdated: its setup step is not done,
+// schedule status and setup status report it, and the setup batch (--all-pending) rewrites it after one approval.
+export function jobFileState(roots, ctx, job) {
+  const label = jobLabel(job), path = launchAgentPath(roots, label);
+  return plistState(path, renderPlist({ label, programArguments: jobArguments(ctx, roots.pilot.path, job), interval: JOBS[job].interval }));
+}
+export function hubJobFileState(roots, ctx, scope) {
+  const label = hubSyncLabel(scope), path = launchAgentPath(roots, label);
+  return plistState(path, renderPlist({ label, programArguments: hubSyncArguments({ ...ctx, pilot: roots.pilot }, scope), interval: HUB_SYNC_INTERVAL }));
+}
+// A plist that cannot be read safely (a link, another owner, a path no longer approved) reads as "unsafe".
+const fileState = (read) => { try { return read(); } catch { return "unsafe"; } };
+// Every job that is on and whose plist is not current: the schedule jobs, then the hub sync job of each joined scope.
+export async function outdatedJobs(roots, ctx) {
+  const state = await readJobs(roots), out = [];
+  for (const job of JOB_IDS) {
+    if (state.jobs[job]?.enabled !== true) continue;
+    const s = fileState(() => jobFileState(roots, ctx, job));
+    if (s !== "current") out.push({ job, label: jobLabel(job), plist: state.jobs[job].plist ?? null, state: s });
+  }
+  const { listHubBindings } = await import("../config/store.mjs");
+  for (const binding of await listHubBindings(roots)) {
+    if (binding.status !== "joined" || binding.jobs?.hubSync?.enabled !== true) continue;
+    const s = fileState(() => hubJobFileState(roots, ctx, binding.scope));
+    if (s !== "current") out.push({ job: "hub-sync", scope: binding.scope, label: hubSyncLabel(binding.scope), plist: binding.jobs.hubSync.plist ?? null, state: s });
+  }
+  return out;
+}
+
 // Install needs what the job reads: a stack approval for the radar and advisory jobs (with the advisories group for
 // the advisory job), the stackWatch exception in live mode, and the radar job on before the advisory job.
 async function requirements(roots, job, state) {
@@ -131,18 +161,28 @@ export async function applySchedule(roots, input, { fingerprint, now = () => new
 }
 // Read-only: for each job, whether it is on, whether its plist is installed, whether launchd has it loaded, and its
 // last run. No network call.
+// An enabled job also reports plistState ("current", or "outdated", "missing" or "unsafe" with outdated: true). The hub
+// sync job of each joined scope is listed under hubSync the same way, and outdated lists every job to rewrite.
 export async function scheduleStatus(roots, ctx) {
   const state = await readJobs(roots), run = launchctlOf(ctx), jobs = [];
   for (const id of JOB_IDS) {
-    const label = jobLabel(id);
+    const label = jobLabel(id), enabled = state.jobs[id]?.enabled === true;
     let plist = null;
     try { plist = launchAgentPath(roots, label); } catch { plist = null; }
     const receipt = await readReceipt(roots, id);
-    jobs.push({ job: id, enabled: state.jobs[id]?.enabled === true, label, plist, installed: Boolean(plist && info(plist)),
+    const file = enabled ? fileState(() => jobFileState(roots, ctx, id)) : null;
+    jobs.push({ job: id, enabled, label, plist, installed: Boolean(plist && info(plist)), plistState: file, outdated: file !== null && file !== "current",
       loaded: run(["print", domain() + "/" + label])?.status === 0, lastRunAt: receipt?.lastRunAt ?? null, lastAttemptAt: receipt?.lastAttemptAt ?? null,
       result: receipt?.result ?? null, ...(receipt?.code ? { code: receipt.code } : {}) });
   }
-  return { jobs };
+  const outdated = await outdatedJobs(roots, ctx), { listHubBindings } = await import("../config/store.mjs"), hubSync = [];
+  for (const binding of await listHubBindings(roots)) {
+    if (binding.status !== "joined") continue;
+    const enabled = binding.jobs?.hubSync?.enabled === true, found = outdated.find((o) => o.job === "hub-sync" && o.scope === binding.scope);
+    const file = enabled ? found?.state ?? "current" : null;
+    hubSync.push({ scope: binding.scope, enabled, label: hubSyncLabel(binding.scope), plist: binding.jobs?.hubSync?.plist ?? null, plistState: file, outdated: file !== null && file !== "current" });
+  }
+  return { jobs, hubSync, outdated };
 }
 
 // The work of each job. deps: the stack seams (catalog, request, lookup, resolvePublicRead), shared by every scope.

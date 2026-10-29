@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile, chmod, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile, chmod, rm, symlink } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { main } from "../src/cli.mjs";
 import { makePilot, sandbox, makeRepo, fixtureGit, now } from "./helpers.mjs";
@@ -12,8 +12,8 @@ import { planProfile, applyProfile } from "../src/profile/store.mjs";
 import { ensurePrivatePath } from "../src/storage/fsx.mjs";
 import { ownerAction } from "../src/hooks/owner-block.mjs";
 import { osascriptArgs, notificationText } from "../src/schedule/notify.mjs";
-import { receiptPath, jobArguments } from "../src/schedule/jobs.mjs";
-import { stableNodePath, hubSyncArguments } from "../src/schedule/launchd.mjs";
+import { receiptPath, jobArguments, jobFileState } from "../src/schedule/jobs.mjs";
+import { stableNodePath, hubSyncArguments, plistState, renderPlist } from "../src/schedule/launchd.mjs";
 import { hookCommand } from "../src/agents/hooks-install.mjs";
 import { appendEntry } from "../src/audit/log.mjs";
 import { createFetcher } from "../src/stack/fetch.mjs";
@@ -332,4 +332,46 @@ test("job and hub sync plists use the stable node path; hook lines run plain nod
   assert.equal(hubSyncArguments(ctx, "example")[0], "/opt/homebrew/bin/node");
   assert.equal(jobArguments({ ...ctx, nodeLookup: lookup({ execPath: "/usr/bin/node" }) }, "/c/live.json", "backup-daily")[0], "/usr/bin/node");
   assert.match(hookCommand({ kitRoot: "/k", pilotPath: "/c/live.json", event: "stop", agent: "claude" }), /^node "/);
+});
+
+test("an enabled job of every kind is outdated when its plist differs from what schedule apply writes now: kit, node or a missing file", async (t) => {
+  const labels = [...JOB_LABELS, "devtwin.learning-send", "devtwin.import-daily"];
+  const s = await setup(t, { labels });
+  const kinds = ["radar-weekly", "advisory-hourly", "review-monthly", "activity-weekly", "learning-send", "import-daily"];
+  for (const job of kinds) await s.on(job);
+  const roots = await s.roots();
+  const current = await s.ok(["schedule", "status"]);
+  assert.deepEqual(current.outdated, []);
+  assert.deepEqual(current.jobs.filter((j) => j.enabled).map((j) => [j.job, j.plistState, j.outdated]), kinds.map((job) => [job, "current", false]));
+  assert.ok(current.jobs.filter((j) => !j.enabled).every((j) => j.plistState === null && j.outdated === false));
+  // Another kit (live set-kit) or another Node path makes each one outdated, read without a write.
+  for (const job of kinds) {
+    assert.equal(jobFileState(roots, {}, job), "current", job);
+    assert.equal(jobFileState(roots, { kitRoot: "/new/kit" }, job), "outdated", job);
+    assert.equal(jobFileState(roots, { nodeLookup: { execPath: "/other/bin/node" } }, job), "outdated", job);
+  }
+  // The plist on disk with an old kit path, and a missing one, are reported by schedule status.
+  const radar = join(s.agents, "devtwin.radar-weekly.plist"), learning = join(s.agents, "devtwin.learning-send.plist");
+  const xml = await readFile(radar, "utf8"), kit = join(import.meta.dirname, "..");
+  assert.ok(xml.includes(join(kit, "bin/devtwin.mjs")));
+  await writeFile(radar, xml.replaceAll(join(kit, "bin/devtwin.mjs"), "/old/kit/bin/devtwin.mjs"), { mode: 0o600 });
+  await rm(learning);
+  const status = await s.ok(["schedule", "status"]);
+  assert.deepEqual(status.outdated.map((o) => [o.job, o.state]), [["radar-weekly", "outdated"], ["learning-send", "missing"]]);
+  assert.deepEqual(status.jobs.filter((j) => j.outdated).map((j) => [j.job, j.plistState]), [["radar-weekly", "outdated"], ["learning-send", "missing"]]);
+  // schedule apply again writes the current bytes.
+  await s.on("radar-weekly");
+  await s.on("learning-send");
+  assert.deepEqual((await s.ok(["schedule", "status"])).outdated, []);
+});
+
+test("the plist state read does not follow a link", async (t) => {
+  const dir = await sandbox(t), target = join(dir, "target.plist"), link = join(dir, "devtwin.review-monthly.plist");
+  const content = renderPlist({ label: "devtwin.review-monthly", programArguments: ["/n", "/k/bin/devtwin.mjs"], interval: 60 });
+  await writeFile(target, content, { mode: 0o600 });
+  assert.equal(plistState(target, content), "current");
+  assert.equal(plistState(target, content + " "), "outdated");
+  assert.equal(plistState(join(dir, "absent.plist"), content), "missing");
+  await symlink(target, link);
+  assert.throws(() => plistState(link, content), (error) => error.code === "DEVTWIN_PATH_UNSAFE");
 });
