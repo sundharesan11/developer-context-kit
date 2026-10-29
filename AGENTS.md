@@ -2,6 +2,17 @@
 
 devtwin is a zero-dependency Node.js CLI (Node 22.13 or later, ESM). It ships on npm as `devtwin`. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; this file adds the rules agents most often miss.
 
+## Issues, branches and pull requests
+
+`main` is the protected branch. Every feature or update follows these steps:
+
+1. Open a GitHub issue that says what will change and why.
+2. Do the work on a feature branch, for example `feat/<topic>` or `fix/<topic>`.
+3. Open a pull request into `main` and link the issue with `Closes #<number>` in its body.
+4. Merge only after CI passes and the owner approves. Release tags come from `main` after the merge.
+
+Never push feature work straight to `main`.
+
 ## Docs follow code
 
 A change to what users can run or see ships with its docs in the same commit. Use this table.
