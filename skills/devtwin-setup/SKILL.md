@@ -36,7 +36,7 @@ The current profile, its free text, stack suggestions and the records they cite 
 
 ## Steps
 
-1. Check the pilot. If the pilot file does not exist or `init` has not run, stop without creating anything. Point the user to the pilot steps in `docs/GETTING-STARTED.md` (or `docs/LIVE.md` for the live config). Never run `init` or create a pilot yourself. To check `init`, run the read-only doctor and require the `roots` and `registry` checks to have status `ok`.
+1. Check the pilot. If the pilot file does not exist or `init` has not run, stop without creating anything. Point the user to the pilot steps in the [getting started guide](https://github.com/sundharesan11/devtwin/blob/main/docs/GETTING-STARTED.md) (or the [live guide](https://github.com/sundharesan11/devtwin/blob/main/docs/LIVE.md) for the live config). Never run `init` or create a pilot yourself. To check `init`, run the read-only doctor and require the `roots` and `registry` checks to have status `ok`.
 
    ```sh
    node "$DEVTWIN_KIT/bin/devtwin.mjs" doctor --pilot '<pilot.json>'
@@ -143,7 +143,7 @@ The current profile, its free text, stack suggestions and the records they cite 
    node "$DEVTWIN_KIT/bin/devtwin.mjs" skill template-list
    ```
 
-   List each template's name and description, and explain that the user can create their own private skill from one through the skill builder (`docs/SKILL-BUILDER.md`, "Create from a template"). An empty list means this kit has no templates. Do not create a skill unless the user asks for one.
+   List each template's name and description, and explain that the user can create their own private skill from one through the skill builder ([skill builder guide](https://github.com/sundharesan11/devtwin/blob/main/docs/SKILL-BUILDER.md), "Create from a template"). An empty list means this kit has no templates. Do not create a skill unless the user asks for one.
 
 9. Run `setup status` again. Tell the user which steps have `done: true`, which steps they declined and which steps arrive later.
 

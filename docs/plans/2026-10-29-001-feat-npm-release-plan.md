@@ -109,7 +109,7 @@ execution: code
     1. Check that the tag equals `v` + the `package.json` version.
     2. Run `check:package`, `check:writing`, the full suite and the pack smoke test.
     3. Compute the KTD3 digest from the packed tarball.
-  - **Publish job.** It needs the gate job and runs in the `npm-release` environment. That environment has the owner as required reviewer and allows only `v*` tags. Only this job has `id-token: write`. In this order:
+  - **Publish job.** It needs the gate job and runs in the `npm-release` environment. That environment has the owner as required reviewer and allows only `v*` tags. Only this job has the `id-token` write permission. In this order:
     1. Install an exact npm version (11.5.1 or the version checked at implementation time).
     2. Run `npm publish --provenance --access public --tag alpha`. A version without a prerelease part gets `--tag next`. The workflow never writes `latest`.
     3. Create a draft GitHub release that lists the version, the source commit and the kit digest.
@@ -304,7 +304,7 @@ execution: code
     4. On npm, require 2FA and disallow tokens.
 - **Test scenarios:**
   - The workflow triggers only on `push` of `v*` tags.
-  - `id-token: write` appears only in the publish job.
+  - The `id-token` write permission appears only in the publish job.
   - The publish job needs the gate job.
   - The tag check is present.
   - npm is an exact version, not a range.

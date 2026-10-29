@@ -11,7 +11,7 @@ import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { validateProfile, PROFILE_CAP } from "./validate.mjs";
 export { PROFILE_CAP };
 const REVISION = /^v([1-9][0-9]*)\.json$/;
-const REMEDY = "keep private roots out of Git; to version the profile, copy or export it into a separate private repository or dotfiles manager (see docs/HARNESS.md)";
+const REMEDY = "keep private roots out of Git; to version the profile, copy or export it into a separate private repository or dotfiles manager (see https://github.com/sundharesan11/devtwin/blob/main/docs/HARNESS.md)";
 export const profileDir = (roots) => join(roots.configRoot, "profile");
 export const profileLockPath = (roots) => join(roots.stateRoot, "locks", "profile.lock");
 const currentPath = (roots) => join(profileDir(roots), "current.json");

@@ -27,7 +27,8 @@ const SETUP_STEPS = { "live-folder": R, "skills-claude": ASK, "skills-codex": AS
   // U9 (one approval): setup apply --steps or --all-pending runs several owner steps after one owner dialog.
   batch: ASK };
 const TABLE = {
-  version: R, help: R,
+  // demo writes only inside the fresh pilot root it is given or makes.
+  version: R, help: R, demo: R,
   // The skill-source and skill-builder routes keep their own recorded approval chain (content-approve, local-approve).
   "skill-sources catalog": R, "skill-sources check": R, "skill-sources preview": R, "skill-sources stage": A, "skill-sources inspect": R,
   "skill-sources package-review": A, "skill-sources content-approve": A, "skill-sources local-plan": R, "skill-sources local-approve": A,
