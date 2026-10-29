@@ -86,6 +86,7 @@ test("docs state the candidate's limits in pinned phrases", async () => {
     "README.md": ["devtwin is an alpha", "npm i -g devtwin@alpha", "never from npm's global folder", "no automatic private-to-public synchronization", "not a sandbox"],
     "docs/SECURITY-MODEL.md": ["residual race", "same-user"],
     "docs/LIMITATIONS.md": ["Linux support is not claimed", "Windows is unsupported", "migration is not implemented", "There is no sync", "lost laptop", "multi-record onboarding", "Without a backup, losing", "client repository text", "A lesson line cannot stop a command", "Secrets printed to a terminal", "Commands that break when pasted", "Polling long jobs"],
+    "docs/UPGRADING.md": ["a kit from before 0.1.0-alpha.1 cannot load it", "run in the kit you start them from"],
     "docs/LIVE.md": ["mkdir -m 700 ~/.devtwin", "--setting-sources user", "--sandbox read-only", "rollback-check", "live set-kit", "agents recover", "legacy", "Cursor", "same-user tampering", "If the store is lost", "There is no sync"],
   };
   for (const [file, phrases] of Object.entries(want)) {
@@ -96,6 +97,8 @@ test("docs state the candidate's limits in pinned phrases", async () => {
   const live = await read("docs/LIVE.md");
   for (const broad of ["Bash(node:*)", "Bash(git -C:*)", "Bash(git:*)", "Bash(printenv:*)"]) assert.ok(!live.includes(broad), `docs/LIVE.md allows ${broad}`);
   assert.ok(!live.includes("rolls back an interrupted update"), "docs/LIVE.md claims update rollback");
+  // U48: the skills read a package kit's version with this exact read-only command, in both forms.
+  for (const rule of ["Bash(node '$K/bin/devtwin.mjs' version)", 'Bash(node "$DEVTWIN_KIT/bin/devtwin.mjs" version)']) assert.ok(live.includes(rule), rule);
 });
 
 // Skill-text checks only; which skills the installer installs is pinned by SKILL_NAMES in src/agents/install.mjs.
@@ -144,7 +147,8 @@ test("bundled skill frontmatter passes skill-builder rules with a one-line descr
 test("bundled skills state the DEVTWIN_KIT validation and pilot-path rules", async () => {
   const common = ["DEVTWIN_KIT", "absolute path", "real path", "bin/devtwin.mjs", "package.json", "devtwin",
     "confirm", "pilot path", "kit checkout", "GATE_REQUIRED", "record publish --apply", "untrusted", "Never send or share",
-    "live config", "~/.devtwin/live.json", "Kit and config confirmed", "`paths check` reports a mismatch", "confirm the pilot path under the same rule as the kit path", "kit commit", ".devtwin-owned.json", "rev-parse HEAD", "warn the user"];
+    "live config", "~/.devtwin/live.json", "Kit and config confirmed", "`paths check` reports a mismatch", "confirm the pilot path under the same rule as the kit path", "kit commit", ".devtwin-owned.json", "rev-parse HEAD", "warn the user",
+    "`kitId`", "`node '<kit>/bin/devtwin.mjs' version`", "only when the receipt has neither"];
   for (const name of BUNDLED_SKILLS) {
     const text = await readBundledSkill(name);
     for (const phrase of common) assert.ok(text.includes(phrase), name + ": " + phrase);

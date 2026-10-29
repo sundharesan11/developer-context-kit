@@ -5,7 +5,7 @@ import { readFile, writeFile, realpath, utimes, readdir, chmod, mkdir, stat } fr
 import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { performance } from "node:perf_hooks";
-import { onboardFixture, draftFor, runCli, fixtureGit, makeRepo, now } from "./helpers.mjs";
+import { onboardFixture, draftFor, runCli, fixtureGit, makeRepo, now, packageKit } from "./helpers.mjs";
 import { main } from "../src/cli.mjs";
 import { applyOnboard, planOnboard } from "../src/onboarding/onboard.mjs";
 import { applyScopeAdd } from "../src/config/store.mjs";
@@ -24,6 +24,9 @@ const BIN = join(import.meta.dirname, "../bin/devtwin.mjs");
 // U46: the session-start line names the running kit, here this checkout.
 const KIT_PART = " Kit: `" + realpathSync(join(import.meta.dirname, "..")) + "`.";
 const KIT_RE = "Kit: `[^`]+`\\. ";
+const KIT = realpathSync(join(import.meta.dirname, ".."));
+// U48: the not-verified line names the kit and the exact verify command to run from it.
+const notVerified = (problem, kit, pilot) => "devtwin hook: kit not verified (" + problem + "); run `node '" + kit + "/bin/devtwin.mjs' hook verify --pilot '" + pilot + "'`. Lessons are off. Kit: `" + kit + "`.";
 const lesson = (requestId, extra = {}, { scope = SCOPE, project = PROJECT } = {}) => {
   const input = draftFor(scope, project, { requestId, kind: "lesson", body: "Do run migrations before seeding the test database.\n" });
   input.draft = { ...input.draft, title: "Migrations before seeds", class: "lesson", reach: "project", match: { paths: ["db/migrations/**"], packages: ["pg"], topics: ["migrations"] }, ...extra };
@@ -237,7 +240,7 @@ test("hook returns empty output with exit 0 for a missing receipt, corrupt index
   const edit = await payload("claude-pre-tool-edit", s.repo);
   assert.deepEqual(Object.values(await hook(s, "claude", "pre-tool", edit)).slice(0, 2), [0, ""]);
   const start = await hook(s, "claude", "session-start", await payload("claude-session-start", s.repo));
-  assert.equal(start.context, "devtwin hook: kit not verified (missing); run `devtwin hook verify`. Lessons are off.");
+  assert.equal(start.context, notVerified("missing", KIT, realpathSync(s.path)));
   // With no receipt, the hook writes nothing under stateRoot.
   await assert.rejects(readdir(join(s.stateRoot, "hooks")), { code: "ENOENT" });
   // An expired receipt, and one for a changed pilot file, are not trusted.
@@ -461,6 +464,36 @@ test("hook drops the confirmation and does not renew after a config edit or a ne
   assert.equal(await s.verifiedAt(), new Date(now().getTime() - 86400000).toISOString(), "no renewal");
   const log = await hookLog(s);
   assert.ok(log.some((entry) => entry.code === "paths-changed"), JSON.stringify(log));
+});
+
+test("hook session start runs the full package kit check before it renews, and calls a changed kit file not verified", async (t) => {
+  const s = await store(t, { receipt: false });
+  const home = join(s.sandbox, "kit-home");
+  await mkdir(join(home, ".devtwin"), { recursive: true });
+  await chmod(join(home, ".devtwin"), 0o700);
+  const pkg = await packageKit(home, join(s.sandbox, "kit-src")), kitRoot = await realpath(pkg.kit);
+  // The receipt names the package kit, as hook verify writes it under a live config.
+  await writeKitReceipt(s.roots, { pilotPath: s.path, kitRoot, now: new Date(now().getTime() - 10 * 86400000) });
+  const receipt = receiptPath(s.stateRoot);
+  await writeFile(receipt, JSON.stringify({ ...JSON.parse(await readFile(receipt, "utf8")), kitId: pkg.kitId }) + "\n");
+  const run = async (args) => { const chunks = []; await main([...args, "--pilot", s.path], { stdout: { write(v) { chunks.push(v); return true; } }, now, env: {}, kitRoot, ownerDialog: () => "approved" }); return JSON.parse(chunks.join("")); };
+  const preview = await run(["paths", "confirm"]);
+  assert.equal(preview.ok, true, JSON.stringify(preview.error));
+  assert.equal((await run(["paths", "confirm", "--apply", "--plan-fingerprint", preview.result.fingerprint])).ok, true);
+  const start = async (at) => {
+    const chunks = [];
+    await main(["hook", "--event", "session-start", "--agent", "claude", "--pilot", s.path], { stdout: { write(v) { chunks.push(v); return true; } }, stdin: JSON.stringify(await payload("claude-session-start", s.repo)), now: () => at, kitRoot });
+    return JSON.parse(chunks.join("")).hookSpecificOutput.additionalContext;
+  };
+  const verifiedAt = async () => JSON.parse(await readFile(receipt, "utf8")).verifiedAt;
+  assert.match(await start(now()), /Kit and config confirmed\.$/);
+  assert.equal(await verifiedAt(), now().toISOString());
+  // A changed file under an untouched manifest: the fast path still passes, the full check before renewal does not.
+  const file = join(kitRoot, "README.md");
+  await chmod(kitRoot, 0o700); await chmod(file, 0o600); await writeFile(file, "changed\n"); await chmod(file, 0o400); await chmod(kitRoot, 0o500);
+  const later = new Date(now().getTime() + 86400000);
+  assert.equal(await start(later), notVerified("kit-changed", kitRoot, realpathSync(s.path)));
+  assert.equal(await verifiedAt(), now().toISOString(), "no renewal");
 });
 
 test("hook warns at session start when the receipt expires within three days and is not renewed", async (t) => {

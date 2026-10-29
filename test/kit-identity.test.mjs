@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { lstatSync } from "node:fs";
-import { mkdir, writeFile, readFile, readdir, rm, symlink, chmod, cp, realpath } from "node:fs/promises";
+import { mkdir, writeFile, readFile, readdir, rm, symlink, link, chmod, cp, realpath } from "node:fs/promises";
 import { sandbox } from "./helpers.mjs";
 import { kitDigest, writeManifest, readManifest, verifyKit, MANIFEST } from "../src/kit/manifest.mjs";
-import { kitId, parseKitId, displayKitId, kitIdentity, identityOfKit, kitsFolder } from "../src/kit/identity.mjs";
+import { kitId, parseKitId, parseKitArg, displayKitId, kitIdentity, identityOfKit, kitsFolder } from "../src/kit/identity.mjs";
 import { assertKit } from "../src/config/pilot.mjs";
 import { receiptProblem, receiptPath } from "../src/hooks/receipt.mjs";
 import { currentPaths, confirmationState, confirmedPath } from "../src/paths/confirm.mjs";
@@ -242,4 +242,20 @@ test("paths confirm records the kitId of a package kit, and a saved Git confirma
   assert.equal((await confirmationState(stateRoot, { pilotPath, kitRoot: pkg })).state, "mismatch");
   await save({ schemaVersion: 2, kitRoot: pkg, kitHead: COMMIT, kitRef: null, pilotPath: values.pilotPath, pilotSha256: values.pilotSha256 });
   assert.equal((await confirmationState(stateRoot, { pilotPath, kitRoot: pkg })).state, "invalid");
+});
+
+test("package kit with a file hard-linked to another file fails with GATE_REQUIRED", async (t) => {
+  const k = await packageKit(t);
+  const outside = join(k.sb, "outside.mjs"), file = join(k.kit, "src/a.mjs");
+  await writeFile(outside, await readFile(file, "utf8"));
+  await k.edit(async () => { await rm(file); await link(outside, file); });
+  assert.throws(() => k.check(), gate("live.kitRoot", "hardlink"));
+  assert.throws(() => verifyKit(k.kit), (e) => e.code === "DEVTWIN_GATE_REQUIRED" && e.details.reason === "hardlink");
+  await k.edit(async () => { await rm(file); await writeFile(file, await readFile(outside, "utf8")); });
+  assert.doesNotThrow(() => k.check());
+});
+
+test("parseKitArg reads a --kit value as <version>+<64 hex> and nothing else", () => {
+  assert.deepEqual(parseKitArg(VERSION + "+" + DIGEST), { kind: "package", version: VERSION, digest: DIGEST });
+  for (const bad of [undefined, null, 1, "", VERSION, VERSION + "+" + DIGEST.slice(0, 12), VERSION + "+sha256:" + DIGEST, "1.0+" + DIGEST, VERSION + "+" + DIGEST + "+x", "npm:" + VERSION + "+" + DIGEST]) assert.equal(parseKitArg(bad), null, String(bad));
 });

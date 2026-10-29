@@ -13,7 +13,7 @@ import { RUN_ID } from "../storage/runs.mjs";
 import { recordInventory, INVENTORY } from "./inventory.mjs";
 import { isHookKind, isHookJournal, hookJournalFinished, hookRecoveryFor } from "./hooks-install.mjs";
 import { LEGACY_SKILL_NAMES, LEGACY_SKILL_PREFIX, LEGACY_RECEIPT, isLegacySkill } from "../config/legacy.mjs";
-import { kitId, kitIdentity, parseKitId } from "../kit/identity.mjs";
+import { kitId, kitIdentity, parseKitId, COMMIT } from "../kit/identity.mjs";
 export const AGENT_HOMES = { claude: ".claude/skills", codex: ".agents/skills" };
 // Earlier releases wrote Codex skills here. Status reports leftovers; nothing ever acts on them.
 export const LEGACY_HOMES = { codex: ".codex/skills" };
@@ -109,7 +109,7 @@ const validKitId = (value) => { if (value === null) return true; try { parseKitI
 function receiptShape(pilot, receipt, skill) {
   return isObject(receipt) && Object.hasOwn(RECEIPT_KEYS, receipt.schemaVersion) && canonicalJson(Object.keys(receipt).sort()) === canonicalJson(RECEIPT_KEYS[receipt.schemaVersion])
     && (receipt.schemaVersion === 2 || validKitId(receipt.kitId)) && receipt.kind === KIND && receipt.skill === skill && receipt.configId === configIdOf(pilot) && RUN_ID.test(receipt.runId ?? "")
-    && (receipt.kitCommit === null || /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(receipt.kitCommit ?? ""))
+    && (receipt.kitCommit === null || COMMIT.test(receipt.kitCommit ?? ""))
     && isObject(receipt.files) && canonicalJson(Object.keys(receipt.files)) === canonicalJson([SKILL]) && /^sha256:[0-9a-f]{64}$/.test(receipt.files[SKILL]);
 }
 async function observe(pilot, owned, dir, skill, mode) {

@@ -92,12 +92,13 @@ GitHub repository visibility is a separate setting. A local license change neith
 
 `.github/workflows/release.yml` publishes devtwin to npm. Only a pushed tag that starts with `v` starts it. It has no manual or pull-request trigger.
 
-The workflow has two jobs:
+The workflow has three jobs:
 
 1. The gate job runs on macOS 15 with Node 22.13.0 and 26.4.0. It checks that the tag equals `v` plus the `package.json` version. Next, it runs the package audit, the writing check, the full suite and the pack smoke test. Last, it computes the kit digest of the packed tarball with `scripts/kit-digest.mjs`.
-2. The publish job waits for the owner's approval in the `npm-release` environment. It installs npm 11.21.1, packs the package and compares the kit digest with the gate's digest. It publishes that tarball with provenance under the `alpha` dist-tag, or `next` for a version without a prerelease part. Last, it creates a draft GitHub release with the version, the source commit and the kit digest.
+2. The publish job waits for the owner's approval in the `npm-release` environment. It installs npm 11.21.1, packs the package and compares the kit digest with the gate's digest. It publishes that tarball with provenance under the `alpha` dist-tag, or `next` for a version without a prerelease part.
+3. The release job runs after the publish job. It creates a draft GitHub release with the version, the source commit and the kit digest. When a release for the tag exists, it does nothing.
 
-Only the publish job has the `id-token: write` permission, which trusted publishing needs. The publish job uses Node 26.4.0, because trusted publishing needs Node 22.14.0 or later and npm 11.5.1 or later. The workflow never writes the default dist-tag, `latest`.
+Only the publish job has the `id-token: write` permission, which trusted publishing needs. Only the release job has `contents: write`. The publish job uses Node 26.4.0, because trusted publishing needs Node 22.14.0 or later and npm 11.5.1 or later. The workflow never writes the default dist-tag, `latest`.
 
 ### Owner one-time steps
 
@@ -123,7 +124,7 @@ The owner does each step and approves each change on npm or GitHub.
 
 A deprecated version still installs when its dist-tag names it. Until `latest` moves, `npm i devtwin` installs the placeholder and shows the deprecation message. Install with `npm i -g devtwin@alpha`.
 
-A failed publish changes nothing on npm. Run the failed jobs again from the same tag. If the publish passed but the draft release failed, create the draft by hand with the digest from the gate job's log.
+A failed publish changes nothing on npm. Run the failed jobs again from the same tag. If the publish passed but the release job failed, run the release job again alone. It does not publish again. If it still fails, create the draft by hand with the digest from the gate job's log.
 
 ### Moving latest
 

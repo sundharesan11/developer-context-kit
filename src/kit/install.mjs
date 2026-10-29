@@ -1,7 +1,7 @@
 // U44 (KTD1, KTD4, KTD5): kit install copies the running package's runtime set into <home>/.devtwin/kits/<version>-
 // <digest12>, a locked folder checked against its digest. Nothing runs from it until live set-kit pins it, so there is no
 // owner dialog; the hook still denies kit install --apply from agent shells. kit list shows the folders and the pinned one.
-import { constants, chmodSync, closeSync, fstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmdirSync, unlinkSync, writeSync, fsyncSync } from "node:fs";
+import { constants, chmodSync, closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmdirSync, unlinkSync, writeSync, fsyncSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
@@ -15,6 +15,27 @@ import { gitCommit } from "./version.mjs";
 const KIT = resolve(import.meta.dirname, "../..");
 // A folder being staged, or left by an interrupted install. kit list and assertKit never name it.
 export const TEMP_PREFIX = ".tmp-";
+// One apply at a time per kits folder: the lock is held from the stale temp cleanup to the final check, so a run never
+// removes the folder another run is staging. A lock older than LOCK_STALE_MS was left by a killed run and is replaced.
+export const INSTALL_LOCK = ".install.lock";
+const LOCK_STALE_MS = 10 * 60 * 1000;
+function takeLock(kits) {
+  const path = join(kits, INSTALL_LOCK);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let fd;
+    try { fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600); }
+    catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      const node = info(path);
+      if (attempt === 0 && node && Date.now() - node.mtimeMs > LOCK_STALE_MS) { removeTree(path); continue; }
+      throw new DevtwinError("CONFLICT", "Another kit install is running", { field: "kits", reason: "install-running" });
+    }
+    try { writeSync(fd, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }) + "\n"); fsyncSync(fd); } finally { closeSync(fd); }
+    const own = lstatSync(path);
+    // Removes the lock only while the path still names this run's file.
+    return () => { try { const now = lstatSync(path); if (now.dev === own.dev && now.ino === own.ino) unlinkSync(path); } catch { /* Already gone. */ } };
+  }
+}
 const corrupt = (kitRoot, error) => new DevtwinError("KIT_CORRUPT", "Kit folder present but does not verify", { kitRoot, reason: error.details?.reason ?? null });
 // The KTD4 lock: files 0400, an executable file (only bin/devtwin.mjs in a release) 0500, folders 0500 deepest-first.
 function lockTree(path) {
@@ -73,14 +94,20 @@ function present(target, identity, home) {
   return true;
 }
 export const planKitInstall = (ctx = {}) => prepare(ctx).plan;
+// ctx.faults.beforeCopy is a test seam: it runs after the plan, before the first copy.
 export async function applyKitInstall(ctx = {}) {
   const { plan, source, kits, identity, sourceCommit } = prepare(ctx), home = ctx.home ?? homedir();
   if (plan.status === "present") return plan;
   ensurePrivateDir(kits);
+  const release = takeLock(kits);
+  try { return await install({ plan, source, kits, identity, sourceCommit, home, faults: ctx.faults ?? {} }); } finally { release(); }
+}
+async function install({ plan, source, kits, identity, sourceCommit, home, faults }) {
   for (const name of readdirSync(kits)) if (name.startsWith(TEMP_PREFIX)) removeTree(join(kits, name));
   const temp = join(kits, TEMP_PREFIX + randomBytes(8).toString("hex"));
   mkdirSync(temp, { mode: 0o700 });
   try {
+    if (faults.beforeCopy) await faults.beforeCopy();
     for (const rel of listRuntimeFiles(source)) copyFile(join(source, rel), join(temp, rel));
     const manifest = await writeManifest(temp, { sourceCommit });
     // The folder name comes from the plan's digest, so a source that changed while it was copied is refused.

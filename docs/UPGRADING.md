@@ -107,6 +107,8 @@ Until the batch runs, the hook lines and job files still name the old kit. The l
 
 A rollback pins an earlier kit folder again. `kit install` never deletes a folder, so each earlier release stays in `~/.devtwin/kits/`.
 
+Once the live config names a package kit, a kit from before 0.1.0-alpha.1 cannot load it: those kits do not know the `kitVersion` and `kitDigest` fields. A rollback therefore goes to a kit from 0.1.0-alpha.1 or later.
+
 1. List the kit folders and find the earlier one:
 
    ```sh
@@ -151,7 +153,9 @@ The clone stays on disk. To go back, run `live set-kit` from the clone with its 
 node ~/.devtwin/kit/bin/devtwin.mjs live set-kit --pilot "$LIVE_CONFIG" --commit '<commit>'
 ```
 
-The clone must still be clean and detached at that commit. Then run one setup batch.
+The clone must still be clean and detached at that commit, and the commit must be from 0.1.0-alpha.1 or later. Then run one setup batch.
+
+`live set-kit --commit` and `live migrate` run in the kit you start them from. The global command does not forward them to the pinned kit, so start them with the clone's own `bin/devtwin.mjs`.
 
 ## Node versions and nvm
 

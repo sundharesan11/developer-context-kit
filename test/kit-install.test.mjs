@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { lstatSync, existsSync } from "node:fs";
-import { mkdir, writeFile, readFile, readdir, symlink, chmod } from "node:fs/promises";
+import { mkdir, writeFile, readFile, readdir, symlink, chmod, utimes } from "node:fs/promises";
 import { sandbox, runCli } from "./helpers.mjs";
 import { readManifest, kitDigest, MANIFEST } from "../src/kit/manifest.mjs";
 import { kitId, displayKitId } from "../src/kit/identity.mjs";
@@ -186,4 +186,53 @@ test("kit list shows each kit folder, its kitId, whether it verifies and which o
   }
   // A named config that cannot be read is an error, not an unpinned list.
   assert.equal((await f.cli(["list", "--pilot", join(f.home, "missing.json")])).code, 1);
+});
+
+test("kit install --apply holds an install lock: a fresh lock refuses a second run and keeps its temp folder, a stale one is replaced", async (t) => {
+  const f = await fixture(t);
+  await mkdir(f.kits, { mode: 0o700 });
+  const lockPath = join(f.kits, ".install.lock"), temp = join(f.kits, ".tmp-0123456789abcdef");
+  await mkdir(temp, { mode: 0o700 });
+  await writeFile(lockPath, JSON.stringify({ pid: 1, at: new Date().toISOString() }), { mode: 0o600 });
+  const held = await f.cli(["install", "--apply"]);
+  assert.equal(held.code, 1);
+  assert.equal(held.json.error.code, "DEVTWIN_CONFLICT");
+  assert.equal(held.json.error.details.reason, "install-running");
+  assert.ok(existsSync(temp), "another run's temp folder stays");
+  assert.ok(existsSync(lockPath), "another run's lock stays");
+  // kit list ignores the lock file.
+  assert.deepEqual((await f.cli(["list"])).json.result.kits, []);
+  const old = new Date(Date.now() - 11 * 60000);
+  await utimes(lockPath, old, old);
+  const r = await f.cli(["install", "--apply"]);
+  assert.equal(r.code, 0, JSON.stringify(r.json));
+  assert.deepEqual(await readdir(f.kits), [f.name], "the stale lock and temp folder are gone");
+});
+
+test("kit install refuses a source that changed while it was copied and leaves no kit or temp folder", async (t) => {
+  const f = await fixture(t);
+  const { applyKitInstall } = await import("../src/kit/install.mjs");
+  const faults = { beforeCopy: () => writeFile(join(f.src, "src/a.mjs"), "export const a = 2;\n") };
+  await assert.rejects(applyKitInstall({ home: f.home, kitRoot: f.src, faults }), (e) => e.code === "DEVTWIN_INTEGRITY");
+  assert.deepEqual(await readdir(f.kits), []);
+});
+
+test("kit install refuses a tampered folder that appears at the target while it copies, and leaves it untouched", async (t) => {
+  const f = await fixture(t);
+  const { applyKitInstall } = await import("../src/kit/install.mjs");
+  const faults = { beforeCopy: async () => { await mkdir(f.kit, { mode: 0o700 }); await writeFile(join(f.kit, "other.txt"), "other\n"); } };
+  await assert.rejects(applyKitInstall({ home: f.home, kitRoot: f.src, faults }), (e) => e.code === "DEVTWIN_KIT_CORRUPT" && e.details.kitRoot === f.kit);
+  assert.deepEqual(await readdir(f.kits), [f.name]);
+  assert.deepEqual(await readdir(f.kit), ["other.txt"]);
+  assert.equal(await readFile(join(f.kit, "other.txt"), "utf8"), "other\n");
+});
+
+test("kit install records a 40-hex gitHead from package.json as the manifest sourceCommit, and null for any other value", async (t) => {
+  for (const [gitHead, want] of [["a".repeat(40), "a".repeat(40)], ["a".repeat(39), null], ["HEAD", null]]) {
+    const f = await fixture(t);
+    await writeFile(join(f.src, "package.json"), JSON.stringify({ name: "devtwin", version: VERSION, gitHead }) + "\n");
+    const r = await f.cli(["install", "--apply"]);
+    assert.equal(r.code, 0, JSON.stringify(r.json));
+    assert.equal(readManifest(r.json.result.kitRoot).sourceCommit, want, gitHead);
+  }
 });

@@ -57,15 +57,17 @@ export async function writeManifest(root, options) {
   await writeNewFile(join(root, MANIFEST), JSON.stringify(manifest, null, 2) + "\n");
   return manifest;
 }
-// The full check: every entry under root is a plain file or folder (check(path, node, rel) sees each, root first), the
-// files are exactly the manifest's plus the manifest, the runtime set is exactly the manifest's list and the digest
-// recomputes. lstat is a test seam for the owner checks. Throws GATE_REQUIRED with the reason; returns the manifest.
+// The full check: every entry under root is a plain file with one link or a folder (check(path, node, rel) sees each,
+// root first), the files are exactly the manifest's plus the manifest, the runtime set is exactly the manifest's list
+// and the digest recomputes. lstat is a test seam for the owner checks. Throws GATE_REQUIRED with the reason; returns the manifest.
 export function verifyKit(root, { lstat = lstatSync, check = () => {}, field = "kitRoot" } = {}) {
   const files = [];
   const visit = (rel) => {
     const path = rel ? join(root, rel) : root, node = lstat(path);
     if (node.isSymbolicLink()) refuse("link", field);
     if (!node.isDirectory() && !node.isFile()) refuse("special", field);
+    // A hard-linked file shares its bytes with a path outside the kit, which a write there would change.
+    if (node.isFile() && node.nlink !== 1) refuse("hardlink", field);
     check(path, node, rel);
     if (node.isFile()) return files.push(rel);
     const names = readdirSync(path);

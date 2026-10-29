@@ -9,12 +9,11 @@ import { ensureRoots, validateRoot } from "./roots.mjs";
 import { info, checkNode, ensurePrivateDir, writeNewFile, atomicReplace, fsyncDir } from "../storage/fsx.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
-import { identityOfKit, kitIdentity, kitFields, kitId, displayKitId, kitsFolder, DIGEST, VERSION } from "../kit/identity.mjs";
+import { identityOfKit, kitIdentity, kitFields, kitId, displayKitId, kitsFolder, parseKitArg, COMMIT } from "../kit/identity.mjs";
 // The running kit. Tests inject ctx.kitRoot; production derives it from this file, as pilot.mjs does.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const AGENTS = ["claude", "codex"];
 export const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live", "writeClasses", "exceptions", "approval"];
-const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const KIT_FIELDS = ["kitCommit", "kitVersion", "kitDigest"];
 // Stands in for the config ID while a new config is validated; apply draws the real ID once.
 const PENDING_ID = "cfg_pending0000";
@@ -147,9 +146,7 @@ const addRepo = (repo) => (before) => {
 function requestedKit(input) {
   if ((input.commit === undefined) === (input.kit === undefined)) invalid("kit");
   if (input.commit !== undefined) return typeof input.commit === "string" && COMMIT.test(input.commit) ? { kind: "git", commit: input.commit } : invalid("commit");
-  const parts = typeof input.kit === "string" ? input.kit.split("+") : [];
-  if (parts.length !== 2 || !VERSION.test(parts[0]) || !DIGEST.test(parts[1])) invalid("kit");
-  return { kind: "package", version: parts[0], digest: parts[1] };
+  return parseKitArg(input.kit) ?? invalid("kit");
 }
 const kitEnd = (kitRoot, identity) => ({ kitRoot, ...kitFields(identity), kitId: kitId(identity) });
 function setKit(input, ctx) {

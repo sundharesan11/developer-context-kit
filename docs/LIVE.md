@@ -371,7 +371,7 @@ node "$KIT/bin/devtwin.mjs" paths confirm --pilot "$LIVE_CONFIG" --apply --plan-
 
 - The apply shows the owner dialog with both paths. It writes `store/state/confirmed-paths.json`: the real paths of the kit and the live config, the SHA-256 of the config and the kit's identity. For a Git kit, that is its `.git/HEAD` and the commit of the branch it names. For a package kit, it is the `kitId` from the kit's manifest. The setup step `paths-confirm` runs the same command.
 - This is an owner action. The devtwin hook denies `paths confirm --apply` from an agent shell.
-- At each session start, the hook compares these values with small file reads, with no Git process and no lock. The line names the pinned kit as ``Kit: `<path>` ``, and the skills run the CLI from that path. While the values match, the line ends with "Kit and config confirmed." and the hook moves the receipt's `verifiedAt` to now. You do not need to run `hook verify` each week.
+- At each session start, the hook compares these values with small file reads, with no Git process and no lock. The line names the pinned kit as ``Kit: `<path>` ``, and the skills run the CLI from that path. While the values match, the line ends with "Kit and config confirmed." and the hook moves the receipt's `verifiedAt` to now. For a package kit, the hook first checks every file of the kit against its digest. If a file changed, the line says `kit not verified` and the receipt is not renewed. You do not need to run `hook verify` each week.
 - A kit upgrade or a config change ends the confirmation. The line then says that the kit or the config changed, and skills ask for the paths again. Run `paths confirm` again after you check the new paths.
 - `paths check --pilot "$LIVE_CONFIG"` is read-only. It reports `match` or `mismatch` for each value.
 - The receipt lasts 30 days. When it is not renewed and expires within three days, the session-start line says so. Run `hook verify`, or confirm the paths.
@@ -449,12 +449,12 @@ Claude, with read tools and only the exact shell commands the checks need. Never
 
 Pipe the prompt on stdin. `--allowedTools` takes several values, so a prompt placed after it is read as another tool rule. Then `claude -p` fails with "Input must be provided either through stdin or as a prompt argument".
 
-The skills run the CLI as `node '<kit>/bin/devtwin.mjs'`, with the kit's real path from the session-start line. They check a Git kit's commit with `git -C '<kit>' rev-parse HEAD`. A session without that line falls back to the literal `"$DEVTWIN_KIT"` form. The list therefore names both forms of exactly these read-only commands. Replace `<kit real path>` with the output of `realpath "$KIT"`.
+The skills run the CLI as `node '<kit>/bin/devtwin.mjs'`, with the kit's real path from the session-start line. They check a Git kit's commit with `git -C '<kit>' rev-parse HEAD`, and a package kit's version and digest with `node '<kit>/bin/devtwin.mjs' version`. A session without that line falls back to the literal `"$DEVTWIN_KIT"` form. The list therefore names both forms of exactly these read-only commands. Replace `<kit real path>` with the output of `realpath "$KIT"`.
 
 ```sh
 K='<kit real path>'
-ALLOWED="Read,Glob,Grep,Bash(printenv DEVTWIN_KIT),Bash(realpath:*),Bash(git -C '$K' rev-parse HEAD),Bash(node '$K/bin/devtwin.mjs' context resolve:*),Bash(node '$K/bin/devtwin.mjs' context brief:*),Bash(node $K/bin/devtwin.mjs context resolve:*),Bash(node $K/bin/devtwin.mjs context brief:*)"
-ALLOWED="$ALLOWED"',Bash(git -C "$DEVTWIN_KIT" rev-parse HEAD),Bash(node "$DEVTWIN_KIT/bin/devtwin.mjs" context resolve:*),Bash(node "$DEVTWIN_KIT/bin/devtwin.mjs" context brief:*)'
+ALLOWED="Read,Glob,Grep,Bash(printenv DEVTWIN_KIT),Bash(realpath:*),Bash(git -C '$K' rev-parse HEAD),Bash(node '$K/bin/devtwin.mjs' version),Bash(node '$K/bin/devtwin.mjs' context resolve:*),Bash(node '$K/bin/devtwin.mjs' context brief:*),Bash(node $K/bin/devtwin.mjs context resolve:*),Bash(node $K/bin/devtwin.mjs context brief:*)"
+ALLOWED="$ALLOWED"',Bash(git -C "$DEVTWIN_KIT" rev-parse HEAD),Bash(node "$DEVTWIN_KIT/bin/devtwin.mjs" version),Bash(node "$DEVTWIN_KIT/bin/devtwin.mjs" context resolve:*),Bash(node "$DEVTWIN_KIT/bin/devtwin.mjs" context brief:*)'
 printf '%s\n' '<prompt>' | claude -p --setting-sources user --allowedTools "$ALLOWED"
 ```
 
@@ -466,7 +466,7 @@ Codex, in its read-only sandbox:
 codex exec --sandbox read-only --skip-git-repo-check '<prompt>'
 ```
 
-Pass when each session lists `devtwin-onboard`, `devtwin-record` and `devtwin-resume`, runs `context resolve` from the pinned kit path, and names the onboarded project. A session without the hook line uses `DEVTWIN_KIT` instead. A kit-commit warning means the installed skills came from another commit than the one at `<kit>`; stop and find out why. A package kit has no commit in the receipt, so the skills skip that check. Save the transcripts under `~/.devtwin/store/state/evidence/`.
+Pass when each session lists `devtwin-onboard`, `devtwin-record` and `devtwin-resume`, runs `context resolve` from the pinned kit path, and names the onboarded project. A session without the hook line uses `DEVTWIN_KIT` instead. A kit warning means the installed skills came from another kit than the one at `<kit>`; stop and find out why. For a package kit, the skills compare the receipt's `kitId` with the version and digest that `version` prints instead. Save the transcripts under `~/.devtwin/store/state/evidence/`.
 
 ## 16. Interactive sessions
 
@@ -492,7 +492,7 @@ Then reinstall with a fresh preview and approval (step 13), and repeat a fresh-s
 
 ## Upgrading the kit
 
-For a package kit, follow [Upgrading](UPGRADING.md): install the new release, `kit install`, `live set-kit --kit`, then one setup batch. A rollback is `live set-kit` to an earlier kit folder, then one batch. The same guide moves a Git-clone setup to a package kit.
+For a package kit, follow [Upgrading](UPGRADING.md): install the new release, `kit install`, `live set-kit --kit`, then one setup batch. A rollback is `live set-kit` to an earlier kit folder from 0.1.0-alpha.1 or later, then one batch. Older kits cannot load a live config that names a package kit. The same guide moves a Git-clone setup to a package kit.
 
 `live set-kit` takes `--commit <sha>` for a Git kit or `--kit <version>+<digest>` for a package kit, never both. It runs from the new kit. Its apply shows the owner dialog "Change the kit devtwin runs". The dialog names the old and new kit IDs and folders. For a package kit, it also asks you to compare the digest with the one in the GitHub release for that version. The devtwin hook denies `live set-kit --apply` from an agent shell.
 
