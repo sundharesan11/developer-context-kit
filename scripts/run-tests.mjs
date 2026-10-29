@@ -19,7 +19,13 @@ for await (const ev of run({ files, concurrency: 1 })) {
   if (ev.type === "test:pass") {
     if (ev.data.skip || ev.data.todo) problems.push(`skipped or todo: ${ev.data.name}`);
     else passed.set(ev.data.name, (passed.get(ev.data.name) ?? 0) + 1);
-  } else if (ev.type === "test:fail") { failed++; problems.push(`failed: ${ev.data.name}`); }
+  } else if (ev.type === "test:fail") {
+    // The error's code and first message line, so a CI log says why a test failed, not only which.
+    const error = ev.data.details?.error?.cause ?? ev.data.details?.error;
+    const where = error?.details && typeof error.details === "object" ? [error.details.field, error.details.reason].filter(Boolean).join("/") : "";
+    const why = [error?.code, where, String(error?.message ?? "").split("\n")[0]].filter(Boolean).join(" ").slice(0, 300);
+    failed++; problems.push(`failed: ${ev.data.name}` + (why ? ` (${why})` : ""));
+  }
 }
 for (const name of required) if (!passed.has(name)) problems.push(`required test did not pass: ${name}`);
 console.log(JSON.stringify({ ok: problems.length === 0, files: files.length, passed: [...passed.values()].reduce((x, y) => x + y, 0), failed, problems }));
