@@ -195,7 +195,7 @@ const scheduleDialog = (plan) => ({ title: plan.action === "install" ? "Turn on 
 export async function applySchedule(roots, { scope, off = false }, { fingerprint, now = () => new Date(), ctx = {} } = {}) {
   const plan = await planSchedule(roots, { scope, off }, ctx);
   assertFingerprint(plan, fingerprint);
-  await requireOwnerApproval(ctx, scheduleDialog(plan));
+  await requireOwnerApproval(ctx, scheduleDialog(plan), { fingerprint: plan.fingerprint });
   return withHubLock(roots, async () => {
     const binding = await requireJoined(roots, plan.scope);
     if (plan.action === "remove") {

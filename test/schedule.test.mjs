@@ -291,14 +291,41 @@ test("the runs of one job share one request budget and one answer for each sourc
 });
 
 test("job plists pin the stable Homebrew node shim, not the versioned Cellar path", () => {
-  const cellar = "/opt/homebrew/Cellar/node/26.1.0/bin/node", real = { "/opt/homebrew/bin/node": cellar, "/usr/local/bin/node": "/usr/local/Cellar/node/24.0.0/bin/node" };
+  const cellar = "/opt/homebrew/Cellar/node/26.1.0/bin/node";
+  const real = { "/opt/homebrew/bin/node": cellar, "/usr/local/bin/node": "/usr/local/Cellar/node/24.0.0/bin/node",
+    "/usr/local/opt/node@22/bin/node": "/usr/local/Cellar/node@22/22.9.0/bin/node" };
   const lookup = (over = {}) => ({ execPath: cellar, realpath: (path) => { if (!real[path]) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); return real[path]; }, isFile: () => true, ...over });
   assert.equal(stableNodePath(lookup()), "/opt/homebrew/bin/node", "the shim of the same prefix");
-  assert.equal(stableNodePath(lookup({ execPath: "/usr/local/Cellar/node@22/22.9.0/bin/node" })), "/usr/local/bin/node");
   assert.equal(stableNodePath(lookup({ execPath: "/opt/nvm/versions/node/v24.0.0/bin/node" })), "/opt/nvm/versions/node/v24.0.0/bin/node", "not a Cellar path: execPath stays");
   assert.equal(stableNodePath(lookup({ realpath: () => { throw new Error("ENOENT"); } })), cellar, "no shim: execPath stays");
   assert.equal(stableNodePath(lookup({ realpath: () => "/opt/homebrew/bin/python3" })), cellar, "a shim that is not node is not used");
   assert.equal(stableNodePath(lookup({ isFile: () => false })), cellar, "a shim whose target is not a file is not used");
+  assert.equal(stableNodePath(lookup({ realpath: () => "/opt/homebrew/Cellar/node/../../../tmp/bin/node" })), cellar, "a target outside the formula's Cellar folder is not used");
+});
+
+test("the job node path is the link of the same prefix and formula, never another install", () => {
+  const files = {
+    "/opt/homebrew/bin/node": "/opt/homebrew/Cellar/node@20/20.1.0/bin/node",
+    "/opt/homebrew/opt/node@22/bin/node": "/opt/homebrew/Cellar/node@22/22.9.0/bin/node",
+    "/usr/local/opt/node@22/bin/node": "/usr/local/Cellar/node@24/24.0.0/bin/node",
+    "/usr/local/bin/node": "/usr/local/Cellar/node/24.0.0/bin/node"
+  };
+  const lookup = (execPath, real = files) => ({ execPath, realpath: (path) => { if (!real[path]) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); return real[path]; }, isFile: () => true });
+  // node@NN uses <prefix>/opt/node@NN/bin/node when it leads to the same formula.
+  assert.equal(stableNodePath(lookup("/opt/homebrew/Cellar/node@22/22.9.0/bin/node")), "/opt/homebrew/opt/node@22/bin/node");
+  // The old fallback picked /usr/local/bin/node for a node@22 under /usr/local: another formula, so execPath stays.
+  const old = "/usr/local/Cellar/node@22/22.9.0/bin/node";
+  assert.equal(stableNodePath(lookup(old)), old, "the opt link leads to another formula");
+  // A link of the same prefix that leads to another formula or version line is not used.
+  assert.equal(stableNodePath(lookup("/opt/homebrew/Cellar/node/26.1.0/bin/node")), "/opt/homebrew/Cellar/node/26.1.0/bin/node", "bin/node leads to node@20");
+  // No link in the same prefix: execPath stays, even when another prefix has one.
+  assert.equal(stableNodePath(lookup("/srv/brew/Cellar/node/24.0.0/bin/node")), "/srv/brew/Cellar/node/24.0.0/bin/node", "missing shim in the same prefix");
+  assert.equal(stableNodePath(lookup("/usr/local/Cellar/node/24.0.0/bin/node")), "/usr/local/bin/node", "the same prefix and formula");
+});
+
+test("job and hub sync plists use the stable node path; hook lines run plain node", () => {
+  const cellar = "/opt/homebrew/Cellar/node/26.1.0/bin/node", real = { "/opt/homebrew/bin/node": cellar };
+  const lookup = (over = {}) => ({ execPath: cellar, realpath: (path) => { if (!real[path]) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); return real[path]; }, isFile: () => true, ...over });
   // The radar, review and backup jobs and the hub sync job all use it; the hook lines run plain node from PATH.
   const ctx = { kitRoot: "/k", nodeLookup: lookup(), pilot: { path: "/c/live.json" } };
   assert.equal(jobArguments(ctx, "/c/live.json", "backup-daily")[0], "/opt/homebrew/bin/node");

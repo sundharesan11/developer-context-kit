@@ -81,7 +81,7 @@ export async function applyConfirm(ctx, fingerprint) {
   ctx = { ...ctx, projection: undefined };
   const plan = planConfirm(ctx);
   assertFingerprint(plan, fingerprint);
-  await (await import("../owner/dialog.mjs")).requireOwnerApproval(ctx, dialogFor(plan));
+  await (await import("../owner/dialog.mjs")).requireOwnerApproval(ctx, dialogFor(plan), { fingerprint: plan.fingerprint });
   // The config may have changed while the dialog was open.
   assertFingerprint(planConfirm(ctx), fingerprint);
   assertWritable(ctx.roots, [plan.file]);

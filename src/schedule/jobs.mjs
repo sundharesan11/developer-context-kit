@@ -112,7 +112,7 @@ const dialogFor = (plan) => ({ title: plan.mode === "on" ? "Turn on the " + plan
 export async function applySchedule(roots, input, { fingerprint, now = () => new Date(), ctx = {} } = {}) {
   const plan = await planSchedule(roots, input, ctx);
   assertFingerprint(plan, fingerprint);
-  await requireOwnerApproval(ctx, dialogFor(plan));
+  await requireOwnerApproval(ctx, dialogFor(plan), { fingerprint: plan.fingerprint });
   return withPilotLock(roots, lockPath(roots), { kind: "schedule-apply" }, async () => {
     const state = await readJobs(roots), results = [];
     for (const action of plan.actions) {

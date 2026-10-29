@@ -287,7 +287,8 @@ Approve 12 setup changes
 - The radar jobs join the batch only after the stack approval in [Turn on the radar](#turn-on-the-radar). The advisory job needs the radar job on, so it joins a later batch.
 - If a step changed after your approval, the batch stops with `DEVTWIN_STALE_VERSION`. The error lists `done` and `notRun`. Preview again for the rest.
 - `instructions apply` and `backup key export` keep their own dialog. So does `hub join`.
-- The hook denies `setup apply --all-pending` and `setup apply --steps` from an agent shell.
+- The hook denies `setup apply --all-pending` and `setup apply --steps` from an agent shell. From an agent shell it allows `setup apply` only with one `--step` that is not an owner step. A command that names devtwin and `setup` or an owner action is denied too when it holds a shell expansion such as `${`, `$(`, `$'`, `$"` or a backtick.
+- A step whose path cannot be approved, such as a symlinked settings file, leaves the batch with a reason. The other steps still run under the one dialog.
 
 The per-step commands below stay as the alternative. Each one asks on its own.
 
