@@ -13,6 +13,7 @@ import { RUN_ID } from "../storage/runs.mjs";
 import { recordInventory, INVENTORY } from "./inventory.mjs";
 import { isHookKind, isHookJournal, hookJournalFinished, hookRecoveryFor } from "./hooks-install.mjs";
 import { LEGACY_SKILL_NAMES, LEGACY_SKILL_PREFIX, LEGACY_RECEIPT, isLegacySkill } from "../config/legacy.mjs";
+import { kitId, kitIdentity, parseKitId } from "../kit/identity.mjs";
 export const AGENT_HOMES = { claude: ".claude/skills", codex: ".agents/skills" };
 // Earlier releases wrote Codex skills here. Status reports leftovers; nothing ever acts on them.
 export const LEGACY_HOMES = { codex: ".codex/skills" };
@@ -24,6 +25,8 @@ const KNOWN_SKILLS = [...SKILL_NAMES, ...LEGACY_SKILL_NAMES];
 const WRITES = ["create", "update", "remove"];
 const KIT = fileURLToPath(new URL("../..", import.meta.url));
 const configIdOf = (pilot) => pilot.live?.configId ?? null;
+// U45: the live kit's kitId (git:<sha> or npm:<version>+sha256:<digest>), null for a disposable pilot.
+const kitIdOf = (pilot) => pilot.live ? kitId(kitIdentity(pilot.live)) : null;
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const lockPath = (roots) => join(roots.stateRoot, "locks", "install.lock");
 const entryPaths = (path, skill) => [path, join(path, SKILL), join(path, receiptOf(skill))];
@@ -100,9 +103,12 @@ function ledger(pilot, journals) {
     return Boolean(journal) && journal.completed.some((e) => e.path === path && ["create", "update"].includes(e.status) && canonicalJson(e.receipt) === canonicalJson(receipt));
   };
 }
+// U45: schema 3 adds kitId, so a receipt from a package kit names its kit; schema 2 (kitCommit only) still reads.
+const RECEIPT_KEYS = { 2: ["configId", "files", "kind", "kitCommit", "runId", "schemaVersion", "skill"], 3: ["configId", "files", "kind", "kitCommit", "kitId", "runId", "schemaVersion", "skill"] };
+const validKitId = (value) => { if (value === null) return true; try { parseKitId(value); return true; } catch { return false; } };
 function receiptShape(pilot, receipt, skill) {
-  return isObject(receipt) && canonicalJson(Object.keys(receipt).sort()) === canonicalJson(["configId", "files", "kind", "kitCommit", "runId", "schemaVersion", "skill"])
-    && receipt.schemaVersion === 2 && receipt.kind === KIND && receipt.skill === skill && receipt.configId === configIdOf(pilot) && RUN_ID.test(receipt.runId ?? "")
+  return isObject(receipt) && Object.hasOwn(RECEIPT_KEYS, receipt.schemaVersion) && canonicalJson(Object.keys(receipt).sort()) === canonicalJson(RECEIPT_KEYS[receipt.schemaVersion])
+    && (receipt.schemaVersion === 2 || validKitId(receipt.kitId)) && receipt.kind === KIND && receipt.skill === skill && receipt.configId === configIdOf(pilot) && RUN_ID.test(receipt.runId ?? "")
     && (receipt.kitCommit === null || /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(receipt.kitCommit ?? ""))
     && isObject(receipt.files) && canonicalJson(Object.keys(receipt.files)) === canonicalJson([SKILL]) && /^sha256:[0-9a-f]{64}$/.test(receipt.files[SKILL]);
 }
@@ -150,7 +156,7 @@ export async function planInstall(pilot, { targetHome, agents, mode = "install" 
     if (!actions.some((a) => a.agent === agent && ["conflict", "modified"].includes(a.status))) continue;
     for (const a of actions) if (a.agent === agent && ["create", "update", "remove"].includes(a.status)) Object.assign(a, { status: "blocked", reason: "agent-conflict" });
   }
-  return finalizePlan({ kind: "skill-install", mode, targetHome: targetHome ?? null, configId: configIdOf(pilot), kitCommit: pilot.live?.kitCommit ?? null, agents: roots.map((r) => r.agent), actions });
+  return finalizePlan({ kind: "skill-install", mode, targetHome: targetHome ?? null, configId: configIdOf(pilot), kitCommit: pilot.live?.kitCommit ?? null, kitId: kitIdOf(pilot), agents: roots.map((r) => r.agent), actions });
 }
 // faults.beforeFolder, afterFolder, afterSkill and afterReceipt are test seams that crash between the writes of one action.
 // created runs right after this call makes the folder, so the journal can prove the folder is ours.
@@ -214,7 +220,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
       if (a.status !== "remove") {
         own.skill = source(pilot, a.skill);
         if (sha256(own.skill) !== a.hash) throw new DevtwinError("STALE_VERSION", "Bundled source changed during apply");
-        entry.receipt = { schemaVersion: 2, kind: KIND, skill: a.skill, configId: configIdOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, files: { [SKILL]: sha256(own.skill) } };
+        entry.receipt = { schemaVersion: 3, kind: KIND, skill: a.skill, configId: configIdOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, kitId: kitIdOf(pilot), files: { [SKILL]: sha256(own.skill) } };
         own.receipt = receiptBytes(entry.receipt);
         await writeNewFile(join(copies, i + "-new-skill"), own.skill);
         await writeNewFile(join(copies, i + "-new-receipt"), own.receipt);
@@ -223,7 +229,7 @@ export async function applyInstall(roots, pilot, input, { fingerprint, runId }, 
       entries.push(entry); bytes.push(own);
     }
     fsyncDir(copies);
-    const journal = { schemaVersion: 2, kind: KIND, configId: configIdOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, mode: plan.mode, planFingerprint: fingerprint, targetHome: plan.targetHome, intended: entries, started: [], created: [], completed: [] };
+    const journal = { schemaVersion: 2, kind: KIND, configId: configIdOf(pilot), runId, kitCommit: pilot.live?.kitCommit ?? null, kitId: kitIdOf(pilot), mode: plan.mode, planFingerprint: fingerprint, targetHome: plan.targetHome, intended: entries, started: [], created: [], completed: [] };
     // Every journal write is a temp file renamed into place, so a crash never leaves a torn journal.
     await atomicReplace(journalPath, journalBytes(journal));
     for (const [i, entry] of entries.entries()) {

@@ -68,7 +68,17 @@ async function writable(dir) {
     for (const entry of await readdir(dir, { withFileTypes: true })) if (entry.isDirectory()) await writable(join(dir, entry.name));
   } catch (error) { if (error.code !== "ENOENT") throw error; }
 }
-export async function runCli(args, { env = {}, home = tmpdir(), kitRoot, templateRoot, ownerDialog } = {}) {
+// A package kit as kit install leaves it (U44): the files go into a source folder outside the home, as npm's global copy,
+// and are copied into the locked <home>/.devtwin/kits/<version>-<digest12>. <home>/.devtwin must exist and be private.
+export async function packageKit(home, source, { version = "0.1.0-alpha.1", files = {} } = {}) {
+  const all = { "package.json": JSON.stringify({ name: "devtwin", version }) + "\n", "bin/devtwin.mjs": "#!/usr/bin/env node\n", "README.md": "# devtwin\n", ...files };
+  for (const [rel, text] of Object.entries(all)) { await mkdir(dirname(join(source, rel)), { recursive: true }); await writeFile(join(source, rel), text); }
+  await chmod(join(source, "bin/devtwin.mjs"), 0o755);
+  const { applyKitInstall } = await import("../src/kit/install.mjs");
+  const r = await applyKitInstall({ home, kitRoot: source });
+  return { kit: r.kitRoot, version: r.version, digest: r.digest, kitId: r.kitId, arg: r.version + "+" + r.digest, identity: { kind: "package", version: r.version, digest: r.digest } };
+}
+export async function runCli(args,{ env = {}, home = tmpdir(), kitRoot, templateRoot, ownerDialog } = {}) {
   const chunks = [];
   const stdout = { write(value) { chunks.push(value); return true; } };
   const code = await main(args, { stdout, now, home, env, kitRoot, templateRoot, ownerDialog });

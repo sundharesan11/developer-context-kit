@@ -9,12 +9,13 @@ import { ensureRoots, validateRoot } from "./roots.mjs";
 import { info, checkNode, ensurePrivateDir, writeNewFile, atomicReplace, fsyncDir } from "../storage/fsx.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
-import { gitQuery } from "../identity/git.mjs";
+import { identityOfKit, kitIdentity, kitFields, kitId, displayKitId, kitsFolder, DIGEST, VERSION } from "../kit/identity.mjs";
 // The running kit. Tests inject ctx.kitRoot; production derives it from this file, as pilot.mjs does.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const AGENTS = ["claude", "codex"];
 export const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live", "writeClasses", "exceptions", "approval"];
 const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const KIT_FIELDS = ["kitCommit", "kitVersion", "kitDigest"];
 // Stands in for the config ID while a new config is validated; apply draws the real ID once.
 const PENDING_ID = "cfg_pending0000";
 const invalid = (field) => { throw new DevtwinError("INVALID_INPUT", "Invalid live config input", { field }); };
@@ -30,6 +31,19 @@ export function configPath(path) {
 }
 export function runningKit(ctx) {
   try { return realpathSync(ctx.kitRoot ?? KIT); } catch { return gate("live.kitRoot", "running-kit"); }
+}
+// U45 (KTD2): the running kit's identity, from small reads (a Git clone's HEAD, a package kit's manifest); the kit gate
+// in checkLiveConfig then checks it in full. A folder that is neither is not a kit live mode can pin.
+export function runningIdentity(kitRoot) {
+  return identityOfKit(kitRoot) ?? gate("live.kitRoot", "not-top-level");
+}
+// A Git clone belongs at <config folder>/kit and a package kit directly in <home>/.devtwin/kits; anywhere else warns.
+export const kitWarnings = (kitRoot, identity, dir, home) =>
+  kitRoot === join(dir, "kit") || (identity.kind === "package" && [join(dir, "kits"), kitsFolder(home)].includes(dirname(kitRoot))) ? [] : [{ code: "KIT_NOT_SIBLING" }];
+// The live block with the given kit: kitRoot plus exactly one kind's fields, so a switch of kind leaves no stale field.
+export function withKit(live, kitRoot, identity) {
+  const rest = Object.fromEntries(Object.entries(live).filter(([key]) => !KIT_FIELDS.includes(key)));
+  return { ...rest, kitRoot, ...kitFields(identity) };
 }
 // The live config folder (~/.devtwin) is created by the owner at 0700 and is never created or chmodded here.
 export function assertConfigDir(dir) {
@@ -68,12 +82,10 @@ export function planLiveInit(input, ctx) {
   const agents = sorted(input.agents ?? []);
   if (!agents.length || agents.some((agent) => !AGENTS.includes(agent))) invalid("agent");
   const home = ctx.home, all = skillDirsFor({ home, env: ctx.env ?? process.env });
-  const kitRoot = runningKit(ctx);
-  const head = gitQuery(kitRoot, ["rev-parse", "--verify", "HEAD"], { notRepo: true });
-  if (head.notRepo) gate("live.kitRoot", "not-top-level");
-  const config = { schemaVersion: 1, ...layout, agentHomes: [], repos: sorted(input.repos ?? []), forbidden: [], live: { configId: PENDING_ID, home, skillDirs: Object.fromEntries(agents.map((agent) => [agent, all[agent]])), kitRoot, kitCommit: head.stdout.trim() } };
+  const kitRoot = runningKit(ctx), identity = runningIdentity(kitRoot);
+  const config = { schemaVersion: 1, ...layout, agentHomes: [], repos: sorted(input.repos ?? []), forbidden: [], live: withKit({ configId: PENDING_ID, home, skillDirs: Object.fromEntries(agents.map((agent) => [agent, all[agent]])) }, kitRoot, identity) };
   const checked = checkLiveConfig(config, path, gateContext(ctx));
-  return finalizePlan({ kind: "live-init", config: { ...config, live: { ...config.live, configId: null } }, layout: { config: path, ...layout, kitRoot }, warnings: [...checked.warnings, ...(kitRoot === join(dir, "kit") ? [] : [{ code: "KIT_NOT_SIBLING" }])] });
+  return finalizePlan({ kind: "live-init", config: { ...config, live: { ...config.live, configId: null } }, layout: { config: path, ...layout, kitRoot }, warnings: [...checked.warnings, ...kitWarnings(kitRoot, identity, dir, home)] });
 }
 // faults.afterRoots and faults.afterApproval are test seams for a crash before the config is written.
 export async function applyLiveInit(input, ctx, { faults = {} } = {}) {
@@ -129,15 +141,31 @@ const addRepo = (repo) => (before) => {
   const repos = sorted([...before.repos, repo]);
   return { after: { ...before, repos }, details: { repo, repos: { from: before.repos, to: repos } } };
 };
+// U45: --commit <sha> names a Git kit and --kit <version>+<64 hex> a package kit; exactly one of the two.
+function requestedKit(input) {
+  if ((input.commit === undefined) === (input.kit === undefined)) invalid("kit");
+  if (input.commit !== undefined) return typeof input.commit === "string" && COMMIT.test(input.commit) ? { kind: "git", commit: input.commit } : invalid("commit");
+  const parts = typeof input.kit === "string" ? input.kit.split("+") : [];
+  if (parts.length !== 2 || !VERSION.test(parts[0]) || !DIGEST.test(parts[1])) invalid("kit");
+  return { kind: "package", version: parts[0], digest: parts[1] };
+}
+const kitEnd = (kitRoot, identity) => ({ kitRoot, ...kitFields(identity), kitId: kitId(identity) });
 function setKit(input, ctx) {
-  if (typeof input.commit !== "string" || !COMMIT.test(input.commit)) invalid("commit");
-  const kitRoot = runningKit(ctx), kitCommit = input.commit;
+  const identity = requestedKit(input), kitRoot = runningKit(ctx);
   const change = (before) => {
-    if (before.live.kitRoot === kitRoot && before.live.kitCommit === kitCommit) invalid("commit");
-    return { after: { ...before, live: { ...before.live, kitRoot, kitCommit } }, details: { kit: { from: { kitRoot: before.live.kitRoot, kitCommit: before.live.kitCommit }, to: { kitRoot, kitCommit } } } };
+    const from = kitIdentity(before.live);
+    if (before.live.kitRoot === kitRoot && kitId(from) === kitId(identity)) invalid(identity.kind === "git" ? "commit" : "kit");
+    return { after: { ...before, live: withKit(before.live, kitRoot, identity) }, details: { kit: { from: kitEnd(before.live.kitRoot, from), to: kitEnd(kitRoot, identity) } } };
   };
-  // set-kit runs from the new kit, which must be a clean detached checkout of the requested commit.
-  return [change, { kit: { kitRoot, kitCommit } }];
+  // set-kit runs from the new kit, which must be the requested one: a clean detached checkout of the commit, or the
+  // locked package kit folder whose files match the version and digest.
+  return [change, { kit: { kitRoot, ...kitFields(identity) } }];
+}
+// KTD5: the owner dialog names both kits in full; for a package kit the owner checks the digest against the release.
+function kitDialog({ from, to }) {
+  const end = (label, kit) => [label + ": " + displayKitId(kit.kitId), kit.kitId, kit.kitRoot, ""];
+  const release = to.kitVersion ? ["Compare the digest with the one published in the GitHub release for " + to.kitVersion + " before you approve: " + to.kitDigest, ""] : [];
+  return { title: "Change the kit devtwin runs", body: [...end("From", from), ...end("To", to), ...release, "Hooks, jobs and skills move to this kit with the next setup batch."].join("\n") };
 }
 // Replaces the approved write classes as a whole; the new config passes every fence check before it is approved.
 const setWriteClasses = (writeClasses) => (before) => {
@@ -194,7 +222,11 @@ export const applyLiveAddRepo = (input, ctx, options) => applyChange("live-add-r
 export const planLiveSetKit = (input, ctx) => preview(planChange("live-set-kit", input, ctx, ...setKit(input, ctx)).then((r) => r.plan));
 // Upgrade fix: after the kit change, the new kit rebuilds the derived state (lesson indexes and session summaries), so
 // a store that an older kit wrote works with the hook at once.
+// KTD5: the apply shows the owner dialog before the change is approved. It is never batched (src/setup/batch.mjs).
 export async function applyLiveSetKit(input, ctx, options) {
+  const { pilot, plan } = await planChange("live-set-kit", input, ctx, ...setKit(input, ctx));
+  assertFingerprint(plan, input.fingerprint);
+  await (await import("../owner/dialog.mjs")).requireOwnerApproval({ ...ctx, pilot }, kitDialog(plan.kit));
   const result = await applyChange("live-set-kit", input, ctx, ...setKit(input, ctx), options);
   let derived;
   try { derived = await (await import("../lessons/index.mjs")).rebuildDerived(rootsFromPilot(await loadPilot(result.config, gateContext(ctx)))); }

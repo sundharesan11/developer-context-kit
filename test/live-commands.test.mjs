@@ -4,7 +4,7 @@ import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { mkdir, writeFile, readFile, chmod, stat, readdir, rm } from "node:fs/promises";
-import { sandbox, makeRepo, fixtureGit, runCli, treeSnapshot } from "./helpers.mjs";
+import { sandbox, makeRepo, fixtureGit, runCli, treeSnapshot, packageKit } from "./helpers.mjs";
 import { loadPilot, readApprovedDigest } from "../src/config/pilot.mjs";
 import { applyLiveInit, applyLiveAddRepo, applyLiveSetKit } from "../src/config/live.mjs";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -22,8 +22,12 @@ async function liveHome(t) {
   const { kit, commit } = await pinnedKit(join(devtwin, "kit"));
   const repo = await makeRepo(join(sb, "work/atlas"), { "README.md": "# Atlas\n" });
   const liveConfig = join(devtwin, "live.json"), store = join(devtwin, "store");
-  const cli = (args, kitRoot = kit) => runCli(args, { home, env: {}, kitRoot });
-  const context = { home, env: {}, kitRoot: kit };
+  // Every owner dialog (live set-kit) goes to a recording fake; no test shows a real dialog.
+  const dialogs = [];
+  let answer = "approved";
+  const ownerDialog = async (content) => { dialogs.push(content); return answer; };
+  const cli = (args, kitRoot = kit) => runCli(args, { home, env: {}, kitRoot, ownerDialog });
+  const context = { home, env: {}, kitRoot: kit, ownerDialog };
   const init = async (extra = ["--agent", "claude", "--agent", "codex", "--repo", repo]) => {
     const preview = await cli(["live", "init", "--pilot", liveConfig, ...extra]);
     assert.equal(preview.json.ok, true, JSON.stringify(preview.json.error));
@@ -31,7 +35,7 @@ async function liveHome(t) {
     assert.equal(applied.json.ok, true, JSON.stringify(applied.json.error));
     return { preview: preview.json.result, applied: applied.json.result };
   };
-  return { sb, home, devtwin, kit, commit, repo, liveConfig, store, cli, context, init };
+  return { sb, home, devtwin, kit, commit, repo, liveConfig, store, cli, context, init, dialogs, setAnswer: (value) => { answer = value; } };
 }
 const readConfig = async (path) => JSON.parse(await readFile(path, "utf8"));
 const failed = (r, code, field) => {
@@ -151,11 +155,12 @@ test("live set-kit from a clean detached new kit at the requested commit rewrite
   const preview = await h.cli(["live", "set-kit", "--pilot", h.liveConfig, "--commit", next.commit], next.kit);
   assert.equal(preview.json.ok, true, JSON.stringify(preview.json.error));
   assert.equal(await treeSnapshot(h.home), before);
-  assert.deepEqual(preview.json.result.kit, { from: { kitRoot: h.kit, kitCommit: h.commit }, to: { kitRoot: next.kit, kitCommit: next.commit } });
+  assert.deepEqual(preview.json.result.kit, { from: { kitRoot: h.kit, kitCommit: h.commit, kitId: "git:" + h.commit }, to: { kitRoot: next.kit, kitCommit: next.commit, kitId: "git:" + next.commit } });
   assert.equal(preview.json.result.configId, applied.configId);
   failed(await h.cli(["live", "set-kit", "--pilot", h.liveConfig, "--commit", next.commit, "--apply", "--plan-fingerprint", "sha256:" + "1".repeat(64)], next.kit), "DEVTWIN_PLAN_MISMATCH");
   const done = await h.cli(["live", "set-kit", "--pilot", h.liveConfig, "--commit", next.commit, "--apply", "--plan-fingerprint", preview.json.result.fingerprint], next.kit);
   assert.equal(done.json.ok, true, JSON.stringify(done.json.error));
+  assert.equal(h.dialogs.length, 1, "one owner dialog, after the fingerprint check");
   const written = await readConfig(h.liveConfig);
   assert.deepEqual([written.live.kitRoot, written.live.kitCommit, written.live.configId], [next.kit, next.commit, applied.configId]);
   const pilot = await loadPilot(h.liveConfig, { ...h.context, kitRoot: next.kit });
@@ -331,4 +336,98 @@ test("live add-repo or set-kit crash around the live config replace leaves a liv
   const stale = await h.cli(["doctor", "--pilot", h.liveConfig], h.kit);
   failed(stale, "DEVTWIN_GATE_REQUIRED", "live.approval");
   assert.equal(stale.json.error.details.reason, "changed");
+});
+// U45: a package kit installed under ~/.devtwin/kits, as kit install leaves it.
+const pkgKit = (h, version = "0.1.0-alpha.1") => packageKit(h.home, join(h.sb, "global", version), { version });
+test("live init from a package kit writes kitVersion and the full kitDigest and no kitCommit", async (t) => {
+  const h = await liveHome(t);
+  const pkg = await pkgKit(h);
+  const args = ["live", "init", "--pilot", h.liveConfig, "--agent", "claude"];
+  const preview = await h.cli(args, pkg.kit);
+  assert.equal(preview.json.ok, true, JSON.stringify(preview.json.error));
+  const plan = preview.json.result;
+  assert.deepEqual(plan.config.live, { configId: null, home: h.home, skillDirs: { claude: join(h.home, ".claude/skills") }, kitRoot: pkg.kit, kitVersion: pkg.version, kitDigest: pkg.digest });
+  assert.match(plan.config.live.kitDigest, /^[0-9a-f]{64}$/);
+  assert.ok(!plan.warnings.some((w) => w.code === "KIT_NOT_SIBLING"), "a package kit under <config folder>/kits is where it belongs");
+  const applied = await h.cli([...args, "--apply", "--plan-fingerprint", plan.fingerprint], pkg.kit);
+  assert.equal(applied.json.ok, true, JSON.stringify(applied.json.error));
+  const written = await readConfig(h.liveConfig);
+  assert.equal(Object.hasOwn(written.live, "kitCommit"), false);
+  assert.deepEqual([written.live.kitRoot, written.live.kitVersion, written.live.kitDigest], [pkg.kit, pkg.version, pkg.digest]);
+  assert.equal((await h.cli(["doctor", "--pilot", h.liveConfig], pkg.kit)).json.ok, true);
+  failed(await h.cli(["doctor", "--pilot", h.liveConfig], h.kit), "DEVTWIN_GATE_REQUIRED", "live.kitRoot");
+});
+test("live set-kit from a Git kit to a package kit shows both identities in the owner dialog, and a denied dialog changes nothing", async (t) => {
+  const h = await liveHome(t);
+  const { applied } = await h.init();
+  const pkg = await pkgKit(h);
+  const args = ["live", "set-kit", "--pilot", h.liveConfig, "--kit", pkg.arg];
+  const preview = await h.cli(args, pkg.kit);
+  assert.equal(preview.json.ok, true, JSON.stringify(preview.json.error));
+  assert.deepEqual(preview.json.result.kit, { from: { kitRoot: h.kit, kitCommit: h.commit, kitId: "git:" + h.commit }, to: { kitRoot: pkg.kit, kitVersion: pkg.version, kitDigest: pkg.digest, kitId: pkg.kitId } });
+  const text = await readFile(h.liveConfig, "utf8"), before = await treeSnapshot(h.home);
+  h.setAnswer("denied");
+  failed(await h.cli([...args, "--apply", "--plan-fingerprint", preview.json.result.fingerprint], pkg.kit), "DEVTWIN_OWNER_DENIED");
+  assert.equal(await readFile(h.liveConfig, "utf8"), text);
+  assert.equal(await treeSnapshot(h.home), before, "a denied dialog writes nothing");
+  assert.equal((await loadPilot(h.liveConfig, h.context)).digest, applied.digest);
+  assert.equal(h.dialogs.length, 1);
+  const { title, body } = h.dialogs[0];
+  assert.equal(title, "devtwin: Change the kit devtwin runs");
+  for (const part of ["git:" + h.commit.slice(0, 12), "git:" + h.commit, h.kit, "npm:" + pkg.version + "+sha256:" + pkg.digest.slice(0, 12), pkg.kitId, pkg.kit]) assert.ok(body.includes(part), part);
+  assert.match(body, new RegExp("Compare the digest with the one published in the GitHub release for " + pkg.version.replace(/\./g, "\\.")));
+  // A wrong fingerprint is refused before any dialog.
+  failed(await h.cli([...args, "--apply", "--plan-fingerprint", "sha256:" + "1".repeat(64)], pkg.kit), "DEVTWIN_PLAN_MISMATCH");
+  assert.equal(h.dialogs.length, 1);
+  h.setAnswer("approved");
+  const done = await h.cli([...args, "--apply", "--plan-fingerprint", preview.json.result.fingerprint], pkg.kit);
+  assert.equal(done.json.ok, true, JSON.stringify(done.json.error));
+  assert.equal(h.dialogs.length, 2);
+  const written = await readConfig(h.liveConfig);
+  assert.deepEqual([written.live.kitRoot, written.live.kitVersion, written.live.kitDigest, Object.hasOwn(written.live, "kitCommit"), written.live.configId], [pkg.kit, pkg.version, pkg.digest, false, applied.configId]);
+  assert.equal((await h.cli(["doctor", "--pilot", h.liveConfig], pkg.kit)).json.ok, true);
+  failed(await h.cli(["doctor", "--pilot", h.liveConfig], h.kit), "DEVTWIN_GATE_REQUIRED", "live.kitRoot");
+  // Back to the Git kit: the package fields go and the dialog has no release note.
+  const back = ["live", "set-kit", "--pilot", h.liveConfig, "--commit", h.commit];
+  const undo = await h.cli(back);
+  assert.equal(undo.json.ok, true, JSON.stringify(undo.json.error));
+  assert.equal((await h.cli([...back, "--apply", "--plan-fingerprint", undo.json.result.fingerprint])).json.ok, true);
+  const reverted = await readConfig(h.liveConfig);
+  assert.deepEqual([reverted.live.kitRoot, reverted.live.kitCommit, Object.hasOwn(reverted.live, "kitVersion"), Object.hasOwn(reverted.live, "kitDigest")], [h.kit, h.commit, false, false]);
+  assert.doesNotMatch(h.dialogs[2].body, /GitHub release/);
+});
+test("live set-kit run from a kit other than the one it names is refused", async (t) => {
+  const h = await liveHome(t);
+  await h.init();
+  const a = await pkgKit(h, "0.1.0-alpha.1"), b = await pkgKit(h, "0.1.0-alpha.2");
+  const text = await readFile(h.liveConfig, "utf8");
+  const setKit = (pin, kit) => h.cli(["live", "set-kit", "--pilot", h.liveConfig, ...pin], kit);
+  const gated = (r, field, reason) => { failed(r, "DEVTWIN_GATE_REQUIRED", field); assert.equal(r.json.error.details.reason, reason); };
+  gated(await setKit(["--kit", a.arg], h.kit), "live.kitRoot", "outside-kits");
+  gated(await setKit(["--kit", b.arg], a.kit), "live.kitVersion", "version");
+  gated(await setKit(["--kit", a.version + "+" + b.digest], a.kit), "live.kitDigest", "digest");
+  gated(await setKit(["--commit", h.commit], a.kit), "live.kitRoot", "not-top-level");
+  for (const [pin, kit] of [[["--kit", b.arg], a.kit], [["--commit", h.commit], a.kit]]) {
+    failed(await h.cli(["live", "set-kit", "--pilot", h.liveConfig, ...pin, "--apply", "--plan-fingerprint", "sha256:" + "1".repeat(64)], kit), "DEVTWIN_GATE_REQUIRED");
+  }
+  assert.equal(await readFile(h.liveConfig, "utf8"), text);
+  assert.deepEqual(h.dialogs, []);
+});
+test("live set-kit takes exactly one of --commit and --kit, and --kit needs a version and the full digest", async (t) => {
+  const h = await liveHome(t);
+  await h.init();
+  const pkg = await pkgKit(h);
+  const run = (pin, extra = []) => h.cli(["live", "set-kit", "--pilot", h.liveConfig, ...pin, ...extra], pkg.kit);
+  for (const extra of [[], ["--apply", "--plan-fingerprint", "sha256:" + "1".repeat(64)]]) {
+    failed(await run([], extra), "DEVTWIN_INVALID_INPUT", "kit");
+    failed(await run(["--commit", h.commit, "--kit", pkg.arg], extra), "DEVTWIN_INVALID_INPUT", "kit");
+    for (const bad of [pkg.version + "+" + pkg.digest.slice(0, 12), pkg.version, pkg.digest, "v" + pkg.arg, pkg.version + "+" + pkg.digest.toUpperCase(), pkg.version + "+sha256:" + pkg.digest, pkg.version + "+" + pkg.digest + "+x", "latest+" + pkg.digest]) {
+      failed(await run(["--kit", bad], extra), "DEVTWIN_INVALID_INPUT", "kit");
+    }
+  }
+  const preview = await run(["--kit", pkg.arg]);
+  assert.equal((await run(["--kit", pkg.arg], ["--apply", "--plan-fingerprint", preview.json.result.fingerprint])).json.ok, true);
+  // The kit already pinned is no change.
+  failed(await run(["--kit", pkg.arg]), "DEVTWIN_INVALID_INPUT", "kit");
+  assert.equal(h.dialogs.length, 1);
 });

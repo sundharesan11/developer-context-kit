@@ -518,3 +518,34 @@ test("help lists locks release", async () => {
   const help = await runCli(["help"]);
   assert.ok(help.json.result.commands.includes("locks release"));
 });
+test("live skill receipts carry the kitId in schema 3, and a schema 2 receipt from an earlier kit still reads as owned", async (t) => {
+  const f = await liveInstall(t), a = await f.use(), input = { agents: ["claude"], mode: "install" };
+  const plan = await planInstall(a.pilot, input);
+  assert.equal(plan.kitId, "git:" + f.kitA.commit);
+  await install(a, input, "run_schema3inst");
+  const onboard = join(f.claude, "devtwin-onboard"), receiptFile = join(onboard, ".devtwin-owned.json");
+  const receipt = JSON.parse(await readFile(receiptFile, "utf8"));
+  assert.deepEqual([receipt.schemaVersion, receipt.kitId, receipt.kitCommit], [3, "git:" + f.kitA.commit, f.kitA.commit]);
+  // Rewrite the receipts and the journal as a kit before U45 wrote them: schema 2, no kitId.
+  const journalFile = join(a.roots.stateRoot, "runs/run_schema3inst/journal.json"), journal = JSON.parse(await readFile(journalFile, "utf8"));
+  const old = ({ kitId, ...rest }) => ({ ...rest, schemaVersion: 2 });
+  for (const entry of [...journal.intended, ...journal.completed]) {
+    entry.receipt = old(entry.receipt);
+    const bytes = canonicalJson(entry.receipt) + "\n";
+    entry.new[".devtwin-owned.json"] = sha256(bytes);
+    await writeFile(join(entry.path, ".devtwin-owned.json"), bytes);
+  }
+  await writeFile(journalFile, canonicalJson(journal) + "\n");
+  assert.ok((await planInstall(a.pilot, input)).actions.every((x) => x.status === "installed"), "schema 2 receipts are owned");
+  // A forged schema 3 receipt with a bad kitId, or a schema 2 one with a kitId, is foreign.
+  for (const bad of [{ ...receipt, kitId: "npm:x" }, { ...old(receipt), kitId: receipt.kitId }]) {
+    const saved = await readFile(receiptFile);
+    await writeFile(receiptFile, canonicalJson(bad) + "\n");
+    assert.equal((await planInstall(a.pilot, input)).actions.find((x) => x.path === onboard).status, "conflict", JSON.stringify(bad));
+    await writeFile(receiptFile, saved);
+  }
+  const b = await f.use(await f.kit("kit-b", kitFiles("Kit B")));
+  await install(b, input, "run_schema3upd1");
+  const updated = JSON.parse(await readFile(receiptFile, "utf8"));
+  assert.deepEqual([updated.schemaVersion, updated.kitId], [3, "git:" + b.commit]);
+});

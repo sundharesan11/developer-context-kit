@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { mkdir, chmod, readFile, writeFile, rm, symlink, lstat } from "node:fs/promises";
 import { existsSync, writeFileSync } from "node:fs";
-import { sandbox, makeRepo, fixtureGit, treeSnapshot, makePilot, now } from "./helpers.mjs";
+import { sandbox, makeRepo, fixtureGit, treeSnapshot, makePilot, now, packageKit } from "./helpers.mjs";
 import { main } from "../src/cli.mjs";
 import { SKILL_NAMES } from "../src/agents/install.mjs";
 import { ownerAction } from "../src/hooks/owner-block.mjs";
@@ -448,4 +448,63 @@ test("setup batch lists an enabled job whose plist is missing and does not read 
   assert.equal(refused.json.error.code, "DEVTWIN_GATE_REQUIRED");
   assert.equal(await readFile(elsewhere, "utf8"), bytes, "the link target is left alone");
   assert.ok((await lstat(backup)).isSymbolicLink(), "the link is not replaced");
+});
+
+// U45 (R4): an upgrade is live set-kit plus one batch, and so is a rollback to the earlier kit, which stays on disk.
+test("setup batch after live set-kit to a package kit and back: hooks and the four jobs are pending, and one batch each way makes them clean", async (t) => {
+  const h = await setupHome(t);
+  const jobs = ["review-monthly", "backup-daily", "activity-weekly", "import-daily"];
+  const plists = jobs.map((job) => join(h.home, AGENTS_DIR, "devtwin." + job + ".plist"));
+  const agentsArgs = ["--launch-agent", plists[2], "--launch-agent", plists[3]];
+  const pre = await h.ok(["live", "write-classes", "--pilot", h.liveConfig, ...agentsArgs]);
+  await h.ok(["live", "write-classes", "--pilot", h.liveConfig, ...agentsArgs, "--apply", "--plan-fingerprint", pre.fingerprint]);
+  for (const job of jobs.slice(2)) {
+    const p = await h.ok(["schedule", "plan", "--pilot", h.liveConfig, "--job", job]);
+    await h.ok(["schedule", "apply", "--pilot", h.liveConfig, "--job", job, "--plan-fingerprint", p.fingerprint]);
+  }
+  const first = await plan(h);
+  assert.equal((await apply(h, first.fingerprint)).json.ok, true);
+  const commit = (await fixtureGit(h.kit, ["rev-parse", "HEAD"])).trim();
+  const skills = Object.fromEntries(await Promise.all(SKILL_NAMES.map(async (name) => ["skills/" + name + "/SKILL.md", await readFile(join(SKILLS, name, "SKILL.md"), "utf8")])));
+  const pkg = await packageKit(h.home, join(h.sb, "global/devtwin"), { files: skills });
+  const hookIds = ["hooks-claude", "hooks-codex"];
+  const hookLine = (kit) => JSON.stringify(join(kit, "bin/devtwin.mjs")).slice(1, -1);
+  const clean = async (kit, other) => {
+    const sched = await h.ok(["schedule", "status", "--pilot", h.liveConfig]);
+    assert.deepEqual(sched.outdated, []);
+    for (const job of jobs) assert.equal(sched.jobs.find((j) => j.job === job).plistState, "current", job);
+    const status = await h.ok(["setup", "status", "--pilot", h.liveConfig, "--backup-target", h.backups]);
+    for (const id of [...hookIds, "job-review-reminder", "job-backup", "paths-confirm"]) assert.equal(status.steps.find((s) => s.id === id).done, true, id);
+    const settled = await plan(h);
+    assert.deepEqual(settled.items.filter((i) => i.id.startsWith("job-") || i.id.startsWith("hooks-")), [], kit);
+    for (const path of plists) assert.ok((await readFile(path, "utf8")).includes("<string>" + join(kit, "bin/devtwin.mjs") + "</string>"), path);
+    for (const file of [".claude/settings.json", ".codex/hooks.json"]) {
+      const text = await readFile(join(h.home, file), "utf8");
+      assert.ok(text.includes(hookLine(kit)) && !text.includes(hookLine(other)), file);
+    }
+  };
+  // One kit change behind its own dialog, then one batch whose single dialog moves the hooks and every job.
+  const move = async (kit, other, pin, shown) => {
+    h.useKit(kit);
+    const kitPlan = await h.ok(["live", "set-kit", "--pilot", h.liveConfig, ...pin]);
+    const dialogs = h.dialogs.length;
+    await h.ok(["live", "set-kit", "--pilot", h.liveConfig, ...pin, "--apply", "--plan-fingerprint", kitPlan.fingerprint]);
+    assert.equal(h.dialogs.length, dialogs + 1, "set-kit has its own dialog");
+    assert.equal(h.dialogs.at(-1).title, "devtwin: Change the kit devtwin runs");
+    const sched = await h.ok(["schedule", "status", "--pilot", h.liveConfig]);
+    assert.deepEqual(sched.outdated.map((o) => o.job).sort(), [...jobs].sort());
+    const status = await h.ok(["setup", "status", "--pilot", h.liveConfig, "--backup-target", h.backups]);
+    for (const id of [...hookIds, "job-review-reminder", "job-backup"]) assert.equal(status.steps.find((s) => s.id === id).done, false, id);
+    const p = await plan(h);
+    for (const id of [...hookIds, "job-review-reminder", "job-backup", "job-rewrite-activity-weekly", "job-rewrite-import-daily", "paths-confirm"]) assert.ok(p.items.some((i) => i.id === id), id);
+    assert.deepEqual(rewriteLines(p), jobs.map((job) => "Rewrite job " + job + " at ~/" + AGENTS_DIR + "/devtwin." + job + ".plist for kit " + shown));
+    const out = await apply(h, p.fingerprint);
+    assert.equal(out.json.ok, true, JSON.stringify(out.json.error));
+    assert.equal(h.dialogs.length, dialogs + 2, "one approval for the whole batch");
+    await clean(kit, other);
+  };
+  await move(pkg.kit, h.kit, ["--kit", pkg.arg], "~/.devtwin/kits/" + pkg.version + "-" + pkg.digest.slice(0, 12));
+  assert.equal(JSON.parse(await readFile(h.liveConfig, "utf8")).live.kitDigest, pkg.digest);
+  await move(h.kit, pkg.kit, ["--commit", commit], "~/.devtwin/kit");
+  assert.equal(JSON.parse(await readFile(h.liveConfig, "utf8")).live.kitCommit, commit);
 });
