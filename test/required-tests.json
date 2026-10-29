@@ -861,5 +861,16 @@
   "kit install from a Git clone is refused with a note to use the clone",
   "an interrupted kit install leaves only a temp folder, which the next run removes without following links",
   "an installed kit passes the live config kit gate",
-  "kit list shows each kit folder, its kitId, whether it verifies and which one the live config pins"
+  "kit list shows each kit folder, its kitId, whether it verifies and which one the live config pins",
+  "forward runs a live command in the pinned kit with the same arguments and exit code",
+  "forward sends live set-kit --kit and live init --kit to the named kit under ~/.devtwin/kits",
+  "forward runs --version, version, help, demo, the kit routes and the hook locally",
+  "forward does not run an unapproved config, a kit outside ~/.devtwin/kits or a kit that fails the check",
+  "forward reads the config --pilot names, and ~/.devtwin/live.json without one",
+  "forward refuses a second hop",
+  "forward runs locally with no note when there is no live config or the running kit is the pinned one",
+  "no skill or template resolves devtwin through PATH or names an unpacked docs/ path",
+  "hook session start names the running kit's real path",
+  "owner block denies owner routes run through a pinned kit's absolute bin path",
+  "live init --kit runs only from the package kit it names"
 ]

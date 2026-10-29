@@ -4,7 +4,7 @@ import { isAbsolute, join } from "node:path";
 import { SCOPE_ID } from "../identity/ids.mjs";
 import { readIndex, findRepoRoot, readCommonDir, resolveRepo } from "../lessons/index.mjs";
 import { matchLessons } from "../lessons/match.mjs";
-import { readPilotBytes, receiptProblem, writeKitReceipt, renewReceipt, receiptExpiry } from "./receipt.mjs";
+import { readPilotBytes, receiptProblem, writeKitReceipt, renewReceipt, receiptExpiry, runningKit } from "./receipt.mjs";
 import { confirmationState } from "../paths/confirm.mjs";
 import { ownerAction, denyOutput } from "./owner-block.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
@@ -124,9 +124,11 @@ async function dropRemoved(stateRoot, found) {
   const entries = found.index.entries.filter((e) => e.source !== "hub" || (removed !== null && !removed.has(e.id)));
   return entries.length === found.index.entries.length ? found : { ...found, index: { ...found.index, entries } };
 }
-function startLine(found, key, notices = 0) {
-  if (found.status === "ambiguous") return "devtwin hook: this folder is bound in more than one scope, so lessons are off.";
-  const session = " Session ID for lesson propose: " + sessionTag(key) + ".";
+// U46 (KTD6): kit is the real path of the running kit, which the receipt just vouched for; skills run its bin from it.
+function startLine(found, key, notices = 0, kit) {
+  const kitPart = " Kit: `" + kit + "`.";
+  if (found.status === "ambiguous") return "devtwin hook: this folder is bound in more than one scope, so lessons are off." + kitPart;
+  const session = kitPart + " Session ID for lesson propose: " + sessionTag(key) + ".";
   if (found.status !== "bound") return "devtwin hook live: this folder is not a bound project." + session;
   const count = found.index.entries.filter((e) => e.reach !== "project" || e.project === found.repo.project).length;
   const replaced = notices ? " " + notices + " of your lessons " + (notices === 1 ? "was" : "were") + " replaced; run `devtwin lesson notices --scope " + found.repo.scope + "`." : "";
@@ -164,7 +166,7 @@ async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, 
   const found = await dropRemoved(stateRoot, await locate(stateRoot, payload.cwd));
   if (found.status === "ambiguous") logHook(stateRoot, { at, agent, event, code: "ambiguous-root" });
   if (event === "SessionStart") {
-    const line = startLine(found, key, found.status === "bound" ? await openNoticeCount(stateRoot, found.repo.scope) : 0) + paths;
+    const line = startLine(found, key, found.status === "bound" ? await openNoticeCount(stateRoot, found.repo.scope) : 0, runningKit(kitRoot)) + paths;
     const summary = found.status === "bound" ? await summaryBlock(stateRoot, found, { log: (code) => logHook(stateRoot, { at, agent, event, code }) }) : { text: "", asks: [] };
     return { text: summary.text ? line + "\n" + summary.text : line, lines: 0, overflow: 0, summaryIds: summary.asks, key };
   }
