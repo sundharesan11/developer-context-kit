@@ -872,5 +872,15 @@
   "no skill or template resolves devtwin through PATH or names an unpacked docs/ path",
   "hook session start names the running kit's real path",
   "owner block denies owner routes run through a pinned kit's absolute bin path",
-  "live init --kit runs only from the package kit it names"
+  "live init --kit runs only from the package kit it names",
+  "release workflow triggers only on pushed v* tags",
+  "release workflow grants id-token write only to the publish job, which needs the gate",
+  "release gate checks the tag, runs every gate on macOS for both Node versions and outputs the kit digest",
+  "release publish job pins npm exactly, never writes the default dist-tag and drafts the GitHub release",
+  "release workflow pins every action by full commit SHA and keeps credentials out of the checkout",
+  "package metadata allows publishing from the release workflow only",
+  "publish guard refuses outside GitHub Actions and allows the explicit override",
+  "kit digest script refuses a missing or malformed tarball",
+  "kit digest of the packed tarball equals the digest kit install computes for the same package",
+  "a GitHub Actions id-token permission is not a credential, but an id-token value still is"
 ]

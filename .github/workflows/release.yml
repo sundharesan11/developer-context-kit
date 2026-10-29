@@ -1,0 +1,169 @@
+name: Release
+
+# Publishes devtwin to npm with trusted publishing and provenance. Only a v* tag that the owner pushes starts it. The
+# publish job waits for the owner's approval in the npm-release environment. It writes the alpha or next dist-tag only;
+# the owner moves the default dist-tag by hand. See docs/RELEASING.md.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  gate:
+    name: Gate / Node ${{ matrix.node }}
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        node: ['22.13.0', '26.4.0']
+    outputs:
+      version: ${{ steps.digest.outputs.version }}
+      digest: ${{ steps.digest.outputs.digest }}
+      kit-id: ${{ steps.digest.outputs.kit-id }}
+    steps:
+      - name: Check out the tagged revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Report environment
+        run: |
+          node --version
+          npm --version
+          git rev-parse HEAD
+      - name: Check that the tag names the package version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          test "$GITHUB_REF_TYPE" = tag
+          VERSION="$(node -p 'require("./package.json").version')"
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "::error::Tag $TAG does not equal v$VERSION from package.json"
+            exit 1
+          fi
+      - name: Audit release files and dry-run package
+        run: npm run check:package
+      - name: Check STE-based writing rules
+        run: npm run check:writing
+      - name: Run complete test suite
+        run: npm test
+      - name: Install the packed tarball and run the demo
+        run: node scripts/pack-smoke.mjs
+      - name: Compute the kit digest of the packed tarball
+        id: digest
+        env:
+          NODE_LEG: ${{ matrix.node }}
+        run: |
+          PACK_DIR="$(mktemp -d "$RUNNER_TEMP/devtwin-release.XXXXXX")"
+          npm pack --json --ignore-scripts --pack-destination "$PACK_DIR" > "$PACK_DIR/pack.json"
+          TARBALL="$PACK_DIR/$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))[0].filename' "$PACK_DIR/pack.json")"
+          node scripts/kit-digest.mjs "$TARBALL" | tee "$PACK_DIR/kit.json"
+          # One leg sets the job outputs. Both legs print the digest, so the log shows when they differ.
+          if [ "$NODE_LEG" = 22.13.0 ]; then
+            node -p 'const k = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); "version=" + k.version + "\ndigest=" + k.digest + "\nkit-id=" + k.kitId' "$PACK_DIR/kit.json" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    name: Publish to npm
+    needs: gate
+    # Trusted publishing needs a GitHub-hosted runner; npm documents it on Ubuntu. This job runs no tests, so the
+    # macOS gate stays the support evidence.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: npm-release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Check out the tagged revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        # Trusted publishing needs Node 22.14.0 or later, so this job does not use the 22.13.0 minimum.
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.4.0'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+      - name: Install the pinned npm
+        env:
+          # Trusted publishing needs npm 11.5.1 or later.
+          NPM_VERSION: '11.21.1'
+        run: |
+          npm install --global --ignore-scripts --no-audit --no-fund "npm@$NPM_VERSION"
+          test "$(npm --version)" = "$NPM_VERSION"
+      - name: Pack and compare the kit digest with the gate
+        id: pack
+        env:
+          TAG: ${{ github.ref_name }}
+          GATE_VERSION: ${{ needs.gate.outputs.version }}
+          GATE_DIGEST: ${{ needs.gate.outputs.digest }}
+        run: |
+          VERSION="$(node -p 'require("./package.json").version')"
+          if [ "$TAG" != "v$VERSION" ] || [ "$VERSION" != "$GATE_VERSION" ]; then
+            echo "::error::Tag $TAG, package.json version $VERSION and gate version $GATE_VERSION differ"
+            exit 1
+          fi
+          PACK_DIR="$(mktemp -d "$RUNNER_TEMP/devtwin-publish.XXXXXX")"
+          npm pack --json --ignore-scripts --pack-destination "$PACK_DIR" > "$PACK_DIR/pack.json"
+          TARBALL="$PACK_DIR/$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))[0].filename' "$PACK_DIR/pack.json")"
+          DIGEST="$(node scripts/kit-digest.mjs "$TARBALL" | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).digest')"
+          if [ "$DIGEST" != "$GATE_DIGEST" ]; then
+            echo "::error::Kit digest $DIGEST differs from the gate digest $GATE_DIGEST"
+            exit 1
+          fi
+          case "$VERSION" in
+            *-*) DIST_TAG=alpha ;;
+            *) DIST_TAG=next ;;
+          esac
+          {
+            echo "tarball=$TARBALL"
+            echo "dist-tag=$DIST_TAG"
+          } >> "$GITHUB_OUTPUT"
+      - name: Publish with provenance
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+          DIST_TAG: ${{ steps.pack.outputs.dist-tag }}
+        run: npm publish "$TARBALL" --provenance --access public --tag "$DIST_TAG"
+      - name: Create a draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.gate.outputs.version }}
+          DIGEST: ${{ needs.gate.outputs.digest }}
+          KIT_ID: ${{ needs.gate.outputs.kit-id }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          DIST_TAG: ${{ steps.pack.outputs.dist-tag }}
+        run: |
+          NOTES="$RUNNER_TEMP/release-notes.md"
+          {
+            echo "devtwin $VERSION, published to npm under the \`$DIST_TAG\` dist-tag with provenance."
+            echo
+            echo "- Version: \`$VERSION\`"
+            echo "- Source commit: \`$SOURCE_COMMIT\`"
+            echo "- Kit digest (SHA-256): \`$DIGEST\`"
+            echo "- Kit ID: \`$KIT_ID\`"
+            echo
+            echo "Compare the kit digest with the one that \`devtwin kit install\` prints and the \`live set-kit\` dialog shows."
+            echo "See CHANGELOG.md for the changes."
+          } > "$NOTES"
+          PRERELEASE=()
+          if [ "$DIST_TAG" = alpha ]; then PRERELEASE=(--prerelease); fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "devtwin $VERSION" --notes-file "$NOTES" "${PRERELEASE[@]}"

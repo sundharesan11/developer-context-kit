@@ -78,6 +78,62 @@ Live connectors, company-hub distribution, skill export and a weekly skill updat
 
 ## License and publishing settings
 
-`package.json` declares `Apache-2.0`. Its `private: true` flag deliberately blocks npm publication; leave that guard in place until a separate package-release workflow is reviewed.
+`package.json` declares `Apache-2.0`. It has no `private` flag, because the release workflow publishes the package. Two controls stop an accidental publish:
+
+- A `prepublishOnly` guard (`scripts/publish-guard.mjs`) refuses `npm publish` from a folder outside GitHub Actions. Set `DEVTWIN_ALLOW_LOCAL_PUBLISH=1` only for a deliberate local publish.
+- `publishConfig.provenance` is `true`. A local publish has no CI identity for provenance, so npm refuses it.
+
+The guard only stops accidents. The real control is the npm setting that disallows tokens, together with a trusted publisher that names only the release workflow.
 
 GitHub repository visibility is a separate setting. A local license change neither makes the repository public nor pushes these files.
+
+## Package release
+
+`.github/workflows/release.yml` publishes devtwin to npm. Only a pushed tag that starts with `v` starts it. It has no manual or pull-request trigger.
+
+The workflow has two jobs:
+
+1. The gate job runs on macOS 15 with Node 22.13.0 and 26.4.0. It checks that the tag equals `v` plus the `package.json` version. Next, it runs the package audit, the writing check, the full suite and the pack smoke test. Last, it computes the kit digest of the packed tarball with `scripts/kit-digest.mjs`.
+2. The publish job waits for the owner's approval in the `npm-release` environment. It installs npm 11.21.1, packs the package and compares the kit digest with the gate's digest. It publishes that tarball with provenance under the `alpha` dist-tag, or `next` for a version without a prerelease part. Last, it creates a draft GitHub release with the version, the source commit and the kit digest.
+
+Only the publish job has the `id-token: write` permission, which trusted publishing needs. The publish job uses Node 26.4.0, because trusted publishing needs Node 22.14.0 or later and npm 11.5.1 or later. The workflow never writes the default dist-tag, `latest`.
+
+### Owner one-time steps
+
+The owner does these steps once, before the first release. An agent does none of them.
+
+1. On npmjs.com, add a trusted publisher to the `devtwin` package. Use GitHub Actions, repository `sundharesan11/devtwin`, workflow `release.yml` and environment `npm-release`. The fields are case-sensitive.
+2. In the GitHub repository settings, create the `npm-release` environment. Add the owner as the required reviewer.
+3. In the same environment, limit deployments to tags that match `v*`.
+4. Add a tag ruleset for `v*`. Allow only the owner to create, update or delete these tags.
+5. On npmjs.com, open the package's publishing access settings. Select "Require two-factor authentication and disallow tokens".
+
+### First release
+
+The owner does each step and approves each change on npm or GitHub.
+
+1. Merge the release branch into `main`.
+2. Do the owner one-time steps.
+3. Push the tag `v0.1.0-alpha.1` from the merged commit.
+4. Approve the `npm-release` environment run when the gate job passes.
+5. Open the draft GitHub release. Check the version, the source commit and the kit digest. Publish the release.
+6. Deprecate the placeholder versions with `npm deprecate devtwin@"<0.1.0-alpha.1" "Use devtwin@alpha"`. This range covers `0.0.1` and `0.0.0-stage`.
+7. Run `npm view devtwin dist-tags`. Check that `alpha` names `0.1.0-alpha.1`. Check the provenance badge on the npm package page.
+
+A deprecated version still installs when its dist-tag names it. Until `latest` moves, `npm i devtwin` installs the placeholder and shows the deprecation message. Install with `npm i -g devtwin@alpha`.
+
+A failed publish changes nothing on npm. Run the failed jobs again from the same tag. If the publish passed but the draft release failed, create the draft by hand with the digest from the gate job's log.
+
+### Moving latest
+
+`latest` moves only after the real-agent scenarios pass on the published version. The owner approves this step separately and runs one command:
+
+```sh
+npm dist-tag add devtwin@<version> latest
+```
+
+The release workflow never runs this command.
+
+### Compare the kit digest
+
+The draft release lists the kit ID, `npm:<version>+sha256:<digest>`. `devtwin kit install` prints the same digest for the installed package. The set-kit dialog shows it too. Compare them before you approve the dialog. A different digest means that the installed package is not the published tarball.

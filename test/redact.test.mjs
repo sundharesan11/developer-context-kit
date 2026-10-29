@@ -28,3 +28,8 @@ test("value-like scan finds URLs with user info or a query, assignments and rand
   assert.throws(() => assertNoValueLike("vault/" + run), (e) => e.code === "DEVTWIN_SENSITIVE_CONTENT" && e.details.types.includes("high-entropy") && !JSON.stringify(toJson(e)).includes(run));
   assert.throws(() => assertNoValueLike(["api", "_key"].join("") + ": " + "abcdef" + "123456"), (e) => e.details.types.includes("credential-assignment"));
 });
+test("a GitHub Actions id-token permission is not a credential, but an id-token value still is", () => {
+  const key = ["id", "-token"].join("");
+  for (const text of [key + ": write", "the `" + key + ": write` permission", "  " + key + ": read\n", key + ":none;"]) assert.deepEqual(scanSensitive(text), [], text);
+  for (const text of [key + ": " + "abcdef" + "123456", key + ": " + "write" + "_abc123", "my_" + "token: " + "write`x", "token = " + "write-abcdef"]) assert.ok(scanSensitive(text).some((x) => x.type === "credential-assignment"), text);
+});
