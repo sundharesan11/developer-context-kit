@@ -48,8 +48,39 @@
         "configId",
         "home",
         "skillDirs",
-        "kitRoot",
-        "kitCommit"
+        "kitRoot"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "kitCommit"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "kitVersion"
+                ]
+              },
+              {
+                "required": [
+                  "kitDigest"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "kitVersion",
+            "kitDigest"
+          ],
+          "not": {
+            "required": [
+              "kitCommit"
+            ]
+          }
+        }
       ],
       "additionalProperties": false,
       "properties": {
@@ -79,6 +110,14 @@
         "kitCommit": {
           "type": "string",
           "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        },
+        "kitVersion": {
+          "type": "string",
+          "pattern": "^(?=.{5,64}$)(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+        },
+        "kitDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       }
     },

@@ -833,5 +833,17 @@
   "setup batch lists an enabled job whose plist is missing and does not read a plist through a link",
   "an enabled job of every kind is outdated when its plist differs from what schedule apply writes now: kit, node or a missing file",
   "the plist state read does not follow a link",
-  "an enabled hub sync job whose plist names an old kit is outdated, listed for a rewrite and written again in one batch"
+  "an enabled hub sync job whose plist names an old kit is outdated, listed for a rewrite and written again in one batch",
+  "kit identity names a Git or package kit and parses only full digests",
+  "kit digest covers path, executable bit and bytes of the runtime set, and the manifest is outside it",
+  "kit manifest records version, digest, sorted files and the source commit, and readManifest refuses a bad one",
+  "identity of a running kit is git for a clone and package for a folder with a manifest",
+  "a good package kit passes the kit gate",
+  "package kit with a changed, added or removed file fails with GATE_REQUIRED",
+  "package kit with a link, a writable folder or a foreign owner fails with GATE_REQUIRED",
+  "package kit outside the kits folder, or with a manifest that does not match, fails with GATE_REQUIRED",
+  "hook receipt fast path flags kit-changed when the manifest digest changes, and old Git receipts still validate",
+  "paths confirm records the kitId of a package kit, and a saved Git confirmation still reads",
+  "live config holds exactly one kit form: kitCommit, or kitVersion with a full kitDigest",
+  "live package kit under the kits folder validates, gets a kitId receipt and fails after a changed byte"
 ]
