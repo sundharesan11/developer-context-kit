@@ -34,7 +34,7 @@ const liveFolder = {
   why: "devtwin keeps all private state in a folder that you create at mode 0700, usually ~/.devtwin. devtwin never creates that folder for you.",
   undo: "Nothing to undo. This step writes nothing.",
   plan: (ctx) => ({ guidance: true, live: Boolean(ctx.pilot.live), pilot: ctx.pilot.path, store: ctx.pilot.pilotRoot, initialized: initialized(ctx),
-    steps: ["mkdir -m 700 ~/.devtwin, then clone and pin the kit in ~/.devtwin/kit (docs/LIVE.md)", "live init --pilot <live.json> --agent <agent> --repo <repo>, preview then apply", "init --pilot <live.json> --actor <actor-ref> --apply"] }),
+    steps: ["mkdir -m 700 ~/.devtwin, then clone and pin the kit in ~/.devtwin/kit (https://github.com/sundharesan11/devtwin/blob/main/docs/LIVE.md)", "live init --pilot <live.json> --agent <agent> --repo <repo>, preview then apply", "init --pilot <live.json> --actor <actor-ref> --apply"] }),
   apply: () => { throw new DevtwinError("INVALID_INPUT", "This setup step has nothing to apply", { field: "step" }); },
   done: (ctx) => initialized(ctx)
 };

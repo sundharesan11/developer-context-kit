@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Widget updates</title>
+  <id>urn:example:widget-updates</id>
+  <updated>2026-10-04T12:00:00Z</updated>
+  <entry>
+    <title type="html">Widget 2.3 &lt;em&gt;released&lt;/em&gt;</title>
+    <link rel="alternate" href="https://updates.example.com/widget-2-3"/>
+    <link rel="self" href="https://updates.example.com/self/widget-2-3"/>
+    <id>urn:example:widget-2-3</id>
+    <updated>2026-10-04T12:00:00Z</updated>
+    <summary>Faster builds and a new config flag.</summary>
+  </entry>
+</feed>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic RSS 2.0 fixture -->
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Acme changelog</title>
+    <link>https://changelog.example.com/</link>
+    <description>Synthetic vendor changelog</description>
+    <item>
+      <title>acme-sdk 4 adds streaming</title>
+      <link>https://changelog.example.com/posts/streaming</link>
+      <guid isPermaLink="false">acme-post-0001</guid>
+      <pubDate>Tue, 06 Oct 2026 09:00:00 GMT</pubDate>
+      <description><![CDATA[<p>Streaming responses are now <b>generally available</b>.</p>]]></description>
+    </item>
+    <item>
+      <title>Quarterly office hours &amp; community notes</title>
+      <link>https://elsewhere.example.net/office-hours</link>
+      <guid>acme-post-0002</guid>
+      <pubDate>Mon, 05 Oct 2026 09:00:00 GMT</pubDate>
+      <description>&lt;a href="https://changelog.example.com/acme-sdk"&gt;Read more&lt;/a&gt; about the meetup.</description>
+    </item>
+  </channel>
+</rss>

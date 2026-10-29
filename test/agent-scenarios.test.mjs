@@ -193,6 +193,6 @@ test("agent scenario runbook lists every scenario the judge knows and the collea
   const form = await readFile(join(DIR, "colleague-check.template.txt"), "utf8");
   assert.match(form, /Which store did you stop maintaining by hand/);
   assert.deepEqual(scanSensitive(form), []);
-  const acceptance = await readFile(join(import.meta.dirname, "../scripts/acceptance.mjs"), "utf8");
+  const acceptance = await readFile(join(import.meta.dirname, "../src/demo/run.mjs"), "utf8");
   assert.match(acceptance, /id: "real-agent-scenarios", status: "deferred"/);
 });

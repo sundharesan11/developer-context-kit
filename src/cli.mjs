@@ -7,8 +7,11 @@ const ROOT_OPTIONS = {
   "state-root": { type: "string" }, pilot: { type: "string" }
 };
 export const COMMANDS = {
-  version: { rootFree: true, load: async () => ({ options: {}, run: () => ({ name: "devtwin", version: "0.0.0-local" }) }) },
+  // U42 (KTD9): the version from the kit's package.json, plus the commit of a Git clone.
+  version: { rootFree: true, load: async () => ({ options: {}, run: ({}, ctx) => import("./kit/version.mjs").then((m) => m.kitVersion(ctx.kitRoot)) }) },
   help: { rootFree: true, load: async () => ({ options: {}, run: () => ({ commands: listCommands() }) }) },
+  // U42: the offline demo, in a fresh pilot root of its own; it never reads or writes a real pilot.
+  demo: { rootFree: true, rootOptions: false, interactive: true, load: async () => (await import("./demo/run.mjs")).demoCommand },
   "skill-sources catalog": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/commands.mjs")).catalogCommand },
   "skill-sources check": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/commands.mjs")).checkCommand },
   "skill-sources preview": { rootFree: true, rootOptions: false, load: async () => (await import("./skill-sources/acquisition-commands.mjs")).previewCommand },
@@ -149,6 +152,7 @@ export const COMMANDS = {
 export const listCommands = () => Object.keys(COMMANDS).sort();
 export const isRootFree = (route) => COMMANDS[route]?.rootFree === true;
 function routeFor(argv) {
+  if (argv.length === 1 && argv[0] === "--version") return { route: "version", args: [] };
   if (argv.length === 0 || argv[0].startsWith("-")) throw new DevtwinError("USAGE", "A command is required");
   const three = argv.slice(0, 3).join(" "), two = argv.slice(0, 2).join(" ");
   if (argv.length >= 3 && COMMANDS[three]) return { route: three, args: argv.slice(3) };

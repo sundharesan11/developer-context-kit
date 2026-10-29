@@ -75,7 +75,7 @@ function nextSteps({ to, toDir, fromDir, kitRoot, agents }) {
   return [
     ...agents.map((agent) => ({ step: "replace-skills", agent, command: cli + " agents install --pilot " + quote(to) + " --agent " + agent, note: "Preview, review, then apply with --apply --plan-fingerprint. Installs devtwin-* and removes the owned legacy devctx-* entries in one journaled run." })),
     { step: "shell-profile", command: "export " + KIT_ENV + "=" + quote(kitRoot), note: "Replace the export " + LEGACY_KIT_ENV + " line in the shell profile with this one, then open a new terminal." },
-    { step: "verify", command: cli + " agents status --pilot " + quote(to), note: "Expect no legacy devctx-* actions and no notes. Run a fresh-session check as in docs/LIVE.md." },
+    { step: "verify", command: cli + " agents status --pilot " + quote(to), note: "Expect no legacy devctx-* actions and no notes. Run a fresh-session check as in https://github.com/sundharesan11/devtwin/blob/main/docs/LIVE.md." },
     { step: "remove-legacy-root", command: "rm -rf " + quote(fromDir), note: "Only after the checks above pass. live migrate never deletes it. Nothing under " + toDir + " depends on it." }
   ];
 }
