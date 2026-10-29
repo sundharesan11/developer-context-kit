@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { readFile, writeFile, realpath, utimes, readdir, chmod, mkdir, stat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { performance } from "node:perf_hooks";
 import { onboardFixture, draftFor, runCli, fixtureGit, makeRepo, now } from "./helpers.mjs";
 import { main } from "../src/cli.mjs";
@@ -20,6 +21,9 @@ import { summaryPath } from "../src/context/summary.mjs";
 const SCOPE = "example", PROJECT = "example.atlas";
 const FIXTURES = join(import.meta.dirname, "fixtures/hooks");
 const BIN = join(import.meta.dirname, "../bin/devtwin.mjs");
+// U46: the session-start line names the running kit, here this checkout.
+const KIT_PART = " Kit: `" + realpathSync(join(import.meta.dirname, "..")) + "`.";
+const KIT_RE = "Kit: `[^`]+`\\. ";
 const lesson = (requestId, extra = {}, { scope = SCOPE, project = PROJECT } = {}) => {
   const input = draftFor(scope, project, { requestId, kind: "lesson", body: "Do run migrations before seeding the test database.\n" });
   input.draft = { ...input.draft, title: "Migrations before seeds", class: "lesson", reach: "project", match: { paths: ["db/migrations/**"], packages: ["pg"], topics: ["migrations"] }, ...extra };
@@ -96,7 +100,8 @@ test("hook delivers a lesson for a package named in the prompt before any edit",
   const s = await store(t);
   const start = await hook(s, "claude", "session-start", await payload("claude-session-start", s.repo));
   assert.equal(start.json.hookSpecificOutput.hookEventName, "SessionStart");
-  assert.match(start.context, /^devtwin hook live: 1 lesson for example\.atlas\. Index lines arrive when work matches\. Session ID for lesson propose: ses_[a-f0-9]{24}\.$/);
+  assert.match(start.context, new RegExp("^devtwin hook live: 1 lesson for example\\.atlas\\. Index lines arrive when work matches\\. " + KIT_RE + "Session ID for lesson propose: ses_[a-f0-9]{24}\\.$"));
+  assert.ok(start.context.includes(KIT_PART), start.context);
   // The tag is the same for every start of one session, and differs between sessions and agents.
   const tag = /ses_[a-f0-9]{24}/.exec(start.context)[0];
   assert.equal(/ses_[a-f0-9]{24}/.exec((await hook(s, "claude", "session-start", await payload("claude-session-start", s.repo))).context)[0], tag);
@@ -314,7 +319,7 @@ test("hook emits nothing for a root bound in two scopes", async (t) => {
   assert.deepEqual([result.code, result.out], [0, ""]);
   assert.ok((await hookLog(s)).some((e) => e.code === "ambiguous-root"));
   const start = await hook(s, "claude", "session-start", await payload("claude-session-start", s.repo));
-  assert.equal(start.context, "devtwin hook: this folder is bound in more than one scope, so lessons are off.");
+  assert.equal(start.context, "devtwin hook: this folder is bound in more than one scope, so lessons are off." + KIT_PART);
 });
 
 // A live-mode-shaped store: one bound project plus three more scopes of 300 lessons each, read on every call.
@@ -469,7 +474,7 @@ test("hook warns at session start when the receipt expires within three days and
 });
 
 // U31 (KTD30): the session summary after the live line.
-const START_LINE = /^devtwin hook live: \d+ lessons? for example\.atlas\. Index lines arrive when work matches\. Session ID for lesson propose: ses_[a-f0-9]{24}\.$/;
+const START_LINE = new RegExp("^devtwin hook live: \\d+ lessons? for example\\.atlas\\. Index lines arrive when work matches\\. " + KIT_RE + "Session ID for lesson propose: ses_[a-f0-9]{24}\\.$");
 const constraint = (requestId, title, body) => { const input = draftFor(SCOPE, PROJECT, { requestId, kind: "constraint", body }); input.draft.title = title; return input; };
 
 test("hook appends the session summary after the live line at session start, within the budget", async (t) => {

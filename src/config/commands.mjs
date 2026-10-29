@@ -21,9 +21,10 @@ const liveOptions = { pilot: { type: "string" }, apply: { type: "boolean" }, "pl
 const liveInput = (values, extra = {}) => ({ configPath: values.pilot, fingerprint: values["plan-fingerprint"], ...extra });
 const live = () => import("./live.mjs");
 export const liveInitCommand = {
-  options: { ...liveOptions, agent: { type: "string", multiple: true }, repo: { type: "string", multiple: true } },
+  // U46: --kit <version>+<digest> is optional and must name the running kit; the global command forwards on it.
+  options: { ...liveOptions, agent: { type: "string", multiple: true }, repo: { type: "string", multiple: true }, kit: { type: "string" } },
   async run(values, ctx) {
-    const input = liveInput(values, { agents: asList(values.agent), repos: asList(values.repo) });
+    const input = liveInput(values, { agents: asList(values.agent), repos: asList(values.repo), kit: values.kit });
     return values.apply ? (await live()).applyLiveInit(input, ctx) : (await live()).previewLiveInit(input, ctx);
   }
 };

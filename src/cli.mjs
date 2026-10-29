@@ -164,6 +164,8 @@ function routeFor(argv) {
   if (COMMANDS[argv[0]]) return { route: argv[0], args: argv.slice(1) };
   throw new DevtwinError("USAGE", "Unknown command");
 }
+// The route argv names, or null for none (src/kit/forward.mjs).
+export const routeOf = (argv) => { try { return routeFor(argv).route; } catch { return null; } };
 export async function main(argv, options = {}) {
   // kitRoot and templateRoot are test seams for the running kit; production leaves them undefined.
   // stackCatalog, resolvePublicRead, request and lookup are seams for the stack routes; routing will supply the real

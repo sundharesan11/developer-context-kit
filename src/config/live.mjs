@@ -83,6 +83,8 @@ export function planLiveInit(input, ctx) {
   if (!agents.length || agents.some((agent) => !AGENTS.includes(agent))) invalid("agent");
   const home = ctx.home, all = skillDirsFor({ home, env: ctx.env ?? process.env });
   const kitRoot = runningKit(ctx), identity = runningIdentity(kitRoot);
+  // U46: an optional --kit names the package kit init must run from (src/kit/forward.mjs forwards to it).
+  if (input.kit !== undefined && kitId(requestedKit({ kit: input.kit })) !== kitId(identity)) gate("kit", "running-kit");
   const config = { schemaVersion: 1, ...layout, agentHomes: [], repos: sorted(input.repos ?? []), forbidden: [], live: withKit({ configId: PENDING_ID, home, skillDirs: Object.fromEntries(agents.map((agent) => [agent, all[agent]])) }, kitRoot, identity) };
   const checked = checkLiveConfig(config, path, gateContext(ctx));
   return finalizePlan({ kind: "live-init", config: { ...config, live: { ...config.live, configId: null } }, layout: { config: path, ...layout, kitRoot }, warnings: [...checked.warnings, ...kitWarnings(kitRoot, identity, dir, home)] });

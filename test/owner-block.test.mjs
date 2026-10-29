@@ -123,6 +123,20 @@ test("owner block denies owner-only actions through terminal wrappers", async (t
   }
 });
 
+// U46 (KTD6): skills run the pinned kit by its absolute path, single-quoted, and a human may name a package kit's bin.
+test("owner block denies owner routes run through a pinned kit's absolute bin path", async (t) => {
+  const p = await makePilot(t);
+  const kits = ["'/x/.devtwin/kit/bin/devtwin.mjs'", "\"/x/.devtwin/kits/0.1.0-alpha.1-0123456789ab/bin/devtwin.mjs\"", "'/x/kit dir/bin/devtwin.mjs'"];
+  for (const bin of kits) {
+    for (const route of ["setup apply --pilot '/x/live.json' --all-pending --apply", "setup apply --pilot '/x/live.json' --step hooks-claude", "live set-kit --pilot '/x/live.json' --kit 0.1.0+aa --apply", "paths confirm --pilot '/x/live.json' --apply", "setup"]) {
+      const command = "node " + bin + " " + route;
+      assert.ok(ownerAction("claude", claudeBash(p.reposDir, command)), command);
+      assert.ok(isDeny(await hook(p.path, "claude", claudeBash(p.reposDir, command))), command);
+    }
+    for (const route of ["setup status --pilot '/x/live.json'", "lesson match --pilot '/x/live.json' --scope example --path db/a.sql", "paths check --pilot '/x/live.json'"]) assert.equal(ownerAction("claude", claudeBash(p.reposDir, "node " + bin + " " + route)), null, route);
+  }
+});
+
 test("owner block allows a live migrate preview and gives no decision for non-owner commands", async (t) => {
   const p = await makePilot(t);
   for (const command of ALLOWED) {

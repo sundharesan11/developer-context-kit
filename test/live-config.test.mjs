@@ -4,7 +4,7 @@ import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { mkdir, writeFile, readFile, readdir, rm, symlink, chmod } from "node:fs/promises";
-import { sandbox, makeRepo, fixtureGit } from "./helpers.mjs";
+import { sandbox, makeRepo, fixtureGit, runCli } from "./helpers.mjs";
 import { loadPilot, rootsFromPilot, assertWritable, recordApprovedDigest, pilotDigest } from "../src/config/pilot.mjs";
 import { ensureRoots } from "../src/config/roots.mjs";
 import { toJson } from "../src/errors.mjs";
@@ -200,14 +200,15 @@ test("live kit clone of the committed HEAD runs devtwin from a pinned detached c
   await fixtureGit(clone, ["checkout", "-q", "--detach", head]);
   const f = await liveFixture(t, { kit: { kit: clone, commit: head } });
   const path = await f.approved();
-  const run = (kit) => {
-    const r = spawnSync(process.execPath, [join(kit, "bin/devtwin.mjs"), "doctor", "--pilot", path], { cwd: f.sb, encoding: "utf8", env: { PATH: process.env.PATH, HOME: f.home } });
-    return JSON.parse(r.stdout);
-  };
-  const ok = run(clone);
+  const run = (kit) => spawnSync(process.execPath, [join(kit, "bin/devtwin.mjs"), "doctor", "--pilot", path], { cwd: f.sb, encoding: "utf8", env: { PATH: process.env.PATH, HOME: f.home } });
+  const ok = JSON.parse(run(clone).stdout);
   assert.equal(ok.ok, true, JSON.stringify(ok.error));
   assert.equal(ok.command, "doctor");
-  const mismatch = run(REPO_ROOT);
+  // U46 (KTD6): this checkout's bin forwards to the pinned clone; the gate still refuses this checkout as the running kit.
+  const forwarded = run(REPO_ROOT);
+  assert.equal(JSON.parse(forwarded.stdout).ok, true, forwarded.stdout);
+  assert.equal(forwarded.stderr, "devtwin: running kit git:" + head.slice(0, 12) + "\n");
+  const mismatch = (await runCli(["doctor", "--pilot", path], { home: f.home, env: {}, kitRoot: REPO_ROOT })).json;
   assert.equal(mismatch.ok, false);
   assert.equal(mismatch.error.code, "DEVTWIN_GATE_REQUIRED");
   assert.equal(mismatch.error.details.field, "live.kitRoot");

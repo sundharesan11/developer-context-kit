@@ -357,6 +357,24 @@ test("live init from a package kit writes kitVersion and the full kitDigest and 
   assert.equal((await h.cli(["doctor", "--pilot", h.liveConfig], pkg.kit)).json.ok, true);
   failed(await h.cli(["doctor", "--pilot", h.liveConfig], h.kit), "DEVTWIN_GATE_REQUIRED", "live.kitRoot");
 });
+// U46: the global command forwards live init --kit to the named kit, which then checks that it is that kit.
+test("live init --kit runs only from the package kit it names", async (t) => {
+  const h = await liveHome(t);
+  const a = await pkgKit(h, "0.1.0-alpha.1"), b = await pkgKit(h, "0.1.0-alpha.2");
+  const args = ["live", "init", "--pilot", h.liveConfig, "--agent", "claude"];
+  const own = await h.cli([...args, "--kit", a.arg], a.kit);
+  assert.equal(own.json.ok, true, JSON.stringify(own.json.error));
+  assert.equal(own.json.result.fingerprint, (await h.cli(args, a.kit)).json.result.fingerprint, "--kit does not change the plan");
+  for (const [kit, from] of [[b.arg, a.kit], [a.arg, h.kit], [a.version + "+" + b.digest, a.kit]]) {
+    const r = await h.cli([...args, "--kit", kit], from);
+    failed(r, "DEVTWIN_GATE_REQUIRED", "kit");
+    assert.equal(r.json.error.details.reason, "running-kit");
+  }
+  failed(await h.cli([...args, "--kit", "0.1.0+short"], a.kit), "DEVTWIN_INVALID_INPUT", "kit");
+  const applied = await h.cli([...args, "--kit", a.arg, "--apply", "--plan-fingerprint", own.json.result.fingerprint], a.kit);
+  assert.equal(applied.json.ok, true, JSON.stringify(applied.json.error));
+  assert.equal((await readConfig(h.liveConfig)).live.kitDigest, a.digest);
+});
 test("live set-kit from a Git kit to a package kit shows both identities in the owner dialog, and a denied dialog changes nothing", async (t) => {
   const h = await liveHome(t);
   const { applied } = await h.init();

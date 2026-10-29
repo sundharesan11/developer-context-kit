@@ -103,14 +103,15 @@ const readBundledSkill = (name) => readFile(join(import.meta.dirname, "..", "ski
 function assertSkillRoutes(name, text, COMMANDS) {
   assert.doesNotMatch(text, /node bin\/devtwin\.mjs/, name + ": checkout-relative command");
   let count = 0;
-  for (const match of text.matchAll(/devtwin\.mjs"?[ \t]+([a-z-]+)(?:[ \t]+([a-z-]+))?/g)) {
+  for (const match of text.matchAll(/devtwin\.mjs["']?[ \t]+([a-z-]+)(?:[ \t]+([a-z-]+))?/g)) {
     const first = match[1], second = match[2];
     assert.ok(COMMANDS[first] || COMMANDS[first + " " + second], name + ": " + match[0]);
     count++;
   }
   assert.ok(count > 0, name + " invokes the CLI");
   for (const match of text.matchAll(/node[^\n]*devtwin\.mjs[^\n]*/g)) {
-    assert.match(match[0], /node "\$DEVTWIN_KIT\/bin\/devtwin\.mjs" /, name + ": " + match[0]);
+    // U46 (KTD6): the pinned kit path from the session-start line, never the variable or devtwin on PATH.
+    assert.match(match[0], /node '<kit>\/bin\/devtwin\.mjs' /, name + ": " + match[0]);
     assert.doesNotMatch(match[0], /record publish/, name + " never invokes record publish");
   }
 }
@@ -120,7 +121,7 @@ test("bundled skills invoke only implemented CLI routes through DEVTWIN_KIT", as
 });
 test("bundled skill route check refuses a route missing from COMMANDS", async () => {
   const { COMMANDS } = await import("../src/cli.mjs");
-  const text = "```sh\nnode \"$DEVTWIN_KIT/bin/devtwin.mjs\" profile erase --pilot '<pilot.json>'\n```\n";
+  const text = "```sh\nnode '<kit>/bin/devtwin.mjs' profile erase --pilot '<pilot.json>'\n```\n";
   assert.throws(() => assertSkillRoutes("fixture", text, COMMANDS), /profile erase/);
 });
 test("bundled skill frontmatter passes skill-builder rules with a one-line description", async () => {
