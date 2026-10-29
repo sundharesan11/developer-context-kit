@@ -64,6 +64,8 @@ test("release workflow grants id-token write only to the publish job, and the re
 test("release gate checks the tag, runs every gate on macOS for both Node versions and outputs the kit digest", () => {
   const { gate } = jobs(workflow());
   assert.match(gate, /runs-on: macos-15\n/);
+  // The suite plus the pack smoke test run past 30 minutes on hosted macOS runners.
+  assert.match(gate, /timeout-minutes: 60\n/);
   assert.match(gate, /node: \['22\.13\.0', '26\.4\.0'\]/);
   assert.match(gate, /"\$TAG" != "v\$VERSION"/, "the tag must equal v + the package.json version");
   const order = ["\"$TAG\" != \"v$VERSION\"", "run: npm run check:package", "run: npm run check:writing", "run: npm test", "run: node scripts/pack-smoke.mjs", "node scripts/kit-digest.mjs"];

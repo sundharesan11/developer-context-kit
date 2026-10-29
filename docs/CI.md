@@ -11,7 +11,7 @@
 | Linux evaluation (unsupported) | `ubuntu-24.04` | `26.4.0` | Gather Linux compatibility evidence |
 | Linux minimum evaluation (unsupported) | `ubuntu-24.04` | `22.13.0` | Evaluate both Linux and the declared floor |
 
-Each matrix job has a distinct name and a 20-minute timeout. Failures remain visible; the workflow does not turn them into success with `continue-on-error`. A failing evaluation is not a reason to weaken the pilot guards. Do not make the Linux evaluation a required support gate until support is deliberately adopted.
+Each matrix job has a distinct name and a 45-minute timeout. The full suite takes more than 20 minutes on hosted macOS runners. Failures remain visible; the workflow does not turn them into success with `continue-on-error`. A failing evaluation is not a reason to weaken the pilot guards. Do not make the Linux evaluation a required support gate until support is deliberately adopted.
 
 A green job establishes synthetic behavior on that runner and commit. It does not prove native agent discovery, real-client onboarding, backup/restore or a supported operating-system release. Keep the [limitations](LIMITATIONS.md) until compatibility evidence has been reviewed. No branch protection or required checks are configured by this file.
 
