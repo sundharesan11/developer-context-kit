@@ -154,6 +154,21 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;margin:0;font-weight:
 .d-txt{fill:#aab3c7;font-size:12px}
 .d-ok{fill:var(--ok);font-size:12px}
 .d-acc{fill:var(--accent);font-size:12px}
+/* hero card: the devtwin folder and the agent sessions that apply it */
+.d-dim{fill:var(--faint)}
+.d-del{fill:#f07178;font-size:12px}
+.d-cool{fill:var(--cool);font-size:12px}
+.d-hd{fill:var(--faint);font-size:11px;letter-spacing:.06em}
+.d-del-bg{fill:rgba(240,113,120,.08)}
+.d-add-bg{fill:rgba(116,224,204,.08)}
+.d-new-bg{fill:rgba(116,224,204,.07)}
+.d-id rect{fill:var(--accent-soft);stroke:var(--accent-line)}
+.d-id text{fill:var(--accent-2);font-size:11px}
+.d-id.c rect{fill:var(--cool-soft);stroke:rgba(116,224,204,.4)}
+.d-id.c text{fill:var(--cool)}
+.d-sep{stroke:rgba(150,170,215,.12);stroke-width:1}
+html.m-on .d-new-bg{animation:d-new 4.8s ease-in-out infinite}
+@keyframes d-new{0%,100%{fill:rgba(116,224,204,.05)}50%{fill:rgba(116,224,204,.14)}}
 .d-node{fill:#151d33;stroke:var(--accent)}
 .d-node-ring{fill:none;stroke:var(--accent);opacity:.35;transform-origin:center;transform-box:fill-box;animation:ring 4.8s ease-out infinite}
 @keyframes ring{0%{transform:scale(1);opacity:.45}70%,100%{transform:scale(1.55);opacity:0}}
@@ -164,10 +179,10 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;margin:0;font-weight:
 .lane .id rect{fill:#10172a;stroke:rgba(150,170,215,.16);transition:none}
 .lane .id text{fill:#7f899f;font-size:11.5px}
 .lane .lit{opacity:0}
-.lane-acme .lit{animation:litA 16s ease-in-out infinite}
-.lane-globex .lit{animation:litB 16s ease-in-out infinite}
-.lane-acme .dim{animation:dimA 16s ease-in-out infinite}
-.lane-globex .dim{animation:dimB 16s ease-in-out infinite}
+.lane-work .lit{animation:litA 16s ease-in-out infinite}
+.lane-client .lit{animation:litB 16s ease-in-out infinite}
+.lane-work .dim{animation:dimA 16s ease-in-out infinite}
+.lane-client .dim{animation:dimB 16s ease-in-out infinite}
 @keyframes litA{0%,4%{opacity:0}9%,44%{opacity:1}50%,100%{opacity:0}}
 @keyframes litB{0%,54%{opacity:0}59%,94%{opacity:1}100%{opacity:0}}
 @keyframes dimA{0%,4%{opacity:1}9%,44%{opacity:0}50%,100%{opacity:1}}
@@ -186,7 +201,7 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;margin:0;font-weight:
 .stage-foot div{padding:16px 18px;font-size:13px;color:var(--muted);border-right:1px solid var(--line)}
 .stage-foot div:last-child{border-right:0}
 .stage-foot b{display:block;color:var(--text);font-weight:500;font-size:13.5px;margin-bottom:2px}
-.stage-foot code{color:var(--accent);font-size:12px}
+.stage-foot code{display:block;margin-top:6px;color:var(--accent);font-size:12px}
 @media (max-width:760px){.stage-foot{grid-template-columns:1fr 1fr}.stage-foot div:nth-child(2){border-right:0}.stage-foot div:nth-child(-n+2){border-bottom:1px solid var(--line)}}
 
 /* ---------- sections ---------- */
@@ -286,8 +301,8 @@ section{position:relative}
 .idrow .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:var(--surface-3);border:1px solid var(--line-2)}
 .idrow .who{font-size:14px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .idrow .who small{display:block;font:12px/1.4 var(--mono);color:var(--faint);font-weight:400}
-.acct[data-scope="acme"] .idrow{border-color:var(--accent-line);background:linear-gradient(90deg,var(--accent-soft),var(--surface) 60%)}
-.acct[data-scope="globex"] .idrow{border-color:rgba(116,224,204,.35);background:linear-gradient(90deg,var(--cool-soft),var(--surface) 60%)}
+.acct[data-scope="work"] .idrow{border-color:var(--accent-line);background:linear-gradient(90deg,var(--accent-soft),var(--surface) 60%)}
+.acct[data-scope="client"] .idrow{border-color:rgba(116,224,204,.35);background:linear-gradient(90deg,var(--cool-soft),var(--surface) 60%)}
 .refuse{margin-top:14px;padding:12px 14px;border-radius:12px;background:rgba(255,123,123,.06);border:1px solid rgba(255,123,123,.25);font:12.5px/1.55 var(--mono);color:#e7c3c3}
 .refuse b{color:var(--bad);font-weight:500}
 .swap{transition:opacity .25s ease}
@@ -369,11 +384,12 @@ footer{border-top:1px solid var(--line);padding:48px 0 56px;color:var(--faint);f
 @media (prefers-reduced-motion:reduce){
   html:not(.m-on){scroll-behavior:auto}
   html:not(.m-on) .d-pulse,html:not(.m-on) .d-node-ring{display:none}
+  html:not(.m-on) .d-new-bg{animation:none!important}
   html:not(.m-on) .lane .lit,html:not(.m-on) .lane .dim,html:not(.m-on) .proj-a,html:not(.m-on) .proj-b,html:not(.m-on) .lit-wire-a,html:not(.m-on) .lit-wire-b{animation:none!important}
-  html:not(.m-on) .lane-acme .lit,html:not(.m-on) .lit-wire-a{opacity:1}
-  html:not(.m-on) .lane-acme .dim{opacity:0}
-  html:not(.m-on) .lane-globex .lit,html:not(.m-on) .lit-wire-b{opacity:0}
-  html:not(.m-on) .lane-globex .dim{opacity:1}
+  html:not(.m-on) .lane-work .lit,html:not(.m-on) .lit-wire-a{opacity:1}
+  html:not(.m-on) .lane-work .dim{opacity:0}
+  html:not(.m-on) .lane-client .lit,html:not(.m-on) .lit-wire-b{opacity:0}
+  html:not(.m-on) .lane-client .dim{opacity:1}
   html:not(.m-on) .proj-a{opacity:1}html:not(.m-on) .proj-b{opacity:0}
   html:not(.m-on).js .reveal{opacity:1;transform:none;transition:none}
   html:not(.m-on) .swap,html:not(.m-on) .btn{transition:none}
