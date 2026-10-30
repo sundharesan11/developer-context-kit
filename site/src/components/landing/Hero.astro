@@ -2,6 +2,7 @@
 import { GITHUB_URL, DOCS, INSTALL_CMD } from '../../site';
 import HeroGrid from './HeroGrid.astro';
 import CrtGlass from './CrtGlass.astro';
+import ContextGraph from './ContextGraph.astro';
 ---
 <section class="hero" id="top" aria-labelledby="hero-title">
   <HeroGrid />
@@ -27,149 +28,9 @@ import CrtGlass from './CrtGlass.astro';
       </div>
     </div>
 
-    <figure class="stage reveal" aria-labelledby="stage-cap">
-      <div class="stage-inner">
-        <div class="stage-bar" aria-hidden="true">
-          <span class="dots"><i></i><i></i><i></i></span>
-          <span class="t">~/.devtwin → every agent session</span>
-          <span class="live">applied</span>
-        </div>
-
-        <!-- Desktop diagram: the devtwin folder on the left, two agent sessions applying it on the right -->
-        <svg class="diagram diagram-d" viewBox="0 0 1120 592" role="img" aria-labelledby="dd-title dd-desc">
-        <title id="dd-title">One copy of you, applied in every repo</title>
-        <desc id="dd-desc">Left: the devtwin folder on your disk with your preferences, rules and lessons, a teammate's shared lesson, project context and an account per org. Right: two agent sessions in two repos. In work/billing-service the agent picks up your last handoff, sees priya's lesson about 4xx retries, changes a force push to main into a normal push because of your rule, and opens the PR as @sam-work. In client/mobile-app it changes SELECT star to named columns because of your lesson, runs your test command and opens the PR as @sam-client.</desc>
-
-        <path class="d-wire" d="M412 296 C 444 296, 444 158, 476 158"/>
-        <path class="d-wire" d="M412 296 C 444 296, 444 434, 476 434"/>
-        <path aria-hidden="true" class="d-pulse" d="M412 296 C 444 296, 444 158, 476 158" pathLength="100" style="animation-duration:3.6s"/>
-        <path aria-hidden="true" class="d-pulse c" d="M412 296 C 444 296, 444 434, 476 434" pathLength="100" style="animation-duration:3.6s;animation-delay:-1.8s"/>
-
-        <!-- the devtwin folder -->
-        <rect class="d-card" x="32" y="32" width="380" height="528" rx="12"/>
-        <path class="d-win-bar" d="M44 32 H400 A12 12 0 0 1 412 44 V64 H32 V44 A12 12 0 0 1 44 32Z" style="fill:#151c33"/>
-        <text class="d-acc" x="50" y="53" style="font-size:13px">✦</text><text class="d-win-t" x="68" y="53">~/.devtwin</text>
-        <text class="d-txt d-dim" x="396" y="53" text-anchor="end" style="font-size:11px">on your disk</text>
-
-        <text class="d-hd" x="52" y="96">PREFERENCES</text>
-        <text class="d-txt" x="52" y="118">small PRs, one change each</text>
-        <text class="d-txt" x="52" y="139">tests: npm test -- --runInBand</text>
-        <text class="d-txt" x="52" y="160">voice: short, plain sentences</text>
-
-        <text class="d-hd" x="52" y="192">RULES AND LESSONS</text>
-        <text class="d-txt" x="52" y="214">never force-push main</text><text class="d-txt d-dim" x="396" y="214" text-anchor="end" style="font-size:11px">rule</text>
-        <rect class="d-new-bg" x="40" y="222" width="364" height="40" rx="5"/>
-        <text class="d-cool" x="42" y="235">+</text>
-        <text class="d-txt" x="52" y="235">name every column</text><text class="d-txt d-dim" x="396" y="235" text-anchor="end" style="font-size:11px">lesson · just recorded</text>
-        <text class="d-txt d-dim" x="64" y="254" style="font-size:11px">why: SELECT * broke the export</text>
-        <text class="d-cool" x="52" y="282">don't retry 4xx from billing</text><text class="d-txt d-dim" x="396" y="282" text-anchor="end" style="font-size:11px">priya · shared</text>
-
-        <text class="d-hd" x="52" y="314">PROJECT CONTEXT · work.billing</text>
-        <text class="d-txt" x="52" y="336">decision: cursor paging</text><text class="d-txt d-dim" x="396" y="336" text-anchor="end" style="font-size:11px">BILL-148</text>
-        <text class="d-txt" x="52" y="357">constraint: workers never write billing</text>
-        <text class="d-txt" x="52" y="378">handoff: retry backoff half done</text>
-        <text class="d-txt d-dim" x="64" y="397" style="font-size:11px">next: add the 4xx test</text>
-
-        <text class="d-hd" x="52" y="429">IDENTITY</text>
-        <circle cx="56" cy="447" r="3.5" fill="#ff8a3d"/><text class="d-txt" x="68" y="451">work</text><text class="d-txt" x="148" y="451" style="fill:#ffb07a">@sam-work</text><text class="d-txt d-dim" x="396" y="451" text-anchor="end" style="font-size:11px">GitHub · Slack · Linear</text>
-        <circle cx="56" cy="468" r="3.5" fill="#74e0cc"/><text class="d-txt" x="68" y="472">client</text><text class="d-cool" x="148" y="472">@sam-client</text><text class="d-txt d-dim" x="396" y="472" text-anchor="end" style="font-size:11px">GitHub · Slack · Linear</text>
-
-        <line class="d-sep" x1="32" y1="494" x2="412" y2="494"/>
-        <text class="d-txt d-dim" x="52" y="519" style="font-size:11px">plain files · no account · no server</text>
-        <text class="d-acc" x="52" y="542">$</text><text class="d-txt" x="66" y="542">devtwin undo</text><text class="d-txt d-dim" x="166" y="542" style="font-size:11px">reverses any write</text>
-
-        <!-- session A -->
-        <rect class="d-win" x="476" y="32" width="612" height="252" rx="12"/>
-        <path class="d-win-bar" d="M488 32 H1076 A12 12 0 0 1 1088 44 V64 H476 V44 A12 12 0 0 1 488 32Z"/>
-        <circle cx="492" cy="48" r="3.5" fill="#2a3349"/><circle cx="504" cy="48" r="3.5" fill="#2a3349"/><circle cx="516" cy="48" r="3.5" fill="#2a3349"/>
-        <text class="d-win-t" x="532" y="53">agent</text><text class="d-txt d-dim" x="576" y="53" style="font-size:11.5px">~/work/billing-service</text>
-        <g class="d-id"><rect x="950" y="38" width="126" height="20" rx="6"/><text x="960" y="52">work · @sam-work</text></g>
-        <text class="d-acc" x="496" y="94">›</text><text class="d-txt" x="512" y="94">pick up the retry fix</text>
-        <text class="d-txt d-dim" x="496" y="118" style="font-size:11.5px">↳ last handoff: retry backoff half done · next: add the 4xx test</text>
-        <text class="d-cool" x="496" y="142">◆ don't retry 4xx from the billing API</text><text class="d-txt d-dim" x="776" y="142" style="font-size:11.5px">· priya's lesson</text>
-        <rect class="d-del-bg" x="492" y="156" width="580" height="24" rx="5"/><text class="d-del" x="504" y="173">- git push --force origin main</text>
-        <rect class="d-add-bg" x="492" y="184" width="580" height="24" rx="5"/><text class="d-ok" x="504" y="201">+ git push origin fix/retry-backoff</text>
-        <text class="d-acc" x="496" y="234">✦</text><text class="d-txt" x="512" y="234">never force-push main</text><text class="d-txt d-dim" x="670" y="234">· your rule</text>
-        <text class="d-txt d-dim" x="496" y="260" style="font-size:11.5px">› PR #212 opened as @sam-work</text>
-
-        <!-- session B -->
-        <rect class="d-win" x="476" y="308" width="612" height="252" rx="12"/>
-        <path class="d-win-bar" d="M488 308 H1076 A12 12 0 0 1 1088 320 V340 H476 V320 A12 12 0 0 1 488 308Z"/>
-        <circle cx="492" cy="324" r="3.5" fill="#2a3349"/><circle cx="504" cy="324" r="3.5" fill="#2a3349"/><circle cx="516" cy="324" r="3.5" fill="#2a3349"/>
-        <text class="d-win-t" x="532" y="329">agent</text><text class="d-txt d-dim" x="576" y="329" style="font-size:11.5px">~/client/mobile-app</text>
-        <g class="d-id c"><rect x="924" y="314" width="152" height="20" rx="6"/><text x="934" y="328">client · @sam-client</text></g>
-        <text class="d-acc" x="496" y="370">›</text><text class="d-txt" x="512" y="370">add the orders query</text>
-        <text class="d-txt d-dim" x="496" y="394" style="font-size:11.5px">↳ constraint: reads go through src/db/read.ts</text>
-        <rect class="d-del-bg" x="492" y="408" width="580" height="24" rx="5"/><text class="d-del" x="504" y="425">- SELECT * FROM orders</text>
-        <rect class="d-add-bg" x="492" y="436" width="580" height="24" rx="5"/><text class="d-ok" x="504" y="453">+ SELECT id, total, status FROM orders</text>
-        <text class="d-acc" x="496" y="486">✦</text><text class="d-txt" x="512" y="486">name every column</text><text class="d-txt d-dim" x="641" y="486">· your lesson</text>
-        <text class="d-txt d-dim" x="496" y="512" style="font-size:11.5px">› npm test -- --runInBand · passed</text>
-        <text class="d-txt d-dim" x="496" y="536" style="font-size:11.5px">› PR #48 opened as @sam-client</text>
-        </svg>
-
-        <!-- Phone diagram: the same story, stacked -->
-        <svg class="diagram diagram-m" viewBox="0 0 360 838" role="img" aria-labelledby="dm-title">
-        <title id="dm-title">The devtwin folder on your disk holds your preferences, rules, lessons, a teammate's shared lesson, project context and an account per org. Agents in work/billing-service and client/mobile-app apply it: no force push to main, named columns instead of SELECT star, and each PR opened from the right account.</title>
-        <path class="d-wire" d="M180 356 V 380"/><path class="d-wire" d="M180 588 V 612"/>
-        <path aria-hidden="true" class="d-pulse" d="M180 356 V 380" pathLength="100" style="animation-duration:3.6s"/>
-        <path aria-hidden="true" class="d-pulse c" d="M180 588 V 612" pathLength="100" style="animation-duration:3.6s;animation-delay:-1.8s"/>
-
-        <rect class="d-card" x="16" y="16" width="328" height="340" rx="10"/>
-        <path class="d-win-bar" d="M26 16 H334 A10 10 0 0 1 344 26 V44 H16 V26 A10 10 0 0 1 26 16Z" style="fill:#151c33"/>
-        <text class="d-acc" x="30" y="35">✦</text><text class="d-win-t" x="46" y="35" style="font-size:12px">~/.devtwin</text>
-        <text class="d-txt d-dim" x="330" y="35" text-anchor="end" style="font-size:10.5px">on your disk</text>
-        <g style="font-size:10.5px">
-        <text class="d-hd" x="30" y="66" style="font-size:10px">PREFERENCES</text>
-        <text class="d-txt" x="30" y="85" style="font-size:10.5px">small PRs · npm test -- --runInBand</text>
-        <text class="d-txt" x="30" y="104" style="font-size:10.5px">voice: short, plain sentences</text>
-        <text class="d-hd" x="30" y="128" style="font-size:10px">RULES AND LESSONS</text>
-        <text class="d-txt" x="30" y="147" style="font-size:10.5px">never force-push main</text>
-        <rect class="d-new-bg" x="22" y="154" width="316" height="34" rx="4"/>
-        <text class="d-txt" x="30" y="166" style="font-size:10.5px">name every column</text><text class="d-txt d-dim" x="330" y="166" text-anchor="end" style="font-size:10px">just recorded</text>
-        <text class="d-txt d-dim" x="40" y="182" style="font-size:10px">why: SELECT * broke the export</text>
-        <text class="d-cool" x="30" y="206" style="font-size:10.5px">don't retry 4xx from billing</text><text class="d-txt d-dim" x="330" y="206" text-anchor="end" style="font-size:10px">priya</text>
-        <text class="d-hd" x="30" y="230" style="font-size:10px">PROJECT CONTEXT</text>
-        <text class="d-txt" x="30" y="249" style="font-size:10.5px">decision: cursor paging · BILL-148</text>
-        <text class="d-txt" x="30" y="268" style="font-size:10.5px">handoff: retry backoff half done</text>
-        <text class="d-hd" x="30" y="292" style="font-size:10px">IDENTITY</text>
-        <text class="d-txt" x="30" y="311" style="font-size:10.5px">work <tspan style="fill:#ffb07a">@sam-work</tspan> · client <tspan style="fill:#74e0cc">@sam-client</tspan></text>
-        <line class="d-sep" x1="16" y1="322" x2="344" y2="322"/>
-        <text class="d-txt d-dim" x="30" y="342" style="font-size:10.5px">plain files · <tspan style="fill:#ff8a3d">$</tspan> devtwin undo</text>
-        </g>
-
-        <rect class="d-win" x="16" y="380" width="328" height="208" rx="10"/>
-        <path class="d-win-bar" d="M26 380 H334 A10 10 0 0 1 344 390 V408 H16 V390 A10 10 0 0 1 26 380Z"/>
-        <text class="d-win-t" x="30" y="399" style="font-size:12px">agent</text><text class="d-txt d-dim" x="70" y="399" style="font-size:10.5px">~/work/billing-service</text>
-        <g class="d-id"><rect x="262" y="386" width="72" height="18" rx="5"/><text x="269" y="399" style="font-size:10.5px">@sam-work</text></g>
-        <text class="d-txt" x="30" y="430" style="font-size:11px"><tspan class="d-acc" style="font-size:11px">›</tspan> pick up the retry fix</text>
-        <text class="d-txt d-dim" x="30" y="450" style="font-size:10.5px">↳ handoff: retry backoff half done</text>
-        <text class="d-cool" x="30" y="470" style="font-size:11px">◆ don't retry 4xx · priya's lesson</text>
-        <rect class="d-del-bg" x="26" y="480" width="308" height="22" rx="4"/><text class="d-del" x="34" y="495" style="font-size:11px">- git push --force origin main</text>
-        <rect class="d-add-bg" x="26" y="506" width="308" height="22" rx="4"/><text class="d-ok" x="34" y="521" style="font-size:11px">+ git push origin fix/retry-backoff</text>
-        <text class="d-txt" x="30" y="550" style="font-size:11px"><tspan class="d-acc" style="font-size:11px">✦</tspan> never force-push main <tspan class="d-dim">· your rule</tspan></text>
-        <text class="d-txt d-dim" x="30" y="572" style="font-size:10.5px">› PR #212 opened as @sam-work</text>
-
-        <rect class="d-win" x="16" y="612" width="328" height="210" rx="10"/>
-        <path class="d-win-bar" d="M26 612 H334 A10 10 0 0 1 344 622 V640 H16 V622 A10 10 0 0 1 26 612Z"/>
-        <text class="d-win-t" x="30" y="631" style="font-size:12px">agent</text><text class="d-txt d-dim" x="70" y="631" style="font-size:10.5px">~/client/mobile-app</text>
-        <g class="d-id c"><rect x="251" y="618" width="83" height="18" rx="5"/><text x="258" y="631" style="font-size:10.5px">@sam-client</text></g>
-        <text class="d-txt" x="30" y="662" style="font-size:11px"><tspan class="d-acc" style="font-size:11px">›</tspan> add the orders query</text>
-        <text class="d-txt d-dim" x="30" y="682" style="font-size:10.5px">↳ reads go through src/db/read.ts</text>
-        <rect class="d-del-bg" x="26" y="692" width="308" height="22" rx="4"/><text class="d-del" x="34" y="707" style="font-size:11px">- SELECT * FROM orders</text>
-        <rect class="d-add-bg" x="26" y="718" width="308" height="22" rx="4"/><text class="d-ok" x="34" y="733" style="font-size:11px">+ SELECT id, total, status FROM orders</text>
-        <text class="d-txt" x="30" y="762" style="font-size:11px"><tspan class="d-acc" style="font-size:11px">✦</tspan> name every column <tspan class="d-dim">· your lesson</tspan></text>
-        <text class="d-txt d-dim" x="30" y="784" style="font-size:10.5px">› npm test -- --runInBand · passed</text>
-        <text class="d-txt d-dim" x="30" y="806" style="font-size:10.5px">› PR #48 opened as @sam-client</text>
-        </svg>
-
-        <figcaption id="stage-cap" class="stage-foot">
-          <div><b>Recorded as you work</b>Agents write it down. You can undo any write. <code>record add</code></div>
-          <div><b>In every session</b>Preferences, rules and project context, in every repo. <code>context brief</code></div>
-          <div><b>Team lessons</b>Shared with consent, shown when the file opens. <code>lesson match</code></div>
-          <div><b>Right account</b>Each org uses its own accounts, on every service. <code>context resolve</code></div>
-        </figcaption>
-      </div>
-    </figure>
+    <div class="stage stage-wide reveal">
+      <div class="stage-inner"><ContextGraph /></div>
+    </div>
   </div>
   <CrtGlass />
 </section>
