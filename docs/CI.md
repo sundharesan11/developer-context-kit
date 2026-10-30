@@ -1,6 +1,14 @@
 # Continuous integration
 
-[Pilot CI](../.github/workflows/ci.yml) runs on pushes, pull requests and manual dispatch. A manual dispatch becomes available when the workflow exists on the default branch. It validates the disposable pilot; it does not install into real agent homes or deploy anything.
+[Pilot CI](../.github/workflows/ci.yml) runs on pushes to `main`, on pull requests and on manual dispatch. A feature branch gets its run from its pull request, so a push to a feature branch starts no run. A manual dispatch becomes available when the workflow exists on the default branch. It validates the disposable pilot; it does not install into real agent homes or deploy anything.
+
+## Change scope
+
+The first job, **Change scope**, lists the files that a pull request changes.
+
+- If every changed file is under `site/` or `docs/`, or is a Markdown file at the top level, the **Docs and website check** runs instead of the matrix. It runs the package audit, the writing check, `test/docs.test.mjs` and `test/package.test.mjs`, and it checks whitespace.
+- Any other change runs the full matrix below. A push to `main` and a manual dispatch always run the full matrix.
+- The skipped job shows as skipped, not as failed.
 
 ## Jobs and meaning
 
