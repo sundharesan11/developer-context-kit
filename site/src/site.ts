@@ -19,6 +19,8 @@ const DOC_PATHS = {
 	whereDataLives: '/docs/concepts/where-data-lives/',
 	codingAgents: '/docs/guides/coding-agents/',
 	personalHarness: '/docs/guides/personal-harness/',
+	preferences: '/docs/guides/preferences-and-templates/',
+	routines: '/docs/guides/preferences-and-templates/#make-a-routine-of-your-own',
 	lessons: '/docs/guides/lessons-and-hooks/',
 	orgHub: '/docs/guides/organization-hub/',
 	identityRouting: '/docs/guides/identity-routing/',

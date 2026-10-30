@@ -8,15 +8,16 @@
 
 [Website](https://sundharesan11.github.io/devtwin/) · [Docs](https://sundharesan11.github.io/devtwin/docs/) · [Getting started](https://github.com/sundharesan11/devtwin/blob/main/docs/GETTING-STARTED.md) · [Roadmap](https://github.com/sundharesan11/devtwin/blob/main/docs/ROADMAP.md)
 
-Your agents can read any codebase. They can't read why it was built that way, the mistakes you never repeat, or where you stopped yesterday. devtwin keeps that knowledge on your disk and gives it to Claude Code and Codex when a session starts.
+Your agents can read any codebase. They can't read why it was built that way, the mistakes you never repeat, or where you stopped yesterday. devtwin keeps that knowledge on your disk and gives it to Claude Code, Codex and Gemini CLI when a session starts.
 
 ## Why use it
 
 - **Never teach an agent the same process twice.** Your preferences and lessons follow you into every project and every agent.
-- **Run your agents like one team.** Start a task in Claude Code and finish it in Codex. Both read the same brief and the last handoff.
+- **Run your agents like one team.** Start a task in Claude Code, review it in Codex and test it in Gemini CLI. Every agent reads the same brief and the last handoff.
+- **Make your routines run themselves.** Save a rule once, such as "after I open a PR, ask my reviewer on Slack", and every agent follows it with its own connectors.
 - **Pick up where you stopped.** Each session starts with the project's rules, its top constraints and the next step from the last handoff.
 - **Stay in control.** Everything lives in plain files on your machine. Agents write as they work, every write is logged, and `undo` reverses any of them.
-- **Share what your team learns.** Send a lesson to your team's hub or repository, only with your consent.
+- **Share what your team learns.** Send a lesson to your team's hub, repository or knowledge server, only with your consent.
 
 ## Quick start
 

@@ -82,6 +82,7 @@ export default defineConfig({
 						'docs/guides/coding-agents',
 						'docs/guides/lessons-and-hooks',
 						'docs/guides/organization-hub',
+						'docs/guides/knowledge-server',
 						'docs/guides/setup-wizard',
 						'docs/guides/preferences-and-templates',
 						'docs/guides/personal-harness',

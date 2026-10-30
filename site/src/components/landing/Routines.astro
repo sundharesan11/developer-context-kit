@@ -1,0 +1,85 @@
+---
+// "Your routines" pillar (issue #27): devtwin is the setup and your routines live in it. A saved preference matches
+// after the agent opens a PR, and the agent asks the reviewer through its own Slack connector. devtwin sends nothing
+// itself. The cards show other routines set up the same way. Rows arrive line by line with the other mocks
+// (motion.ts sets --i); the route pulse runs only under html.m-on.
+import { DOCS } from '../../site';
+
+const cards = [
+	{
+		title: 'On merge',
+		text: 'Post the change in your team channel.',
+		code: 'your rule',
+		icon: '<path d="M6 3v12M18 9v12M6 15a6 6 0 0 0 6-6h6"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/>',
+	},
+	{
+		title: 'Ticket moves',
+		text: 'Comment on the Jira ticket with the PR link.',
+		code: 'your rule',
+		icon: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+	},
+	{
+		title: 'Standup',
+		text: 'A standup draft in your voice, from your records.',
+		code: 'template: slack-update',
+		icon: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+	},
+];
+---
+<article class="pillar" id="routines" aria-labelledby="p-routines">
+  <div class="p-copy reveal">
+    <div class="p-num"><span>03</span> Your routines</div>
+    <h3 id="p-routines">Teach a routine once. Every agent runs it.</h3>
+    <p>devtwin is the setup. Your routines live in it. Save a rule as a preference, or turn a template into a skill, and every agent follows it in every session.</p>
+    <ul class="ticks">
+      <li><span>A rule is a saved preference. Every agent loads it at session start.</span></li>
+      <li><span>Start a skill from a template: <code>slack-update</code>, <code>stack-watch</code> or <code>writing</code>.</span></li>
+      <li><span>Your agent sends the message through its own Slack, Jira or Google Chat connector.</span></li>
+    </ul>
+    <a class="p-more" href={DOCS.routines}>Set up your routines <span aria-hidden="true">→</span></a>
+  </div>
+  <div class="frame reveal">
+    <div class="frame-in">
+      <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">Gemini CLI · work.billing</span><span class="right"><span class="pill acc">your rule</span></span></div>
+      <div class="f-body" aria-label="An agent opens a pull request, your saved rule matches, and the agent asks your reviewer on Slack">
+        <div class="agent-line">
+          <span class="cmd"><span class="p">›</span> gh pr create --fill<i class="rt-cur" aria-hidden="true"></i></span>
+          <span class="pill">PR #42</span>
+        </div>
+        <div class="brief">
+          <div class="brief-h"><span><b>Your preference</b> <span class="muted">· every session</span></span><span class="acc">matched</span></div>
+          <div class="bsec">
+            <div class="brow"><span class="dot"></span><span>After I open a PR, ask my reviewer in #team-reviews on Slack with the link.</span><span class="src">personal</span></div>
+          </div>
+          <div class="bsec"><h4>Your agent</h4>
+            <div class="brow"><span class="dot"></span><span>Opened #42 retry fix</span><span class="src">gh</span></div>
+            <div class="brow"><span class="dot c"></span><span>Asks Priya in #team-reviews</span><span class="src">Slack connector</span></div>
+          </div>
+        </div>
+        <div class="rt-route" aria-hidden="true"><span>your rule</span><i></i><span>your agent</span><i></i><span class="c">its Slack connector</span></div>
+        <div class="rt-msg">
+          <span class="rt-av" aria-hidden="true">S</span>
+          <div class="rt-txt">
+            <div class="rt-who"><b>Sam</b><span>#team-reviews · 10:52</span></div>
+            <p><span class="rt-at">@Priya</span> Review please: #42 retry fix</p>
+            <span class="rt-link">github.com/example/billing-service/pull/42</span>
+          </div>
+          <span class="pill ok">sent by your agent</span>
+        </div>
+      </div>
+      <div class="rt-more">
+        <h4>Set up the same way</h4>
+        <div class="rt-cards">
+          {cards.map((c) => (
+            <div class="rt-card">
+              <span class="tpl-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a6b0c4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={c.icon} /></span>
+              <h5>{c.title}</h5>
+              <p>{c.text}</p>
+              <code>{c.code}</code>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+</article>

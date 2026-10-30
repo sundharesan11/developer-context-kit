@@ -73,7 +73,7 @@ code,kbd,.mono{font-family:var(--mono)}
   background:linear-gradient(90deg,var(--accent),var(--accent-2));box-shadow:0 0 12px var(--accent);
   transform-origin:left;transform:scaleX(var(--p,0))}
 :target,[id]{scroll-margin-top:84px}
-@media (max-width:860px){.nav-links{display:none}}
+@media (max-width:1000px){.nav-links{display:none}}
 @media (max-width:520px){.nav .wrap.nav-capsule{gap:10px;padding-left:14px}.nav-cta .nav-gh-label{display:none}.nav-cta .nav-gh{padding:0 10px}}
 @media (max-width:440px){.nav-cta .nav-docs{display:none}}
 @media (prefers-reduced-motion:reduce){.brand-mark{animation:none}.nav-links a,.nav-dot,.nav .wrap.nav-capsule{transition:none}}
@@ -117,6 +117,7 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;margin:0;font-weight:
 .works span.wm{font-family:var(--display);font-weight:600;font-size:15.5px;color:var(--muted);letter-spacing:-.01em;display:inline-flex;align-items:center;gap:8px}
 .works span.wm i{width:8px;height:8px;border-radius:2px;background:var(--accent);display:inline-block;transform:rotate(45deg)}
 .works span.wm.cx i{background:var(--cool)}
+.works span.wm.gm i{background:#b6c7ff}
 
 /* ---------- stage / diagram ---------- */
 .stage{margin:56px auto 0;max-width:1120px;position:relative;border-radius:var(--radius-lg);padding:1px;
@@ -440,3 +441,31 @@ footer{border-top:1px solid var(--line);padding:48px 0 56px;color:var(--faint);f
 /* hero and final actions: the install command on its own row, buttons together below it */
 .hero-actions:has(.action-btns){flex-direction:column;align-items:center}
 .action-btns{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+
+/* team lessons: the org knowledge server results sit in a second brief below the hook output */
+.brief+.brief{margin-top:12px}
+
+/* routines: a saved rule matches, the agent posts through its own connector (issue #27) */
+.rt-cur{display:inline-block;width:7px;height:13px;margin-left:6px;vertical-align:-2px;background:var(--accent)}
+.rt-route{display:flex;align-items:center;gap:8px;margin:14px 0;font:11.5px/1 var(--mono);color:var(--faint);min-width:0}
+.rt-route span{white-space:nowrap}
+.rt-route span.c{color:var(--cool)}
+.rt-route i{flex:1;min-width:14px;height:1px;background:var(--line-2);position:relative;overflow:hidden}
+.rt-msg{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 14px;border-radius:12px;border:1px solid rgba(116,224,204,.3);background:linear-gradient(90deg,var(--cool-soft),var(--surface) 70%);font-family:var(--font)}
+.rt-av{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--surface-3);border:1px solid var(--line-2);font:600 14px/1 var(--display);color:var(--text)}
+.rt-txt{min-width:0}
+.rt-who{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;font-size:13px}
+.rt-who b{color:var(--text);font-weight:600}
+.rt-who span{font:11.5px/1.4 var(--mono);color:var(--faint)}
+.rt-msg p{margin:4px 0 2px;font-size:14px;color:var(--text);line-height:1.45}
+.rt-at{color:var(--cool);background:var(--cool-soft);border-radius:4px;padding:0 3px}
+.rt-link{display:block;font:12px/1.4 var(--mono);color:var(--accent-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt-more{padding:0 clamp(16px,2.6vw,24px) clamp(16px,2.6vw,24px)}
+.rt-more h4{margin:0 0 10px;font:500 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.rt-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.rt-card{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--surface);display:flex;flex-direction:column;gap:8px;min-width:0}
+.rt-card .tpl-ic{width:30px;height:30px;border-radius:8px}
+.rt-card h5{margin:0;font:600 14.5px/1.25 var(--display);color:var(--text);letter-spacing:-.01em}
+.rt-card p{margin:0;font-size:13px;color:var(--muted);line-height:1.5}
+.rt-card code{margin-top:auto;font-size:11.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:520px){.rt-cards{grid-template-columns:minmax(0,1fr)}.rt-card{display:grid;grid-template-columns:30px minmax(0,1fr);gap:4px 12px}.rt-card .tpl-ic{grid-row:span 3}.rt-msg{grid-template-columns:34px minmax(0,1fr)}.rt-msg .pill{grid-column:2;justify-self:start}.rt-route{font-size:10.5px;gap:6px}}
