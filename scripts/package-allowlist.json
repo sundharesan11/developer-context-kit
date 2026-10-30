@@ -107,6 +107,7 @@
   "site/src/components/landing/Nav.astro",
   "site/src/components/landing/OpenSource.astro",
   "site/src/components/landing/Pillars.astro",
+  "site/src/components/landing/Routines.astro",
   "site/src/components/landing/SeoHead.astro",
   "site/src/content.config.ts",
   "site/src/content/docs/docs/concepts/briefs.md",

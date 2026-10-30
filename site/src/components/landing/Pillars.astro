@@ -1,5 +1,6 @@
 ---
 import { DOCS } from '../../site';
+import Routines from './Routines.astro';
 
 // Kept as strings so the line breaks inside these white-space:pre trees
 // survive Astro's HTML whitespace compression.
@@ -125,10 +126,12 @@ const lines = (tree: string) =>
       </div>
     </article>
 
-    <!-- Pillar 3 -->
-    <article class="pillar" id="lessons" aria-labelledby="p3">
+    <Routines />
+
+    <!-- Pillar 4 -->
+    <article class="pillar flip" id="lessons" aria-labelledby="p3">
       <div class="p-copy reveal">
-        <div class="p-num"><span>03</span> Team lessons</div>
+        <div class="p-num"><span>04</span> Team lessons</div>
         <h3 id="p3">Learn a lesson once. Your whole team keeps it.</h3>
         <p>A lesson is a do or don't with a reason. When an agent touches matching code, the lesson shows up, including your team's.</p>
         <ul class="ticks">
@@ -164,10 +167,10 @@ const lines = (tree: string) =>
       </div>
     </article>
 
-    <!-- Pillar 4 -->
-    <article class="pillar flip" id="accounts" aria-labelledby="p4">
+    <!-- Pillar 5 -->
+    <article class="pillar" id="accounts" aria-labelledby="p4">
       <div class="p-copy reveal">
-        <div class="p-num"><span>04</span> Accounts</div>
+        <div class="p-num"><span>05</span> Accounts</div>
         <h3 id="p4">Never push as the wrong account again.</h3>
         <p>Each org you work for gets its own scope and its own accounts, from GitHub and Slack to your issue tracker and cloud. The project decides which account the agent uses.</p>
         <ul class="ticks">
@@ -213,10 +216,10 @@ const lines = (tree: string) =>
       </div>
     </article>
 
-    <!-- Pillar 5 -->
-    <article class="pillar" id="harness" aria-labelledby="p5">
+    <!-- Pillar 6 -->
+    <article class="pillar flip" id="harness" aria-labelledby="p5">
       <div class="p-copy reveal">
-        <div class="p-num"><span>05</span> Your harness</div>
+        <div class="p-num"><span>06</span> Your harness</div>
         <h3 id="p5">Make your agents work your way.</h3>
         <p>Write down your taste once in a small private profile, and turn the skill templates into skills that follow it.</p>
         <ul class="ticks">
@@ -264,10 +267,10 @@ const lines = (tree: string) =>
       </div>
     </article>
 
-    <!-- Pillar 6 -->
-    <article class="pillar flip" id="disk" aria-labelledby="p6">
+    <!-- Pillar 7 -->
+    <article class="pillar" id="disk" aria-labelledby="p6">
       <div class="p-copy reveal">
-        <div class="p-num"><span>06</span> Local-first</div>
+        <div class="p-num"><span>07</span> Local-first</div>
         <h3 id="p6">Keep all of it on your own machine.</h3>
         <p>Records and profiles stay on your machine in private folders. Nothing leaves without your consent.</p>
         <ul class="ticks">

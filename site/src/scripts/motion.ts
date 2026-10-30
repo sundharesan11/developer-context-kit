@@ -489,7 +489,7 @@ document.querySelectorAll<HTMLElement>('[data-words]').forEach((el) => {
 /* ---------------- [stagger] index items inside mocks for line-by-line arrival ---------------- */
 document.querySelectorAll('.frame, .cmds').forEach((box) => {
 	box
-		.querySelectorAll<HTMLElement>('.q-item, .src-row, .supers, .rec-act, .brow, .idrow, .refuse, .tpl, .digest > div, .disk-foot > *, .cmdc')
+		.querySelectorAll<HTMLElement>('.q-item, .src-row, .supers, .rec-act, .brow, .idrow, .refuse, .tpl, .digest > div, .disk-foot > *, .cmdc, .rt-route, .rt-msg, .rt-card')
 		.forEach((el, i) => el.style.setProperty('--i', String(i)));
 });
 
