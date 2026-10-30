@@ -84,18 +84,19 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>02</span> Many agents</div>
         <h3 id="p2">Run your agents like one team.</h3>
-        <p>Start a task in Claude Code and finish it in Codex. Every agent reads the same brief, rules and lessons and picks up the last handoff, so you can split work across agents without repeating yourself.</p>
+        <p>Build in Claude Code, review in Codex and write the tests in Gemini CLI. Every agent reads the same brief, rules and lessons and picks up the last handoff, so you can split work across agents without repeating yourself.</p>
         <ul class="ticks">
           <li><span><code>handoff write</code> leaves the next step for whichever agent comes next.</span></li>
           <li><span><code>devtwin-resume</code> loads the brief and the handoff in any agent.</span></li>
           <li><span>Note which agent suits which work, for every agent to read.</span></li>
+          <li><span>Set up once. It works the same in Claude Code, Codex and Gemini CLI.</span></li>
         </ul>
         <a class="p-more" href={DOCS.codingAgents}>Set up your coding agents <span aria-hidden="true">→</span></a>
       </div>
       <div class="frame reveal">
         <div class="frame-in">
-          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">One task, two agents · work.billing</span><span class="right"><span class="pill ok">same context</span></span></div>
-          <div class="f-body" aria-label="A task handed from Claude Code to Codex">
+          <div class="f-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">One task, three agents · work.billing</span><span class="right"><span class="pill ok">same context</span></span></div>
+          <div class="f-body" aria-label="A task handed from Claude Code to Codex and Gemini CLI">
             <div class="brief">
               <div class="brief-h"><span><b>Claude Code</b> <span class="muted">· 10:12</span></span><span class="muted">builds</span></div>
               <div class="bsec">
@@ -108,9 +109,15 @@ const lines = (tree: string) =>
                 <div class="brow"><span class="dot"></span><span>› devtwin-resume</span><span class="src">brief + handoff</span></div>
                 <div class="brow"><span class="dot"></span><span>Retry reuses the idempotency key</span><span class="src">your rule</span></div>
                 <div class="brow"><span class="dot"></span><span>Continues 429 handling in src/jobs/retry.ts</span><span class="src">handoff</span></div>
+                <div class="brow"><span class="dot c"></span><span>handoff write: tests for 429 are next</span><span class="src">handoff</span></div>
+              </div>
+              <div class="brief-h"><span><b>Gemini CLI</b> <span class="muted">· 11:15</span></span><span class="muted">writes the tests</span></div>
+              <div class="bsec">
+                <div class="brow"><span class="dot"></span><span>› devtwin-resume</span><span class="src">brief + handoff</span></div>
+                <div class="brow"><span class="dot"></span><span>Adds 429 tests that reuse the key</span><span class="src">your rule</span></div>
               </div>
               <div class="bsec"><h4>Your preference</h4>
-                <div class="brow"><span class="dot q"></span><span>Claude Code builds. Codex reviews.</span><span class="src">personal</span></div>
+                <div class="brow"><span class="dot q"></span><span>Claude Code builds. Codex reviews. Gemini CLI tests.</span><span class="src">personal</span></div>
               </div>
             </div>
           </div>
