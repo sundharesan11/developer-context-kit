@@ -20,7 +20,7 @@ function runAcceptance(parts) {
 
 test("CI uses read-only pinned actions without privileged triggers or persistent credentials", async () => {
   const text = await readFile(workflowPath, "utf8");
-  assert.match(text, /\n  push:\n  pull_request:\n  workflow_dispatch:/);
+  assert.match(text, /\n  push:\n    branches: \[main\]\n  pull_request:\n  workflow_dispatch:/);
   assert.match(text, /permissions:\n  contents: read/);
   assert.equal([...text.matchAll(/^\s*permissions:/gm)].length, 1, "no job-level permission override");
   assert.match(text, /persist-credentials: false/);
@@ -30,9 +30,19 @@ test("CI uses read-only pinned actions without privileged triggers or persistent
   // A newer run cancels an older one on a branch or pull request, but never on main: every merge gets a full result.
   assert.match(text, /cancel-in-progress: \$\{\{ github\.ref != 'refs\/heads\/main' \}\}/);
   const uses = [...text.matchAll(/uses: ([^\s]+)/g)].map(match => match[1]);
-  assert.equal(uses.length, 2);
+  assert.equal(uses.length, 5);
   for (const action of uses) assert.match(action, /^actions\/(?:checkout|setup-node)@[a-f0-9]{40}$/);
   assert.doesNotMatch(text, /pull_request_target|workflow_run|self-hosted|continue-on-error|secrets\.|upload-artifact|npm (?:publish|install|ci)|write-all/);
+});
+
+test("CI runs the full matrix unless a pull request changes only the website or prose docs", async () => {
+  const text = await readFile(workflowPath, "utf8");
+  // The scope job is the only gate: the full matrix runs when it says full, the short docs check otherwise.
+  assert.match(text, /\n  pilot:\n    name: .*\n    needs: scope\n    if: needs\.scope\.outputs\.full == 'true'\n/);
+  assert.match(text, /\n  docs:\n    name: .*\n    needs: scope\n    if: needs\.scope\.outputs\.full == 'false'\n/);
+  assert.ok(text.includes('if [ "$GITHUB_EVENT_NAME" = pull_request ]'), "only a pull request can skip the full matrix");
+  assert.ok(text.includes("grep -Ev '^(site/|docs/)|^[^/]+\\.md$'"), "only site, docs and top-level markdown count as docs-only");
+  for (const value of ["npm run check:package", "npm run check:writing", "node --test test/docs.test.mjs test/package.test.mjs"]) assert.ok(text.includes(value), value);
 });
 
 test("CI evaluates both Node versions without claiming Linux support and checks private acceptance results", async () => {

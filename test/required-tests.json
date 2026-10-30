@@ -241,6 +241,7 @@
   "public alpha onboarding documents only implemented CLI routes",
   "every CLI route appears in backticks in the site CLI reference",
   "CI uses read-only pinned actions without privileged triggers or persistent credentials",
+  "CI runs the full matrix unless a pull request changes only the website or prose docs",
   "CI evaluates both Node versions without claiming Linux support and checks private acceptance results",
   "acceptance forbidden path overlapping the pilot fails preflight without fixture writes",
   "acceptance forbidden option rejects relative non-canonical and missing values",
