@@ -89,7 +89,7 @@ test("handoff docs describe private selected export and unexecuted commands", as
 test("docs state the candidate's limits in pinned phrases", async () => {
   const read = (f) => readFile(join(import.meta.dirname, "..", f), "utf8");
   const want = {
-    "README.md": ["devtwin is an alpha", "npm i -g devtwin@alpha", "never from npm's global folder", "no automatic private-to-public synchronization", "not a sandbox"],
+    "README.md": ["devtwin is an alpha", "npm i -g devtwin\n", "never from npm's global folder", "no automatic private-to-public synchronization", "not a sandbox"],
     "docs/SECURITY-MODEL.md": ["residual race", "same-user"],
     "docs/LIMITATIONS.md": ["Linux support is not claimed", "Windows is unsupported", "migration is not implemented", "There is no sync", "lost laptop", "multi-record onboarding", "Without a backup, losing", "client repository text", "A lesson line cannot stop a command", "Secrets printed to a terminal", "Commands that break when pasted", "Polling long jobs"],
     "docs/UPGRADING.md": ["a kit from before 0.1.0-alpha.1 cannot load it", "run in the kit you start them from"],
