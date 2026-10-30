@@ -1,7 +1,9 @@
 name: Pilot CI
 
 on:
+  # A feature branch gets its run from its pull request, so a push runs CI on main only.
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -18,8 +20,63 @@ defaults:
     shell: bash
 
 jobs:
+  # A pull request that changes only the website or prose docs runs the short docs check. Anything else, and every push
+  # or manual run, runs the full matrix.
+  scope:
+    name: Change scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      full: ${{ steps.scope.outputs.full }}
+    steps:
+      - name: Check out reviewed event revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Classify changed files
+        id: scope
+        run: |
+          full=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            # The pull request checkout is a merge commit; its first parent is the base branch.
+            changed="$(git diff --name-only HEAD^1 HEAD)"
+            printf '%s\n' "$changed"
+            if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -Ev '^(site/|docs/)|^[^/]+\.md$' | grep -q .; then full=false; fi
+          fi
+          echo "full=$full" | tee -a "$GITHUB_OUTPUT"
+
+  docs:
+    name: Docs and website check
+    needs: scope
+    if: needs.scope.outputs.full == 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out reviewed event revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.4.0'
+          package-manager-cache: false
+      - name: Audit release files and dry-run package
+        run: npm run check:package
+      - name: Check STE-based writing rules
+        run: npm run check:writing
+      - name: Run docs and package tests
+        run: node --test test/docs.test.mjs test/package.test.mjs
+      - name: Check whitespace and preserve checkout
+        run: |
+          git diff --check 4b825dc642cb6eb9a060e54bf8d69288fbee4904 HEAD
+          test -z "$(git status --porcelain --untracked-files=all)"
+
   pilot:
     name: ${{ matrix.lane }} / Node ${{ matrix.node }}
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
