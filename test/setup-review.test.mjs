@@ -298,7 +298,8 @@ test("imported memory gives memory-delivered-twice, promoted-source-changed and 
   const twice = ofKind(plan, "memory-delivered-twice");
   assert.deepEqual(twice.map((l) => basename(l.evidence.file)).sort(), ["ports.md", "queue.md"]);
   assert.ok(twice.every((l) => l.change.informational && l.evidence.file.startsWith(m.memoryDir)));
-  assert.doesNotMatch(JSON.stringify(plan.suggestions), /staging queue|8080/);
+  // The memory's own words, not bare digits: random hex in ids and digests can contain 8080.
+  assert.doesNotMatch(JSON.stringify(plan.suggestions), /staging queue|port 8080/);
   // The memory changes and another one is deleted; the import has not run again.
   await m.memoryFile("queue.md", memory({ name: "queue", type: "project", description: "Queue", body: "The staging queue drains every ten minutes." }));
   await rm(join(m.memoryDir, "memory", "ports.md"));

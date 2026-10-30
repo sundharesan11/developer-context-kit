@@ -454,6 +454,7 @@
   "stack fetch refuses a request over the per-run call cap without a lookup or request",
   "stack fetch refuses a response that takes the run over the total byte cap",
   "stack fetch fails a request past its per-request timeout and a call after the run deadline makes no request",
+  "stack fetch refuses every call after the run deadline aborts a request, even when the clock lags the timer",
   "stack fetch refuses a declared content-length over the body cap before reading the body",
   "stack fetch maps HTTP statuses and rate-limit headers to typed codes",
   "stack fetch refuses userinfo, an explicit port, a non-https scheme and an unresolvable host",
