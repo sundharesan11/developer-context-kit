@@ -85,6 +85,15 @@
 .site-title img {
 	width: 26px;
 	height: 26px;
+	border-radius: 50%;
+	animation: dx-mark-breathe 3.2s ease-in-out infinite;
+}
+/* The same breathing glow as the landing page's nav mark. */
+@keyframes dx-mark-breathe {
+	50% { box-shadow: 0 0 0 1px rgba(255, 138, 61, 0.35), 0 0 14px rgba(255, 138, 61, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.site-title img { animation: none; }
 }
 
 /* ---------- Typography ---------- */
