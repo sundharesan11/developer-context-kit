@@ -57,7 +57,7 @@ Commands that write follow one of three patterns:
 | Pattern | Commands |
 | --- | --- |
 | Preview, then `--apply` | `init`, `scope add`, `record add`, `record supersede`, `record propose`, `record publish`, `hub propose`, `lesson propose`, `lesson supersede-propose` |
-| Preview, then `--apply --plan-fingerprint <fp>` | `project onboard`, `live *`, `agents install/uninstall/recover`, `locks release`, `draft save`, `stack digest`, `radar guide`, `schedule off`, `lesson edit/reject/accept/copy`, `lesson notices --ack`, `hub join/leave/schedule`, `note revoke/consent`, `published delete`, `consent grant/revoke`, `project set`, `learning send`, `undo`, `review apply`, `backup create/restore`, `backup key export`, `paths confirm` |
+| Preview, then `--apply --plan-fingerprint <fp>` | `project onboard`, `live *`, `agents install/uninstall/recover`, `locks release`, `draft save`, `stack digest`, `radar guide`, `schedule off`, `lesson edit/reject/accept/copy`, `lesson notices --ack`, `hub join/leave/schedule`, `server bind`, `note revoke/consent`, `published delete`, `consent grant/revoke`, `project set`, `learning send`, `undo`, `review apply`, `backup create/restore`, `backup key export`, `paths confirm` |
 | Preview command, then a separate apply command with `--plan-fingerprint` | `profile plan` → `profile apply`, `stack plan` → `stack approve`, `setup plan` → `setup apply`, `schedule plan` → `schedule apply` |
 | No preview | `lesson index` and `hook verify` write only devtwin's own state. `hub sync` fetches and pushes items you already approved. |
 
@@ -67,7 +67,7 @@ The skill builder and skill-source installers add separate recorded approvals; s
 
 Some commands need you at the keyboard: the **always ask** tier of the [tier table](/docs/security/security-model/#tiers). When the [devtwin hook](/docs/guides/lessons-and-hooks/#the-owner-action-block) is installed, it denies them from an agent shell. `lesson copy`, `published delete`, `hub join`, `record publish`, `live *`, `agents install`, `agents uninstall`, `hub leave`, `hub schedule`, `schedule off`, `lesson notices`, `note revoke`, `note consent`, `consent grant`, `consent revoke`, `project set`, `undo`, `review apply`, `backup restore`, `backup key export`, `paths confirm`, `pref accept` and `pref retire` are denied with `--apply`; their previews stay open to agents. `instructions apply` and `schedule apply` are always denied; their previews are `instructions plan` and `schedule plan`. Most owner actions also show a macOS dialog with the exact content; a denied or dismissed dialog fails with `DEVTWIN_OWNER_DENIED` and writes nothing. This page marks each one **Owner**.
 
-`lesson accept` is not an owner action. Agents run it for the `project` and `repo` targets, and for the `hub` target while you hold a `hub-publish` consent. `record add` and `record supersede` of `confirmed` or `disputed` knowledge, or of a write that replaces a `confirmed` or `disputed` record, are not denied by the hook but show the owner dialog whoever runs them.
+`lesson accept` is not an owner action. Agents run it for the `project` and `repo` targets, and for the `hub` or `server` target under its consent. `record add` and `record supersede` of `confirmed` or `disputed` knowledge, or of a write that replaces a `confirmed` or `disputed` record, are not denied by the hook but show the owner dialog whoever runs them.
 
 ### Identifiers
 
@@ -843,18 +843,19 @@ Accepts a proposal. It shows no owner dialog; the [tier](/docs/security/security
 | `project` | Automatic. Agents run it. Writes an `observed` lesson record and an audit entry. |
 | `repo` | Automatic for the branch. Writes a learning branch `devtwin/learning-<id>` in the project's repository, which must be in the `repoLearnings` class. It never touches the working copy. Under a valid `repo-push` consent, the push waits in the held queue; without one, the result says `needs-consent` and the branch stays local. See [Write a lesson to the repository](/docs/guides/organization-hub/#write-a-lesson-to-the-repository). |
 | `hub` | Consented. Runs only while a `hub-publish` consent for the scope is valid; otherwise fails with `DEVTWIN_APPROVAL_REQUIRED`, "Needs consent". The lesson waits in the [held queue](/docs/guides/organization-hub/#held-items) for the consent's hold time, then `hub sync` or the `learning-send` job sends it. |
+| `server` | Consented. Needs a server binding and `server-publish` consent for the scope. The lesson waits for the hold time. After it is due, the agent calls `log_learning` and records the returned ID. |
 | `general` | Parked, alone or in a set: the other targets are written now, and the general part waits for [`activity review`](#activity-review). The plan lists it in `parked`. `hub+general` is the older spelling of `general,hub`. |
 
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
 | `--id <prop_id>` | Required. |
-| `--target <targets>` | Required. `project`, `general`, `hub` or `repo`, or a set such as `project,repo`. See [Review proposals](/docs/guides/lessons-and-hooks/#review-proposals). |
+| `--target <targets>` | Required. `project`, `general`, `hub`, `repo` or `server`, or a set such as `project,repo`. See [Review proposals](/docs/guides/lessons-and-hooks/#review-proposals). |
 | `--scope <id>`, `--project <id>` | The project for a `project` or `repo` target when the proposal names none. |
 | `--session <id>` | Optional. The session ID from the hook, kept in the audit entry. |
 | `--apply --plan-fingerprint <fp>` | Write. |
 
-A replacement accepts to `hub` only. `DEVTWIN_STALE_VERSION` means another replacement reached the hub first.
+A replacement accepts to the same target as its predecessor. `DEVTWIN_STALE_VERSION` means another replacement reached the hub first.
 
 ### `lesson copy`
 
@@ -869,7 +870,27 @@ A replacement accepts to `hub` only. `DEVTWIN_STALE_VERSION` means another repla
 
 ### `lesson supersede-propose`
 
-Writes a private proposal that replaces a hub lesson. Takes the `lesson propose` flags plus `--predecessor <lsn_id>` (required). With `--apply`, it first tries a `hub sync`. Fails with `DEVTWIN_NOT_FOUND` for an unknown lesson, and with `DEVTWIN_CONFLICT` and the reason `removed` or `superseded` when the lesson was removed or already replaced.
+Writes a private proposal that replaces a hub lesson. Takes the `lesson propose` flags plus `--predecessor <lsn_id>` (required). With `--apply`, it first tries a `hub sync`. Fails with `DEVTWIN_NOT_FOUND` for an unknown lesson, and with `DEVTWIN_CONFLICT` and the reason `removed` or `superseded` when the lesson was removed or already replaced. For a recorded server lesson, pass `--target server` and its returned learning ID as `--predecessor`.
+
+### `server bind`
+
+**Owner** with `--apply`. Binds one scope to an MCP server name and a client slug. Pass `--scope example --name sample-knowledge --client sample-client`. Preview first. Apply with `--plan-fingerprint <fp>`. A changed binding voids its consent.
+
+### `server status`
+
+Shows the bound MCP server and client for `--scope example`, or `server: null` when none is bound.
+
+### `server payload`
+
+Pass `--id <hld_id>` after the hold time. Returns the bound server name, `log_learning`, and its exact arguments. The payload always includes `client`. It records that the payload was handed to the agent. The agent calls the MCP tool. devtwin makes no network call.
+
+### `server record`
+
+After `log_learning` returns, pass `--id <hld_id> --learning-id <returned-id>`. This records the returned ID, marks the item sent and removes it from the queue. Repeating the same ID succeeds. A different ID fails. A returned ID can still be recorded if undo or revoke cancelled the item after the payload was handed to the agent.
+
+### `server supersede`
+
+After a replacement is recorded, pass `--id <hld_id>`. Returns a `supersede_learning` payload with the client, old ID, new ID and reason. The agent calls that MCP tool.
 
 ### `lesson notices`
 
@@ -1010,8 +1031,8 @@ See the [tier table](/docs/security/security-model/#tiers).
 | Flag | |
 | --- | --- |
 | `--pilot <file>` | Required. |
-| `--kind <kind>` | Required. `hub-publish` or `repo-push`. |
-| `--scope <id>` | For `hub-publish`. A scope that joined a hub. |
+| `--kind <kind>` | Required. `hub-publish`, `repo-push` or `server-publish`. |
+| `--scope <id>` | For `hub-publish` or `server-publish`. The server kind needs a bound server and client. |
 | `--repo <path>` | For `repo-push`. A bound repository. The grant records its push URL; learning branches are pushed there only. |
 | `--hold-hours <n>` | How long each item waits in the held queue, from 1 to 168. Default 24. |
 | `--apply --plan-fingerprint <fp>` | Write, after the owner dialog. |

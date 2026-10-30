@@ -368,7 +368,7 @@ test("lesson publish paths never write to a hub without a consent or an approved
   const roots = await m.roots();
   const heads = async () => [await hubA.head(), await hubB.head()];
   const start = await heads();
-  assert.deepEqual(TARGETS.filter(leavesMachine), ["hub", "repo"]);
+  assert.deepEqual(TARGETS.filter(leavesMachine), ["hub", "repo", "server"]);
   const personal = await addPersonalRecord(roots, { requestId: "req_denycopy01", recordedBy: { actor: "human", runId: "run_fixture01" }, draft: { kind: "lesson", status: "observed", title: "Pin the test clock", body: "Do pass a fixed clock.\n", reach: "personal", match: { topics: ["testing"] } } }, { now });
   let n = 0;
   for (const answer of ["denied", { decision: "denied", reason: "no-gui-session" }, undefined, async () => { throw new Error("dialog crashed"); }]) {

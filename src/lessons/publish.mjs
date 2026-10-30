@@ -17,6 +17,8 @@
 //            repo         automatic: a learning branch in the project's repository (src/learnings/repo-write.mjs).
 //                         Under a valid repo-push consent its push waits in the held queue (src/learnings/push.mjs);
 //                         without one the branch stays local and activity lists it as "needs consent"
+//            server       consented: a scoped log_learning payload waits in the held queue. The agent sends it through
+//                         its MCP connection, then records the returned ID with server record.
 // recordedBy names the caller (src/policy/actor.mjs).
 //
 // U37 (KTD40, KTD43): the project target is an automatic knowledge write. The lesson text passes the plain-rule checks
@@ -53,8 +55,8 @@ import { rebuildIndex } from "./index.mjs";
 import { checkLesson, lessonBody, lessonDraft, lessonText, requirePending, proposalHash, markAccepted, withProposalLock, SESSION_ID } from "./propose.mjs";
 import { checkLocalSupersession } from "./supersede.mjs";
 
-export const TARGETS = Object.freeze(["project", "general", "hub", "repo"]);
-export const leavesMachine = (target) => target === "hub" || target === "repo";
+export const TARGETS = Object.freeze(["project", "general", "hub", "repo", "server"]);
+export const leavesMachine = (target) => target === "hub" || target === "repo" || target === "server";
 // The members of a --target value, in TARGETS order.
 export function parseTargets(value) {
   const parts = value === "hub+general" ? ["general", "hub"] : typeof value === "string" ? value.split(",").map((part) => part.trim()) : [];
@@ -104,7 +106,7 @@ export async function planAccept(roots, { id, target: value, scope, project, ses
   const proposal = await requirePending(roots, id);
   if (scope !== undefined && assertScopeId(scope) !== proposal.scope) throw new DevtwinError("CONFLICT", "Proposal belongs to another scope", { scope: proposal.scope });
   const lesson = await checkLesson(roots, proposal.scope, proposal.lesson);
-  if (proposal.supersedes && target !== "hub") throw new DevtwinError("INVALID_INPUT", "A replacement lesson goes to the hub only", { field: "target", allowed: ["hub"] });
+  if (proposal.supersedes && target !== (proposal.supersedes.server ? "server" : "hub")) throw new DevtwinError("INVALID_INPUT", "A replacement lesson must use its original target", { field: "target", allowed: [proposal.supersedes.server ? "server" : "hub"] });
   const rules = Object.fromEntries(members.map((member) => [member, tierRule({ route: "lesson accept", target: member })]));
   const refused = refusedMember(rules);
   if (refused) throw new DevtwinError("GATE_REQUIRED", "This lesson target is done by " + refused[1].via, { target, member: refused[0], tier: refused[1].tier, via: refused[1].via });
@@ -117,7 +119,17 @@ export async function planAccept(roots, { id, target: value, scope, project, ses
   const tier = members.some((member) => rules[member].tier === "consented") ? "consented" : "automatic";
   // tier is the tier of what this accept writes now; a parked member waits for the review.
   const plan = { kind: "lesson-accept", proposalId: id, proposalHash: proposalHash(proposal), revision: proposal.revision, scope: proposal.scope, target, targets: members, tier,
-    ...(members.length > 1 ? { tiers: Object.fromEntries(members.map((member) => [member, rules[member].tier])) } : {}), ...(rules.hub?.consent ? { consent: rules.hub.consent } : {}), requestId, lesson, ...(parked.length ? { parked, waitsFor: "activity review" } : {}) };
+    ...(members.length > 1 ? { tiers: Object.fromEntries(members.map((member) => [member, rules[member].tier])) } : {}), ...((rules.hub?.consent || rules.server?.consent) ? { consent: rules.hub?.consent ?? rules.server.consent } : {}), requestId, lesson, ...(parked.length ? { parked, waitsFor: "activity review" } : {}) };
+  if (has("hub") && has("server")) throw new DevtwinError("INVALID_INPUT", "Choose one shared lesson destination", { field: "target" });
+  if (has("server")) {
+    const { requireServerBinding, learningArguments } = await import("../server/commands.mjs");
+    const binding = await requireServerBinding(roots, proposal.scope);
+    if (proposal.supersedes && (proposal.supersedes.server !== binding.server || proposal.supersedes.client !== binding.client)) throw new DevtwinError("STALE_VERSION", "Knowledge server binding changed since replacement proposal");
+    const serverRequestId = requestOf("server");
+    plan.server = { scope: proposal.scope, server: binding.server, client: binding.client, arguments: learningArguments(binding, lesson, proposal.project), ...(proposal.supersedes ? { supersedes: proposal.supersedes } : {}) };
+    plan.serverRequestId = serverRequestId;
+    plan.session = session;
+  }
   if (has("hub")) {
     const requestId = requestOf("hub");
     const binding = await writableBinding(roots, proposal.scope);
@@ -239,6 +251,18 @@ export async function applyAccept(roots, input, { fingerprint, now = () => new D
       const held = await enqueueHeld(roots, { target: hubTarget(plan.scope), kind: "hub-lesson", title: plan.lesson.title, audit: entry.id, requestId: plan.hubRequestId,
         consent: { kind: consent.kind, holdHours: consent.holdHours, ruleDigest: consent.ruleDigest, grantedAt: consent.grantedAt }, payload: { ...plan.hub, createdAt: plan.createdAt, message: "Add lesson " + plan.hub.lessonId } }, { now, ctx });
       result.hub = { lessonId: plan.hub.lessonId, hubId: plan.hub.hubId, held: true, heldId: held.item.id, sendAfter: held.item.sendAfter, ...(held.notification ? { notification: held.notification } : {}) };
+    }
+    if (plan.server) {
+      const { requireServerBinding, serverTarget } = await import("../server/commands.mjs");
+      const current = await requireServerBinding(roots, plan.scope);
+      if (current.server !== plan.server.server || current.client !== plan.server.client) throw new DevtwinError("STALE_VERSION", "Knowledge server binding changed");
+      const target = serverTarget(plan.scope), heldId = (await import("../held/queue.mjs")).heldIdFor(target, plan.serverRequestId);
+      const entry = await appendEntry(roots, { kind: "server-lesson", tier: "consented", route: "lesson accept", target: "server", scope: plan.scope,
+        itemIds: [heldId], actor: recordedBy.actor, session: plan.session ?? null, requestId: plan.serverRequestId }, { now });
+      result.audit = entry.id;
+      const held = await enqueueHeld(roots, { target, kind: "server-lesson", title: plan.lesson.title, audit: entry.id, requestId: plan.serverRequestId,
+        consent: { kind: consent.kind, holdHours: consent.holdHours, ruleDigest: consent.ruleDigest, grantedAt: consent.grantedAt }, payload: plan.server }, { now, ctx });
+      result.server = { server: plan.server.server, client: plan.server.client, held: true, heldId: held.item.id, sendAfter: held.item.sendAfter };
     }
     if (plan.repo) {
       result.repo.push = repoConsent?.valid

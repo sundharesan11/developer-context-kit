@@ -119,9 +119,11 @@ export const lessonAcceptCommand = { options: { ...planOptions, target: { type: 
 } };
 // U12: lesson supersede-propose (agent-callable, like propose) and lesson notices. The notices list is open to agents;
 // --ack previews, and --ack --apply with the plan fingerprint is an owner action that the hook denies from agent shells.
-export const lessonSupersedeProposeCommand = { options: { ...lessonOptions, predecessor: { type: "string" } }, async run(values, ctx) {
+export const lessonSupersedeProposeCommand = { options: { ...lessonOptions, predecessor: { type: "string" }, target: { type: "string" } }, async run(values, ctx) {
   const { proposeSupersede } = await import("./supersede.mjs");
   const lesson = { title: values.title, summary: values.summary ?? null, text: await bodyFrom(values, ctx) ?? "", match: matchFrom(values) ?? {} };
+  if (values.target === "server") return (await import("./supersede.mjs")).proposeServerSupersede(ctx.roots, { session: values.session, scope: values.scope, project: values.project ?? null, predecessor: values.predecessor, lesson }, { now: ctx.now, apply: values.apply ?? false });
+  if (values.target !== undefined && values.target !== "hub") throw new DevtwinError("INVALID_INPUT", "Invalid replacement target", { field: "target" });
   return proposeSupersede(ctx.roots, { session: values.session, scope: values.scope, project: values.project ?? null, predecessor: values.predecessor, lesson }, { now: ctx.now, apply: values.apply ?? false });
 } };
 export const lessonNoticesCommand = { options: { scope: { type: "string" }, id: { type: "string" }, ack: { type: "boolean" }, apply: { type: "boolean" }, "plan-fingerprint": { type: "string" } }, async run(values, ctx) {

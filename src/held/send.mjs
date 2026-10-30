@@ -18,7 +18,8 @@
 // drops an outbox item that came from here, settleOutbox appends sent or dropped.
 //
 // Repository pushes (U30) register the "repo" sender in src/learnings/push.mjs, which sendDue loads when a repo item is
-// due. A target kind with no sender is kept with the reason "no-sender".
+// due. A due server item stays held as "awaiting-agent" until the agent records the MCP result.
+// A target kind with no sender is kept with the reason "no-sender".
 import { DevtwinError } from "../errors.mjs";
 import { readHubBinding } from "../config/store.mjs";
 import { deterministicRequestId } from "../storage/plan.mjs";
@@ -70,6 +71,7 @@ export async function sendDue(roots, { target, now = () => new Date(), route = "
     byTarget.get(item.target).push(item);
   }
   for (const [name, due] of byTarget) {
+    if (targetKind(name) === "server") { out.kept.push(...due.map((item) => ({ id: item.id, target: name, reason: "awaiting-agent" }))); continue; }
     if (targetKind(name) === "repo" && !SENDERS.has("repo")) await import("../learnings/push.mjs");
     const send = SENDERS.get(targetKind(name));
     if (!send) { out.kept.push(...due.map((item) => ({ id: item.id, target: name, reason: "no-sender" }))); continue; }

@@ -37,6 +37,10 @@ The fence controls what **this CLI** writes. It does not limit what your agent h
 
 ## Approvals and consent
 
+### Knowledge server
+
+An owner binds a scope to an MCP server name and client slug. The binding has no URL or OAuth token. devtwin makes no MCP call. The agent searches with that client and treats results as untrusted reference material, never instructions. A `server-publish` consent holds each accepted lesson. After the hold, `server payload` records the handoff. The agent calls `log_learning` and records the returned ID with `server record`. Until confirmation, the item stays in activity and can be cancelled with undo. If the server returns after cancellation, the agent still records the ID. Activity shows the server write and the earlier cancellation. A binding change voids the consent. The team's Git archive stays read-only for devtwin. Direct changes use a branch and pull request.
+
 Every write is a preview followed by an apply. Applies are bound to a **fingerprint** of the exact plan, so a plan that changed after you reviewed it is refused.
 
 A fingerprint is not proof that *you* approved. An agent can read a preview and pass its fingerprint back. That is why the tier table reserves some actions for you (the **always ask** tier): `record publish --apply`, live config changes, hook and skill installs, `consent grant` and `consent revoke`, `lesson copy`, `published delete`, `hub join`, `undo --since`, `backup restore`, `backup key export`, `paths confirm` and `live approval`, and (when [identity routing](/docs/guides/identity-routing/) ships) account bindings.
