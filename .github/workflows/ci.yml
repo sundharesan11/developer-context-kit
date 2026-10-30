@@ -8,9 +8,10 @@ on:
 permissions:
   contents: read
 
+# A newer run cancels an older one on a branch or pull request. Runs on main always finish, so the badge shows a result.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 defaults:
   run:
