@@ -27,7 +27,8 @@ test("CI uses read-only pinned actions without privileged triggers or persistent
   assert.match(text, /package-manager-cache: false/);
   // The full suite takes over 20 minutes on hosted macOS runners.
   assert.match(text, /timeout-minutes: 45/);
-  assert.match(text, /cancel-in-progress: true/);
+  // A newer run cancels an older one on a branch or pull request, but never on main: every merge gets a full result.
+  assert.match(text, /cancel-in-progress: \$\{\{ github\.ref != 'refs\/heads\/main' \}\}/);
   const uses = [...text.matchAll(/uses: ([^\s]+)/g)].map(match => match[1]);
   assert.equal(uses.length, 2);
   for (const action of uses) assert.match(action, /^actions\/(?:checkout|setup-node)@[a-f0-9]{40}$/);

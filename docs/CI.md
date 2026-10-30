@@ -50,7 +50,7 @@ Open the repository's **Actions → Pilot CI** page. Confirm the branch and comm
 
 For local checks, run `npm test`, `npm run check:package`, `npm run check:writing` and the [acceptance demo](GETTING-STARTED.md). If `actionlint` is installed, also run `actionlint .github/workflows/ci.yml`; it is a development validator, not a runtime dependency. Static contract tests do not replace GitHub's workflow execution.
 
-GitHub-hosted jobs can consume the account's Actions allowance for a private repository. This workflow does not change billing or repository settings. New pushes cancel older runs for the same workflow/ref; pull-request merge refs are separate.
+GitHub-hosted jobs can consume the account's Actions allowance for a private repository. This workflow does not change billing or repository settings. On a branch or pull request, a new push cancels the older run for the same workflow and ref. Runs on `main` are never cancelled, so every merge gets a full result and the README badge shows it. Pull-request merge refs are separate.
 
 A push to a same-repository pull-request branch can trigger both events, producing eight jobs. macOS runners consume more of a private account's allowance than Linux runners. Review usage before enabling frequent automated pushes; this workflow does not impose a spending cap.
 
