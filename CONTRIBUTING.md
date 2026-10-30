@@ -6,7 +6,7 @@ devtwin is pre-release: see the [roadmap](docs/ROADMAP.md) for what is built and
 
 ## Development setup
 
-Contributors work from a Git clone. Users install the npm package with `npm i -g devtwin@alpha`; see [Getting started](docs/GETTING-STARTED.md) for both paths and the prerequisites. There are no third-party runtime dependencies or install steps in a clone.
+Contributors work from a Git clone. Users install the npm package with `npm i -g devtwin`; see [Getting started](docs/GETTING-STARTED.md) for both paths and the prerequisites. There are no third-party runtime dependencies or install steps in a clone.
 
 From the repository root:
 

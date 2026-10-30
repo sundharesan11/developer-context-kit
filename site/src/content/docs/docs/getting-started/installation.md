@@ -18,10 +18,8 @@ You do not need Claude Code, Codex, an API key or a database to try `devtwin`.
 ## 1. Install from npm
 
 ```sh
-npm i -g devtwin@alpha
+npm i -g devtwin
 ```
-
-Name the `alpha` dist-tag: releases go there, and a plain `npm i -g devtwin` installs an older placeholder.
 
 ## 2. Check that it runs
 

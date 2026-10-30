@@ -9,7 +9,7 @@ devtwin is an early, local-first tool. This page lists its honest limits in one 
 
 - **macOS is the reference platform.** Linux is not a supported platform yet, although the test suite also runs there. Windows is unsupported.
 - **Node.js 22.13 or later.** There are no third-party runtime dependencies.
-- **Alpha releases.** Install with `npm i -g devtwin@alpha`. A plain `npm i -g devtwin` installs an older placeholder until a release moves to `latest`.
+- **Alpha releases.** devtwin is an alpha. A new release goes to the `alpha` dist-tag first, and `latest` follows when it is ready.
 - There is no upgrade-compatibility promise between alpha releases yet. An upgrade and a rollback each need a `live set-kit` and one setup batch.
 
 ## Your data

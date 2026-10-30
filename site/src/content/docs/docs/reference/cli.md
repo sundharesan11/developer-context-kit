@@ -6,7 +6,7 @@ description: Every devtwin command, grouped by task, with its flags, what it wri
 Install devtwin from npm and run it as `devtwin`:
 
 ```sh
-npm i -g devtwin@alpha
+npm i -g devtwin
 devtwin <command> [flags]
 ```
 

@@ -15,14 +15,14 @@ npm --version
 
 The manifest declares Node `>=22.13.0`. The reference environment is macOS with Node v26.4.0. [CI](CI.md) runs on macOS and Ubuntu with Node 26.4.0 and 22.13.0. Those are evaluation lanes, not a support claim. Support for the Node floor and for Linux is not claimed. Windows is unsupported.
 
-Install the alpha release from npm:
+Install devtwin from npm:
 
 ```sh
-npm i -g devtwin@alpha
+npm i -g devtwin
 devtwin --version
 ```
 
-Always name the `alpha` dist-tag. Until `latest` moves, `npm i -g devtwin` installs a deprecated placeholder. devtwin has no third-party runtime dependencies.
+devtwin has no third-party runtime dependencies.
 
 Create the private folder for live mode now, if you plan to use it. devtwin never creates it:
 

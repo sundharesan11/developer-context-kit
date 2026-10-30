@@ -74,7 +74,7 @@ It must be yours, mode `drwx------`, and outside any Git worktree.
 Copy the installed package into a locked kit folder. Preview first; the plan writes nothing:
 
 ```sh
-npm i -g devtwin@alpha
+npm i -g devtwin
 devtwin kit install
 ```
 

@@ -170,7 +170,7 @@ The folder must be owned by you, mode `drwx------`, and outside any Git worktree
 Live mode runs from a kit that you pin. Install the package and copy it into a locked kit folder. Contributors can pin a Git clone instead; see [Pin a Git clone](#pin-a-git-clone).
 
 ```sh
-npm i -g devtwin@alpha
+npm i -g devtwin
 devtwin kit install
 ```
 
