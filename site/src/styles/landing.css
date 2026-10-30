@@ -73,7 +73,7 @@ code,kbd,.mono{font-family:var(--mono)}
   background:linear-gradient(90deg,var(--accent),var(--accent-2));box-shadow:0 0 12px var(--accent);
   transform-origin:left;transform:scaleX(var(--p,0))}
 :target,[id]{scroll-margin-top:84px}
-@media (max-width:860px){.nav-links{display:none}}
+@media (max-width:1000px){.nav-links{display:none}}
 @media (max-width:520px){.nav .wrap.nav-capsule{gap:10px;padding-left:14px}.nav-cta .nav-gh-label{display:none}.nav-cta .nav-gh{padding:0 10px}}
 @media (max-width:440px){.nav-cta .nav-docs{display:none}}
 @media (prefers-reduced-motion:reduce){.brand-mark{animation:none}.nav-links a,.nav-dot,.nav .wrap.nav-capsule{transition:none}}
