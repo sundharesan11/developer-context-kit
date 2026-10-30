@@ -1,11 +1,11 @@
 ---
 title: Preferences and templates
-description: Turn a correction into a preference that every Claude Code and Codex session reads, and keep your own structure for RCAs, reports and decision notes.
+description: Turn a correction into a preference that every Claude Code, Codex and Gemini CLI session reads, make your own routines, and keep your own structure for RCAs, reports and decision notes.
 sidebar:
   label: Preferences and templates
 ---
 
-You tell an agent "use Playwright, not a manual browser". With devtwin, you say it once. The agent proposes the correction as a preference, you accept it, and every later Claude Code and Codex session reads it from your own instruction files.
+You tell an agent "use Playwright, not a manual browser". With devtwin, you say it once. The agent proposes the correction as a preference, you accept it, and every later Claude Code, Codex and Gemini CLI session reads it from your own instruction files.
 
 ## How a preference reaches your agents
 
@@ -40,6 +40,7 @@ A session can propose at most three preferences, and one for each kind of correc
 | --- | --- |
 | Claude Code | `~/.claude/devtwin.md`, a file devtwin owns, and one import line in a marker block in `~/.claude/CLAUDE.md` |
 | Codex | A marker block in `~/.codex/AGENTS.md` |
+| Gemini CLI | A marker block in `~/.gemini/GEMINI.md` |
 
 Text outside `<!-- devtwin:begin -->` and `<!-- devtwin:end -->` stays byte for byte. A repository's own `AGENTS.md` or `CLAUDE.md` is never a target. In live mode, each file must be approved first with `live write-classes --instruction-target`; see [Live mode](/docs/guides/live-mode/).
 
@@ -55,6 +56,30 @@ The block has at most 1,200 characters. When your preferences do not fit, the pl
 When `activity review` saves a preference, it also writes the instruction block, with no second dialog. It does this only when your instruction files hold the block without the new preferences, so the only new text is the text the review dialog showed. Otherwise run `instructions plan` and `instructions apply`. Pass `--home` and `--agent` to `activity review` as you pass them to `instructions plan`; in live mode the live home is the default.
 
 `pref accept --apply`, `pref retire --apply`, `activity review --apply` and `instructions apply` are owner actions. An agent can preview them, but the devtwin hook denies the apply from an agent shell, and each one shows the owner dialog.
+
+## Make a routine of your own
+
+devtwin does not ship a fixed feature for each routine. You write the routine once, as a preference or as a skill, and every agent follows it. The agent does the work with its own tools and connectors. devtwin itself sends no message.
+
+### Example: ask for a review when you open a pull request
+
+You open a pull request, then you message a reviewer in your team channel. Make that a routine:
+
+1. Tell your agent the rule, for example: "After I open a PR, ask my reviewer in #team-reviews on Slack with the link."
+2. The agent proposes it with `pref propose`. Accept it and deliver the instruction block, as in [How a preference reaches your agents](#how-a-preference-reaches-your-agents).
+3. From the next session, every agent reads the rule. After `gh pr create`, the agent sends the review request through its own Slack connector, with the pull request link.
+
+The agent uses a connector that it already has, such as Slack, Google Chat or Jira. devtwin stores no login for it. The agent asks before it sends, as it does for any message.
+
+The same pattern covers other routines:
+
+| Routine | Example rule |
+| --- | --- |
+| Merge to main | "After a merge to main, post the change in #team-updates." |
+| Ticket moves | "When I move a Jira ticket to review, comment on it with the PR link." |
+| Standup | "Before standup, draft my update from today's records. Do not post it." |
+
+A preference has at most 300 characters and names no scope. See [What a preference may say](#what-a-preference-may-say). For a longer routine with steps and checks, make a private skill from a template. The bundled `slack-update` template drafts a team update from your profile and the records you select. See [Personal harness](/docs/guides/personal-harness/).
 
 ## Setup review
 

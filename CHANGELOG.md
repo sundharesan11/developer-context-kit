@@ -12,6 +12,7 @@ This file lists the notable changes in each devtwin release. The format follows 
 - **Support levels.** `agents status` has a `support` field, and `doctor` has an `agents` check. Each gives an agent's `supportLevel` (`full` or `partial`) and its capability flags. `setup status` gives the level on each skills and hooks step.
 - **`gemini` actor.** A record written from a Gemini CLI shell (`GEMINI_CLI` set) has the actor `gemini`. An older devtwin refuses such a record in a portable handoff.
 - A consented `server` lesson target shares scoped lessons through an agent's MCP connection and records returned learning IDs.
+- **Docs for routines and the knowledge server.** The preferences guide shows how to make a routine of your own, such as asking a reviewer on Slack when you open a pull request. The new Team knowledge server guide covers the binding, the consent, the payload and record steps and reading at session start.
 
 ### Changed
 
