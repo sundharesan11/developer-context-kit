@@ -246,4 +246,5 @@ When planned work breaks the "do" or "don't" line of a delivered lesson, the age
 
 - Claude Code paths come from the tool input of `Read`, `Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Glob` and `Grep`.
 - Codex paths come from `apply_patch` text. The hook does not see files that Codex reads through the shell, and on Codex a `post-tool` lesson arrives after the edit ran.
+- Gemini CLI paths come from the tool input of `read_file`, `read_many_files`, `write_file`, `replace`, `glob` and `grep_search`. Gemini CLI reads no added context before a tool runs, so its lesson lines arrive on `AfterTool`, with the tool result. Its entries go in `~/.gemini/settings.json`, as `SessionStart`, `BeforeAgent`, `BeforeTool`, `AfterTool`, `PreCompress` and `AfterAgent`. See [Live mode](/docs/guides/live-mode/#gemini-cli).
 - Shell commands give paths on a best-effort basis.

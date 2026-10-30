@@ -10,6 +10,7 @@
 // instead; the route itself refuses it) or { tier, dialog: true } (an always-ask action the route gates with the owner
 // dialog alone: the hook cannot tell it from the route's automatic targets by its words, so it is not in OWNER_ACTIONS).
 import { DevtwinError } from "../errors.mjs";
+import { AGENT_IDS } from "../agents/adapters/index.mjs";
 
 export const TIERS = Object.freeze(["automatic", "consented", "always-ask"]);
 export const READ = "read";
@@ -21,7 +22,8 @@ const DIALOG = { tier: ASK, dialog: true };
 // the owner dialog whoever calls, because the caller's actor comes from environment variables any process can unset.
 const RECORD_WRITE = { observed: A, proposed: A, confirmed: DIALOG, disputed: DIALOG };
 // setup apply has the tier of the step it applies; the owner steps run an always-ask action.
-const SETUP_STEPS = { "live-folder": R, "skills-claude": ASK, "skills-codex": ASK, "write-classes-hooks": ASK, "hooks-claude": ASK, "hooks-codex": ASK,
+// Each agent adapter has a skills-<id> and a hooks-<id> step (src/setup/steps.mjs).
+const SETUP_STEPS = { "live-folder": R, ...Object.fromEntries(AGENT_IDS.flatMap((id) => [["skills-" + id, ASK], ["hooks-" + id, ASK]])), "write-classes-hooks": ASK,
   "hook-verify": A, "paths-confirm": ASK, profile: A, "starter-preferences": A, "starter-templates": R, scope: A, "first-project": A, "hub-join": ASK, "job-hub-sync": ASK,
   "job-radar": ASK, "job-advisories": ASK, "job-review-reminder": ASK, "consent-repo": ASK, "consent-hub": ASK, "backup-folder": ASK, "job-backup": ASK, sandbox: A,
   // U9 (one approval): setup apply --steps or --all-pending runs several owner steps after one owner dialog.

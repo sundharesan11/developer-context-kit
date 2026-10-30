@@ -9,15 +9,14 @@ import { agentDirsFor } from "../config/pilot.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
 import { readRegistry } from "../config/registry.mjs";
-import { CODEX_TRUST_NOTE } from "../agents/hooks-install.mjs";
+import { adapter, AGENT_IDS } from "../agents/adapters/index.mjs";
 import { receiptPath, receiptProblem, readPilotBytes } from "../hooks/receipt.mjs";
 import { readPersonalSnapshot, addPersonalRecord } from "../records/personal.mjs";
 import { personalRecordIdFor, SCOPE_ID } from "../identity/ids.mjs";
 import { planSandbox, applySandbox, sandboxDone } from "./sandbox.mjs";
 
-const AGENTS = ["claude", "codex"];
-const SKILL_FOLDERS = { claude: "~/.claude/skills", codex: "~/.agents/skills" };
-const HOOK_FILES = { claude: "settings.json", codex: "hooks.json" };
+// Issue #8: one skills step and one hooks step per agent adapter (src/agents/adapters), as skills-<id> and hooks-<id>.
+const AGENTS = AGENT_IDS;
 const list = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
 const pick = (values, keys) => Object.fromEntries(keys.filter((key) => values[key] !== undefined).map((key) => [key, values[key]]));
 const agentsCmd = async () => (await import("../agents/commands.mjs"));
@@ -42,8 +41,8 @@ const liveFolder = {
 function skillsStep(agent) {
   const values = (ctx) => ({ agent: [agent], ...pick(ctx.values, ["home"]) });
   return {
-    id: "skills-" + agent, title: "Skills for " + agent, available: true, owner: true, skip: agentSkip(agent),
-    what: "Installs the bundled devtwin skills (devtwin-onboard, devtwin-resume, devtwin-record, devtwin-capture) as devtwin-* entries in " + SKILL_FOLDERS[agent] + ". Runs agents install --agent " + agent + ".",
+    id: "skills-" + agent, agent, title: "Skills for " + agent, available: true, owner: true, skip: agentSkip(agent),
+    what: "Installs the bundled devtwin skills (devtwin-onboard, devtwin-resume, devtwin-record, devtwin-capture) as devtwin-* entries in ~/" + adapter(agent).skills.folder + ". Runs agents install --agent " + agent + ".",
     why: "The skills let the " + agent + " agent onboard projects, resume project context and record decisions through devtwin.",
     undo: "agents uninstall --agent " + agent + " removes only the entries that devtwin wrote. agents rollback-check compares the folder with the inventory taken before the install.",
     plan: async (ctx) => (await agentsCmd()).agentsInstallCommand.run(values(ctx), ctx),
@@ -55,7 +54,7 @@ function skillsStep(agent) {
 // The hook settings files of the agents in the live config.
 export function hookTargetsFor(ctx) {
   const dirs = agentDirsFor({ home: ctx.pilot.live.home, env: ctx.env ?? process.env });
-  return AGENTS.filter((agent) => Object.hasOwn(ctx.pilot.live.skillDirs, agent)).map((agent) => join(dirs[agent], HOOK_FILES[agent]));
+  return AGENTS.filter((agent) => Object.hasOwn(ctx.pilot.live.skillDirs, agent)).map((agent) => join(dirs[agent], adapter(agent).hooks.file));
 }
 // U9 (one approval): needs(ctx) names the write-class paths a step needs approved in the live config. A setup batch
 // (src/setup/batch.mjs) merges them into one live write-classes change that runs before every other step.
@@ -64,7 +63,7 @@ const writeClassesHooks = {
   id: "write-classes-hooks", title: "Approve the hook settings files", available: true, owner: true, config: true,
   needs: (ctx) => ctx.pilot.live ? { hookTargets: hookTargetsFor(ctx) } : {},
   skip: (ctx) => ctx.pilot.live ? null : "a disposable pilot lists its hook targets in the pilot file",
-  what: "Adds the agent hook settings files (~/.claude/settings.json and ~/.codex/hooks.json) to the hookTargets write class of the live config. Runs live write-classes --hook-target for each file. Other classes stay as they are.",
+  what: "Adds the hook settings file of each agent in the live config (" + AGENTS.map((id) => adapter(id).hooks.display).join(", ") + ") to the hookTargets write class of the live config. Runs live write-classes --hook-target for each file. Other classes stay as they are.",
   why: "devtwin edits an agent settings file only when you approved that exact path in the live config. The hook steps need this approval.",
   undo: "live write-classes --clear hookTargets, through preview and apply, removes the approval. Run agents uninstall --hooks first to remove the hook entries.",
   plan: async (ctx) => {
@@ -80,11 +79,11 @@ const writeClassesHooks = {
 
 function hooksStep(agent) {
   const values = (ctx) => ({ agent: [agent], hooks: true, ...pick(ctx.values, ["home"]) });
-  const file = agent === "claude" ? "~/.claude/settings.json" : "~/.codex/hooks.json";
+  const file = adapter(agent).hooks.display, note = adapter(agent).hooks.note;
   return {
-    id: "hooks-" + agent, title: "Hooks for " + agent, available: true, owner: true, skip: agentSkip(agent),
-    needs: (ctx) => ctx.pilot.live ? { hookTargets: hookTargetsFor(ctx).filter((path) => path.endsWith("/" + HOOK_FILES[agent])) } : {},
-    what: "Adds devtwin's hook entries to " + file + ". Runs agents install --hooks --agent " + agent + ". Other entries in the file stay." + (agent === "codex" ? " " + CODEX_TRUST_NOTE.message : ""),
+    id: "hooks-" + agent, agent, title: "Hooks for " + agent, available: true, owner: true, skip: agentSkip(agent),
+    needs: (ctx) => ctx.pilot.live ? { hookTargets: hookTargetsFor(ctx).filter((path) => path === join(agentDirsFor({ home: ctx.pilot.live.home, env: ctx.env ?? process.env })[agent], adapter(agent).hooks.file)) } : {},
+    what: "Adds devtwin's hook entries to " + file + ". Runs agents install --hooks --agent " + agent + ". Other entries in the file stay." + (note ? " " + note.message : ""),
     why: "The hook gives the agent matching lessons at the moment it touches an area, and denies owner-only devtwin commands from agent shells.",
     undo: "agents uninstall --hooks --agent " + agent + " removes only devtwin's entries. A backup of the file is kept in the run folder.",
     plan: async (ctx) => (await agentsCmd()).agentsInstallCommand.run(values(ctx), ctx),

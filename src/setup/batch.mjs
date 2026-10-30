@@ -33,11 +33,14 @@ import { digest } from "../storage/canonical.mjs";
 import { requireOwnerApproval, fitsDialog, issueBatchGrant, revokeBatchGrant, BATCH_GRANT } from "../owner/dialog.mjs";
 import { UNSAFE_PATH_CHARS } from "../config/roots.mjs";
 import { stepById } from "./steps.mjs";
+import { adapter, AGENT_IDS } from "../agents/adapters/index.mjs";
 
 // The apply order. A step's phase never changes with the selection. hook-verify is not an owner step: it is in a batch
 // because a config change ends the kit receipt the hook trusts, and a hook install in the same batch makes it needless.
-export const BATCH_ORDER = Object.freeze(["write-classes-hooks", "backup-folder", "skills-claude", "skills-codex", "consent-hub", "consent-repo",
-  "job-hub-sync", "job-radar", "job-advisories", "job-review-reminder", "job-backup", "paths-confirm", "hooks-claude", "hooks-codex", "hook-verify"]);
+// The agent steps come from the adapter registry (skills-<id>, hooks-<id>).
+const HOOK_STEPS = AGENT_IDS.map((id) => "hooks-" + id);
+export const BATCH_ORDER = Object.freeze(["write-classes-hooks", "backup-folder", ...AGENT_IDS.map((id) => "skills-" + id), "consent-hub", "consent-repo",
+  "job-hub-sync", "job-radar", "job-advisories", "job-review-reminder", "job-backup", "paths-confirm", ...HOOK_STEPS, "hook-verify"]);
 const LONG_TEXT = new Set(["consent-hub", "consent-repo"]);
 const NOT_BATCHED = { "hub-join": "it joins the hub over the network, and its own dialog shows the hub details and the note consent; run setup apply --step hub-join" };
 const NO_APPROVAL = "it needs no owner approval; run setup apply --step with this step, which an agent may run";
@@ -125,7 +128,7 @@ async function linesFor(step, preview, ctx) {
     if (!action) return { excluded: "the hook file cannot be changed: " + preview.actions.map((a) => a.status + (a.reason ? " " + a.reason : "")).join(", ") };
     const events = [...new Set(action.changes.filter((c) => c.op === "add").map((c) => c.event))];
     const replaces = action.changes.some((c) => c.op === "remove");
-    return { lines: [(replaces ? "Replace devtwin hook entries in " : "Add devtwin hook entries to ") + t(action.path) + ": " + events.join(", ") + (action.agent === "codex" ? ". Then trust them in Codex with /hooks" : "")] };
+    return { lines: [(replaces ? "Replace devtwin hook entries in " : "Add devtwin hook entries to ") + t(action.path) + ": " + events.join(", ") + (adapter(action.agent).hooks.trustLine ? ". " + adapter(action.agent).hooks.trustLine : "")] };
   }
   if (step.id === "job-hub-sync") return { lines: [preview.installed ? rewriteLine(ctx, "hub-sync for scope " + preview.scope, preview.plist, preview.programArguments) : "Install job hub-sync for scope " + preview.scope + " (" + every(preview.interval) + ") at " + t(preview.plist)] };
   if (step.job) return { lines: preview.actions.map((a) => a.enabled ? rewriteLine(ctx, a.job, a.plist, a.programArguments) : "Install job " + a.job + " (" + every(a.interval) + ") at " + t(a.plist)) };
@@ -243,7 +246,7 @@ export async function buildBatch(values, ctx) {
       replan: (c) => step.plan(c), apply: (c, fingerprint) => step.apply(c, fingerprint) });
   }
   if (values["all-pending"] === true) {
-    const extra = await rewriteItems(pctx), at = items.findIndex((x) => ["paths-confirm", "hooks-claude", "hooks-codex", "hook-verify"].includes(x.id));
+    const extra = await rewriteItems(pctx), at = items.findIndex((x) => ["paths-confirm", ...HOOK_STEPS, "hook-verify"].includes(x.id));
     items.splice(at === -1 ? items.length : at, 0, ...extra.items);
     excluded.push(...extra.excluded);
   }

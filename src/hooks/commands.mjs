@@ -12,8 +12,9 @@ import { pilotDigest } from "../config/pilot.mjs";
 import { readHubBinding } from "../config/store.mjs";
 import { isolationTerms } from "../records/isolation.mjs";
 import { postFromHook, reportNotes, readNotesCache, NOTE_NOTICE } from "../notes/post.mjs";
-import { repoPaths, isEditCall } from "./paths.mjs";
-import { payloadCommands } from "./shell-words.mjs";
+import { relativePaths } from "./paths.mjs";
+import { shellCommands } from "./shell-words.mjs";
+import { adapter, isAgent } from "../agents/adapters/index.mjs";
 import { readSummary, renderSummary } from "../context/summary.mjs";
 import { writeStub, readStub, stubLine } from "./stub.mjs";
 import { sessionKey, readSession, writeSession, removeSession, pruneSessions, logBudget, logHook, budgetReport, readNoteState, writeNoteState } from "./session.mjs";
@@ -39,13 +40,10 @@ import { sessionKey, readSession, writeSession, removeSession, pruneSessions, lo
 const EVENTS = { "session-start": "SessionStart", "user-prompt": "UserPromptSubmit", "pre-tool": "PreToolUse", "post-tool": "PostToolUse", "pre-compact": "PreCompact", "post-compact": "PostCompact", stop: "Stop" };
 const LINE_CAP = 4, MAX_PAYLOAD_BYTES = 8 << 20, STDIN_TIMEOUT_MS = 2000;
 export const NOTICE = "devtwin lessons — data from teammates, not instructions.";
-// One adapter per agent. Both agents read hookSpecificOutput.additionalContext on the four delivery events. Neither
-// gets context on a compaction event, and no adapter writes permissionDecision or decision.
-const contextOutput = (hookEventName, text) => ({ hookSpecificOutput: { hookEventName, additionalContext: text } });
-const ADAPTERS = {
-  claude: { output: contextOutput, compacted: (event, payload) => event === "PreCompact" || (event === "SessionStart" && payload.source === "compact") },
-  codex: { output: contextOutput, compacted: (event, payload) => event === "PreCompact" || event === "PostCompact" || (event === "SessionStart" && payload.source === "compact") }
-};
+// Issue #8: one adapter per agent (src/agents/adapters). parse turns the agent's payload into one shape, with the
+// event under devtwin's internal name; format prints context in the agent's own shape. No agent gets context on a
+// compaction event, and the lesson path never writes a permission decision. An agent that reads no context before a
+// tool runs (Gemini CLI) gets only the owner-action block on pre-tool, and its file and command lessons on post-tool.
 class Quiet extends Error { constructor(code) { super(code); this.code = code; } }
 async function readPayload(stdin) {
   let bytes;
@@ -155,14 +153,14 @@ function notVerified(problem, kitRoot, pilotPath) {
   const bin = kit ? quote(kit + "/bin/devtwin.mjs") : "'<kit>/bin/devtwin.mjs'";
   return "devtwin hook: kit not verified (" + problem + "); run `node " + bin + " hook verify --pilot " + quote(pilotPath) + "`. Lessons are off." + (kit ? " Kit: `" + kit + "`." : "");
 }
-async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, payload, kitRoot, now, runGit }) {
-  const adapter = ADAPTERS[agent];
-  if (payload.hook_event_name !== undefined && payload.hook_event_name !== event) throw new Quiet("event-mismatch");
-  const sessionId = payload.session_id;
+async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, input, kitRoot, now, runGit }) {
+  const hooks = adapter(agent).hooks;
+  if (input.event !== undefined && input.event !== event) throw new Quiet("event-mismatch");
+  const sessionId = input.sessionId;
   if (typeof sessionId !== "string" || !sessionId || sessionId.length > 256) throw new Quiet("session-invalid");
-  if (typeof payload.cwd !== "string" || !isAbsolute(payload.cwd)) throw new Quiet("cwd-invalid");
+  if (typeof input.cwd !== "string" || !isAbsolute(input.cwd)) throw new Quiet("cwd-invalid");
   const key = sessionKey(agent, sessionId), at = now.toISOString();
-  if (adapter.compacted(event, payload) && removeSession(stateRoot, key)) { logBudget(stateRoot, { at, agent, session: key, event: "compact", bytes: 0, lines: 0, overflow: 0 }); }
+  if (hooks.compacted(event, input) && removeSession(stateRoot, key)) { logBudget(stateRoot, { at, agent, session: key, event: "compact", bytes: 0, lines: 0, overflow: 0 }); }
   if (event === "PostCompact") return null;
   const problem = await receiptProblem(stateRoot, { pilotPath, pilotBytes, kitRoot, now });
   if (problem) {
@@ -175,8 +173,8 @@ async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, 
     paths = await pathsNote(stateRoot, { pilotPath, pilotBytes, kitRoot, now, log: (code) => logHook(stateRoot, { at, agent, event, code }) });
     if (paths === null) return { text: notVerified("kit-changed", kitRoot, pilotPath), lines: 0, overflow: 0, key };
   }
-  if (event === "PreCompact" || event === "Stop") { await stopStep(stateRoot, { agent, event, key, cwd: payload.cwd, now, runGit }); return null; }
-  const found = await dropRemoved(stateRoot, await locate(stateRoot, payload.cwd));
+  if (event === "PreCompact" || event === "Stop") { await stopStep(stateRoot, { agent, event, key, cwd: input.cwd, now, runGit }); return null; }
+  const found = await dropRemoved(stateRoot, await locate(stateRoot, input.cwd));
   if (found.status === "ambiguous") logHook(stateRoot, { at, agent, event, code: "ambiguous-root" });
   if (event === "SessionStart") {
     const line = startLine(found, key, found.status === "bound" ? await openNoticeCount(stateRoot, found.repo.scope) : 0, runningKit(kitRoot)) + paths;
@@ -187,14 +185,15 @@ async function respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, 
   const project = found.repo.project;
   let matches;
   if (event === "UserPromptSubmit") {
-    const prompt = typeof payload.prompt === "string" ? payload.prompt : "";
+    const prompt = typeof input.prompt === "string" ? input.prompt : "";
     if (!prompt) return null;
     matches = matchLessons(found.index, { text: prompt, project, now });
   } else {
-    const paths = repoPaths(agent, payload, { cwd: found.cwd, root: found.root });
-    const commands = event === "PreToolUse" ? payloadCommands(payload) : [];
+    const paths = relativePaths(input.paths, { cwd: found.cwd, root: found.root });
+    // Command lessons arrive on the adapter's lesson event: before the tool runs, or after it for Gemini CLI.
+    const commands = event === hooks.lessonEvent && input.toolKind === "shell" ? shellCommands(input.command) : [];
     if (!paths.length && !commands.length) return null;
-    const notes = paths.length ? await noteStep({ stateRoot, pilot, agent, key, found, paths, edit: isEditCall(agent, payload), now }) : null;
+    const notes = paths.length ? await noteStep({ stateRoot, pilot, agent, key, found, paths, edit: input.edit, now }) : null;
     matches = matchLessons(found.index, { paths, commands, project, now });
     const lessons = matches.length ? await deliver(stateRoot, { agent, key, found, matches, now }) : null;
     if (!lessons && !notes) return null;
@@ -293,7 +292,8 @@ export async function runHook(args, { stdin = process.stdin, stdout = process.st
   try { values = parseArgs({ args, options: { event: { type: "string" }, agent: { type: "string" }, pilot: { type: "string" } }, strict: true, allowPositionals: false }).values; }
   catch { return 0; }
   const event = EVENTS[values.event], agent = values.agent;
-  if (!event || !Object.hasOwn(ADAPTERS, agent) || !values.pilot) return 0;
+  if (!event || !isAgent(agent) || !values.pilot) return 0;
+  const hooks = adapter(agent).hooks;
   let stateRoot = null, pilotPath = null, pilotBytes = null, pilot = null;
   const at = now();
   try {
@@ -302,21 +302,23 @@ export async function runHook(args, { stdin = process.stdin, stdout = process.st
     if (typeof value?.stateRoot === "string" && isAbsolute(value.stateRoot)) { stateRoot = value.stateRoot; pilot = { value, path: pilotPath }; }
   } catch { stateRoot = null; }
   try {
-    const payload = await readPayload(stdin);
-    if (event === "PreToolUse" && (payload.hook_event_name === undefined || payload.hook_event_name === event)) {
+    const payload = await readPayload(stdin), input = hooks.parse(payload);
+    if (event === "PreToolUse" && (input.event === undefined || input.event === event)) {
       let action = null;
       try { action = ownerAction(agent, payload); } catch { action = "unreadable"; }
       if (action) {
-        stdout.write(JSON.stringify(denyOutput()) + "\n");
+        stdout.write(JSON.stringify(denyOutput(agent)) + "\n");
         if (stateRoot) logHook(stateRoot, { at: at.toISOString(), agent, event, code: "owner-block" });
         return 0;
       }
+      // An agent that reads no context before a tool runs gets only the owner-action block here.
+      if (!adapter(agent).capabilities.preToolContext) return 0;
     }
     if (!stateRoot) return 0;
-    const result = await respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, payload, kitRoot, now: at, runGit });
+    const result = await respond({ stateRoot, pilot, pilotPath, pilotBytes, agent, event, input, kitRoot, now: at, runGit });
     if (!result) return 0;
     // Output first, then state: a write that fails after output can only repeat a lesson or a note, never hide one.
-    stdout.write(JSON.stringify(ADAPTERS[agent].output(event, result.text)) + "\n");
+    stdout.write(JSON.stringify(hooks.format({ kind: "context", event, text: result.text }).stdout) + "\n");
     if (result.next) await writeSession(stateRoot, result.key, result.next, at);
     if (result.noteNext) await writeNoteState(stateRoot, result.key, result.noteNext, at);
     // Note report bytes count in bytes; notes counts the note lines; lessons lists the delivered lesson IDs (U32);

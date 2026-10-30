@@ -4,6 +4,7 @@ import { planInstall, applyInstall, installStatus, planRecovery, applyRecovery }
 import { rollbackCheck } from "./inventory.mjs";
 import { planHooks, applyHooks, hookStatus } from "./hooks-install.mjs";
 import { envNotes } from "../config/legacy.mjs";
+import { AGENT_IDS, support, defaultInstructionAgents } from "./adapters/index.mjs";
 const options = { home: { type: "string" }, agent: { type: "string", multiple: true }, apply: { type: "boolean" }, "plan-fingerprint": { type: "string" }, "run-id": { type: "string" }, hooks: { type: "boolean" } };
 const agents = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
 // --hooks selects devtwin's hook entries in the agent settings files instead of the bundled skills. Without it the
@@ -28,7 +29,10 @@ export const agentsUninstallCommand = command("uninstall");
 export const agentsStatusCommand = { options: { home: { type: "string" } }, async run(values, ctx) {
   const status = await installStatus(ctx.roots, ctx.pilot, { targetHome: values.home }), notes = envNotes(ctx.env ?? process.env);
   const hooks = await hookStatus(ctx.pilot, { targetHome: values.home, kitRoot: ctx.kitRoot, now: ctx.now() });
-  return notes.length ? { ...status, hooks, notes } : { ...status, hooks };
+  // Issue #8: each listed agent's support level ("full" or "partial") and the capability flags behind it.
+  const shown = new Set([...status.actions.map((a) => a.agent), ...hooks.agents.map((a) => a.agent)]);
+  const result = { ...status, hooks, support: AGENT_IDS.filter((id) => shown.has(id)).map(support) };
+  return notes.length ? { ...result, notes } : result;
 } };
 // Previews recovery of interrupted bundled installs; --apply with the previewed fingerprint is the approval.
 // --release also closes runs whose entries are held or whose journal is unreadable, leaving their files in place.
@@ -43,7 +47,7 @@ export const agentsRollbackCheckCommand = { options: { "run-id": { type: "string
 // U16: instructions plan previews the managed instruction block and each target file; instructions apply writes it
 // with the plan fingerprint, after the owner dialog. --remove takes the block out. apply is an owner action.
 const instructionOptions = { home: { type: "string" }, agent: { type: "string", multiple: true }, remove: { type: "boolean" } };
-const instructionInput = (values, ctx) => ({ targetHome: values.home, agents: values.agent === undefined ? ["claude", "codex"] : agents(values.agent), remove: values.remove === true, kitRoot: ctx.kitRoot });
+const instructionInput = (values, ctx) => ({ targetHome: values.home, agents: values.agent === undefined ? defaultInstructionAgents(ctx.pilot) : agents(values.agent), remove: values.remove === true, kitRoot: ctx.kitRoot });
 export const instructionsPlanCommand = { options: instructionOptions, run: async (values, ctx) => (await import("./instructions.mjs")).planInstructions(ctx.roots, ctx.pilot, instructionInput(values, ctx)) };
 export const instructionsApplyCommand = { options: { ...instructionOptions, "plan-fingerprint": { type: "string" }, "run-id": { type: "string" } }, async run(values, ctx) {
   if (!values["plan-fingerprint"]) throw new DevtwinError("PLAN_REQUIRED", "Plan fingerprint required");

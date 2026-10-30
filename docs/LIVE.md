@@ -19,6 +19,7 @@ A live config is a pilot file with a `live` block. It names the config ID, the h
 
 - Outside the store, live mode writes only `devtwin-*` entries directly inside `~/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) and `~/.agents/skills`, plus the exact paths of an approved write class (see [Live-mode exceptions](#live-mode-exceptions)). It never creates, removes or changes the mode of a skill folder or its parents.
 - Codex skills go to `~/.agents/skills`. Nothing is written to `~/.codex/skills`. `CODEX_HOME` does not change the target; the preview warns with `CODEX_HOME_IGNORED` when it is set.
+- Gemini CLI skills also go to `~/.agents/skills`. Gemini CLI reads this folder as an alias of `~/.gemini/skills`, and the alias wins. One install serves Codex and Gemini CLI. See [Gemini CLI](#gemini-cli).
 - Live commands run only from the kit the live config names. A clone must be clean and detached at the live config's commit. A package kit folder must match its manifest, version and digest, and be locked and owned by you. Otherwise every live command fails with `GATE_REQUIRED`.
 - Hooks, jobs and agent-invoked skills run the pinned kit's own `bin/devtwin.mjs`. They never run npm's global folder, so a later `npm i -g` changes nothing until you pin a new kit.
 - The home is the process home. A run with a different `$HOME` is refused.
@@ -33,8 +34,8 @@ A live config can hold an optional `writeClasses` block. It names the only other
 | Class | Allowed paths |
 | --- | --- |
 | `hubRoot` | Folders inside the home for hub clones. Writes are allowed in the folder and below it, never in a sibling or a parent. |
-| `instructionTargets` | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`), `~/.codex/AGENTS.md`, and a devtwin-owned file named `devtwin*.md` directly in one of those two folders. |
-| `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) and `~/.codex/hooks.json`. |
+| `instructionTargets` | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`), `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, and a devtwin-owned file named `devtwin*.md` directly in `~/.claude` or `~/.codex`. |
+| `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`), `~/.codex/hooks.json` and `~/.gemini/settings.json`. |
 | `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. |
 | `backupTargets` | Folders inside the home for backup archives and restores. Writes are allowed in the folder and below it, never in a sibling or a parent. |
 | `repoLearnings` | Exact roots of listed repositories that may get learning branches. devtwin writes there only Git objects and one new `devtwin/learning-<id>` branch, never a file. |
@@ -42,9 +43,9 @@ A live config can hold an optional `writeClasses` block. It names the only other
 - The classes are part of the approved config digest. A live config whose classes differ from the approved ones is refused with `GATE_REQUIRED`, `live.approval`. Set the classes only with `live write-classes` (see [Set the write classes](#set-the-write-classes)). Do not edit them in `live.json` by hand.
 - Every path must be canonical and inside the home. A path whose folder is a link, or that is itself a link, is refused. A `hubRoot` or `backupTargets` folder must not overlap the store, the kit, a listed repository, a skill folder, a protected agent home or another approved folder.
 - A `repoLearnings` path must be one of the config's `repos`, exactly. It lets a lesson accepted with `--target repo` write a learning branch in that repository ([HUB.md](HUB.md#write-a-lesson-to-the-repository)). Pushing the branch also needs the owner's `repo-push` consent.
-- A write outside the store is allowed only when the writing code names one class and the path is exactly in it. Every other file in `~/.claude`, `~/.codex`, `~/.agents` and `~/Library/LaunchAgents` stays refused.
+- A write outside the store is allowed only when the writing code names one class and the path is exactly in it. Every other file in `~/.claude`, `~/.codex`, `~/.gemini`, `~/.agents` and `~/Library/LaunchAgents` stays refused.
 - `hub join`, `hub sync` and `hub leave` write only inside an approved `hubRoot` folder, and `hub schedule` writes only its own `devtwin.hub-sync.<scope>.plist` in `launchAgents` ([HUB.md](HUB.md)).
-- Only `agents install --hooks`, `agents uninstall --hooks` and `hub schedule` edit files in a file class, and each edits only its own class. See [Install the hooks](#install-the-hooks). The shared edit step works as follows. In `CLAUDE.md` and `AGENTS.md`, it changes only the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. Every byte outside the markers stays the same. Malformed markers stop the edit with `CONFLICT`. In a JSON settings file, it changes only devtwin's own hook entries; the other values stay, but the file can be re-indented.
+- Only `agents install --hooks`, `agents uninstall --hooks` and `hub schedule` edit files in a file class, and each edits only its own class. See [Install the hooks](#install-the-hooks). The shared edit step works as follows. In `CLAUDE.md`, `AGENTS.md` and `GEMINI.md`, it changes only the text between `<!-- devtwin:begin -->` and `<!-- devtwin:end -->`. Every byte outside the markers stays the same. Malformed markers stop the edit with `CONFLICT`. In a JSON settings file, it changes only devtwin's own hook entries; the other values stay, but the file can be re-indented.
 - Before each edit, it writes the exact prior bytes to `store/state/runs/<run_id>/backups/` at mode 0600, with a record that names the path. For a file that did not exist, only the record is written. If the file changed during the edit, the edit stops with `INTEGRITY` and the file is not replaced. The edited file is replaced atomically and keeps its own mode. A file that devtwin creates gets mode 0600.
 - An edited file must be a regular file you own, with one link, that is not group or other writable.
 
@@ -343,7 +344,7 @@ node "$KIT/bin/devtwin.mjs" agents install --pilot "$LIVE_CONFIG" --agent claude
 
 ### Install the hooks
 
-The devtwin hook delivers lesson lines and blocks owner-only commands from agent shells. It needs the two `hookTargets` files approved in the live config, as [Set the write classes](#set-the-write-classes) shows. `--hooks` changes only those files. Without it, `agents install` installs only the skills, as before. Preview, review, then apply after approval:
+The devtwin hook delivers lesson lines and blocks owner-only commands from agent shells. It needs the `hookTargets` file of each agent approved in the live config, as [Set the write classes](#set-the-write-classes) shows. `--hooks` changes only those files. Without it, `agents install` installs only the skills, as before. Preview, review, then apply after approval:
 
 ```sh
 node "$KIT/bin/devtwin.mjs" agents install --hooks --pilot "$LIVE_CONFIG" --agent claude --agent codex
@@ -352,7 +353,8 @@ node "$KIT/bin/devtwin.mjs" agents install --hooks --pilot "$LIVE_CONFIG" --agen
 
 - The preview lists each entry it adds or removes in `changes`, with the exact JSON. `create` makes a file that does not exist, `update` edits one, `installed` is already current and `blocked` means the file is not approved or its folder is missing.
 - Claude Code gets entries in `settings.json` for `SessionStart`, `UserPromptSubmit`, `PreToolUse` (matcher `Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep|Bash`) `PreCompact` and `Stop`. Codex gets entries in `~/.codex/hooks.json` for `SessionStart`, `UserPromptSubmit`, `PreToolUse` (matcher `^(apply_patch|Bash)$`), `PostToolUse` (matcher `^Bash$`), `PreCompact` and `Stop`. An install made before the `Stop` entry existed shows it as `missing` until you run the install again.
-- Each entry runs `node "<kit>/bin/devtwin.mjs" hook --event <event> --agent <agent> --pilot "<live config>"` with a 10-second timeout. The line names the kit folder and the live config only. A new kit commit checked out in the same clone keeps every line byte-identical. A package kit has a new folder for each version, so a package upgrade changes the lines, as does a move to another clone. Install shows the changed lines as `update`.
+- Gemini CLI gets entries in `~/.gemini/settings.json`. See [Gemini CLI](#gemini-cli).
+- Each entry runs `node "<kit>/bin/devtwin.mjs" hook --event <event> --agent <agent> --pilot "<live config>"` with a 10-second timeout. Gemini CLI counts the timeout in milliseconds, so its entries say `10000`. The line names the kit folder and the live config only. A new kit commit checked out in the same clone keeps every line byte-identical. A package kit has a new folder for each version, so a package upgrade changes the lines, as does a move to another clone. Install shows the changed lines as `update`.
 - An entry is devtwin's only when a completed hook install of this live config wrote it. devtwin never changes another entry, also when it looks like a devtwin entry. An exact copy that devtwin did not write is `conflict` with `foreign-entry`. A devtwin entry that you edited is `conflict` with `modified`. A conflict blocks that agent's file. Fix it by hand, then preview again.
 - Apply writes a backup of each file, an inventory and a journal under `store/state/runs/<run_id>/`, as a skill install does. `agents recover` and `agents rollback-check --run-id '<run_id>'` read them. Install also refreshes the kit receipt that the hook trusts.
 - Codex runs a new or changed hook only after you trust it. Open Codex, run `/hooks`, and trust each devtwin entry. `agents status` repeats this note.
@@ -393,10 +395,11 @@ node "$KIT/bin/devtwin.mjs" instructions apply --pilot "$LIVE_CONFIG" --plan-fin
 
 - **Claude Code.** devtwin writes the block to `~/.claude/devtwin.md`, a file it owns, and adds a marker block to `~/.claude/CLAUDE.md` with one import line, `@<path of devtwin.md>`.
 - **Codex.** devtwin writes the block between the markers in `~/.codex/AGENTS.md`.
+- **Gemini CLI.** devtwin writes the block between the markers in `~/.gemini/GEMINI.md`. Approve that path with `--instruction-target "$HOME/.gemini/GEMINI.md"`. With no `--agent`, the plan targets Gemini CLI only when the live config names it.
 - **Your text.** Every byte outside `<!-- devtwin:begin -->` and `<!-- devtwin:end -->` stays the same. Malformed markers are `conflict` with the reason `markers`, and the apply writes nothing. Each edit writes a backup first, as in [Live-mode exceptions](#live-mode-exceptions).
 - **Repository files.** A repository's own `AGENTS.md` or `CLAUDE.md` is never a target. The write class refuses any path that is not one of the shapes above.
 - **Cap.** The block has at most 1,200 characters. When the preferences do not fit, the plan leaves out the oldest ones and warns with `PREFERENCES_DROPPED`. Retire some with `pref retire`. Each preference is checked again when the block is built, and one that fails, for example because it names a scope added later, is left out with `PREFERENCES_REFUSED`. Sandbox advice from setup is for one repository and stays out of the block.
-- **Owner action.** `instructions apply` shows the owner dialog with the exact block, and the devtwin hook denies it from an agent shell. `--agent claude` or `--agent codex` limits the targets, and `--remove` takes the block out.
+- **Owner action.** `instructions apply` shows the owner dialog with the exact block, and the devtwin hook denies it from an agent shell. `--agent claude`, `--agent codex` or `--agent gemini` limits the targets, and `--remove` takes the block out.
 - **After a change.** Run `instructions plan` again after you accept or retire a preference. The block does not update by itself.
 
 ### Turn on the radar
@@ -588,6 +591,27 @@ An empty or unreadable lock file is refused. Make sure no devtwin command is run
 ## Leftover .codex/skills copies
 
 Earlier pilot installs wrote Codex skills to `.codex/skills`. `agents status` lists any `devtwin-*` or legacy `devctx-*` entries there under `legacy`. The kit never touches them. The owner may remove them by hand after checking they are old copies.
+
+## Gemini CLI
+
+Gemini CLI is the third supported agent. Its support level is `full`: skills, the instruction block and the owner-action block all work. Name it at live init with `--agent gemini`. Then the setup steps `skills-gemini` and `hooks-gemini` install it.
+
+A live config made before this release does not name Gemini CLI. Gemini CLI still reads the skills of the Codex install. To add its hooks and its instruction block, approve `~/.gemini/settings.json` and `~/.gemini/GEMINI.md` with `live write-classes`. Then run `agents install --hooks --agent gemini` and `instructions plan --agent gemini`, and apply each after review.
+
+| Part | Where |
+| --- | --- |
+| Skills | `~/.agents/skills`, shared with Codex |
+| Instruction block | A marker block in `~/.gemini/GEMINI.md` |
+| Hooks | The top-level `hooks` key of `~/.gemini/settings.json` |
+
+- **Shared skills folder.** Codex and Gemini CLI read the same `~/.agents/skills` folder. `agents install --agent codex --agent gemini` writes each skill once. `agents uninstall --agent gemini` keeps the entries while Codex is in the live config: each one shows `preserve` with the reason `shared-folder`. To remove them, uninstall for both agents.
+- **Hook events.** devtwin adds `SessionStart`, `BeforeAgent`, `BeforeTool` (matcher `^run_shell_command$`), `AfterTool` (matcher for the shell, read, edit, glob and search tools), `PreCompress` and `AfterAgent`. Each entry has a `name` such as `devtwin-pre-tool` and a timeout of `10000` milliseconds. Other keys in `settings.json`, such as `mcpServers`, and the hooks of other tools stay. The edit refuses a file with comments, because it reads plain JSON only.
+- **Owner-action block.** On `BeforeTool` for `run_shell_command`, the hook denies an owner-only devtwin command with `{"decision":"deny","reason":"..."}`. Gemini CLI sends the reason to the agent as the tool error.
+- **Lesson lines.** Gemini CLI does not read added context from a `BeforeTool` hook. The hook adds the lesson lines on `AfterTool`, with the tool result, so the agent reads them right after it opens, edits or runs the matching file or command. This is one step later than for Claude Code and Codex. The capability `preToolContext` is `false` for Gemini CLI.
+- **Session start and stop.** The session-start line arrives on `SessionStart`. `AfterAgent` ends each agent turn, as `Stop` does for Claude Code, so it writes the stop stub.
+- **Activity label.** Gemini CLI sets `GEMINI_CLI=1` in the shells it starts. A record written from such a shell has the actor `gemini`.
+
+Antigravity CLI is not supported yet. Its hook and skill locations differ from Gemini CLI's, and its public docs do not agree. devtwin writes nothing for it.
 
 ## Cursor
 

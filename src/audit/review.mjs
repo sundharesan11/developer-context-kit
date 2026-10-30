@@ -35,6 +35,7 @@ import { finalizePlan, assertFingerprint, REQUEST_ID } from "../storage/plan.mjs
 import { requireOwnerApproval, fitsDialog } from "../owner/dialog.mjs";
 import { personalRecordIdFor, recordIdFor } from "../identity/ids.mjs";
 import { appendEntry } from "./log.mjs";
+import { defaultInstructionAgents } from "../agents/adapters/index.mjs";
 
 export const WAIT_ID = /^wait_[a-f0-9]{24}$/;
 export const WAITING_TYPES = Object.freeze(["general-lesson", "capped-record", "outside"]);
@@ -176,7 +177,7 @@ async function buildReview(roots, pilot, { reject = [], targetHome, agents } = {
   if (rejects.length > MAX_REJECTS) throw new DevtwinError("LIMIT", "Reject at most " + MAX_REJECTS + " items in one review", { max: MAX_REJECTS });
   for (const id of rejects) if (!byId.has(id)) throw new DevtwinError("NOT_FOUND", "No waiting item with this ID", { id });
   const { dialogs, tooLong } = batch(items.filter((item) => !rejects.includes(item.id)));
-  const instructions = pilot?.live || targetHome !== undefined ? { targetHome: targetHome ?? null, agents: agents ?? ["claude", "codex"] } : null;
+  const instructions = pilot?.live || targetHome !== undefined ? { targetHome: targetHome ?? null, agents: agents ?? defaultInstructionAgents(pilot) } : null;
   const plan = finalizePlan({ kind: "activity-review", items: items.map(({ id, type, source, title, hash, createdAt, text }) => ({ id, type, source, title, createdAt, hash, text })),
     dialogs: dialogs.map((ids) => ({ items: ids })), tooLong, rejects, instructions, dialog: dialogs.length > 0 || rejects.length > 0, warnings });
   return { plan, byId };

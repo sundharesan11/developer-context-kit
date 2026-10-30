@@ -8,6 +8,7 @@ import { readBindingVersion, readManifest } from "./store.mjs";
 import { describeLock } from "../storage/lock.mjs";
 import { readPrivateJson } from "../storage/fsx.mjs";
 import { locateWorktree } from "../identity/git.mjs";
+import { AGENT_IDS, support } from "../agents/adapters/index.mjs";
 const check = (id, status, detail) => ({ id, status, detail });
 async function names(path) { try { return (await readdir(path)).sort(); } catch (error) { if (error.code === "ENOENT") return []; throw error; } }
 export async function runDoctor(roots) {
@@ -62,6 +63,10 @@ export async function runDoctor(roots) {
     catch { incomplete.push(run); }
   }
   checks.push(check("install-journals", incomplete.length ? "warn" : "ok", incomplete));
+  // Issue #8: each agent devtwin supports, with its support level and capability flags. "partial" means a capability
+  // that "full" needs (skills, instruction block, owner-action block) does not work for that agent.
+  const agents = (roots.pilot?.live ? AGENT_IDS.filter((id) => Object.hasOwn(roots.pilot.live.skillDirs, id)) : AGENT_IDS).map(support);
+  checks.push(check("agents", agents.some((a) => a.supportLevel !== "full") ? "warn" : "ok", agents));
   checks.push(check("bound-roots", boundProblems || gitQueryFailed ? "fail" : registry ? "ok" : "unavailable", gitQueryFailed ? { code: "DEVTWIN_GIT_QUERY_FAILED", changed: boundProblems, gitQueryFailed } : { changed: boundProblems }));
   return { ok: !checks.some((c) => c.status === "fail"), checks };
 }
