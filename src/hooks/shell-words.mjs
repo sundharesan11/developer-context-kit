@@ -104,9 +104,9 @@ export function commandWords(text) {
 }
 // The commands a shell tool call runs. Claude Code sends Bash input.command as text; Codex sends text or an argv array,
 // and an argv array is one command whose words keep their own boundaries. Other tools give none.
-export function payloadCommands(payload) {
-  if (!SHELL_TOOLS.has(payload?.tool_name)) return [];
-  const command = payload.tool_input?.command;
+export const payloadCommands = (payload) => SHELL_TOOLS.has(payload?.tool_name) ? shellCommands(payload.tool_input?.command) : [];
+// The commands of a shell tool's raw command value (text or argv), as an adapter's parse gives it.
+export function shellCommands(command) {
   if (Array.isArray(command)) {
     const words = command.filter((part) => typeof part === "string").slice(0, MAX_WORDS);
     return words.length && Buffer.byteLength(words.join(" ")) <= MAX_COMMAND_BYTES ? normalize(words, 0).slice(0, MAX_COMMANDS) : [];

@@ -10,6 +10,7 @@ import { DevtwinError } from "../errors.mjs";
 import { LEGACY_SKILL_PREFIX, LEGACY_DEFAULT_ROOTS } from "./legacy.mjs";
 import { kitIdentity, kitsFolder } from "../kit/identity.mjs";
 import { verifyKit } from "../kit/manifest.mjs";
+import { adapter, AGENT_IDS } from "../agents/adapters/index.mjs";
 // The running kit. Tests inject context.kitRoot; production derives it from this file.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const members = ["configRoot", "dataRoot", "stateRoot", "inputsRoot"];
@@ -66,19 +67,20 @@ export function protectedPaths({ home = homedir(), env = process.env, kitRoot = 
     { label: "kit-checkout", path: kitRoot }
   ];
 }
+// Each agent's user skill folder, from its adapter (src/agents/adapters). Codex and Gemini CLI share ~/.agents/skills.
 export function skillDirsFor({ home = homedir(), env = process.env } = {}) {
-  return { claude: env.CLAUDE_CONFIG_DIR ? join(env.CLAUDE_CONFIG_DIR, "skills") : join(home, ".claude/skills"), codex: join(home, ".agents/skills") };
+  return Object.fromEntries(AGENT_IDS.map((id) => [id, adapter(id).skills.dir({ home, env })]));
 }
 // The agent folders whose user-level files devtwin may edit. Codex ignores CODEX_HOME in live mode, as for skills.
 export function agentDirsFor({ home = homedir(), env = process.env } = {}) {
-  return { claude: env.CLAUDE_CONFIG_DIR ?? join(home, ".claude"), codex: join(home, ".codex") };
+  return Object.fromEntries(AGENT_IDS.map((id) => [id, adapter(id).agentDir({ home, env })]));
 }
 // The exact shape each file class allows for one home. Every target must also sit inside that home.
 function classShape(writeClass, path, home, env) {
   if (!isWithin(path, home) || path === home) return false;
   const dirs = agentDirsFor({ home, env }), name = basename(path), parent = dirname(path);
-  if (writeClass === "instructionTargets") return path === join(dirs.claude, "CLAUDE.md") || path === join(dirs.codex, "AGENTS.md") || ([dirs.claude, dirs.codex].includes(parent) && OWNED_INSTRUCTIONS.test(name));
-  if (writeClass === "hookTargets") return path === join(dirs.claude, "settings.json") || path === join(dirs.codex, "hooks.json");
+  if (writeClass === "instructionTargets") return AGENT_IDS.some((id) => path === join(dirs[id], adapter(id).instructions.file) || (adapter(id).instructions.ownedFiles && parent === dirs[id] && OWNED_INSTRUCTIONS.test(name)));
+  if (writeClass === "hookTargets") return AGENT_IDS.some((id) => path === join(dirs[id], adapter(id).hooks.file));
   return parent === join(home, "Library/LaunchAgents") && LAUNCH_AGENT.test(name);
 }
 // A live config checks the classes against its home; a disposable pilot only against a listed fake agent home.
@@ -174,7 +176,10 @@ function validate(pilot, context, allowInternal = false) {
     for (const forbidden of pilot.forbidden) if (touches(path, forbidden)) fail(field);
   }
   const spans = skills.length ? [...destinations, ["live.kitRoot", pilot.live.kitRoot]] : destinations;
-  for (let i = 0; i < spans.length; i++) for (let j = i + 1; j < spans.length; j++) if (touches(spans[i][1], spans[j][1])) fail(spans[j][0] === "live.kitRoot" ? spans[i][0] : spans[j][0]);
+  // Issue #8: two agents that share one skill folder (Codex and Gemini CLI, ~/.agents/skills) name the same exact
+  // folder. That is one carve-out, not an overlap; any other overlap still fails.
+  const shared = (a, b) => a[0].startsWith("live.skillDirs.") && b[0].startsWith("live.skillDirs.") && comparable(a[1]) === comparable(b[1]);
+  for (let i = 0; i < spans.length; i++) for (let j = i + 1; j < spans.length; j++) if (touches(spans[i][1], spans[j][1]) && !shared(spans[i], spans[j])) fail(spans[j][0] === "live.kitRoot" ? spans[i][0] : spans[j][0]);
   // A file target sits inside a protected agent folder by design; it must still miss every other destination.
   for (const [field, path] of files) {
     if (!pilot.live) for (const entry of ps) if (touches(path, entry.path)) fail(field, entry.label);

@@ -4,6 +4,7 @@
 // dialog (src/setup/batch.mjs); apply then takes --apply and the batch fingerprint.
 import { DevtwinError, toJson } from "../errors.mjs";
 import { STEPS, stepById } from "./steps.mjs";
+import { support } from "../agents/adapters/index.mjs";
 
 // The flags every setup route takes: the step, and the inputs each step passes to the command it wraps.
 export const setupOptions = {
@@ -30,7 +31,9 @@ export async function describe(step, ctx) {
   // A job step whose job is on but whose plist is not what it would write now (after live set-kit) says outdated.
   let outdated = false;
   if (!done && !problem && !skip && step.outdated) { try { outdated = await step.outdated(ctx); } catch (error) { problem = toJson(error); } }
-  return { id: step.id, title: step.title, available: step.available, owner: step.owner === true, what: step.what, why: step.why, undo: step.undo, done, ...(outdated ? { status: "outdated" } : {}), ...(skip ? { skipped: skip } : {}), ...(problem ? { problem } : {}) };
+  return { id: step.id, title: step.title, available: step.available, owner: step.owner === true, what: step.what, why: step.why, undo: step.undo, done, ...(outdated ? { status: "outdated" } : {}), ...(skip ? { skipped: skip } : {}), ...(problem ? { problem } : {}),
+    // Issue #8: an agent step names its agent and that agent's support level, so a partial agent shows plainly.
+    ...(step.agent ? { agent: step.agent, supportLevel: support(step.agent).supportLevel } : {}) };
 }
 // The consent screen for one step: its header and the preview of the command it wraps. A preview that cannot be built
 // (a missing input, a gate) is reported as problem, so the what, why and undo always show.

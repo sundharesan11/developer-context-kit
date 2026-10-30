@@ -1,6 +1,6 @@
 import { DevtwinError } from "../errors.mjs";
 import { RECORD_ID, assertActorRef } from "../identity/ids.mjs";
-import { KINDS, STATUSES } from "../records/schema.mjs";
+import { KINDS, STATUSES, RECORDERS } from "../records/schema.mjs";
 import { assertNoSensitive } from "../records/redact.mjs";
 import { assertSourceRel, isDeniedRel } from "../storage/source-read.mjs";
 import { sha256 } from "../storage/canonical.mjs";
@@ -68,7 +68,7 @@ export function portableRecord(record, { projected = false } = {}) {
   canonicalTime(record.createdAt);
   if (record.revisitAfter != null) canonicalTime(record.revisitAfter, true);
   const by = record.recordedBy;
-  if (!by || !["human", "claude", "codex", "other"].includes(by.actor) || !/^run_[a-z0-9_-]{8,64}$/.test(by.runId)) unsafe();
+  if (!by || !RECORDERS.includes(by.actor) || !/^run_[a-z0-9_-]{8,64}$/.test(by.runId)) unsafe();
   let review = null;
   if (record.review != null) {
     if (projected) {

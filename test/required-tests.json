@@ -898,5 +898,15 @@
   "publish guard refuses outside GitHub Actions and allows the explicit override",
   "kit digest script refuses a missing or malformed tarball",
   "kit digest of the packed tarball equals the digest kit install computes for the same package",
-  "a GitHub Actions id-token permission is not a credential, but an id-token value still is"
+  "a GitHub Actions id-token permission is not a credential, but an id-token value still is",
+  "agent registry: ordered ids, unknown ids refused, declared paths and support levels",
+  "gemini parse normalizes SessionStart, BeforeAgent, BeforeTool, AfterTool, PreCompress, AfterAgent and SessionEnd payloads",
+  "gemini format prints the exact Gemini CLI JSON for context and for a deny",
+  "gemini owner-action block: a BeforeTool shell call that runs an owner route gets a Gemini deny",
+  "gemini gets file and command lessons on AfterTool and none on BeforeTool",
+  "gemini hooks install into settings.json keeps other keys and hooks, is idempotent, and uninstall removes only devtwin's",
+  "gemini instructions write a marker block to GEMINI.md",
+  "setup lists skills-gemini and hooks-gemini as owner steps generated from the registry",
+  "live init accepts gemini, and Codex and Gemini share one skills install that an uninstall of one keeps",
+  "doctor reports each agent's support level and capability flags"
 ]

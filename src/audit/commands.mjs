@@ -1,6 +1,7 @@
 // U37: activity (read-only) and undo. undo previews, then applies with --apply and the plan fingerprint. undo --apply
 // is an owner action: the hook denies it from agent shells and the apply shows the owner dialog.
 import { DevtwinError } from "../errors.mjs";
+import { AGENT_IDS } from "../agents/adapters/index.mjs";
 
 export const activityCommand = { options: { since: { type: "string" }, held: { type: "boolean" } }, async run(values, ctx) {
   const { activity } = await import("./digest.mjs");
@@ -16,7 +17,7 @@ export const undoCommand = { options: { id: { type: "string" }, since: { type: "
 // U25: activity review previews every waiting item with its full text; --apply with the plan fingerprint shows the
 // owner dialogs. It is an owner action: the hook denies activity review --apply from agent shells. --home and --agent
 // name the instruction targets written again after preferences are accepted, as instructions plan takes them.
-const AGENTS = ["claude", "codex"];
+const AGENTS = AGENT_IDS;
 export const activityReviewCommand = { options: { reject: { type: "string", multiple: true }, home: { type: "string" }, agent: { type: "string", multiple: true }, apply: { type: "boolean" }, "plan-fingerprint": { type: "string" } }, async run(values, ctx) {
   const review = await import("./review.mjs");
   if (values.agent?.some((a) => !AGENTS.includes(a))) throw new DevtwinError("INVALID_INPUT", "Invalid instruction target selection", { field: "agent" });

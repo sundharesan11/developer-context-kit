@@ -30,6 +30,7 @@ The fence controls what **this CLI** writes. It does not limit what your agent h
 
 - In each named skill folder, devtwin writes only `devtwin-*` entries. It never creates, removes or changes the mode of the folder or its parents, and never touches a foreign, symlinked, edited or unowned entry. A conflict blocks only that agent.
 - An entry is removable only when its receipt matches a completed journal in this store for the same config ID.
+- Codex and Gemini CLI share `~/.agents/skills`. The fence accepts that one folder for both agents and still refuses any other overlap. An uninstall for one of them keeps the entries while the other is in the live config.
 - Live commands run only from the kit the config names, with your real home: a Git clone clean and detached at its commit, or a locked package kit folder that matches its version and digest.
 - The rollback check compares a skill folder with the inventory taken before an install. It restores nothing.
 - Onboarding copies some repository text into the store, protected by mode 0700 and disk encryption only. Backups are encrypted, but see [Backups](#backups) for what that protects.
@@ -123,7 +124,7 @@ The full contract is in [Write a lesson to the repository](/docs/guides/organiza
 
 ## Live-mode write classes
 
-The approved [write classes](/docs/reference/configuration/#write-classes) are the only writes outside the store and the skill folders. They widen the fence by exact paths only, and they are covered by the approved config digest. In an agent settings file, devtwin changes only its own entries, and backs up the exact prior bytes first.
+The approved [write classes](/docs/reference/configuration/#write-classes) are the only writes outside the store and the skill folders. They widen the fence by exact paths only, and they are covered by the approved config digest. In an agent settings file, devtwin changes only its own entries, and backs up the exact prior bytes first. The settings files are `~/.claude/settings.json`, `~/.codex/hooks.json` and `~/.gemini/settings.json`. The instruction files are `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.gemini/GEMINI.md`.
 
 ## Network use
 

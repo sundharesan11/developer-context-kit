@@ -114,8 +114,8 @@ A live config can hold an optional top-level `writeClasses` block. It names the 
 | Class | Allowed paths | Written by |
 | --- | --- | --- |
 | `hubRoot` | Folders inside your home for hub clones. Writes are allowed in the folder and below it. | `hub join`, `hub sync`, `hub leave` |
-| `instructionTargets` | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`), `~/.codex/AGENTS.md`, and a `devtwin*.md` file directly in one of those folders. | `instructions apply` |
-| `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`) and `~/.codex/hooks.json`. | `agents install --hooks`, `agents uninstall --hooks` |
+| `instructionTargets` | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`), `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, and a `devtwin*.md` file directly in `~/.claude` or `~/.codex`. | `instructions apply` |
+| `hookTargets` | `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR/settings.json`), `~/.codex/hooks.json` and `~/.gemini/settings.json`. | `agents install --hooks`, `agents uninstall --hooks` |
 | `launchAgents` | Files named `devtwin.<name>.plist` directly in `~/Library/LaunchAgents`. | `hub schedule`, `schedule apply`, `schedule off` |
 | `backupTargets` | Folders inside your home for backup archives and restores. Writes are allowed in the folder and below it, never in a sibling or a parent. | `backup create`, `backup restore`, the `backup-daily` job |
 | `repoLearnings` | Exact roots of repositories listed in `repos`. devtwin writes there only Git objects and one new `devtwin/learning-<id>` branch, never a file. | `lesson accept --target repo`, `undo` of a learning branch |

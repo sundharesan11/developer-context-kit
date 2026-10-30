@@ -1,8 +1,10 @@
 // U16 (R24, R27, KTD8, KTD12, KTD17): the managed instruction block. It carries the developer's accepted
-// preferences and devtwin's working rules into every Claude Code and Codex session, through user-level files only:
+// preferences and devtwin's working rules into every agent session, through user-level files only. Each agent adapter
+// names its file (src/agents/adapters):
 //   claude  ~/.claude/devtwin.md, a devtwin-owned file with the block, and a marker block in ~/.claude/CLAUDE.md
 //           that imports it (Claude Code reads "@<path>" lines as imports)
 //   codex   a marker block in ~/.codex/AGENTS.md with the block itself
+//   gemini  a marker block in ~/.gemini/GEMINI.md with the block itself
 // Every target must be an approved instructionTargets path. Text outside the markers stays byte for byte. A
 // repository's own instruction files are never a target: the paths come only from the agent home. The block is capped
 // at 1,200 characters; when the preferences do not fit, the oldest ones are left out with a warning.
@@ -20,10 +22,11 @@ import { activePreferences, checkInjection } from "../prefs/store.mjs";
 import { isolationTerms, assertOutboundClean } from "../records/isolation.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { hookContext } from "./hooks-install.mjs";
+import { adapter, AGENT_IDS, LISTED } from "./adapters/index.mjs";
 
 export const BLOCK_CHARS = 1200;
 export const OWNED_FILE = "devtwin.md";
-const AGENTS = ["claude", "codex"];
+const AGENTS = AGENT_IDS;
 const hashText = (text) => text === null ? null : sha256(text);
 // KTD8 and R27: the fixed rules. They stay short, so the preferences get most of the cap.
 export const RULES = Object.freeze([
@@ -60,15 +63,17 @@ function homeFor(pilot, targetHome) {
   if (targetHome === homedir()) throw new DevtwinError("GATE_REQUIRED", "Real home refused");
   return agentDirsFor({ home: targetHome, env: {} });
 }
+// An adapter with instructions.owned keeps the block in devtwin.md and imports it from its instructions file; every
+// other adapter gets the block itself in its instructions file.
 function targetsFor(dirs, agents) {
   if (!Array.isArray(agents) || !agents.length || agents.some((a) => !AGENTS.includes(a))) throw new DevtwinError("INVALID_INPUT", "Invalid instruction target selection", { field: "agent" });
-  const owned = join(dirs.claude, OWNED_FILE);
   const out = [];
   for (const agent of [...new Set(agents)].sort()) {
-    if (agent === "claude") {
+    const file = join(dirs[agent], adapter(agent).instructions.file), owned = join(dirs[agent], OWNED_FILE);
+    if (adapter(agent).instructions.owned) {
       out.push({ agent, role: "owned-file", path: owned, body: (block) => block });
-      out.push({ agent, role: "import", path: join(dirs.claude, "CLAUDE.md"), body: () => "@" + owned });
-    } else out.push({ agent, role: "block", path: join(dirs.codex, "AGENTS.md"), body: (block) => block });
+      out.push({ agent, role: "import", path: file, body: () => "@" + owned });
+    } else out.push({ agent, role: "block", path: file, body: (block) => block });
   }
   return out;
 }
@@ -103,9 +108,14 @@ export async function planInstructions(roots, pilot, { targetHome, agents, remov
   ];
   return finalizePlan({ kind: "instructions", mode: remove ? "remove" : "install", block: remove ? null : rendered.text, chars: rendered.text.length, preferences: rendered.kept, actions, warnings });
 }
+// "Claude Code and Codex", and any other agent the plan writes to, such as "Claude Code, Codex and Gemini CLI".
+const agentNames = (plan) => {
+  const names = AGENTS.filter((id) => LISTED.includes(id) || plan.actions.some((a) => a.agent === id)).map((id) => adapter(id).name);
+  return names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names.at(-1) : names[0];
+};
 const dialogFor = (plan) => ({ title: plan.mode === "remove" ? "Remove the devtwin block from agent instructions" : "Write the devtwin block to agent instructions", body: [
   "Files: " + plan.actions.filter((a) => a.status !== "unchanged").map((a) => a.path).join(", "), "",
-  ...(plan.block ? ["Every Claude Code and Codex session on this machine reads this block:", "", plan.block] : ["The block is removed. Text outside the devtwin markers stays."])
+  ...(plan.block ? ["Every " + agentNames(plan) + " session on this machine reads this block:", "", plan.block] : ["The block is removed. Text outside the devtwin markers stays."])
 ].join("\n") });
 // One apply at a time: the lock covers the plan check, the dialog and every edit.
 const withInstructionsLock = (roots, kind, action) => withPilotLock(roots, join(roots.stateRoot, "locks", "instructions.lock"), { kind }, action, { destinations: [join(roots.stateRoot, "runs")] });
