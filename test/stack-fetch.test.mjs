@@ -53,6 +53,19 @@ test("stack fetch fails a request past its per-request timeout and a call after 
   assert.equal(run.lookups.length, 1);
 });
 
+test("stack fetch refuses every call after the run deadline aborts a request, even when the clock lags the timer", async (t) => {
+  // A timer can fire before Date.now() reaches the deadline. A frozen clock makes that lag certain.
+  const now = Date.now, frozen = now();
+  Date.now = () => frozen;
+  t.after(() => { Date.now = now; });
+  const run = harness(hangs);
+  const fetcher = run.fetcher({ timeoutMs: 10000, runMs: 30 });
+  await rejectsWith(fetcher.fetchResource(URL_OK, TYPES), "NETWORK_TIMEOUT");
+  await rejectsWith(fetcher.fetchResource(URL_OK, TYPES), "NETWORK_TIMEOUT", (e) => /deadline/.test(e.message));
+  assert.equal(run.log.length, 1, "the call after the deadline makes no request");
+  assert.equal(run.lookups.length, 1, "and no lookup");
+});
+
 test("stack fetch refuses a declared content-length over the body cap before reading the body", async () => {
   let read = false;
   const net = harness(() => ({ headers: { ...RSS, "content-length": "1025" }, body: (async function* () { read = true; yield Buffer.from("x"); })() }));

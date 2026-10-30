@@ -88,7 +88,9 @@ export function createFetcher({ request = httpsRequest, lookup = systemLookup, h
   const caps = { ...FETCH_LIMITS, ...limits };
   const allowed = new Set(hosts);
   const started = Date.now();
-  let calls = 0, transferred = 0;
+  // expired: the run deadline aborted a request. A timer can fire before Date.now() reaches the deadline, so the clock
+  // alone could let the next call through.
+  let calls = 0, transferred = 0, expired = false;
   async function fetchResource(target, { method = "GET", body, accept, types, auth = false } = {}) {
     const url = new URL(target);
     if (url.protocol !== "https:" || url.username || url.password || url.port || !allowed.has(url.hostname)) fail("HOST_NOT_APPROVED", "Host is not in the approval", { host: url.hostname });
@@ -102,7 +104,7 @@ export function createFetcher({ request = httpsRequest, lookup = systemLookup, h
   }
   async function request1(url, { method, body, accept, types, auth }) {
     const key = method + " " + url.href + " " + (body ?? "");
-    if (Date.now() - started >= caps.runMs) fail("NETWORK_TIMEOUT", "Run deadline exceeded");
+    if (expired || Date.now() - started >= caps.runMs) fail("NETWORK_TIMEOUT", "Run deadline exceeded");
     let answers;
     try { answers = await lookup(url.hostname); } catch { fail("NETWORK_UNAVAILABLE", "Host could not be resolved"); }
     const list = (Array.isArray(answers) ? answers : [answers]).filter(Boolean);
@@ -113,7 +115,8 @@ export function createFetcher({ request = httpsRequest, lookup = systemLookup, h
     const payload = body === undefined ? undefined : Buffer.from(body);
     if (payload) { headers["Content-Type"] = "application/json"; headers["Content-Length"] = String(payload.byteLength); }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.max(1, Math.min(caps.timeoutMs, caps.runMs - (Date.now() - started))));
+    const runLeft = caps.runMs - (Date.now() - started), byRun = runLeft <= caps.timeoutMs;
+    const timer = setTimeout(() => { if (byRun) expired = true; controller.abort(); }, Math.max(1, Math.min(caps.timeoutMs, runLeft)));
     let response;
     try {
       try { response = await request({ url: url.href, method, headers, body: payload, address, family: isIP(address), signal: controller.signal }); }
