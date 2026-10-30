@@ -49,7 +49,7 @@ import SeoHead from '../components/landing/SeoHead.astro';
 
 <Footer />
 
-<!-- Behaviour ported from the sample: reveal-on-scroll, copy buttons, agent tabs and the
+<!-- Behaviour ported from the sample: reveal-on-scroll, copy buttons and the
      account switcher. Motion follows the html.m-on / html.m-off gate set in <head>. -->
 <script is:inline>
 (function(){
@@ -74,25 +74,6 @@ import SeoHead from '../components/landing/SeoHead.astro';
       var t = b.getAttribute('data-copy');
       var done = function(){ b.textContent = 'Copied'; setTimeout(function(){ b.textContent = 'Copy'; }, 1600); };
       if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, done); else done();
-    });
-  });
-
-  // agent tabs
-  var tabs = document.querySelectorAll('.tab');
-  var panel = document.getElementById('brief-panel');
-  var cmdEl = panel.querySelector('[data-agent-cmd]');
-  function selectTab(tab){
-    tabs.forEach(function(t){ var on = t === tab; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
-    panel.setAttribute('aria-labelledby', tab.id);
-    cmdEl.textContent = tab.dataset.agent === 'cc' ? '/devtwin-resume' : 'devtwin-resume';
-  }
-  tabs.forEach(function(t, i){
-    t.addEventListener('click', function(){ selectTab(t); });
-    t.addEventListener('keydown', function(e){
-      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft'){
-        var n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
-        selectTab(n); n.focus(); e.preventDefault();
-      }
     });
   });
 
