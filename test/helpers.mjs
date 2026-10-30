@@ -66,7 +66,8 @@ async function writable(dir) {
   try {
     await chmod(dir, 0o700);
     for (const entry of await readdir(dir, { withFileTypes: true })) if (entry.isDirectory()) await writable(join(dir, entry.name));
-  } catch (error) { if (error.code !== "ENOENT") throw error; }
+  // A folder removed while it is walked is gone; macOS can report that as EINVAL instead of ENOENT.
+  } catch (error) { if (error.code !== "ENOENT" && error.code !== "EINVAL") throw error; }
 }
 // A package kit as kit install leaves it (U44): the files go into a source folder outside the home, as npm's global copy,
 // and are copied into the locked <home>/.devtwin/kits/<version>-<digest12>. <home>/.devtwin must exist and be private.
