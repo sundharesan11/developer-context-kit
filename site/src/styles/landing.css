@@ -442,6 +442,9 @@ footer{border-top:1px solid var(--line);padding:48px 0 56px;color:var(--faint);f
 .hero-actions:has(.action-btns){flex-direction:column;align-items:center}
 .action-btns{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
 
+/* team lessons: the org knowledge server results sit in a second brief below the hook output */
+.brief+.brief{margin-top:12px}
+
 /* routines: a saved rule matches, the agent posts through its own connector (issue #27) */
 .rt-cur{display:inline-block;width:7px;height:13px;margin-left:6px;vertical-align:-2px;background:var(--accent)}
 .rt-route{display:flex;align-items:center;gap:8px;margin:14px 0;font:11.5px/1 var(--mono);color:var(--faint);min-width:0}

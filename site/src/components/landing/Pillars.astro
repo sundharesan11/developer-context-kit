@@ -133,11 +133,12 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>04</span> Team lessons</div>
         <h3 id="p3">Learn a lesson once. Your whole team keeps it.</h3>
-        <p>A lesson is a do or don't with a reason. When an agent touches matching code, the lesson shows up, including your team's.</p>
+        <p>A lesson is a do or don't with a reason. When an agent touches matching code, the lesson shows up, including your team's. Connect your org's knowledge server over MCP, and the whole team can search those lessons from any agent.</p>
         <ul class="ticks">
           <li><span>At most four short lines per session.</span></li>
           <li><span>Lessons for every project wait for your weekly review.</span></li>
-          <li><span>Shared lessons wait 24 hours, so you can cancel them.</span></li>
+          <li><span>Shared lessons are checked for credentials and held first, so you can cancel them.</span></li>
+          <li><span>The knowledge server keeps each lesson with its client.</span></li>
         </ul>
         <a class="p-more" href={DOCS.lessons}>How lessons reach your agents <span aria-hidden="true">→</span></a>
       </div>
@@ -160,6 +161,13 @@ const lines = (tree: string) =>
               </div>
               <div class="bsec"><h4>Session end</h4>
                 <div class="brow"><span class="dot c"></span><span>1 lesson saved for work.billing · undoable</span><span class="src">activity</span></div>
+                <div class="brow"><span class="dot c"></span><span>1 lesson held for your org's knowledge server</span><span class="src">checked</span></div>
+              </div>
+            </div>
+            <div class="brief">
+              <div class="brief-h"><span><b>Org knowledge server</b> <span class="muted">· MCP · client sample</span></span><span class="muted">searched by your agent</span></div>
+              <div class="bsec">
+                <div class="brow"><span class="dot c"></span><span>The billing sandbox allows 10 requests a second</span><span class="src">team</span></div>
               </div>
             </div>
           </div>
