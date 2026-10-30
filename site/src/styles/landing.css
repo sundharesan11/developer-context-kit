@@ -121,6 +121,8 @@ h1,h2,h3{font-family:var(--display);letter-spacing:-.025em;margin:0;font-weight:
 /* ---------- stage / diagram ---------- */
 .stage{margin:56px auto 0;max-width:1120px;position:relative;border-radius:var(--radius-lg);padding:1px;
   background:linear-gradient(180deg,rgba(150,170,215,.28),rgba(150,170,215,.06) 40%,rgba(255,138,61,.18));}
+/* The context graph needs more width than the text column: up to 1440px, centered on the page. */
+.stage.stage-wide{max-width:none;width:min(1440px,calc(100vw - 2 * var(--gutter)));margin-left:calc(50% - min(720px,50vw - var(--gutter)))}
 .stage-inner{border-radius:calc(var(--radius-lg) - 1px);background:
   radial-gradient(600px 300px at 50% 40%,rgba(255,138,61,.06),transparent 70%),
   linear-gradient(180deg,#0b1020,#070a14);overflow:hidden;position:relative}
