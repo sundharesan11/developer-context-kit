@@ -157,7 +157,28 @@ const hubLessonKind = {
     }));
   }
 };
-const KINDS = new Map([["record", recordKind], ["hub-lesson", hubLessonKind]]);
+const serverLessonKind = {
+  async preview(roots, entry) {
+    const { heldForAudit } = await import("../held/queue.mjs");
+    const held = await heldForAudit(roots, entry.id);
+    if (!held) throw new DevtwinError("GATE_REQUIRED", "A sent server lesson cannot be undone locally", { field: "id", reason: "already-sent" });
+    return { heads: [], cancel: { held: held.id, target: held.target, title: held.title, sendAfter: held.sendAfter } };
+  },
+  recordIds: async () => [],
+  async apply(roots, entry) {
+    const { withHeldLock, heldForAudit, removeHeld } = await import("../held/queue.mjs");
+    return withHeldLock(roots, "undo", async () => {
+      const held = await heldForAudit(roots, entry.id);
+      if (!held) throw new DevtwinError("STALE_VERSION", "The held item already left the queue", { id: entry.id });
+      const { info } = await import("../storage/fsx.mjs");
+      const { join } = await import("node:path");
+      if (info(join(roots.stateRoot, "server-receipts", held.id + ".json"))) throw new DevtwinError("STALE_VERSION", "The server lesson was already recorded", { id: entry.id });
+      removeHeld(roots, held.target, held.id);
+      return { cancelled: { held: held.id } };
+    });
+  }
+};
+const KINDS = new Map([["record", recordKind], ["hub-lesson", hubLessonKind], ["server-lesson", serverLessonKind]]);
 // For later units: a held or outbound kind registers { preview, recordIds, apply } under its entry kind.
 export function registerUndoKind(kind, handler) {
   if (KINDS.has(kind) || kind === "undo") throw new DevtwinError("CONFLICT", "Undo kind already registered", { kind });

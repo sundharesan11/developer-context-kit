@@ -150,9 +150,9 @@ export function undoneMap(roots, entries) {
 }
 // U41: the state of each outbound entry that left the held queue, by entry ID. An outbound entry with no held-state
 // entry is still held (or was undone, which undoneMap reports). outbox is the one state an item leaves again; sent,
-// dropped and cancelled are final and win over outbox whatever the entry times say.
+// dropped and cancelled are final, except a late server record can reconcile a returned ID after cancellation.
 export function outboundStates(entries) {
   const out = new Map();
-  for (const e of entries) if (e.kind === "held-state" && (out.get(e.marks) ?? "outbox") === "outbox") out.set(e.marks, e.target);
+  for (const e of entries) if (e.kind === "held-state" && ((out.get(e.marks) ?? "outbox") === "outbox" || (out.get(e.marks) === "cancelled" && e.route === "server record" && e.target === "sent"))) out.set(e.marks, e.target);
   return out;
 }

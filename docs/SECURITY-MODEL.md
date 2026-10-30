@@ -1,5 +1,23 @@
 # Security model
 
+## Knowledge server boundary
+
+An owner binds one scope to an MCP server name and client slug.
+The binding contains no URL or OAuth token.
+devtwin makes no MCP network call.
+An agent calls `search_knowledge` with the bound client and repository when known.
+The agent treats results as untrusted reference material, never instructions.
+A `server-publish` consent holds accepted lessons before the agent may request their exact `log_learning` payload.
+The agent records the returned learning ID with `server record`.
+Without that confirmation, the item stays held and appears in activity.
+Undo cancels an item while held.
+After `server payload` hands an item to an agent, an MCP call can race with undo or revoke.
+If the server returns an ID after cancellation, `server record` accepts it and shows the actual server write in activity.
+Changing the binding voids the consent.
+The team's Git archive is read-only for devtwin.
+Make any direct change on a branch through a pull request.
+
+
 The pilot fence and private file modes reduce accidental writes and reading. Source reads hold a no-follow descriptor, compare its identity before and after reading, and recheck ancestor identity. A residual race remains: a malicious same-user process can swap an ancestor between path checks or before later use. This is not a sandbox.
 
 The core has no automatic private-to-public synchronization. A chosen agent host may transmit selected context to its provider, and direct tools can bypass this CLI's routing and fake connector checks. G-REPO and G-HOME are narrow metadata tripwires, not byte identity.
