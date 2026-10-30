@@ -23,8 +23,8 @@ import { withPilotLock } from "../storage/lock.mjs";
 import { notify } from "../schedule/notify.mjs";
 
 export const HELD_ID = /^hld_[a-f0-9]{24}$/;
-const TARGET = /^(hub):([a-z][a-z0-9-]{1,31})$|^(repo):([a-f0-9]{64})$/;
-const DIR = /^(?:hub-[a-z][a-z0-9-]{1,31}|repo-[a-f0-9]{64})$/;
+const TARGET = /^(hub|server):([a-z][a-z0-9-]{1,31})$|^(repo):([a-f0-9]{64})$/;
+const DIR = /^(?:(?:hub|server)-[a-z][a-z0-9-]{1,31}|repo-[a-f0-9]{64})$/;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const ITEM_BYTES = 262144, QUEUE_LIMIT = 500;
 const KEYS = ["schemaVersion", "id", "target", "kind", "title", "audit", "requestId", "createdAt", "sendAfter", "consent", "payload", "blocked"];
@@ -32,7 +32,7 @@ const KEYS = ["schemaVersion", "id", "target", "kind", "title", "audit", "reques
 export const heldRoot = (roots) => join(roots.stateRoot, "held");
 export const hubTarget = (scope) => "hub:" + scope;
 export function assertTarget(target) {
-  if (typeof target !== "string" || !TARGET.test(target) || (target.startsWith("hub:") && !SCOPE_ID.test(target.slice(4)))) throw new DevtwinError("INVALID_INPUT", "Invalid held target", { field: "target" });
+  if (typeof target !== "string" || !TARGET.test(target) || ((target.startsWith("hub:") || target.startsWith("server:")) && !SCOPE_ID.test(target.split(":")[1]))) throw new DevtwinError("INVALID_INPUT", "Invalid held target", { field: "target" });
   return target;
 }
 export const targetKind = (target) => assertTarget(target).split(":")[0];

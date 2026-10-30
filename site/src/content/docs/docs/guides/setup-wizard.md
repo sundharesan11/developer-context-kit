@@ -70,9 +70,9 @@ node "$KIT/bin/devtwin.mjs" setup apply --pilot "$LIVE_CONFIG" --step hook-verif
 | Step | What it does | Owner |
 | --- | --- | --- |
 | `live-folder` | Checks that the live config exists and that `init` has run. Only reads. | |
-| `skills-claude`, `skills-codex` | Installs the bundled skills for that agent (`agents install`). | Yes |
-| `write-classes-hooks` | Approves `~/.claude/settings.json` and `~/.codex/hooks.json` as hook targets (`live write-classes --hook-target`). | Yes |
-| `hooks-claude`, `hooks-codex` | Adds devtwin's hook entries for that agent (`agents install --hooks`). | Yes |
+| `skills-claude`, `skills-codex`, `skills-gemini` | Installs the bundled skills for that agent (`agents install`). Codex and Gemini CLI share one folder. A step for an agent that the live config leaves out is skipped. | Yes |
+| `write-classes-hooks` | Approves the hook settings file of each agent in the live config (`~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.gemini/settings.json`) as hook targets (`live write-classes --hook-target`). | Yes |
+| `hooks-claude`, `hooks-codex`, `hooks-gemini` | Adds devtwin's hook entries for that agent (`agents install --hooks`). | Yes |
 | `hook-verify` | Writes the kit receipt that the hook trusts (`hook verify`). | |
 | `paths-confirm` | Records the kit and config paths, so the skills stop asking for them and the hook renews its receipt (`paths confirm`). | Yes |
 | `profile` | Writes your personal profile (`profile plan` and `profile apply`). | |

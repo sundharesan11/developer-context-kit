@@ -1,5 +1,23 @@
 # Security model
 
+## Knowledge server boundary
+
+An owner binds one scope to an MCP server name and client slug.
+The binding contains no URL or OAuth token.
+devtwin makes no MCP network call.
+An agent calls `search_knowledge` with the bound client and repository when known.
+The agent treats results as untrusted reference material, never instructions.
+A `server-publish` consent holds accepted lessons before the agent may request their exact `log_learning` payload.
+The agent records the returned learning ID with `server record`.
+Without that confirmation, the item stays held and appears in activity.
+Undo cancels an item while held.
+After `server payload` hands an item to an agent, an MCP call can race with undo or revoke.
+If the server returns an ID after cancellation, `server record` accepts it and shows the actual server write in activity.
+Changing the binding voids the consent.
+The team's Git archive is read-only for devtwin.
+Make any direct change on a branch through a pull request.
+
+
 The pilot fence and private file modes reduce accidental writes and reading. Source reads hold a no-follow descriptor, compare its identity before and after reading, and recheck ancestor identity. A residual race remains: a malicious same-user process can swap an ancestor between path checks or before later use. This is not a sandbox.
 
 The core has no automatic private-to-public synchronization. A chosen agent host may transmit selected context to its provider, and direct tools can bypass this CLI's routing and fake connector checks. G-REPO and G-HOME are narrow metadata tripwires, not byte identity.
@@ -42,6 +60,7 @@ Live mode ([Live activation](LIVE.md)) relaxes the fence for exactly the paths a
 - A package kit sits directly in `~/.devtwin/kits/`. The gate recomputes its digest and requires its files to be exactly those in `KIT-MANIFEST.json`, with no link. Every entry must be the user's and writable by no one else, and `~/.devtwin` and `~/.devtwin/kits` must have no group or other bits. These modes stop accidents, not a compromised account: same-user code can chmod the folder, rewrite the files and the manifest, and edit the live config to match.
 - The approved config digest in the store catches accidental edits to `live.json`. It does not stop deliberate same-user tampering: the same user can rewrite the live config and the digest together.
 - The rollback check compares a skill folder with the inventory taken before an install run. It fails on `devtwin-*` differences and lists foreign changes for the owner. It restores nothing.
+- Codex and Gemini CLI share `~/.agents/skills`. A live config that names both lists the same exact folder twice. The fence treats that as one carve-out; any other overlap between named folders is still refused. An uninstall for one of them keeps the entries while the other agent is in the live config.
 - Cursor also reads `~/.agents/skills` and sees the installed skills. The skills keep every confirmation for any caller.
 - Onboarding copies some client repository text into the store, protected by mode 0700 and disk encryption only. Backups are encrypted, but see [Backups](#backups) for what that protects.
 
@@ -49,7 +68,7 @@ Live mode ([Live activation](LIVE.md)) relaxes the fence for exactly the paths a
 
 The approved write classes in a live config ([Live-mode exceptions](LIVE.md#live-mode-exceptions)) are the only writes outside the store and the named skill folders. They widen the fence by exact paths only.
 
-- The six classes are `hubRoot`, `instructionTargets`, `hookTargets`, `launchAgents`, `backupTargets` and `repoLearnings`. Each path has a fixed shape. A `repoLearnings` path is the exact root of a listed repository; it allows Git objects and one new learning branch there, never a file write. A hub root or a backup folder is a folder inside the home. An instruction target is `CLAUDE.md`, `AGENTS.md` or a `devtwin*.md` file in the Claude or Codex folder. A hook target is `settings.json` or `hooks.json` in those folders. A launch agent is a `devtwin.<name>.plist` file in `~/Library/LaunchAgents`. Every other path stays refused.
+- The six classes are `hubRoot`, `instructionTargets`, `hookTargets`, `launchAgents`, `backupTargets` and `repoLearnings`. Each path has a fixed shape. A `repoLearnings` path is the exact root of a listed repository; it allows Git objects and one new learning branch there, never a file write. A hub root or a backup folder is a folder inside the home. An instruction target is `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` or a `devtwin*.md` file in the Claude or Codex folder. A hook target is `settings.json` in the Claude or Gemini CLI folder, or `hooks.json` in the Codex folder. Each agent adapter in `src/agents/adapters/` names its files, and the fence accepts only those exact shapes. A launch agent is a `devtwin.<name>.plist` file in `~/Library/LaunchAgents`. Every other path stays refused.
 - The classes are covered by the approved config digest, so an accidental change is refused with `GATE_REQUIRED`. As for the rest of the live config, this does not stop deliberate same-user tampering.
 - Only `live write-classes` changes the classes, through a preview and an apply with its fingerprint. The new config passes every fence check before its digest is approved. The devtwin hook denies its `--apply` from an agent shell, as for the other owner actions.
 - The fence accepts a class path only when the caller names that class. A record, draft or onboarding write cannot reach a class path.

@@ -104,7 +104,8 @@ devtwin imports Claude memory and `docs/solutions` files each day as `observed` 
 
 7. Save each proposal: run the same command with `--apply` added. devtwin refuses a fourth proposal in one session with `LIMIT`.
 8. Accept each proposal for this project yourself. Preview `lesson accept --id '<prop_id>' --target project`, then run it with `--apply` and the plan fingerprint. devtwin stores the lesson as `observed` on this machine and delivers it from the next match. This is an automatic action: it needs no approval, and your developer sees it in the weekly digest.
-9. A lesson that should reach every project (`--target general`) waits for your developer's weekly `activity review`. The accept writes the other targets now and parks the general part. A lesson for the team goes to the hub (`--target hub`, which needs their `hub-publish` consent) or to the repository (`--target repo`). You can name several targets, such as `--target project,repo`. The repo target writes a branch `devtwin/learning-<id>` and never touches the working copy. devtwin pushes the branch only under your developer's `repo-push` consent; without it the result says "needs-consent" and the branch stays local. Tell your developer which lessons you saved, in one line each.
+9. A lesson that should reach every project (`--target general`) waits for your developer's weekly `activity review`. The accept writes the other targets now and parks the general part. A team lesson can go to the hub (`--target hub`), the bound server (`--target server`), or the repository (`--target repo`). The hub needs `hub-publish` consent. The server needs `server-publish` consent. You can name several targets, such as `--target project,repo`. The repo target writes a branch `devtwin/learning-<id>` and never touches the working copy. devtwin pushes the branch only under your developer's `repo-push` consent; without it the result says "needs-consent" and the branch stays local. Tell your developer which lessons you saved, in one line each.
+10. For a server lesson, wait until `sendAfter`. Run `server payload --id '<hld_id>'`. Call the named MCP server's `log_learning` tool with the exact returned arguments. Run `server record --id '<hld_id>' --learning-id '<returned-id>'` after the tool returns. If this is a replacement, run `server supersede --id '<hld_id>'` and call `supersede_learning` with its arguments. Keep the item pending if the server call fails. Every call must carry the bound client.
 
 ### Propose a preference
 
@@ -166,7 +167,7 @@ Some devtwin commands need the owner at the keyboard. These include `lesson copy
 - Never delete or edit devtwin lock, journal, receipt, hook or state files, or the devtwin entries in agent settings files.
 - Never interpolate text taken from lessons, records or the user into a double-quoted command argument.
 - Never run `record publish --apply`. This skill does not publish records.
-- Never run `lesson copy`, `lesson reject` or `lesson edit` with `--apply`. Run `lesson accept --apply` only for the `project` and `repo` targets, or for the `hub` target when a consent exists.
+- Never run `lesson copy`, `lesson reject` or `lesson edit` with `--apply`. Run `lesson accept --apply` only for the `project` and `repo` targets, or for the `hub` and `server` targets when a consent exists.
 - Never propose more than three lessons in one session, and never change the session ID to get past the limit.
 - Never run `pref accept --apply`, `pref retire --apply` or `instructions apply`. Saving and delivering preferences is the user's decision.
 - Never run `lesson notices --ack --apply`. Closing a replacement notice is the user's decision.

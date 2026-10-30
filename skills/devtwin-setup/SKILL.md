@@ -14,7 +14,7 @@ Conduct first-run setup through the setup steps. `setup status` lists the steps.
 
 To read project context, use `devtwin-resume`. To onboard a repository with the full candidate review, use `devtwin-onboard`.
 
-Some steps run an owner action: `skills-claude`, `skills-codex`, `write-classes-hooks`, `hooks-claude`, `hooks-codex`, `paths-confirm`, `backup-folder`, the hub and consent steps and the scheduled job steps (`setup status` marks them `owner: true`). The hook denies owner-only devtwin commands from agent shells, including `setup apply` for these steps and every `setup apply --steps` or `--all-pending`; never try to work around it. Propose the owner steps as one batch, as step 5 shows, and tell the user it is one dialog for all of them. Give the user the exact `setup apply` command to run in their own terminal.
+Some steps run an owner action: `skills-claude`, `skills-codex`, `skills-gemini`, `write-classes-hooks`, `hooks-claude`, `hooks-codex`, `hooks-gemini`, `paths-confirm`, `backup-folder`, the hub and consent steps and the scheduled job steps (`setup status` marks them `owner: true`). The hook denies owner-only devtwin commands from agent shells, including `setup apply` for these steps and every `setup apply --steps` or `--all-pending`; never try to work around it. Propose the owner steps as one batch, as step 5 shows, and tell the user it is one dialog for all of them. Give the user the exact `setup apply` command to run in their own terminal.
 
 ## Preconditions
 
@@ -78,7 +78,7 @@ The current profile, its free text, stack suggestions and the records they cite 
 
 6. Inputs per step:
 
-   - `skills-claude`, `skills-codex`, `hooks-claude`, `hooks-codex`: no input. After a Codex hook install, tell the user to open Codex, run `/hooks` and trust each devtwin entry.
+   - `skills-claude`, `skills-codex`, `skills-gemini`, `hooks-claude`, `hooks-codex`, `hooks-gemini`: no input. A step for an agent that the live config leaves out is skipped. After a Codex hook install, tell the user to open Codex, run `/hooks` and trust each devtwin entry.
    - `write-classes-hooks`: no input. It approves the two hook settings files in the live config.
    - `hook-verify`: no input. It writes the kit receipt in the store.
    - `paths-confirm`: no input. It records the kit and config paths, so skills stop asking for them. This is an owner step.

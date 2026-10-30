@@ -76,6 +76,11 @@ export async function proposeSupersede(roots, { session, scope, project = null, 
   const out = await proposeLesson(roots, { session, scope, project, lesson, supersedes }, { now, apply });
   return synced ? { ...out, sync: synced } : out;
 }
+export async function proposeServerSupersede(roots, { session, scope, project = null, predecessor, lesson }, { now = () => new Date(), apply = false } = {}) {
+  const { serverPredecessor } = await import("../server/commands.mjs");
+  const supersedes = await serverPredecessor(roots, scope, predecessor);
+  return proposeLesson(roots, { session, scope, project, lesson, supersedes }, { now, apply });
+}
 
 // Notices. One file per hub; entries are keyed by predecessor and successor. An acknowledged entry stays, so the
 // next sync does not add it again; the oldest acknowledged entries go first when the file is full.

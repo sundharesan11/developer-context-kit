@@ -4,6 +4,20 @@ This file lists the notable changes in each devtwin release. The format follows 
 
 ## [Unreleased]
 
+### Added
+
+- **Gemini CLI as the third agent.** `live init --agent gemini`, `agents install --agent gemini`, `agents install --hooks --agent gemini` and `instructions plan --agent gemini` set up Gemini CLI. Its skills go to `~/.agents/skills`, its instruction block to `~/.gemini/GEMINI.md`, and its hook entries to `~/.gemini/settings.json`. The setup wizard has the new steps `skills-gemini` and `hooks-gemini`.
+- **Gemini CLI hooks.** The hook reads Gemini CLI payloads and prints Gemini CLI JSON. On `BeforeTool` it denies owner-only devtwin commands with `{"decision":"deny","reason":...}`. Lesson lines arrive on `AfterTool`, because Gemini CLI reads no added context before a tool runs. `AfterAgent` writes the stop stub.
+- **Shared skills folder.** Codex and Gemini CLI read the same `~/.agents/skills` folder. An install for both writes each skill once, and the plan names the other agent in `shared`. In live mode, an uninstall for one keeps the entries while the other is in the live config, with the reason `shared-folder`.
+- **Support levels.** `agents status` has a `support` field, and `doctor` has an `agents` check. Each gives an agent's `supportLevel` (`full` or `partial`) and its capability flags. `setup status` gives the level on each skills and hooks step.
+- **`gemini` actor.** A record written from a Gemini CLI shell (`GEMINI_CLI` set) has the actor `gemini`. An older devtwin refuses such a record in a portable handoff.
+- A consented `server` lesson target shares scoped lessons through an agent's MCP connection and records returned learning IDs.
+
+### Changed
+
+- Agent-specific code now lives in one adapter per agent under `src/agents/adapters/`. Claude Code and Codex behave as before.
+- The `instructionTargets` and `hookTargets` write classes also accept `~/.gemini/GEMINI.md` and `~/.gemini/settings.json`.
+
 ## [0.1.0-alpha.1]
 
 The first npm release. Install it with `npm i -g devtwin`. A Git clone stays a supported install for contributors.

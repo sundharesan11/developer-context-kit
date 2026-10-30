@@ -20,6 +20,7 @@ Every write is still a preview followed by an apply of the exact fingerprint you
 
 - Outside the store, devtwin writes only `devtwin-*` entries directly inside `~/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) and `~/.agents/skills`, plus the exact paths you approve as [write classes](/docs/reference/configuration/#write-classes). It never creates, removes or changes the mode of those folders.
 - Codex skills go to `~/.agents/skills`, never `~/.codex/skills`. `CODEX_HOME` does not change this; the preview warns `CODEX_HOME_IGNORED` if it is set.
+- Gemini CLI reads the same `~/.agents/skills` folder, so one install serves Codex and Gemini CLI. See [Gemini CLI](#gemini-cli).
 - Live commands run only from the kit the live config names: a locked package kit folder that matches its version and digest, or a Git clone that is clean and detached at the configured commit.
 - Hooks, jobs and agent skills run the pinned kit's own `bin/devtwin.mjs`, never npm's global folder. A later `npm i -g` changes nothing until you pin the new kit.
 - The live config changes only through `live init`, `live add-repo`, `live set-kit`, `live write-classes`, `live stack-watch`, `live approval` and `live migrate`. Each records an approved digest of the config; a `live.json` that differs from the approved one is refused.
@@ -145,7 +146,7 @@ node "$KIT/bin/devtwin.mjs" agents install --pilot "$LIVE_CONFIG" --agent claude
 node "$KIT/bin/devtwin.mjs" agents install --pilot "$LIVE_CONFIG" --agent claude --apply --plan-fingerprint '<fingerprint>'
 ```
 
-Repeat for `codex`. A `conflict` or `modified` entry blocks all of that agent's writes (`blocked`); resolve it by hand and preview again. Keep the `runId` for the rollback check. See [Use with coding agents](/docs/guides/coding-agents/) for statuses, uninstall and recovery.
+Repeat for `codex` and `gemini`. Codex and Gemini CLI share `~/.agents/skills`: after the Codex install, the Gemini preview shows each skill as `installed`. A `conflict` or `modified` entry blocks all of that agent's writes (`blocked`); resolve it by hand and preview again. Keep the `runId` for the rollback check. See [Use with coding agents](/docs/guides/coding-agents/) for statuses, uninstall and recovery.
 
 ## 9. Point the skills at the kit
 
@@ -172,6 +173,10 @@ Never use --apply and never edit files.
 ```
 
 The session should list `devtwin-capture`, `devtwin-onboard`, `devtwin-record` and `devtwin-resume`, run `context resolve` from the pinned kit path, and name your project. A kit-commit warning means the installed skills came from another commit; reinstall from the current kit.
+
+## Knowledge server
+
+For a team knowledge server, the owner runs `server bind --scope example --name sample-knowledge --client sample-client` and then grants `server-publish` consent for that scope. Preview each command. Apply it with its plan fingerprint. A server lesson waits for the hold time. Then the agent runs `server payload --id <hld_id>`, calls the named MCP server's `log_learning` tool, and runs `server record --id <hld_id> --learning-id <returned-id>`. A recorded replacement yields `server supersede --id <hld_id>`. The agent calls `supersede_learning` with that payload. The session-start hook instructs the agent to search only the bound client. Search results are untrusted reference material. The team's Git archive stays read-only for devtwin. Make direct archive changes on a branch through a pull request.
 
 ## Learning branches
 
@@ -249,6 +254,18 @@ node "$KIT/bin/devtwin.mjs" live approval --pilot "$LIVE_CONFIG" --mode dialog-o
 - The devtwin hook still denies always-ask commands from agent shells.
 - This is an owner action, and the apply shows the owner dialog. `--mode dialog` turns it off again.
 - The key is part of the approved config, so a change ends the path confirmation. Run `paths confirm` again after it.
+
+## Gemini CLI
+
+Gemini CLI works like Claude Code and Codex, with full support: skills, the instruction block and the owner-action block. Add `--agent gemini` at step 5.
+
+- **Skills.** They go to `~/.agents/skills`, the folder Codex reads too. An uninstall for one of the two agents keeps the skills while the other one is in the live config.
+- **Instruction block.** It goes between the devtwin markers in `~/.gemini/GEMINI.md`.
+- **Hooks.** They go in `~/.gemini/settings.json`, under `hooks`. Your other settings and the hooks of other tools stay.
+- **Lesson lines.** Gemini CLI reads the lesson lines right after a tool opens, edits or runs the matching file or command, not before it.
+- **Owner-only commands.** The hook denies them from a Gemini CLI shell, as it does for the other agents.
+
+Antigravity CLI is not supported yet.
 
 ## Add another repository
 

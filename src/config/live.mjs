@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { DevtwinError } from "../errors.mjs";
 import { checkLiveConfig, loadPilot, rootsFromPilot, recordApprovedDigest, approvedDigestPath, skillDirsFor, WRITE_CLASSES, STACK_WATCH_MAX_REQUESTS, APPROVAL_MODES } from "./pilot.mjs";
 import { canonicalJson } from "../storage/canonical.mjs";
+import { AGENT_IDS } from "../agents/adapters/index.mjs";
 import { ensureRoots, validateRoot } from "./roots.mjs";
 import { info, checkNode, ensurePrivateDir, writeNewFile, atomicReplace, fsyncDir } from "../storage/fsx.mjs";
 import { finalizePlan, assertFingerprint } from "../storage/plan.mjs";
@@ -12,7 +13,7 @@ import { withPilotLock } from "../storage/lock.mjs";
 import { identityOfKit, kitIdentity, kitFields, kitId, displayKitId, kitsFolder, parseKitArg, COMMIT } from "../kit/identity.mjs";
 // The running kit. Tests inject ctx.kitRoot; production derives it from this file, as pilot.mjs does.
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const AGENTS = ["claude", "codex"];
+const AGENTS = AGENT_IDS;
 export const KEYS = ["schemaVersion", "pilotRoot", "configRoot", "dataRoot", "stateRoot", "inputsRoot", "agentHomes", "repos", "forbidden", "live", "writeClasses", "exceptions", "approval"];
 const KIT_FIELDS = ["kitCommit", "kitVersion", "kitDigest"];
 // Stands in for the config ID while a new config is validated; apply draws the real ID once.

@@ -10,6 +10,7 @@
 // instead; the route itself refuses it) or { tier, dialog: true } (an always-ask action the route gates with the owner
 // dialog alone: the hook cannot tell it from the route's automatic targets by its words, so it is not in OWNER_ACTIONS).
 import { DevtwinError } from "../errors.mjs";
+import { AGENT_IDS } from "../agents/adapters/index.mjs";
 
 export const TIERS = Object.freeze(["automatic", "consented", "always-ask"]);
 export const READ = "read";
@@ -21,7 +22,8 @@ const DIALOG = { tier: ASK, dialog: true };
 // the owner dialog whoever calls, because the caller's actor comes from environment variables any process can unset.
 const RECORD_WRITE = { observed: A, proposed: A, confirmed: DIALOG, disputed: DIALOG };
 // setup apply has the tier of the step it applies; the owner steps run an always-ask action.
-const SETUP_STEPS = { "live-folder": R, "skills-claude": ASK, "skills-codex": ASK, "write-classes-hooks": ASK, "hooks-claude": ASK, "hooks-codex": ASK,
+// Each agent adapter has a skills-<id> and a hooks-<id> step (src/setup/steps.mjs).
+const SETUP_STEPS = { "live-folder": R, ...Object.fromEntries(AGENT_IDS.flatMap((id) => [["skills-" + id, ASK], ["hooks-" + id, ASK]])), "write-classes-hooks": ASK,
   "hook-verify": A, "paths-confirm": ASK, profile: A, "starter-preferences": A, "starter-templates": R, scope: A, "first-project": A, "hub-join": ASK, "job-hub-sync": ASK,
   "job-radar": ASK, "job-advisories": ASK, "job-review-reminder": ASK, "consent-repo": ASK, "consent-hub": ASK, "backup-folder": ASK, "job-backup": ASK, sandbox: A,
   // U9 (one approval): setup apply --steps or --all-pending runs several owner steps after one owner dialog.
@@ -44,7 +46,7 @@ const TABLE = {
   "lesson match": R, "lesson show": R, "lesson index": R, "lesson propose": A, "lesson proposals": R, "lesson edit": A, "lesson reject": A,
   // U30 (R8): the targets of lesson accept. A --target value is a set of them; each member is asked on its own. repo
   // writes a local learning branch (automatic); pushing it is the consented "learning send" step below.
-  "lesson accept": { project: A, general: REVIEW, hub: { tier: C, consent: "hub-publish" }, repo: A },
+  "lesson accept": { project: A, general: REVIEW, hub: { tier: C, consent: "hub-publish" }, repo: A, server: { tier: C, consent: "server-publish" } },
   "lesson copy": ASK, "lesson supersede-propose": A, "lesson notices": ASK,
   hook: A, "hook verify": A, "budget report": R,
   // U27 (KTD35): a confirmation makes skills stop asking for the paths, so only the owner records it.
@@ -82,6 +84,7 @@ const TABLE = {
   // cloud drive may sync. Showing the key is always ask.
   "backup create": A, "backup restore": ASK, "backup status": R, "backup key export": ASK,
   "hub propose": A, "hub join": ASK, "hub sync": A, "hub leave": ASK, "hub status": R, "hub schedule": ASK,
+  "server bind": ASK, "server status": R, "server payload": A, "server record": C, "server supersede": R,
   "schedule plan": R, "schedule apply": ASK, "schedule off": ASK, "schedule status": R, "schedule run": A,
   "published list": R, "published delete": ASK,
   "skill workspace-create": A, "skill requirements-record": A, "skill design-record": A, "skill design-approve": A, "skill draft-create": A,
