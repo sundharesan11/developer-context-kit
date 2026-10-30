@@ -3,7 +3,7 @@ export const GITHUB_URL = 'https://github.com/sundharesan11/devtwin';
 export const DEEPWIKI_URL = 'https://deepwiki.com/sundharesan11/devtwin';
 
 // The install command on the landing page; `devtwin demo` follows it in the install band.
-export const INSTALL_CMD = 'npm i -g devtwin@alpha';
+export const INSTALL_CMD = 'npm i -g devtwin';
 export const DEMO_CMD = 'devtwin demo';
 
 // Prefix a root-relative path with the configured base (e.g. /devtwin on GitHub Pages).

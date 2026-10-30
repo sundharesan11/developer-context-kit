@@ -2,7 +2,7 @@
 
 This folder holds devtwin's repository guides and maintainer contracts. For task-oriented user docs (quickstart, concepts, guides, CLI and error reference), use the documentation site at **[sundharesan11.github.io/devtwin/docs](https://sundharesan11.github.io/devtwin/docs/)**; its source is in `site/src/content/docs/docs/`. To ask questions about the code, use [DeepWiki](https://deepwiki.com/sundharesan11/devtwin).
 
-Install devtwin with `npm i -g devtwin@alpha` and start with `devtwin demo`, a disposable synthetic project. Move to the [live activation runbook](LIVE.md) only after the demo.
+Install devtwin with `npm i -g devtwin` and start with `devtwin demo`, a disposable synthetic project. Move to the [live activation runbook](LIVE.md) only after the demo.
 
 ## First use
 

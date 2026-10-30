@@ -6,7 +6,7 @@ This file lists the notable changes in each devtwin release. The format follows 
 
 ## [0.1.0-alpha.1]
 
-The first npm release. Install it with `npm i -g devtwin@alpha`. A Git clone stays a supported install for contributors.
+The first npm release. Install it with `npm i -g devtwin`. A Git clone stays a supported install for contributors.
 
 ### Added
 

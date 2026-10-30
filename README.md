@@ -23,13 +23,11 @@ Your agents can read any codebase. They can't read why it was built that way, th
 You need Node.js 22.13 or later. devtwin has no dependencies.
 
 ```sh
-npm i -g devtwin@alpha
+npm i -g devtwin
 devtwin demo
 ```
 
 The demo runs in a new temporary folder with sample projects and fake agent homes. It needs no network and never touches your real agents or accounts. Expect `"ok": true`.
-
-Name the `@alpha` tag when you install. Without it, npm installs an old placeholder.
 
 Every command prints one line of JSON. Run `devtwin help` to list the commands.
 
@@ -79,7 +77,7 @@ node bin/devtwin.mjs help
 
 ## Status
 
-devtwin is an alpha. The first release is `0.1.0-alpha.1` on npm, under the `alpha` tag.
+devtwin is an alpha. The first release is `0.1.0-alpha.1` on npm.
 
 - Live mode works on a real machine, and fresh Claude Code and Codex sessions find the skills and read the brief.
 - Lessons, the agent hook, the team hub, preferences, backups and the weekly review pass their tests against local fixtures. Runs with real agents are still to come.

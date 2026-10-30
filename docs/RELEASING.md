@@ -1,6 +1,6 @@
 # Public-alpha release checklist
 
-Documentation and a license do not make this a finished product. devtwin is an alpha: the npm release goes to the `alpha` dist-tag, and daily use still has open items. This checklist separates a public source preview, an npm release and a daily-use release.
+Documentation and a license do not make this a finished product. devtwin is an alpha: a new npm release goes to the `alpha` dist-tag first, and daily use still has open items. This checklist separates a public source preview, an npm release and a daily-use release.
 
 Nothing here authorizes changing repository visibility, pushing branches or tags, publishing a package, moving a dist-tag or sending private context. Each of those is a separate owner approval. Only the [release workflow](#package-release) publishes, after the owner pushes a tag and approves the `npm-release` environment.
 
@@ -122,13 +122,13 @@ The owner does each step and approves each change on npm or GitHub.
 6. Deprecate the placeholder versions with `npm deprecate devtwin@"<0.1.0-alpha.1" "Use devtwin@alpha"`. This range covers `0.0.1` and `0.0.0-stage`.
 7. Run `npm view devtwin dist-tags`. Check that `alpha` names `0.1.0-alpha.1`. Check the provenance badge on the npm package page.
 
-A deprecated version still installs when its dist-tag names it. Until `latest` moves, `npm i devtwin` installs the placeholder and shows the deprecation message. Install with `npm i -g devtwin@alpha`.
+A deprecated version still installs when its dist-tag names it, and the npm package page shows the version that `latest` names. Move `latest` to the release, so the page and a plain `npm i devtwin` show it.
 
 A failed publish changes nothing on npm. Run the failed jobs again from the same tag. If the publish passed but the release job failed, run the release job again alone. It does not publish again. If it still fails, create the draft by hand with the digest from the gate job's log.
 
 ### Moving latest
 
-`latest` moves only after the real-agent scenarios pass on the published version. The owner approves this step separately and runs one command:
+The owner moves `latest` as a separate approval, after checking the published version. On 2026-10-30 the owner moved `latest` to `0.1.0-alpha.1` before the real-agent scenarios ran, so that the npm page and `npm i devtwin` show the release and not the placeholder. The command is:
 
 ```sh
 npm dist-tag add devtwin@<version> latest

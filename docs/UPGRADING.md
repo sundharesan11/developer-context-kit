@@ -2,7 +2,7 @@
 
 This guide moves live mode to a new devtwin release, and back to an earlier one. It also moves a Git-clone setup to a package kit. Read [Live activation](LIVE.md) first: this guide uses its placeholders and its owner dialogs.
 
-devtwin is an alpha. Releases go to the `alpha` dist-tag on npm, so always install `devtwin@alpha` or an exact version.
+devtwin is an alpha. A new release goes to the `alpha` dist-tag on npm first, and `latest` follows when the owner moves it. To upgrade to the newest release, install `devtwin@alpha` or an exact version.
 
 ## How an upgrade works
 

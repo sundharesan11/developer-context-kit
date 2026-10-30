@@ -31,7 +31,7 @@ No. You need Git and Node.js 22.13 or later. Everything else is files on your di
 
 ## Is it on npm?
 
-Yes. Install it with `npm i -g devtwin@alpha`. Name the `alpha` dist-tag: releases go there, and a plain `npm i -g devtwin` installs an older placeholder. Contributors can also run it from a Git clone. See [Installation](/docs/getting-started/installation/).
+Yes. Install it with `npm i -g devtwin`. Contributors can also run it from a Git clone. See [Installation](/docs/getting-started/installation/).
 
 ## Does it run on Linux or Windows?
 
