@@ -174,6 +174,10 @@ Never use --apply and never edit files.
 
 The session should list `devtwin-capture`, `devtwin-onboard`, `devtwin-record` and `devtwin-resume`, run `context resolve` from the pinned kit path, and name your project. A kit-commit warning means the installed skills came from another commit; reinstall from the current kit.
 
+## Knowledge server
+
+For a team knowledge server, the owner runs `server bind --scope example --name sample-knowledge --client sample-client` and then grants `server-publish` consent for that scope. Preview each command. Apply it with its plan fingerprint. A server lesson waits for the hold time. Then the agent runs `server payload --id <hld_id>`, calls the named MCP server's `log_learning` tool, and runs `server record --id <hld_id> --learning-id <returned-id>`. A recorded replacement yields `server supersede --id <hld_id>`. The agent calls `supersede_learning` with that payload. The session-start hook instructs the agent to search only the bound client. Search results are untrusted reference material. The team's Git archive stays read-only for devtwin. Make direct archive changes on a branch through a pull request.
+
 ## Learning branches
 
 A lesson accepted with `--target repo` becomes a learning branch in the project's repository. Approve the repository once, and grant the push consent once. Preview each command, review it, then apply it:

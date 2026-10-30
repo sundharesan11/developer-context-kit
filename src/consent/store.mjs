@@ -3,6 +3,7 @@
 // action for that target with no owner dialog (src/policy/tiers.mjs).
 //   repo-push    target: the real path of a bound repository root; push a learning branch to it
 //   hub-publish  target: a scope with a hub binding; publish a lesson to its hub
+//   server-publish target: a scope with a bound MCP server and client; prepare a held lesson for agent delivery
 // Each record keeps the rule digest of the rules it was granted under. When the rules change (another check, another
 // hold time, or for a repository its learnings folder, base or remote URL), the digest changes and the stored consent
 // is void. The note consent (KTD10) is not stored here: it lives in the hub binding and keeps its own rules.
@@ -20,7 +21,7 @@ import { canonicalJson, digest } from "../storage/canonical.mjs";
 import { withPilotLock } from "../storage/lock.mjs";
 import { learningsFor, DEFAULT_LEARNINGS_DIR, DEFAULT_LEARNINGS_BASE } from "../projects/commands.mjs";
 
-export const CONSENT_KINDS = Object.freeze(["repo-push", "hub-publish"]);
+export const CONSENT_KINDS = Object.freeze(["repo-push", "hub-publish", "server-publish"]);
 export const HOLD_HOURS = Object.freeze({ default: 24, min: 1, max: 168 });
 // The checks every consented action of the kind runs before it acts. A change here voids every consent of the kind.
 // U41 added the held queue here, so consents granted before it (when items went out at once) are void and asked for
@@ -29,7 +30,8 @@ export const HOLD_HOURS = Object.freeze({ default: 24, min: 1, max: 168 });
 const RULES = Object.freeze({
   "repo-push": Object.freeze({ schemaVersion: 2, checks: Object.freeze(["bound repository", "repoLearnings approval", "recorded Git identity", "isolation", "credential patterns", "held queue", "push URL matches", "SSH only, never forced"]),
     template: "<learnings dir>/<slug>.md with title, date, category: lesson, tags and source: devtwin <record id>, on a new branch devtwin/learning-<id>" }),
-  "hub-publish": Object.freeze({ schemaVersion: 1, checks: Object.freeze(["joined hub binding", "lesson draft checks", "isolation", "credential patterns", "held queue"]), layout: "lessons/<lesson id>.md" })
+  "hub-publish": Object.freeze({ schemaVersion: 1, checks: Object.freeze(["joined hub binding", "lesson draft checks", "isolation", "credential patterns", "held queue"]), layout: "lessons/<lesson id>.md" }),
+  "server-publish": Object.freeze({ schemaVersion: 1, checks: Object.freeze(["bound MCP server and client", "lesson draft checks", "isolation", "credential patterns", "held queue", "agent MCP confirmation"]), tool: "log_learning" })
 });
 export const assertKind = (kind) => {
   if (!CONSENT_KINDS.includes(kind)) throw new DevtwinError("INVALID_INPUT", "Invalid consent kind", { field: "kind", allowed: CONSENT_KINDS });
@@ -42,11 +44,18 @@ export function assertHoldHours(value) {
 // The repository part of a repo-push rule set: the effective learnings folder and base ref, and the recorded URL.
 export const repoPushParams = ({ learningsDir = null, learningsBase = null, remoteUrl = null } = {}) => ({ learningsDir: learningsDir ?? DEFAULT_LEARNINGS_DIR, learningsBase: learningsBase ?? DEFAULT_LEARNINGS_BASE, remoteUrl: remoteUrl ?? null });
 // The rules a consent of this kind and hold time covers, and their digest. params is the repository part (repo-push).
-export const consentRules = (kind, holdHours, params) => Object.freeze({ kind: assertKind(kind), holdHours: assertHoldHours(holdHours), ...RULES[kind], ...(kind === "repo-push" ? repoPushParams(params) : {}) });
+export const consentRules = (kind, holdHours, params) => Object.freeze({ kind: assertKind(kind), holdHours: assertHoldHours(holdHours), ...RULES[kind], ...(kind === "repo-push" ? repoPushParams(params) : kind === "server-publish" ? params : {}) });
 export const ruleDigestFor = (kind, holdHours, params) => digest(consentRules(kind, holdHours, params));
 // The repository part for a target now: its project's learnings settings, and the given recorded URL. An unbound
 // repository has no settings, so its consent cannot match.
 export async function consentParams(roots, kind, target, remoteUrl = null) {
+  if (kind === "server-publish") {
+    const { readServerBinding } = await import("../server/commands.mjs");
+    let binding;
+    try { binding = await readServerBinding(roots, target); }
+    catch (error) { if (error.code !== "DEVTWIN_INTEGRITY") throw error; binding = null; }
+    return { server: binding?.server ?? null, client: binding?.client ?? null };
+  }
   if (kind !== "repo-push") return undefined;
   let learnings;
   try { learnings = await learningsFor(roots, target); } catch (error) { if (error.code !== "ENOENT") throw error; learnings = null; }

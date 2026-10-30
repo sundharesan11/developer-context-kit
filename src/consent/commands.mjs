@@ -39,8 +39,15 @@ async function targetFor(roots, { kind, repo, scope }, { grant }) {
     if (grant && !(await isBound(roots, real))) throw new DevtwinError("PROJECT_UNBOUND", "Repository is not bound; onboard it first", { reason: "not-bound", field: "repo" });
     return { target: real, hub: null };
   }
-  if (repo !== undefined) usage("A hub-publish consent takes --scope, not --repo", "repo");
+  if (repo !== undefined) usage("A scope consent takes --scope, not --repo", "repo");
   const target = assertScopeId(scope);
+  if (kind === "server-publish") {
+    if (grant) {
+      const { requireServerBinding } = await import("../server/commands.mjs");
+      await requireServerBinding(roots, target);
+    }
+    return { target, hub: null };
+  }
   const binding = await readHubBinding(roots, target);
   if (grant && binding?.status !== "joined") throw new DevtwinError("HUB_NOT_JOINED", "Scope has not joined a hub", { scope: target });
   return { target, hub: binding?.status === "joined" ? binding.hubId : null };
@@ -59,7 +66,8 @@ const repoLines = (rules) => rules.kind !== "repo-push" ? [] : [
 ];
 const ACTION = {
   "repo-push": "push learning branches (devtwin/learning-<id>) to this repository's remote without asking each time (lesson accept --target repo, learning send). Each branch adds one lesson file. devtwin never force-pushes and opens no pull request.",
-  "hub-publish": "publish lessons to this hub without asking each time (lesson accept --target hub). Everyone with access to the hub can read them, and Git history keeps the text."
+  "hub-publish": "publish lessons to this hub without asking each time (lesson accept --target hub). Everyone with access to the hub can read them, and Git history keeps the text.",
+  "server-publish": "prepare lessons for the bound MCP server (lesson accept --target server). An agent sends each due item with log_learning and records the returned ID."
 };
 
 export async function planGrant(roots, input) {
@@ -71,8 +79,9 @@ export async function planGrant(roots, input) {
   return finalizePlan({ kind: "consent-grant", consent: { kind, target, holdHours, ruleDigest: ruleDigestFor(kind, holdHours, params), rules: consentRules(kind, holdHours, params), ...(kind === "repo-push" ? { remoteUrl } : {}) }, hub,
     current: await readConsent(roots, kind, target), destination: { root: "stateRoot", path: "consents/" + kind } });
 }
-export const grantDialog = (plan) => ({ title: plan.consent.kind === "repo-push" ? "Allow learning-branch pushes to a repository" : "Allow lessons to go to an organization hub", body: [
+export const grantDialog = (plan) => ({ title: plan.consent.kind === "repo-push" ? "Allow learning-branch pushes to a repository" : plan.consent.kind === "server-publish" ? "Allow lessons to go to a knowledge server" : "Allow lessons to go to an organization hub", body: [
   targetLine(plan), "", "Agents and scheduled jobs may " + ACTION[plan.consent.kind],
+  ...(plan.consent.kind === "server-publish" ? ["MCP server: " + plan.consent.rules.server, "Client: " + plan.consent.rules.client] : []),
   "Each item waits " + plan.consent.holdHours + " hours in the held queue before it is sent. A notification names it when it is held, devtwin activity --held shows its text, and devtwin undo cancels it.",
   ...repoLines(plan.consent.rules),
   "Checks: " + plan.consent.rules.checks.join(", ") + ".",
@@ -102,7 +111,7 @@ const revokeDialog = (plan) => ({ title: "Revoke a standing consent", body: [
   ...(plan.held.length ? ["", "It also cancels " + plan.held.length + (plan.held.length === 1 ? " held item" : " held items") + " and any outbox item that came from them:", ...plan.held.map((x) => "- " + x.title)] : [])
 ].join("\n") });
 // The held-queue target of a consent. A repo-push target is the repository root's hash.
-const heldTarget = (kind, target) => kind === "hub-publish" ? hubTarget(target) : "repo:" + createHash("sha256").update(target).digest("hex");
+const heldTarget = (kind, target) => kind === "hub-publish" ? hubTarget(target) : kind === "server-publish" ? "server:" + target : "repo:" + createHash("sha256").update(target).digest("hex");
 // Cancels every held item of the target, and each outbox item a sender moved there from the held queue, then removes
 // the consent, all under the hub-sync, held and consent locks (the senders' order; the consent lock comes last). Each
 // cancelled item gets a held-state audit entry "cancelled" after the locks are released, since the audit lock comes
@@ -117,6 +126,11 @@ async function revokeAndCancel(roots, plan, { now }) {
     const current = await readConsent(roots, plan.consent.kind, plan.consent.target);
     if (JSON.stringify(current) !== JSON.stringify(plan.current)) throw new DevtwinError("STALE_VERSION", "Consent changed");
     for (const item of await listHeld(roots, { target })) {
+      if (plan.consent.kind === "server-publish") {
+        const { info } = await import("../storage/fsx.mjs");
+        const { join } = await import("node:path");
+        if (info(join(roots.stateRoot, "server-receipts", item.id + ".json"))) continue;
+      }
       if (removeHeld(roots, target, item.id)) { cancelled.held.push(item.id); marks.push([item, []]); }
     }
     for (const entry of waiting) {

@@ -12,6 +12,7 @@ export const OWNER_ACTIONS = Object.freeze([
   // shows the owner dialog as a second gate. U36 (KTD38): lesson accept left this list; it refuses the targets its tier
   // does not allow (src/policy/tiers.mjs).
   { words: ["lesson", "copy"], apply: true },
+  { words: ["server", "bind"], apply: true },
   { words: ["published", "delete"], apply: true }, { words: ["hub", "join"], apply: true },
   // U15 and U16: the preview of pref accept stays open, as above. instructions apply is itself the apply; its preview is
   // instructions plan.

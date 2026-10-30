@@ -53,6 +53,11 @@ export const COMMANDS = {
   "lesson copy": { load: async () => (await import("./lessons/commands.mjs")).lessonCopyCommand },
   "lesson supersede-propose": { load: async () => (await import("./lessons/commands.mjs")).lessonSupersedeProposeCommand },
   "lesson notices": { load: async () => (await import("./lessons/commands.mjs")).lessonNoticesCommand },
+  "server bind": { load: async () => (await import("./server/commands.mjs")).serverBindCommand },
+  "server status": { load: async () => (await import("./server/commands.mjs")).serverStatusCommand },
+  "server payload": { load: async () => (await import("./server/commands.mjs")).serverPayloadCommand },
+  "server record": { load: async () => (await import("./server/commands.mjs")).serverRecordCommand },
+  "server supersede": { load: async () => (await import("./server/commands.mjs")).serverSupersedeCommand },
   // The agent hook route prints the agent's own JSON, not the CLI envelope, and skips the full pilot load (KTD6).
   hook: { hook: true, load: async () => import("./hooks/commands.mjs") },
   "hook verify": { load: async () => (await import("./hooks/commands.mjs")).hookVerifyCommand },
