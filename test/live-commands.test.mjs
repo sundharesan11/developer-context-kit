@@ -78,7 +78,7 @@ test("live init refuses missing or stale fingerprints, unknown agents and a runn
   failed(await h.cli(["live", "init", "--pilot", h.liveConfig, "--agent", "claude", "--apply"]), "DEVTWIN_PLAN_REQUIRED");
   failed(await h.cli(["live", "init", "--pilot", h.liveConfig, "--agent", "codex", "--apply", "--plan-fingerprint", preview.json.result.fingerprint]), "DEVTWIN_PLAN_MISMATCH");
   failed(await h.cli(["live", "init", "--pilot", h.liveConfig, "--agent", "claude", "--apply", "--plan-fingerprint", "sha256:" + "0".repeat(64)]), "DEVTWIN_PLAN_MISMATCH");
-  failed(await h.cli(["live", "init", "--pilot", h.liveConfig, "--agent", "gemini"]), "DEVTWIN_INVALID_INPUT", "agent");
+  failed(await h.cli(["live", "init", "--pilot", h.liveConfig, "--agent", "antigravity"]), "DEVTWIN_INVALID_INPUT", "agent");
   failed(await h.cli(["live", "init", "--pilot", h.liveConfig]), "DEVTWIN_INVALID_INPUT", "agent");
   failed(await h.cli(["live", "init", "--pilot", "relative/live.json", "--agent", "claude"]), "DEVTWIN_GATE_REQUIRED", "pilot");
   assert.equal((await h.cli(["live", "init", "--pilot", h.liveConfig, "--pilot", h.liveConfig, "--agent", "claude"])).json.error.code, "DEVTWIN_USAGE");

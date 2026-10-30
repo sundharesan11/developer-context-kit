@@ -3,6 +3,9 @@ import { sha256, digest, canonicalJson } from "../storage/canonical.mjs";
 import { assertActorRef, assertProjectId, assertScopeId, recordIdFor, personalRecordIdFor, orgRecordIdFor } from "../identity/ids.mjs";
 import { assertSourceRel, isDeniedRel } from "../storage/source-read.mjs";
 import { assertNoSensitive, assertNoValueLike, findForbiddenFields } from "./redact.mjs";
+import { ACTORS } from "../policy/actor.mjs";
+// The recordedBy actors: the human, each agent adapter (src/agents/adapters) and "other" for devtwin jobs.
+export const RECORDERS = Object.freeze([...ACTORS, "other"]);
 export const KINDS = ["brief", "map", "command", "environment", "constraint", "fact", "decision", "experiment", "unknown", "handoff", "lesson", "preference", "retraction"];
 // U37 (KTD40): a retraction is the undo of a record. It supersedes the current head of that record's chain and is
 // never delivered: the brief, the lesson index, handoffs and the stack match all skip it.
@@ -105,7 +108,7 @@ export function validateDraft(draft, { recordedBy, retraction = false } = {}) {
   classAndReach(draft.kind, draft.class ?? defaultClass(draft.kind), draftReach(draft));
   if (draft.match !== undefined) match(draft.match);
   if (draft.locations !== undefined && (draft.kind !== "environment" || validateLocations(draft.locations).length === 0)) invalid();
-  if (!recordedBy || !["human", "claude", "codex", "other"].includes(recordedBy.actor)) invalid();
+  if (!recordedBy || !RECORDERS.includes(recordedBy.actor)) invalid();
   if (draft.status === "confirmed" && !draft.review?.reviewer) throw new DevtwinError("APPROVAL_REQUIRED", "Confirmation requires reviewer");
   if (draft.review?.reviewer) assertActorRef(draft.review.reviewer);
   assertNoSensitive([draft.title, draft.body, ...locationLines(draft.locations)].join("\n"));

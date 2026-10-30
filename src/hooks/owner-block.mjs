@@ -3,7 +3,8 @@
 // time, sudo, npx). The check is text-based and conservative: it is not a shell parser, and a harmless command whose
 // text names an owner action can be denied too. It is a separate path from lesson delivery: a denied call returns only
 // the deny, and a call that is not denied goes on to the lesson path, which never returns a decision.
-const SHELL_TOOLS = new Set(["Bash", "shell", "local_shell", "exec_command"]);
+// Issue #8: each agent adapter says which tool is its shell and how it prints a deny (src/agents/adapters).
+import { adapter, isAgent, AGENT_IDS } from "../agents/adapters/index.mjs";
 const MAX_COMMAND_BYTES = 65536;
 // words: the route words (one for undo, two, or three for backup key export). apply: the action is owner-only only with --apply (its preview stays allowed).
 export const OWNER_ACTIONS = Object.freeze([
@@ -47,7 +48,7 @@ export const OWNER_ACTIONS = Object.freeze([
 // an allowlist: from an agent shell it is allowed only with exactly one --step <id> whose id is not listed here, and
 // with neither --steps nor --all-pending. Anything else that names setup apply is denied, and so is the "setup"
 // terminal loop, which can apply owner steps. setup status and setup plan stay allowed.
-export const OWNER_SETUP_STEPS = Object.freeze(["skills-claude", "skills-codex", "write-classes-hooks", "hooks-claude", "hooks-codex", "hub-join", "job-hub-sync", "job-radar", "job-advisories", "job-review-reminder", "consent-repo", "consent-hub", "paths-confirm", "backup-folder", "job-backup"]);
+export const OWNER_SETUP_STEPS = Object.freeze([...AGENT_IDS.map((id) => "skills-" + id), "write-classes-hooks", ...AGENT_IDS.map((id) => "hooks-" + id), "hub-join", "job-hub-sync", "job-radar", "job-advisories", "job-review-reminder", "consent-repo", "consent-hub", "paths-confirm", "backup-folder", "job-backup"]);
 // U9 (one approval): the flags that make setup apply a batch of owner steps (src/setup/batch.mjs). Its preview is
 // setup plan with the same flags, so every setup apply that names one is denied, with or without --apply.
 export const SETUP_BATCH_FLAGS = Object.freeze(["--steps", "--all-pending"]);
@@ -77,8 +78,8 @@ function setupAction(words) {
 }
 export const DENY_REASON = "devtwin: this command runs an owner-only devtwin action. An agent may not run it. Ask your developer to run it themselves in their own terminal.";
 // Codex sends shell commands as text or as an argv array; both are read as one text.
-function commandText(input) {
-  const command = Array.isArray(input?.command) ? input.command.filter((part) => typeof part === "string").join(" ") : input?.command;
+function commandText(raw) {
+  const command = Array.isArray(raw) ? raw.filter((part) => typeof part === "string").join(" ") : raw;
   if (typeof command !== "string") return "";
   return Buffer.byteLength(command) <= MAX_COMMAND_BYTES ? command : command.slice(0, MAX_COMMAND_BYTES);
 }
@@ -88,10 +89,12 @@ function commandText(input) {
 const wordsOf = (text) => text.toLowerCase().replace(/\\\n/g, " ").replace(/["'`\\]/g, "").split(/[\s;|&()<>{}$=]+/).filter(Boolean);
 // Shell expansions that can hide or build words: ${...}, $'...', $"...", $(...) and backticks.
 const HIDING = /\$\{|\$'|\$"|\$\(|`/;
-// The owner action a payload's shell command runs, or null. Only shell tools are checked.
+// The owner action a payload's shell command runs, or null. Only the agent's shell tools are checked.
 export function ownerAction(agent, payload) {
-  if (!["claude", "codex"].includes(agent) || !SHELL_TOOLS.has(payload?.tool_name)) return null;
-  const text = commandText(payload.tool_input);
+  if (!isAgent(agent) || !adapter(agent).capabilities.ownerBlock) return null;
+  const input = adapter(agent).hooks.parse(payload);
+  if (input.toolKind !== "shell") return null;
+  const text = commandText(input.command);
   if (!/devtwin/i.test(text)) return null;
   const words = wordsOf(text), apply = words.includes("--apply");
   // Every route word anywhere, adjacent or not: a wrapper such as xargs or a variable can split the route.
@@ -105,5 +108,5 @@ export function ownerAction(agent, payload) {
   if (HIDING.test(text) && (words.includes("setup") || OWNER_ACTIONS.some(({ words: route }) => route.every((word) => words.includes(word)) || (apply && words.includes(route[0]))))) return "shell expansion near an owner action";
   return null;
 }
-// Both agents read the same PreToolUse deny shape.
-export const denyOutput = () => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: DENY_REASON } });
+// The deny in the agent's own shape: Claude Code and Codex read a PreToolUse permissionDecision, Gemini CLI a decision.
+export const denyOutput = (agent = "claude") => adapter(agent).hooks.format({ kind: "deny", reason: DENY_REASON }).stdout;

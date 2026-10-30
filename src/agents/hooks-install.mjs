@@ -14,24 +14,25 @@ import { editOwnedFile, readOwnedText, replaceOwnedEntries } from "../storage/ow
 import { writeKitReceipt, receiptPath, receiptProblem, readPilotBytes } from "../hooks/receipt.mjs";
 import { readIndex, rebuildDerived } from "../lessons/index.mjs";
 import { SCOPE_ID } from "../identity/ids.mjs";
+import { adapter, AGENT_IDS, LISTED } from "./adapters/index.mjs";
+export { CODEX_TRUST_NOTE } from "./adapters/codex.mjs";
 // U8: devtwin's hook entries in the agent settings files (KTD6, KTD7, KTD9). The only files are the approved
-// hookTargets: <claudeDir>/settings.json and ~/.codex/hooks.json. Both use the same shape:
-// { "hooks": { "<Event>": [ { "matcher"?: "<regex>", "hooks": [ { "type": "command", "command": "...", "timeout": 10 } ] } ] } }.
+// hookTargets, one per agent adapter (src/agents/adapters): <claudeDir>/settings.json, ~/.codex/hooks.json and
+// ~/.gemini/settings.json. Each uses the shape
+// { "hooks": { "<Event>": [ { "matcher"?: "<regex>", "hooks": [ { "type": "command", "command": "...", "timeout": 10 } ] } ] } },
+// and the adapter builds the entry: Gemini CLI adds a name and counts the timeout in milliseconds.
 // An entry is devtwin's only when a completed hook journal of this config wrote it and each of its commands names
 // this pilot. Every other entry, including one that looks like devtwin's, is the developer's and is never changed.
 export const HOOK_KIND = "hook-bundled";
 export const HOOK_INVENTORY = "hook-inventory";
 const KIT = fileURLToPath(new URL("../..", import.meta.url));
-const AGENTS = ["claude", "codex"], WRITES = ["create", "update", "remove"], TIMEOUT_SECONDS = 10;
-const FILES = { claude: "settings.json", codex: "hooks.json" };
-// [agent event, devtwin hook event, matcher]. Claude matches tool names exactly; Codex matchers are regexes.
+const AGENTS = AGENT_IDS, WRITES = ["create", "update", "remove"];
+// [agent event, devtwin hook event, matcher], per agent, from its adapter.
 // U33 (KTD32): Stop writes the stop stub and prints nothing. It is added last, so every earlier entry keeps its bytes;
 // an install made before it reports Stop as missing (status partial) until the owner installs the hooks again.
-export const HOOK_EVENTS = Object.freeze({
-  claude: [["SessionStart", "session-start", null], ["UserPromptSubmit", "user-prompt", null], ["PreToolUse", "pre-tool", "Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep|Bash"], ["PreCompact", "pre-compact", null], ["Stop", "stop", null]],
-  codex: [["SessionStart", "session-start", null], ["UserPromptSubmit", "user-prompt", null], ["PreToolUse", "pre-tool", "^(apply_patch|Bash)$"], ["PostToolUse", "post-tool", "^Bash$"], ["PreCompact", "pre-compact", null], ["Stop", "stop", null]]
-});
-export const CODEX_TRUST_NOTE = { code: "CODEX_HOOK_TRUST", message: "Codex runs a new or changed hook only after you review it. Open Codex, run /hooks, and trust each devtwin entry." };
+export const HOOK_EVENTS = Object.freeze(Object.fromEntries(AGENTS.map((id) => [id, adapter(id).hooks.events])));
+// The notes an owner needs after a hook install for these agents, such as the Codex /hooks trust step.
+const notesFor = (agents) => [...new Set(agents)].map((id) => adapter(id).hooks.note).filter(Boolean);
 const UNSAFE_IN_COMMAND = /["$`\\\n\r]/;
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const lockPath = (roots) => join(roots.stateRoot, "locks", "install.lock");
@@ -50,7 +51,7 @@ export function hookContext(pilot, kitRoot) {
   return context;
 }
 export function expectedEntries(agent, context) {
-  return Object.fromEntries(HOOK_EVENTS[agent].map(([name, event, matcher]) => [name, [{ ...(matcher ? { matcher } : {}), hooks: [{ type: "command", command: hookCommand({ ...context, event, agent }), timeout: TIMEOUT_SECONDS }] }]]));
+  return Object.fromEntries(HOOK_EVENTS[agent].map(([name, event, matcher]) => [name, [adapter(agent).hooks.entry({ command: hookCommand({ ...context, event, agent }), matcher, event })]]));
 }
 function targets(pilot, { targetHome, agents }) {
   if (!Array.isArray(agents) || !agents.length || agents.some((a) => typeof a !== "string" || !AGENTS.includes(a))) throw new DevtwinError("INVALID_INPUT", "Invalid installer selection");
@@ -63,7 +64,7 @@ function targets(pilot, { targetHome, agents }) {
     if (targetHome === homedir()) throw new DevtwinError("GATE_REQUIRED", "Real home refused");
     dirs = agentDirsFor({ home: targetHome, env: {} });
   }
-  return [...new Set(agents)].sort().map((agent) => ({ agent, path: join(dirs[agent], FILES[agent]) }));
+  return [...new Set(agents)].sort().map((agent) => ({ agent, path: join(dirs[agent], adapter(agent).hooks.file) }));
 }
 // Journals: stateRoot/runs/<runId>/journal.json, shared with the skill installer. An unreadable journal is null.
 async function readJournals(stateRoot) {
@@ -181,7 +182,7 @@ export async function planHooks(pilot, { targetHome, agents, mode = "install", k
     });
     return { ...base, status: row.text === null ? "create" : mode === "install" ? "update" : "remove", before, after: hashText(after), events, changes, foreign };
   });
-  const notes = actions.some((a) => a.agent === "codex" && mode === "install") ? [CODEX_TRUST_NOTE] : [];
+  const notes = mode === "install" ? notesFor(actions.map((a) => a.agent)) : [];
   return finalizePlan({ kind: "hook-install", mode, configId: configIdOf(pilot), pilotPath: context.pilotPath, kitRoot: context.kitRoot, agents: actions.map((a) => a.agent), receipt: mode === "install" ? receiptPath(pilot.stateRoot) : null, actions, notes });
 }
 // The pre-apply inventory of one hook target. Devtwin rows are entries whose commands all name this pilot; foreign
@@ -277,14 +278,23 @@ const overall = (events) => {
   for (const status of ["modified", "foreign-entry"]) if (set.has(status)) return status;
   return set.size === 1 ? [...set][0] : set.has("outdated") ? "outdated" : "partial";
 };
+// The agents hook status lists: Claude Code and Codex always, as before adapters existed, and any other agent that the
+// live config names or whose hook file is an approved hook target.
+function statusAgents(pilot, targetHome) {
+  const approved = pilot.writeClasses?.hookTargets ?? [];
+  const home = pilot.live ? pilot.live.home : targetHome, env = pilot.live ? pilot._context?.env ?? process.env : {};
+  const fileOf = (id) => join(adapter(id).agentDir({ home, env }), adapter(id).hooks.file);
+  const named = (id) => (pilot.live && Object.hasOwn(pilot.live.skillDirs, id)) || (typeof home === "string" && approved.includes(fileOf(id)));
+  return AGENTS.filter((id) => LISTED.includes(id) || named(id));
+}
 // Read-only: each agent's hook entries, the kit receipt and the notes an owner needs.
 export async function hookStatus(pilot, { targetHome, kitRoot, now = new Date() }) {
-  const { context, rows } = await analyzeAll(pilot, { targetHome, agents: AGENTS, kitRoot });
+  const { context, rows } = await analyzeAll(pilot, { targetHome, agents: statusAgents(pilot, targetHome), kitRoot });
   const agents = rows.map((row) => ({ agent: row.agent, path: row.path,
     status: row.blocked ?? row.conflict ?? overall(row.events), ...(row.events ? { events: eventRows(row.events), foreign: row.foreign } : {}) }));
   let receipt;
   try { receipt = (await receiptProblem(pilot.stateRoot, { pilotPath: context.pilotPath, pilotBytes: readPilotBytes(context.pilotPath), kitRoot, now })) ?? "ok"; } catch { receipt = "invalid"; }
-  const notes = [...(agents.some((a) => a.agent === "codex" && a.events) ? [CODEX_TRUST_NOTE] : []), ...await ambiguousRoots(pilot.stateRoot)];
+  const notes = [...notesFor(agents.filter((a) => a.events).map((a) => a.agent)), ...await ambiguousRoots(pilot.stateRoot)];
   return { agents, receipt, notes };
 }
 // Rollback check for a hook install run: devtwin's entries now must equal those before the run; foreign entries are listed.

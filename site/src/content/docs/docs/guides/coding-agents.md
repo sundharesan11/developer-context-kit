@@ -15,8 +15,11 @@ In live mode, `agents install --hooks` also adds the devtwin agent hook, which d
 | --- | --- | --- |
 | Claude Code | `.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) | `devtwin-onboard`, `devtwin-resume`, `devtwin-record`, `devtwin-capture` |
 | Codex | `.agents/skills` | the same four |
+| Gemini CLI | `.agents/skills`, shared with Codex | the same four |
 
 Each installed entry is a folder holding `SKILL.md` and a `.devtwin-owned.json` ownership receipt. devtwin only ever writes, updates or removes `devtwin-*` entries it owns. Codex skills go to `.agents/skills`, never `.codex/skills`.
+
+Gemini CLI reads `.agents/skills` as an alias of `.gemini/skills`, and the alias wins. So one install serves Codex and Gemini CLI. With both agents selected, the preview plans each skill once and names the other agent in `shared`. In live mode, an uninstall for one of them keeps the entries while the other is in the live config.
 
 See [Bundled skills](/docs/reference/bundled-skills/) for what each skill does.
 

@@ -14,9 +14,15 @@ import { recordInventory, INVENTORY } from "./inventory.mjs";
 import { isHookKind, isHookJournal, hookJournalFinished, hookRecoveryFor } from "./hooks-install.mjs";
 import { LEGACY_SKILL_NAMES, LEGACY_SKILL_PREFIX, LEGACY_RECEIPT, isLegacySkill } from "../config/legacy.mjs";
 import { kitId, kitIdentity, parseKitId, COMMIT } from "../kit/identity.mjs";
-export const AGENT_HOMES = { claude: ".claude/skills", codex: ".agents/skills" };
-// Earlier releases wrote Codex skills here. Status reports leftovers; nothing ever acts on them.
-export const LEGACY_HOMES = { codex: ".codex/skills" };
+import { adapter, isAgent, AGENT_IDS, LISTED } from "./adapters/index.mjs";
+// Each agent's skill folder under a home, from its adapter (src/agents/adapters). Codex and Gemini CLI share
+// .agents/skills: one install serves both, and an uninstall keeps the folder's entries while another agent of the live
+// config still uses it.
+const SKILL_HOMES = Object.freeze(Object.fromEntries(AGENT_IDS.map((id) => [id, adapter(id).skills.folder])));
+// The skill-builder package installs (frozen feature work) keep the two agents they always had.
+export const AGENT_HOMES = Object.freeze(Object.fromEntries(LISTED.map((id) => [id, SKILL_HOMES[id]])));
+// Earlier releases wrote Codex skills to .codex/skills. Status reports leftovers; nothing ever acts on them.
+export const LEGACY_HOMES = Object.freeze(Object.fromEntries(AGENT_IDS.flatMap((id) => adapter(id).skills.legacy.map((rel) => [id, rel]))));
 export const SKILL_NAMES = ["devtwin-onboard", "devtwin-resume", "devtwin-record", "devtwin-capture"];
 const SKILL = "SKILL.md", RECEIPT = ".devtwin-owned.json", KIND = "skill-bundled", FILE_LIMIT = 1048576;
 // Entries installed under the former name keep their legacy receipt file. They are only ever removed, never written.
@@ -45,12 +51,12 @@ function hashOf(path) {
 }
 // Each selected agent's skill folder and the root assertWritable takes for it. Live mode never derives either from an argument.
 function skillRoots(pilot, targetHome, agents) {
-  if (!Array.isArray(agents) || agents.some((a) => typeof a !== "string" || !Object.hasOwn(AGENT_HOMES, a))) throw new DevtwinError("INVALID_INPUT", "Invalid installer selection");
+  if (!Array.isArray(agents) || agents.some((a) => !isAgent(a))) throw new DevtwinError("INVALID_INPUT", "Invalid installer selection");
   const chosen = [...new Set(agents)].sort();
   if (!pilot.live) {
     assertInPilot(pilot, targetHome, "agentHomes");
     if (targetHome === homedir()) throw new DevtwinError("GATE_REQUIRED", "Real home refused");
-    return chosen.map((agent) => ({ agent, dir: join(targetHome, AGENT_HOMES[agent]), root: targetHome }));
+    return chosen.map((agent) => ({ agent, dir: join(targetHome, SKILL_HOMES[agent]), root: targetHome }));
   }
   const home = pilot.live.home;
   if (targetHome !== undefined && targetHome !== home) throw new DevtwinError("GATE_REQUIRED", "Live target must be the live config home", { field: "targetHome" });
@@ -133,12 +139,20 @@ async function observe(pilot, owned, dir, skill, mode) {
 }
 export async function planInstall(pilot, { targetHome, agents, mode = "install" }) {
   if (!["install", "uninstall"].includes(mode)) throw new DevtwinError("INVALID_INPUT", "Invalid installer selection");
-  const roots = skillRoots(pilot, targetHome, agents);
+  const selected = skillRoots(pilot, targetHome, agents);
+  // A folder two selected agents share is planned once, under the first of them; shared names the others.
+  const roots = selected.filter((r, i) => selected.findIndex((o) => o.dir === r.dir) === i);
+  const shared = selected.filter((r) => !roots.includes(r)).map((r) => ({ agent: r.agent, dir: r.dir, with: roots.find((o) => o.dir === r.dir).agent }));
+  // Uninstall keeps a folder that another agent of the live config still uses and that is not selected.
+  const users = (dir) => pilot.live ? Object.keys(pilot.live.skillDirs).filter((a) => isAgent(a) && pilot.live.skillDirs[a] === dir && !selected.some((r) => r.agent === a)).sort() : [];
   const owned = ledger(pilot, await readJournals(pilot.stateRoot));
   const actions = [];
   for (const { agent, dir, root } of roots) {
+    const keep = mode === "uninstall" && users(dir).length > 0;
+    if (keep) shared.push({ agent, dir, keptFor: users(dir) });
     for (const skill of SKILL_NAMES) {
       const path = join(dir, skill), seen = await observe(pilot, owned, path, skill, mode);
+      if (keep && seen.status === "remove") Object.assign(seen, { status: "preserve", reason: "shared-folder" });
       actions.push({ agent, skill, path, root, status: seen.status, ...(seen.reason ? { reason: seen.reason } : {}), prior: seen.receipt ? digest(seen.receipt) : null, ...(mode === "install" ? { hash: sha256(source(pilot, skill)) } : {}) });
     }
     // Entries from the former devctx name: an owned, unedited one is removed by install (its devtwin successor replaces it)
@@ -146,8 +160,8 @@ export async function planInstall(pilot, { targetHome, agents, mode = "install" 
     for (const skill of LEGACY_SKILL_NAMES) {
       const path = join(dir, skill), seen = await observe(pilot, owned, path, skill, "uninstall");
       if (seen.status === "absent") continue;
-      const status = seen.status === "remove" ? "remove" : "preserve";
-      const reason = seen.status === "remove" ? "legacy-name" : seen.status === "modified" ? "legacy-" + seen.reason : seen.reason;
+      const status = seen.status === "remove" && !keep ? "remove" : "preserve";
+      const reason = seen.status === "remove" ? (keep ? "shared-folder" : "legacy-name") : seen.status === "modified" ? "legacy-" + seen.reason : seen.reason;
       actions.push({ agent, skill, path, root, status, reason, prior: seen.receipt ? digest(seen.receipt) : null });
     }
   }
@@ -156,7 +170,7 @@ export async function planInstall(pilot, { targetHome, agents, mode = "install" 
     if (!actions.some((a) => a.agent === agent && ["conflict", "modified"].includes(a.status))) continue;
     for (const a of actions) if (a.agent === agent && ["create", "update", "remove"].includes(a.status)) Object.assign(a, { status: "blocked", reason: "agent-conflict" });
   }
-  return finalizePlan({ kind: "skill-install", mode, targetHome: targetHome ?? null, configId: configIdOf(pilot), kitCommit: pilot.live?.kitCommit ?? null, kitId: kitIdOf(pilot), agents: roots.map((r) => r.agent), actions });
+  return finalizePlan({ kind: "skill-install", mode, targetHome: targetHome ?? null, configId: configIdOf(pilot), kitCommit: pilot.live?.kitCommit ?? null, kitId: kitIdOf(pilot), agents: selected.map((r) => r.agent), actions, ...(shared.length ? { shared } : {}) });
 }
 // faults.beforeFolder, afterFolder, afterSkill and afterReceipt are test seams that crash between the writes of one action.
 // created runs right after this call makes the folder, so the journal can prove the folder is ours.
@@ -380,7 +394,7 @@ export async function installStatus(roots, pilot, { targetHome }) {
       if (j === null || !Array.isArray(j.intended) || !Array.isArray(j.completed) || j.completed.length < j.intended.length) incomplete.push(id);
     }
   }
-  const agents = pilot.live ? Object.keys(pilot.live.skillDirs).filter((a) => Object.hasOwn(AGENT_HOMES, a)).sort() : ["claude", "codex"];
+  const agents = pilot.live ? Object.keys(pilot.live.skillDirs).filter(isAgent).sort() : [...LISTED];
   const plans = await Promise.all(agents.map((agent) => planInstall(pilot, { targetHome, agents: [agent], mode: "install" })));
   return { status: incomplete.length ? "RECOVERY_REQUIRED" : "ok", incomplete, actions: plans.flatMap((plan) => plan.actions), legacy: legacyEntries(pilot.live?.home ?? targetHome) };
 }
