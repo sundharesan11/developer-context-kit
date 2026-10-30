@@ -1,58 +1,73 @@
 # devtwin
 
-**Clone the developer.** devtwin keeps your project context, decisions and handoffs between coding-agent sessions, so the next session starts where the last one stopped.
+**Clone the developer.** devtwin gives your coding agents your taste and your project knowledge, in every project and every agent.
 
 [![CI](https://github.com/sundharesan11/devtwin/actions/workflows/ci.yml/badge.svg)](https://github.com/sundharesan11/devtwin/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/sundharesan11/devtwin)
 
-[Website](https://sundharesan11.github.io/devtwin/) · [Docs](https://sundharesan11.github.io/devtwin/docs/) · [Getting started](https://github.com/sundharesan11/devtwin/blob/main/docs/GETTING-STARTED.md) · [DeepWiki](https://deepwiki.com/sundharesan11/devtwin) · [Roadmap](https://github.com/sundharesan11/devtwin/blob/main/docs/ROADMAP.md)
+[Website](https://sundharesan11.github.io/devtwin/) · [Docs](https://sundharesan11.github.io/devtwin/docs/) · [Getting started](https://github.com/sundharesan11/devtwin/blob/main/docs/GETTING-STARTED.md) · [Roadmap](https://github.com/sundharesan11/devtwin/blob/main/docs/ROADMAP.md)
 
-A repository tells an agent what the code is. It rarely says why a decision was made, what is still unknown, or where the last session stopped. devtwin keeps that knowledge as private, source-linked records outside the repository and turns them into a short, bounded brief for each new session.
+Your agents can read any codebase. They can't read why it was built that way, the mistakes you never repeat, or where you stopped yesterday. devtwin keeps that knowledge on your disk and gives it to Claude Code and Codex when a session starts.
 
-## What it does
+## Why use it
 
-| Pillar | What you get |
-| --- | --- |
-| **Project context** | Onboard a repository read-only, then keep its facts, decisions, constraints, commands, unknowns, locations and handoffs as source-linked records. Each record links to its sources by hash, so a brief can tell you when evidence has changed. Records are superseded, never silently overwritten. |
-| **Works in the background** | Agents and daily jobs write project lessons, constraints, facts, locations and handoffs as `observed` records, with no prompt. Every write goes to an audit log, appears in a weekly digest and reverses with `undo`. A daily job imports Claude memory and `docs/solutions`, and another writes an encrypted backup. devtwin reads Claude memory and never writes it: memory captures, devtwin promotes. Anything that reaches every session, leaves the machine or cannot be undone still asks you. See [Tiers](https://github.com/sundharesan11/devtwin/blob/main/docs/SECURITY-MODEL.md#tiers). |
-| **Every coding agent** | Bundled `devtwin-onboard`, `devtwin-resume`, `devtwin-record` and `devtwin-capture` skills give Claude Code and Codex the same context through the same CLI. |
-| **Delivered when they apply** | At session start in a bound project, the agent gets a summary of at most 1,200 characters: the project's "ask before" rules, top constraints, where things live (never their values) and the next step of the last handoff. A lesson is one "do" or "don't" with a reason, tied to paths, packages, topics or a shell command such as `git push`. The devtwin agent hook shows a short index line when an agent reads or edits matching code or runs a matching command, at most four per session. When a session stops without a handoff, a stop stub records where that worktree stood, and the agent answers it with `handoff write`. Agents accept lessons for the current project on their own; a lesson for every project waits for your weekly `activity review`. See [Agent protocol](https://github.com/sundharesan11/devtwin/blob/main/docs/AGENT-PROTOCOL.md#8-lessons-for-the-work-in-hand). |
-| **Preferences and templates** | When you correct an agent, it can propose the correction as a preference, and you accept it in the weekly `activity review`. Accepted preferences reach every Claude Code and Codex session through a marked block in your own `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`, never a repository's files. Starter templates for an RCA, a report and a decision note can be replaced by the structure of an output you liked. |
-| **Team sharing** | Join a Git repository your organization hosts as a hub to share lessons with colleagues, or send a lesson to the team's repository as a commit on a `devtwin/learning-<id>` branch, never your working copy or current branch. Each target needs a one-time consent. An outbound item waits in a held queue, 24 hours by default, where you can read it and cancel it with `undo`. Short "working on" notes warn a colleague's agent when you change the same area. See [Organization hub](https://github.com/sundharesan11/devtwin/blob/main/docs/HUB.md). |
-| **Organization identity routing** *(planned)* | Each scope binds its own GitHub and Slack accounts, and devtwin checks the live identity before acting. This is designed, not built yet; see the [roadmap](https://github.com/sundharesan11/devtwin/blob/main/docs/ROADMAP.md). |
-| **Personal harness** | Clone it as a personal-harness template: a small private profile, skill templates you turn into your own private skills, and a watch on vendor announcements for your stack. A monthly setup review (`review plan`, `review apply`) suggests stale imported items, lessons that never matched and consents you never used. See the [harness guide](https://github.com/sundharesan11/devtwin/blob/main/docs/HARNESS.md). |
-| **Release radar** | A weekly digest, in Markdown or HTML, of releases in your stack, new agent tools, approaches and adjacent tech, ranked by your stack and interests. In live mode it also reports upcoming model retirements. Each item can open a short "how to try this" guide. Hourly advisory checks notify you at once about an urgent fix, and each scheduled job has its own consent and off switch. See [the radar](https://github.com/sundharesan11/devtwin/blob/main/docs/HARNESS.md#the-radar). |
-
-## How it works
-
-![Project sources pass through tiered CLI operations into private stores, and are read as session summaries, briefs or selected handoffs. Agents and jobs write new observations back as audited records.](https://raw.githubusercontent.com/sundharesan11/devtwin/main/docs/assets/architecture.svg)
-
-1. **Read.** devtwin scans a bounded set of repository files (README, agent instructions, manifests) and Git metadata. Onboarding never writes to the repository.
-2. **Learn in the background.** Agents record decisions, lessons, locations and handoffs as they work. A daily job promotes new Claude memory and `docs/solutions` items. These writes are automatic: each one is an `observed` record, written to the audit log and reversible with `undo`.
-3. **Ask only when it matters.** A global preference, a lesson for every project, a consent and every `undo` need you, in an owner dialog or the weekly `activity review`. Sending to a hub or a repository needs a one-time consent per target, and each item waits 24 hours in a held queue first.
-4. **Keep private.** Records live in local stores outside the repository, with private file modes. A daily job writes an encrypted backup.
-5. **Deliver.** The session-start summary gives the key rules in at most 1,200 characters. The agent hook adds matching lesson lines while the agent works, and never uses the network. `context brief` returns at most 12 items and 24 KiB, with sources, freshness and unknowns.
-6. **Hand off.** At each stopping point the agent writes a handoff with `handoff write`, and the next session starts from it. Selected records can also go out as a [handoff packet](https://github.com/sundharesan11/devtwin/blob/main/docs/HANDOFF.md).
-
-More in [Architecture](https://github.com/sundharesan11/devtwin/blob/main/docs/ARCHITECTURE.md).
+- **Never teach an agent the same process twice.** Your preferences and lessons follow you into every project and every agent.
+- **Run your agents like one team.** Start a task in Claude Code and finish it in Codex. Both read the same brief and the last handoff.
+- **Pick up where you stopped.** Each session starts with the project's rules, its top constraints and the next step from the last handoff.
+- **Stay in control.** Everything lives in plain files on your machine. Agents write as they work, every write is logged, and `undo` reverses any of them.
+- **Share what your team learns.** Send a lesson to your team's hub or repository, only with your consent.
 
 ## Quick start
 
-You need Node.js 22.13 or later. devtwin has no third-party dependencies.
+You need Node.js 22.13 or later. devtwin has no dependencies.
 
 ```sh
 npm i -g devtwin@alpha
 devtwin demo
 ```
 
-The demo builds synthetic repositories, a disposable pilot and fake agent homes in a fresh temporary folder. It checks onboarding, records, briefs, handoffs, installs and the personal harness end to end, with no network. Expect `"ok": true`. The checks that need a Git clone of the kit show `skipped`, and `fresh-agent-smoke` and `real-agent-scenarios` show `deferred`, because they need a real agent. The demo never touches your real agent homes or accounts.
+The demo runs in a new temporary folder with sample projects and fake agent homes. It needs no network and never touches your real agents or accounts. Expect `"ok": true`.
 
-Every command prints one line of JSON, `{"ok": true, ...}` or `{"ok": false, "error": {...}}`. Run `devtwin help` for the command list.
+Name the `@alpha` tag when you install. Without it, npm installs an old placeholder.
 
-### From a Git clone
+Every command prints one line of JSON. Run `devtwin help` to list the commands.
 
-Contributors run devtwin from a clone. You also need Git.
+## How it works
+
+![Project sources pass through tiered CLI operations into private stores, and are read as session summaries, briefs or selected handoffs. Agents and jobs write new observations back as audited records.](https://raw.githubusercontent.com/sundharesan11/devtwin/main/docs/assets/architecture.svg)
+
+1. **Onboard a project.** devtwin reads the repository and never writes to it. It keeps decisions, constraints, commands and handoffs as records that link to their sources.
+2. **Learn while you work.** Agents record lessons and handoffs on their own. The audit log keeps every write, and `undo` reverses it.
+3. **Start every session ready.** The agent gets a short summary at the start. The full brief is one command away. A lesson appears when the agent opens a file or runs a command that it matches.
+4. **Decide what spreads.** A lesson for every project, or anything that leaves your machine, waits for your approval.
+
+Read [Architecture](https://github.com/sundharesan11/devtwin/blob/main/docs/ARCHITECTURE.md) for the details.
+
+## What's included
+
+| Feature | What it does | Guide |
+| --- | --- | --- |
+| Project context | Records with sources, and a short brief for each session | [Agent protocol](https://github.com/sundharesan11/devtwin/blob/main/docs/AGENT-PROTOCOL.md) |
+| Lessons | A "do" or "don't" with a reason, shown when matching code is in hand | [Lessons](https://github.com/sundharesan11/devtwin/blob/main/docs/AGENT-PROTOCOL.md#8-lessons-for-the-work-in-hand) |
+| Handoffs | The next step for the next session, in any agent | [Handoffs](https://github.com/sundharesan11/devtwin/blob/main/docs/HANDOFF.md) |
+| Team hub | Share lessons and "working on" notes through a Git repository your team hosts | [Organization hub](https://github.com/sundharesan11/devtwin/blob/main/docs/HUB.md) |
+| Personal harness | Use it as a personal-harness template: a private profile and skills built from templates | [Harness guide](https://github.com/sundharesan11/devtwin/blob/main/docs/HARNESS.md) |
+| Release radar | A weekly digest of releases and tools that touch your stack | [The radar](https://github.com/sundharesan11/devtwin/blob/main/docs/HARNESS.md#the-radar) |
+| Backup and undo | A daily encrypted backup, an audit log and `undo` | [Security model](https://github.com/sundharesan11/devtwin/blob/main/docs/SECURITY-MODEL.md#tiers) |
+| Accounts per org *(planned)* | Each org uses its own accounts, checked before every action | [Roadmap](https://github.com/sundharesan11/devtwin/blob/main/docs/ROADMAP.md) |
+
+devtwin works alongside `AGENTS.md` and `CLAUDE.md`. Instructions in a repository always take precedence over a brief.
+
+## Use it on your own machine
+
+The demo uses throwaway folders. To run devtwin on your real projects, follow [Live activation](https://github.com/sundharesan11/devtwin/blob/main/docs/LIVE.md). [Upgrading](https://github.com/sundharesan11/devtwin/blob/main/docs/UPGRADING.md) explains how to move to a new release or roll back.
+
+Live mode runs a pinned copy of the kit under `~/.devtwin/kits/`, never from npm's global folder. A later `npm i -g` changes nothing until you pin the new kit.
+
+## Work on devtwin
+
+Contributors run devtwin from a Git clone:
 
 ```sh
 git clone https://github.com/sundharesan11/devtwin.git
@@ -60,50 +75,25 @@ cd devtwin
 node bin/devtwin.mjs help
 ```
 
-From a clone, the acceptance harness runs every check. That includes the package audit, the live-mode checks and `npm-install`, which packs the kit, installs the tarball offline and runs the demo from that install:
+[Contributing](CONTRIBUTING.md) covers setup, tests and the rules for public-safe examples. The [documentation index](https://github.com/sundharesan11/devtwin/blob/main/docs/README.md) lists every guide.
 
-```sh
-DEMO_PARENT="$(mktemp -d /tmp/devtwin-demo.XXXXXX)"
-DEMO_PARENT="$(cd "$DEMO_PARENT" && pwd -P)"
-node scripts/acceptance.mjs \
-  --pilot-root "$DEMO_PARENT/pilot" \
-  --report "$DEMO_PARENT/acceptance.json"
-```
+## Status
 
-Expect `"ok": true`, with 33 checks `passed`, and `fresh-agent-smoke` and `real-agent-scenarios` `deferred`.
+devtwin is an alpha. The first release is `0.1.0-alpha.1` on npm, under the `alpha` tag.
 
-Next steps:
+- Live mode works on a real machine, and fresh Claude Code and Codex sessions find the skills and read the brief.
+- Lessons, the agent hook, the team hub, preferences, backups and the weekly review pass their tests against local fixtures. Runs with real agents are still to come.
+- Accounts per org are planned. Known gaps are in [Limitations](https://github.com/sundharesan11/devtwin/blob/main/docs/LIMITATIONS.md).
+- devtwin needs Node.js 22.13 or later and Git. macOS is the reference platform. CI also runs on Ubuntu, but Linux support is not claimed yet. Windows is unsupported.
 
-- [Getting started](https://github.com/sundharesan11/devtwin/blob/main/docs/GETTING-STARTED.md): the demo in detail, with troubleshooting.
-- [Guided onboarding](https://github.com/sundharesan11/devtwin/blob/main/docs/ONBOARDING.md): preview, approve, brief and record on a synthetic project, step by step.
-- [Live activation](https://github.com/sundharesan11/devtwin/blob/main/docs/LIVE.md): run devtwin on your own machine against real repositories and agent skill folders.
-- [Upgrading](https://github.com/sundharesan11/devtwin/blob/main/docs/UPGRADING.md): move live mode to a new release, or roll back to an earlier kit.
-- [Migrating from devctx](https://github.com/sundharesan11/devtwin/blob/main/docs/MIGRATING.md): `devtwin live migrate` moves a setup made under the old name.
-- [Organization hub](https://github.com/sundharesan11/devtwin/blob/main/docs/HUB.md): join a hub, share lessons and post "working on" notes.
+## Safety
 
-## How it compares
+- Your data stays in private files on your machine. There is no automatic private-to-public synchronization.
+- A team hub or repository gets a lesson only after your one-time consent, and each one waits 24 hours by default, so you can cancel it.
+- The pilot fence is not a sandbox. It limits this CLI, not your agent or other processes.
 
-| | Repo files (`AGENTS.md`, `CLAUDE.md`) | Hosted agent memory | devtwin |
-| --- | --- | --- | --- |
-| Where it lives | In the repository, shared with everyone who clones it | On the vendor's service | Local private stores, outside the repository |
-| Works across agents | Depends on which file each agent reads | Usually one product | Claude Code and Codex through the same CLI |
-| Sources and freshness | None | Usually none | Every record is hashed against its sources |
-| History | Git history of one file | Varies | Immutable records with supersession |
-| Writes | Anyone edits the file | Often automatic | Agents write project knowledge, audited and undoable; anything global or outbound asks you |
-
-devtwin complements repository instruction files rather than replacing them: repository instructions always take precedence over a brief.
-
-## Status and requirements
-
-- **Status.** devtwin is an alpha. The first npm release is `0.1.0-alpha.1`, under the `alpha` dist-tag. Live mode is implemented, and its first activation on a real machine passed, including fresh non-interactive Claude Code and Codex sessions that found the skills and read the brief. Lessons, the agent hook, the setup wizard, the organization hub, preferences and output templates are implemented and tested against local fixtures. They are not yet activated on a real machine or tested on a real hub host. The tiers, standing consents, the audit log with `activity` and `undo`, and daily encrypted backups are implemented. So are the session summary, command lessons, locations and the stop stub. The daily import, the held queue, repository write-back, the weekly review, model retirements and the monthly setup review are implemented too. These are tested against synthetic fixtures and local bare repositories. The real-agent scenario kit is ready; its runs with real agents have not been done yet. Organization identity routing is on the [roadmap](https://github.com/sundharesan11/devtwin/blob/main/docs/ROADMAP.md); known gaps are in [Limitations](https://github.com/sundharesan11/devtwin/blob/main/docs/LIMITATIONS.md).
-- **Install.** `npm i -g devtwin@alpha` installs the global `devtwin` command. Until `latest` moves, `npm i devtwin` without `@alpha` installs a deprecated placeholder, so always name the dist-tag. Live mode runs from a pinned copy of the kit under `~/.devtwin/kits/`, never from npm's global folder. A later `npm i -g` changes nothing until you pin the new kit; see [Upgrading](https://github.com/sundharesan11/devtwin/blob/main/docs/UPGRADING.md). A Git clone stays a supported install for contributors.
-- **Requirements.** Node.js `>=22.13.0` and Git. macOS is the reference platform. CI also runs on Ubuntu, but Linux support is not claimed yet. Windows is unsupported.
-- **Safety.** Every stateful command needs an explicit pilot file: a disposable pilot for evaluation, or a live config for one real machine. There is no automatic private-to-public synchronization. An organization hub receives only the lessons accepted under your `hub-publish` consent or copied by you, and the "working on" notes you consent to. A repository receives a learning branch only under your `repo-push` consent, after the hold. The pilot fence is not a sandbox: it limits this CLI, not your agent or other processes. Read the [security model](https://github.com/sundharesan11/devtwin/blob/main/docs/SECURITY-MODEL.md) before using private data.
-
-## Contributing
-
-Contributions are welcome. Start with [Contributing](CONTRIBUTING.md) for setup, tests and the rules for keeping examples public-safe. Report vulnerabilities privately as described in [Security](SECURITY.md). The [documentation index](https://github.com/sundharesan11/devtwin/blob/main/docs/README.md) lists every guide and maintainer contract.
+Read the [security model](https://github.com/sundharesan11/devtwin/blob/main/docs/SECURITY-MODEL.md) before you use private data. Report vulnerabilities privately as described in [Security](SECURITY.md).
 
 ## License
 
-[Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party skill sources listed in the catalog keep their own licenses.
+[Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party skill sources in the catalog keep their own licenses.
