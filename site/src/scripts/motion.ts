@@ -545,11 +545,13 @@ function buildRail() {
 	const stage = document.querySelector<HTMLElement>('.stage');
 	if (!stage) return;
 	const so = offsetIn(stage, main);
-	let y = Math.round(so.y + 120) + 0.5;
-	const sx = so.x;
-	let d = `M${sx} ${y} H${X + 10} L${X} ${y + 10}`;
-	y += 10;
-	const vias: [number, number][] = [[sx, y - 10]];
+	// A stage wider than the column (the context graph) covers the rail's lane, so the rail starts under it instead.
+	const covers = so.x <= X + 12;
+	let y = Math.round(covers ? so.y + stage.offsetHeight + 24 : so.y + 120) + 0.5;
+	const sx = covers ? X : so.x;
+	let d = covers ? `M${X} ${y}` : `M${sx} ${y} H${X + 10} L${X} ${y + 10}`;
+	if (!covers) y += 10;
+	const vias: [number, number][] = [[sx, covers ? y : y - 10]];
 	const targets = Array.from(document.querySelectorAll<HTMLElement>('.intro .kicker, .p-num, .marquee, .band .kicker, .final h2'));
 	for (const el of targets) {
 		const o = offsetIn(el, main);

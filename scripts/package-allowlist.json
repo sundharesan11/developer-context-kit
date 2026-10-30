@@ -96,6 +96,7 @@
   "site/src/components/landing/CliReadout.astro",
   "site/src/components/landing/CommandMarquee.astro",
   "site/src/components/landing/Commands.astro",
+  "site/src/components/landing/ContextGraph.astro",
   "site/src/components/landing/CrtGlass.astro",
   "site/src/components/landing/DitherBand.astro",
   "site/src/components/landing/FinalCta.astro",
