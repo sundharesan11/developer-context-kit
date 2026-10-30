@@ -57,9 +57,13 @@ if (stage) {
 		return el;
 	};
 	type Pt = { x: number; y: number };
+	// The hero's power-on animation scales its content, and client rects include that transform. Dividing by the graph's
+	// own scale gives layout coordinates, so wires drawn mid-animation still land on the cards.
 	const point = (id: string, side: string, f = 0.5): Pt => {
 		const a = $(id).getBoundingClientRect(), b = graph.getBoundingClientRect();
-		return { x: a.left - b.left + (side === 'right' ? a.width : side === 'left' ? 0 : a.width * f), y: a.top - b.top + (side === 'bottom' ? a.height : side === 'top' ? 0 : a.height * f) };
+		const sx = b.width / graph.offsetWidth || 1, sy = b.height / graph.offsetHeight || 1;
+		const w = a.width / sx, h = a.height / sy;
+		return { x: (a.left - b.left) / sx + (side === 'right' ? w : side === 'left' ? 0 : w * f), y: (a.top - b.top) / sy + (side === 'bottom' ? h : side === 'top' ? 0 : h * f) };
 	};
 	const curve = (a: Pt, b: Pt, axis = 'x') => {
 		if (axis === 'y') { const d = Math.max(22, Math.abs(b.y - a.y) * 0.45); return `M${a.x},${a.y} C${a.x},${a.y + d} ${b.x},${b.y - d} ${b.x},${b.y}`; }
@@ -116,6 +120,8 @@ if (stage) {
 	observer.observe(graph);
 	stage.querySelectorAll('.cg-record,.cg-brief,.cg-identity,.cg-agents,.cg-learning,.cg-team-node,.cg-skill-node').forEach((el) => observer.observe(el));
 	window.addEventListener('resize', schedule);
+	// A scale of 0 at the first frame of the animation leaves nothing to divide by; redraw once it has ended.
+	stage.closest('.hero')?.addEventListener('animationend', (e) => { if (e.animationName === 'crt-power') schedule(); });
 	draw();
 
 	const data: Record<string, Record<string, string>> = {
