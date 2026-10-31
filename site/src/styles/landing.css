@@ -367,7 +367,7 @@ section{position:relative}
 .final{text-align:center;padding:clamp(100px,14vw,170px) 0;position:relative;isolation:isolate}
 .final::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(700px 360px at 50% 60%,rgba(255,138,61,.10),transparent 70%)}
 .final h2{font-size:clamp(40px,7vw,84px);line-height:1;letter-spacing:-.045em;max-width:900px;margin:0 auto}
-.final p{color:var(--muted);font-size:18px;margin:22px auto 0;max-width:520px}
+.final p{color:var(--muted);font-size:18px;margin:22px auto 0;max-width:520px}.final p.final-lead{color:var(--text);font-size:20px;max-width:620px}.final p.final-lead+p{margin-top:10px}
 
 footer{border-top:1px solid var(--line);padding:48px 0 56px;color:var(--faint);font-size:14px}
 .foot{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:32px}
