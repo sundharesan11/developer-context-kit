@@ -79,8 +79,8 @@ import SeoHead from '../components/landing/SeoHead.astro';
 
   // account switcher
   var data = {
-    work:{cwd:'~/work/billing-service', gh:'@sam-work', ghOrg:'work', sl:'Sam R.', slWs:'work.slack.com', ln:'sam-work', lnWs:'work', cl:'work-prod', repo:'work/billing-service', wrong:'@sam-client'},
-    client:{cwd:'~/client/mobile-app', gh:'@sam-client', ghOrg:'client', sl:'Sam', slWs:'client.slack.com', ln:'sam-client', lnWs:'client', cl:'client-staging', repo:'client/mobile-app', wrong:'@sam-work'}
+    work:{cwd:'~/work/billing-service', gh:'@sam-work', ghOrg:'work', sl:'Sam R.', slWs:'work.slack.com', ln:'sam-work', lnWs:'work', cl:'work-deploy', env:'staging', repo:'work/billing-service', wrong:'@sam-client'},
+    client:{cwd:'~/client/mobile-app', gh:'@sam-client', ghOrg:'client', sl:'Sam', slWs:'client.slack.com', ln:'sam-client', lnWs:'client', cl:'client-deploy', env:'preview', repo:'client/mobile-app', wrong:'@sam-work'}
   };
   var acct = document.getElementById('acct');
   var auto = true, timer;
@@ -88,11 +88,11 @@ import SeoHead from '../components/landing/SeoHead.astro';
     var d = data[s];
     acct.dataset.scope = s;
     acct.querySelectorAll('.scope-switch button').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.scope === s); });
-    document.getElementById('acct-cwd').innerHTML = 'cwd <b>' + d.cwd + '</b> → scope <b>' + s + '</b>';
+    document.getElementById('acct-cwd').innerHTML = 'cwd <b>' + d.cwd + '</b> → scope <b>' + s + '</b> · env <b>' + d.env + '</b>';
     acct.querySelector('[data-gh]').innerHTML = d.gh + '<small>GitHub · ' + d.ghOrg + '</small>';
     acct.querySelector('[data-sl]').innerHTML = d.sl + '<small>Slack · ' + d.slWs + '</small>';
     acct.querySelector('[data-ln]').innerHTML = d.ln + '<small>Linear · ' + d.lnWs + '</small>';
-    acct.querySelector('[data-cl]').innerHTML = d.cl + '<small>AWS · deploy role</small>';
+    acct.querySelector('[data-cl]').innerHTML = d.cl + '<small>AWS · ' + d.env + '</small>';
     document.getElementById('r-repo').textContent = d.repo;
     document.getElementById('r-who').textContent = d.wrong;
     acct.querySelector('.refuse .muted').textContent = 'scope ' + s + ' is bound to ' + d.gh;
