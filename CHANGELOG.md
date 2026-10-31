@@ -4,6 +4,10 @@ This file lists the notable changes in each devtwin release. The format follows 
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2]
+
+Gemini CLI joins Claude Code and Codex, and lessons can go to an org knowledge server over MCP. Upgrade with `npm i -g devtwin@alpha`, then follow [Upgrading](docs/UPGRADING.md).
+
 ### Added
 
 - **Gemini CLI as the third agent.** `live init --agent gemini`, `agents install --agent gemini`, `agents install --hooks --agent gemini` and `instructions plan --agent gemini` set up Gemini CLI. Its skills go to `~/.agents/skills`, its instruction block to `~/.gemini/GEMINI.md`, and its hook entries to `~/.gemini/settings.json`. The setup wizard has the new steps `skills-gemini` and `hooks-gemini`.
@@ -18,6 +22,12 @@ This file lists the notable changes in each devtwin release. The format follows 
 
 - Agent-specific code now lives in one adapter per agent under `src/agents/adapters/`. Claude Code and Codex behave as before.
 - The `instructionTargets` and `hookTargets` write classes also accept `~/.gemini/GEMINI.md` and `~/.gemini/settings.json`.
+
+### Known limits
+
+- Gemini CLI support is checked against the Gemini CLI documentation and tests, not yet in a real Gemini CLI session. Gemini CLI runs hooks in a reduced environment; if `node` is not found there, the hooks do not run.
+- A Gemini CLI settings file with comments is refused as `invalid-json`.
+- Antigravity CLI is not supported yet.
 
 ## [0.1.0-alpha.1]
 
@@ -41,5 +51,6 @@ The first npm release. Install it with `npm i -g devtwin`. A Git clone stays a s
 - `package.json` has a description, keywords and the documentation site as its homepage.
 - `package.json` no longer has `"private": true`. A `prepublishOnly` guard refuses a publish outside GitHub Actions unless `DEVTWIN_ALLOW_LOCAL_PUBLISH=1` is set.
 
-[Unreleased]: https://github.com/sundharesan11/devtwin/compare/v0.1.0-alpha.1...HEAD
+[Unreleased]: https://github.com/sundharesan11/devtwin/compare/v0.1.0-alpha.2...HEAD
+[0.1.0-alpha.2]: https://github.com/sundharesan11/devtwin/releases/tag/v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/sundharesan11/devtwin/releases/tag/v0.1.0-alpha.1

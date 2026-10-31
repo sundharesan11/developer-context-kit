@@ -139,7 +139,7 @@ LIVE_CONFIG="$HOME/.devtwin/live.json"
 REPO='<absolute real path of the repository>'
 ```
 
-`<kit path>` is the `kitRoot` that `devtwin kit install` prints in step 5, such as `~/.devtwin/kits/0.1.0-alpha.1-<digest prefix>`. For a Git clone, it is `$HOME/.devtwin/kit`.
+`<kit path>` is the `kitRoot` that `devtwin kit install` prints in step 5, such as `~/.devtwin/kits/0.1.0-alpha.2-<digest prefix>`. For a Git clone, it is `$HOME/.devtwin/kit`.
 
 `<scope>` is the scope name, `<project>` a project ID that starts with the scope, such as `example.atlas`, and `<actor>` an actor reference such as `email:you@example.com`. Do not write real client names or account identifiers into this repository, issues or public notes.
 

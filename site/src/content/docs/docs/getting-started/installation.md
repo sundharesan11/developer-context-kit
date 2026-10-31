@@ -30,7 +30,7 @@ devtwin --version
 You should see a version line like this:
 
 ```json
-{"ok":true,"command":"version","result":{"name":"devtwin","version":"0.1.0-alpha.1"}}
+{"ok":true,"command":"version","result":{"name":"devtwin","version":"0.1.0-alpha.2"}}
 ```
 
 Every `devtwin` command prints exactly one line of JSON: `{"ok": true, ...}` on success, or `{"ok": false, "error": {...}}` on failure. To list every command:

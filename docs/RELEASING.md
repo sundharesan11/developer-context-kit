@@ -126,6 +126,17 @@ A deprecated version still installs when its dist-tag names it, and the npm pack
 
 A failed publish changes nothing on npm. Run the failed jobs again from the same tag. If the publish passed but the release job failed, run the release job again alone. It does not publish again. If it still fails, create the draft by hand with the digest from the gate job's log.
 
+### Later releases
+
+The owner does each step and approves each change on npm or GitHub.
+
+1. Merge the release pull request into `main`. It sets the version in `package.json` and moves the Unreleased entries in `CHANGELOG.md` under that version.
+2. Push the tag `v<version>` from the merged commit.
+3. Approve the `npm-release` environment run when the gate job passes.
+4. Open the draft GitHub release. Check the version, the source commit and the kit digest. Publish the release.
+5. Run `npm view devtwin dist-tags`. Check that `alpha` names the new version.
+6. Move `latest` to the new version, as described below.
+
 ### Moving latest
 
 The owner moves `latest` as a separate approval, after checking the published version. On 2026-10-30 the owner moved `latest` to `0.1.0-alpha.1` before the real-agent scenarios ran, so that the npm page and `npm i devtwin` show the release and not the placeholder. The command is:
