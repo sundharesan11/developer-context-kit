@@ -97,7 +97,7 @@ Prints the kit name and version. No pilot needed.
 
 ```sh
 devtwin --version
-# {"ok":true,"command":"version","result":{"name":"devtwin","version":"0.1.0-alpha.1"}}
+# {"ok":true,"command":"version","result":{"name":"devtwin","version":"0.1.0-alpha.2"}}
 ```
 
 A Git clone adds its `commit`.

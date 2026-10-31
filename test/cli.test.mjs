@@ -13,7 +13,7 @@ test("version prints JSON and exits 0", async () => {
   const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const commit = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8", env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: "1" } }).trim();
   assert.deepEqual(json, { ok: true, command: "version", result: { name: "devtwin", version, commit } });
-  assert.equal(version, "0.1.0-alpha.1");
+  assert.equal(version, "0.1.0-alpha.2");
 });
 test("version of a package kit adds its digest prefix", async (t) => {
   const sb = await sandbox(t), home = join(sb, "home");
