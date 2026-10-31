@@ -180,9 +180,10 @@ const lines = (tree: string) =>
       <div class="p-copy reveal">
         <div class="p-num"><span>05</span> Accounts</div>
         <h3 id="p4">Never push as the wrong account again.</h3>
-        <p>Each org you work for gets its own scope and its own accounts, from GitHub and Slack to your issue tracker and cloud. The project decides which account the agent uses.</p>
+        <p>Each org you work for gets its own scope, with its own accounts and environments, from GitHub and Slack to your issue tracker and cloud. The project decides which account and which environment every agent uses.</p>
         <ul class="ticks">
           <li><span>A mismatched account is refused.</span></li>
+          <li><span>Each project names its environment, so agents deploy to staging, not production.</span></li>
           <li><span>Credentials never go into records or briefs.</span></li>
         </ul>
         <a class="p-more" href={DOCS.identityRouting}>Route identities per org <span aria-hidden="true">→</span></a>
@@ -195,7 +196,7 @@ const lines = (tree: string) =>
               <button type="button" aria-pressed="true" data-scope="work"><i aria-hidden="true"></i>work</button>
               <button type="button" aria-pressed="false" data-scope="client" class="gx"><i aria-hidden="true"></i>client</button>
             </div>
-            <p class="cwd swap" id="acct-cwd">cwd <b>~/work/billing-service</b> → scope <b>work</b></p>
+            <p class="cwd swap" id="acct-cwd">cwd <b>~/work/billing-service</b> → scope <b>work</b> · env <b>staging</b></p>
             <div class="ids swap" id="acct-ids" aria-live="polite">
               <div class="idrow">
                 <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 16 16"><path fill="#edf0f7" d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></span>
@@ -214,7 +215,7 @@ const lines = (tree: string) =>
               </div>
               <div class="idrow">
                 <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#edf0f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 9.5 4.25 4.25 0 0 0 7 18Z"/></svg></span>
-                <span class="who" data-cl>work-prod<small>AWS · deploy role</small></span>
+                <span class="who" data-cl>work-deploy<small>AWS · staging</small></span>
                 <span class="pill ok">active</span>
               </div>
             </div>
