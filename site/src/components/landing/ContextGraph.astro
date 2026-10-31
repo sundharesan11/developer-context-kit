@@ -90,6 +90,9 @@ if (stage) {
 			wire(c, l, 'return', curve(c, l, 'y'));
 			const cl = point('claude', 'right', 0.7), lr = point('learning', 'right', 0.34), edge = graph.clientWidth - 17;
 			wire(cl, lr, 'return', `M${cl.x},${cl.y} C${edge},${cl.y} ${edge},${lr.y} ${lr.x},${lr.y}`);
+			// Codex runs inside Claude's channel and lands higher on the lesson, so the two wires nest.
+			const cx = point('codex', 'right', 0.62), lc = point('learning', 'right', 0.18), inner = edge - 9;
+			wire(cx, lc, 'return', `M${cx.x},${cx.y} C${inner},${cx.y} ${inner},${lc.y} ${lc.x},${lc.y}`);
 			const learn = point('learning', 'left', 0.23), saved = point('saved-lesson', 'bottom', 0.75), y = point('learning', 'top').y - 32;
 			wire(learn, saved, 'return', `M${learn.x},${learn.y} C${learn.x - 28},${learn.y} ${learn.x - 28},${y} ${learn.x - 70},${y} L${saved.x + 30},${y} Q${saved.x},${y} ${saved.x},${saved.y}`);
 			const a = point('learning', 'left', 0.68), b = point('team', 'right', 0.45);
